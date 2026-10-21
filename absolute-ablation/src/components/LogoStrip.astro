@@ -1,0 +1,38 @@
+---
+const stats = [
+  { value: "12M+", label: "Songs chorded" },
+  { value: "98%", label: "AI accuracy" },
+  { value: "4", label: "Instruments" },
+  { value: "180+", label: "Countries" },
+];
+---
+
+<section
+  style="
+    background:var(--color-canvas);
+    border-top:1px solid var(--color-hairline);
+    border-bottom:1px solid var(--color-hairline);
+    padding: var(--space-lg) var(--space-lg);
+  "
+>
+  <div class="max-w-6xl mx-auto">
+    <!-- Stats row -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+      {
+        stats.map((stat) => (
+          <div>
+            <div
+              class="gradient-accent-text"
+              style="font-size:clamp(28px,4vw,40px);font-weight:700;letter-spacing:-0.03em;line-height:1;"
+            >
+              {stat.value}
+            </div>
+            <div style="font-size:13px;color:var(--color-mute);margin-top:4px;font-weight:500;">
+              {stat.label}
+            </div>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</section>

@@ -1,0 +1,169 @@
+---
+const features = [
+  {
+    title: "AI Chord Detection",
+    description:
+      "State-of-the-art neural network trained on millions of songs. 98% accuracy across genres — pop, rock, jazz, classical.",
+    icon: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><circle cx="11" cy="11" r="9" stroke="currentColor" stroke-width="1.5"/><path d="M7 11c0-2.2 1.8-4 4-4s4 1.8 4 4-1.8 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="11" cy="11" r="2" fill="currentColor"/></svg>`,
+    badge: "AI-powered",
+    badgeColor: "#7c3aed",
+    badgeBg: "#ede9fe",
+  },
+  {
+    title: "Live Microphone Detection",
+    description:
+      "Pick up your instrument and play — TheChordify listens and shows you the chord you're playing live, in real time.",
+    icon: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="8" y="2" width="6" height="11" rx="3" stroke="currentColor" stroke-width="1.5"/><path d="M4 11c0 3.9 3.1 7 7 7s7-3.1 7-7M11 18v2M8 20h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
+    badge: "New",
+    badgeColor: "#059669",
+    badgeBg: "#d1fae5",
+  },
+  {
+    title: "Smart Key Detection",
+    description:
+      "Instantly identifies the song's key and scale. Suggests the most natural capo position for guitarists.",
+    icon: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><circle cx="9" cy="9" r="5" stroke="currentColor" stroke-width="1.5"/><path d="M13 13l6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M7 9h4M9 7v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
+    badge: null,
+    badgeColor: null,
+    badgeBg: null,
+  },
+  {
+    title: "Transposition",
+    description:
+      "Shift any song up or down by semitones. Instantly re-calculates all chord diagrams for your target key.",
+    icon: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M4 16h6M7 13v6M12 6h6M15 3v6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
+    badge: null,
+    badgeColor: null,
+    badgeBg: null,
+  },
+  {
+    title: "Practice Loop",
+    description:
+      "Mark any A–B section to loop. Combine with 0.5× speed to master complex chord transitions without breaking a sweat.",
+    icon: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M4 11c0-3.9 3.1-7 7-7 2.4 0 4.5 1.2 5.8 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M18 11c0 3.9-3.1 7-7 7-2.4 0-4.5-1.2-5.8-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M16 7l2-3M6 18l-2 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
+    badge: null,
+    badgeColor: null,
+    badgeBg: null,
+  },
+  {
+    title: "Export to MIDI & PDF",
+    description:
+      "Download a chord sheet as PDF to print or share, or grab the MIDI file to drop straight into your DAW.",
+    icon: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M7 10V4h8l3 3v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 7h-3V4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M4 14h14M11 11v7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
+    badge: "Premium",
+    badgeColor: "#d97706",
+    badgeBg: "#fef3c7",
+  },
+  {
+    title: "Chord Progression Analysis",
+    description:
+      "See the roman numeral analysis of any song. Understand why those chords work together and apply it to your own writing.",
+    icon: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M4 18l4-6 4 3 4-8 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    badge: "New",
+    badgeColor: "#059669",
+    badgeBg: "#d1fae5",
+  },
+  {
+    title: "Community Corrections",
+    description:
+      "Every chord chart can be fine-tuned by the community. Crowd-sourced accuracy means your charts get better over time.",
+    icon: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="1.5"/><circle cx="16" cy="14" r="3" stroke="currentColor" stroke-width="1.5"/><path d="M11 8h2a5 5 0 015 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
+    badge: null,
+    badgeColor: null,
+    badgeBg: null,
+  },
+  {
+    title: "Difficulty Rating",
+    description:
+      "Songs are automatically rated beginner / intermediate / advanced based on chord complexity. Find your next challenge.",
+    icon: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><path d="M11 2l2.2 6.8H20l-5.8 4.2 2.2 6.8L11 15.6l-5.4 4.2 2.2-6.8L2 8.8h6.8L11 2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>`,
+    badge: null,
+    badgeColor: null,
+    badgeBg: null,
+  },
+];
+---
+
+<section
+  style="
+    background:var(--color-canvas-soft);
+    padding: var(--space-5xl) var(--space-lg);
+  "
+>
+  <div class="max-w-6xl mx-auto">
+    <div class="text-center mb-14">
+      <div
+        class="inline-block rounded-full mb-4"
+        style="
+          padding:4px 12px;
+          background:var(--color-canvas-soft-2);
+          border:1px solid var(--color-hairline);
+          font-size:12px;
+          font-weight:600;
+          color:var(--color-body);
+          font-family:var(--font-mono);
+          text-transform:uppercase;
+          letter-spacing:0.08em;
+        "
+      >
+        Everything you need
+      </div>
+      <h2 class="display-lg" style="color:var(--color-ink);margin-bottom:12px;">
+        Built for players,<br />
+        <span class="gradient-violet-text">not just listeners.</span>
+      </h2>
+    </div>
+
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+      {
+        features.map((feat) => (
+          <div
+            class="rounded-xl shadow-card"
+            style="
+              background:var(--color-canvas);
+              padding:var(--space-xl);
+              border:1px solid var(--color-hairline);
+              transition: box-shadow 0.2s ease;
+            "
+            onmouseover="this.classList.replace('shadow-card','shadow-card-hover')"
+            onmouseout="this.classList.replace('shadow-card-hover','shadow-card')"
+          >
+            <div class="flex items-start justify-between mb-4">
+              <div
+                class="flex items-center justify-center rounded-lg"
+                style="
+                  width:40px;height:40px;
+                  background:var(--color-canvas-soft-2);
+                  color:var(--color-primary);
+                  flex-shrink:0;
+                "
+                set:html={feat.icon}
+              />
+              {feat.badge && (
+                <span
+                  class="rounded-full"
+                  style={`
+                    padding:2px 8px;
+                    font-size:11px;
+                    font-weight:600;
+                    color:${feat.badgeColor};
+                    background:${feat.badgeBg};
+                    font-family:var(--font-mono);
+                  `}
+                >
+                  {feat.badge}
+                </span>
+              )}
+            </div>
+            <h3 class="display-sm" style="color:var(--color-ink);margin-bottom:8px;font-size:17px;">
+              {feat.title}
+            </h3>
+            <p style="font-size:14px;color:var(--color-body);line-height:1.65;margin:0;">
+              {feat.description}
+            </p>
+          </div>
+        ))
+      }
+    </div>
+  </div>
+</section>

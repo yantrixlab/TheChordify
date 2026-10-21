@@ -1,0 +1,110 @@
+// Dev talks to the local backend. A production build uses same-origin paths (/api, /media),
+// which the reverse proxy in deploy/Caddyfile forwards to the backend. PUBLIC_API_BASE overrides both.
+export const API_BASE: string =
+  import.meta.env.PUBLIC_API_BASE ?? (import.meta.env.DEV ? "http://127.0.0.1:8000" : "");
+
+export interface ChordSegment {
+  start: number;
+  end: number;
+  chord: string; // e.g. "C", "Am7", "Gsus4", "D/F#"; "N" = no chord
+  confidence?: number; // 0-1, only from the neural engine
+}
+
+export interface Bar {
+  start: number;
+  beats: number[]; // 5 timestamps: start of each of the 4 beats + the start of the next bar
+}
+
+export interface ExtractResult {
+  sessionId: string;
+  source: "youtube" | "upload";
+  sourceUrl?: string;
+  duration: number;
+  chords: ChordSegment[];
+  tempo: number;
+  beatTimes: number[];
+  bars: Bar[];
+  audioUrl: string;
+  engine?: "btc" | "classic";
+}
+
+export interface JobStatus {
+  sessionId: string;
+  status: "queued" | "downloading" | "analyzing" | "done" | "error";
+  progress: number;
+  stage?: string;
+  error?: string;
+  result?: ExtractResult;
+}
+
+export class ApiError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ApiError";
+    Object.setPrototypeOf(this, ApiError.prototype);
+  }
+}
+
+export function getApiErrorMessage(err: unknown, fallback: string): string {
+  if (err instanceof ApiError || err instanceof Error) {
+    return err.message;
+  }
+  return fallback;
+}
+
+async function fetchApi(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(input, init);
+  } catch {
+    throw new ApiError(
+      "Could not reach the chord extraction server. Please check your connection and try again.",
+    );
+  }
+}
+
+/** Kicks off background extraction and returns immediately with a session id to poll. */
+export async function startExtractFromYoutube(url: string): Promise<{ sessionId: string }> {
+  const res = await fetchApi(`${API_BASE}/api/extract/youtube`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new ApiError(body.detail || `Extraction failed (${res.status})`);
+  }
+  return res.json();
+}
+
+/** Kicks off background extraction and returns immediately with a session id to poll. */
+export async function startExtractFromUpload(file: File): Promise<{ sessionId: string }> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await fetchApi(`${API_BASE}/api/extract/upload`, {
+    method: "POST",
+    body: formData,
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new ApiError(body.detail || `Extraction failed (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function getJobStatus(sessionId: string): Promise<JobStatus> {
+  const res = await fetchApi(`${API_BASE}/api/job/${sessionId}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new ApiError(body.detail || `Could not check progress (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function getResult(sessionId: string): Promise<ExtractResult> {
+  const res = await fetchApi(`${API_BASE}/api/result/${sessionId}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new ApiError(body.detail || `Could not load this song (${res.status})`);
+  }
+  return res.json();
+}

@@ -1,0 +1,235 @@
+---
+const plans = [
+  {
+    name: "Free",
+    price: "$0",
+    period: "forever",
+    description: "Everything you need to start jamming today.",
+    cta: "Get started free",
+    ctaStyle: "secondary",
+    featured: false,
+    features: [
+      "5 chord extractions / day",
+      "Guitar & ukulele chords",
+      "Real-time chord scrolling",
+      "Basic transposition",
+      "Discover library (limited)",
+      "Mobile & desktop app",
+    ],
+    missing: ["Piano & mandolin chords", "PDF / MIDI export", "Live mic detection", "Unlimited songs", "Offline mode"],
+  },
+  {
+    name: "Premium",
+    price: "$4.99",
+    period: "/ month",
+    description: "For serious players who want the full experience.",
+    cta: "Start 7-day free trial",
+    ctaStyle: "primary",
+    featured: true,
+    badge: "Most popular",
+    features: [
+      "Unlimited chord extractions",
+      "All 4 instruments",
+      "Real-time chord scrolling",
+      "Full transposition + capo",
+      "PDF & MIDI export",
+      "Live mic chord detection",
+      "A–B loop + slow-down",
+      "Full Discover library",
+      "Offline mode",
+      "Priority processing",
+    ],
+    missing: [],
+  },
+  {
+    name: "Pro",
+    price: "$9.99",
+    period: "/ month",
+    description: "For teachers, creators, and professional musicians.",
+    cta: "Go Pro",
+    ctaStyle: "secondary",
+    featured: false,
+    features: [
+      "Everything in Premium",
+      "Chord progression analysis",
+      "Multi-track export",
+      "Team library (5 seats)",
+      "API access (beta)",
+      "Custom chord tunings",
+      "White-label PDF export",
+      "Dedicated support",
+    ],
+    missing: [],
+  },
+];
+---
+
+<section
+  id="pricing"
+  style="
+    background:var(--color-canvas-soft);
+    padding: var(--space-5xl) var(--space-lg);
+  "
+>
+  <div class="max-w-5xl mx-auto">
+    <div class="text-center mb-14">
+      <div
+        class="inline-block rounded-full mb-4"
+        style="
+          padding:4px 12px;
+          background:var(--color-violet-soft);
+          border:1px solid #c4b5fd;
+          font-size:12px;
+          font-weight:600;
+          color:var(--color-violet-deep);
+          font-family:var(--font-mono);
+          text-transform:uppercase;
+          letter-spacing:0.08em;
+        "
+      >
+        Pricing
+      </div>
+      <h2 class="display-lg" style="color:var(--color-ink);margin-bottom:12px;">
+        Simple, honest pricing.
+      </h2>
+      <p style="font-size:17px;color:var(--color-body);max-width:440px;margin:0 auto;">
+        Start free. Upgrade when you're ready. Cancel anytime.
+      </p>
+    </div>
+
+    <div class="grid md:grid-cols-3 gap-5 items-start">
+      {
+        plans.map((plan) => (
+          <div
+            class={`rounded-2xl relative overflow-hidden ${plan.featured ? "shadow-float" : "shadow-card"}`}
+            style="transition: box-shadow 0.2s ease;"
+            style={`
+              background:${plan.featured ? "var(--color-primary)" : "var(--color-canvas)"};
+              padding:var(--space-xl);
+              border:1px solid ${plan.featured ? "transparent" : "var(--color-hairline)"};
+            `}
+          >
+            {/* Featured badge */}
+            {plan.badge && (
+              <div
+                class="absolute top-0 right-0 rounded-bl-xl"
+                style="
+                  padding:5px 12px;
+                  background:var(--color-accent);
+                  color:var(--color-on-accent);
+                  font-size:11px;
+                  font-weight:700;
+                  font-family:var(--font-mono);
+                  text-transform:uppercase;
+                  letter-spacing:0.06em;
+                "
+              >
+                {plan.badge}
+              </div>
+            )}
+
+            <div style="margin-bottom:24px;">
+              <div
+                class="display-sm mb-1"
+                style={`color:${plan.featured ? "var(--color-accent)" : "var(--color-ink)"};`}
+              >
+                {plan.name}
+              </div>
+              <div class="flex items-baseline gap-1 mb-2">
+                <span
+                  style={`font-size:38px;font-weight:700;letter-spacing:-0.03em;font-variant-numeric:tabular-nums;color:${plan.featured ? "white" : "var(--color-ink)"};`}
+                >
+                  {plan.price}
+                </span>
+                <span
+                  style={`font-size:14px;color:${plan.featured ? "#c4b5fd" : "var(--color-mute)"};`}
+                >
+                  {plan.period}
+                </span>
+              </div>
+              <p
+                style={`font-size:14px;color:${plan.featured ? "#c4b5fd" : "var(--color-body)"};margin:0;`}
+              >
+                {plan.description}
+              </p>
+            </div>
+
+            {/* CTA */}
+            <a
+              href="#"
+              class="flex items-center justify-center rounded-full font-semibold mb-6"
+              style={`
+                height:44px;
+                font-size:15px;
+                text-decoration:none;
+                transition: background-color 0.15s;
+                ${
+                  plan.featured
+                    ? "background:var(--color-accent);color:var(--color-on-accent);"
+                    : "background:var(--color-primary);color:var(--color-on-primary);"
+                }
+              `}
+              onmouseover={plan.featured
+                ? "this.style.background='var(--color-accent-deep)'"
+                : "this.style.background='var(--color-primary-deep)'"}
+              onmouseout={plan.featured
+                ? "this.style.background='var(--color-accent)'"
+                : "this.style.background='var(--color-primary)'"}
+            >
+              {plan.cta}
+            </a>
+
+            {/* Features */}
+            <ul class="flex flex-col gap-2.5" style="list-style:none;padding:0;margin:0;">
+              {plan.features.map((f) => (
+                <li
+                  class="flex items-start gap-2.5"
+                  style={`font-size:14px;color:${plan.featured ? "#e0d7f5" : "var(--color-body)"};`}
+                >
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    style="flex-shrink:0;margin-top:1px;"
+                  >
+                    <circle
+                      cx="8"
+                      cy="8"
+                      r="7"
+                      fill={plan.featured ? "var(--color-accent)" : "var(--color-primary)"}
+                    />
+                    <path
+                      d="M5 8l2 2 4-4"
+                      stroke={plan.featured ? "var(--color-on-accent)" : "white"}
+                      stroke-width="1.5"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    />
+                  </svg>
+                  {f}
+                </li>
+              ))}
+              {plan.missing.map((f) => (
+                <li
+                  class="flex items-start gap-2.5"
+                  style="font-size:14px;color:var(--color-hairline-strong);"
+                >
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="flex-shrink:0;margin-top:1px;">
+                    <circle cx="8" cy="8" r="7" fill="var(--color-hairline)"/>
+                    <path d="M5.5 5.5l5 5M10.5 5.5l-5 5" stroke="var(--color-hairline-strong)" stroke-width="1.5" stroke-linecap="round"/>
+                  </svg>
+                  <span style="text-decoration:line-through;">{f}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))
+      }
+    </div>
+
+    <p class="text-center mt-8" style="font-size:13px;color:var(--color-mute);">
+      All plans include a 7-day free trial of Premium. No credit card required to start.
+    </p>
+  </div>
+</section>

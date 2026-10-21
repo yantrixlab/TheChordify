@@ -1,0 +1,140 @@
+---
+const instruments = [
+  {
+    id: "guitar",
+    name: "Guitar",
+    emoji: "🎸",
+    description:
+      "Standard, drop-D, open tunings. Chord shapes for every level from beginner to advanced.",
+    features: ["Standard & alternate tunings", "Capo support", "Barre chord diagrams", "Beginner-friendly shapes"],
+    color: "#f59e0b",
+    colorSoft: "#fef3c7",
+  },
+  {
+    id: "piano",
+    name: "Piano",
+    emoji: "🎹",
+    description:
+      "Full keyboard view with highlighted keys. See exactly which notes to play, left and right hand.",
+    features: ["88-key visual display", "Left & right hand split", "Inversions shown", "Velocity hints"],
+    color: "#7c3aed",
+    colorSoft: "#ede9fe",
+  },
+  {
+    id: "ukulele",
+    name: "Ukulele",
+    emoji: "🪗",
+    description:
+      "Soprano, concert, and baritone tunings. Clean chord grids optimised for 4-string players.",
+    features: ["GCEA & ADF#B tunings", "Re-entrant tuning", "Chord inversions", "Easy-first suggestions"],
+    color: "#10b981",
+    colorSoft: "#d1fae5",
+  },
+  {
+    id: "mandolin",
+    name: "Mandolin",
+    emoji: "🎵",
+    description:
+      "The only chord tool with full mandolin support. GDAE tuning with authentic 8-string chord shapes.",
+    features: ["GDAE tuning", "Authentic 8-string shapes", "Fiddle-tune keys", "Bluegrass voicings"],
+    color: "#f43f5e",
+    colorSoft: "#ffe4e6",
+  },
+];
+---
+
+<section
+  id="instruments"
+  style="
+    background:var(--color-canvas-soft-2);
+    padding: var(--space-5xl) var(--space-lg);
+  "
+>
+  <div class="max-w-6xl mx-auto">
+    <div class="text-center mb-14">
+      <div
+        class="inline-block rounded-full mb-4"
+        style="
+          padding:4px 12px;
+          background:var(--color-primary);
+          font-size:12px;
+          font-weight:600;
+          color:var(--color-accent);
+          font-family:var(--font-mono);
+          text-transform:uppercase;
+          letter-spacing:0.08em;
+        "
+      >
+        4 instruments
+      </div>
+      <h2 class="display-lg" style="color:var(--color-ink);margin-bottom:12px;text-wrap:balance;">
+        Whatever you play,<br />
+        <span class="gradient-accent-text">we've got you covered.</span>
+      </h2>
+      <p style="font-size:17px;color:var(--color-body);max-width:500px;margin:0 auto;">
+        The only chord tool on the web with native mandolin support alongside
+        guitar, piano and ukulele.
+      </p>
+    </div>
+
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      {
+        instruments.map((inst) => (
+          <div
+            class="rounded-xl shadow-card group"
+            style="
+              background:var(--color-canvas);
+              padding:var(--space-xl);
+              border:1px solid var(--color-hairline);
+              cursor:pointer;
+              transition: border-color 0.2s ease, box-shadow 0.2s ease;
+            "
+            onmouseover={`this.style.borderColor='${inst.color}';this.classList.replace('shadow-card','shadow-card-hover')`}
+            onmouseout={`this.style.borderColor='var(--color-hairline)';this.classList.replace('shadow-card-hover','shadow-card')`}
+          >
+            <!-- Icon -->
+            <div
+              class="text-4xl mb-4 flex items-center justify-center rounded-xl"
+              style={`width:56px;height:56px;background:${inst.colorSoft};font-size:28px;`}
+            >
+              {inst.emoji}
+            </div>
+
+            <h3
+              class="display-sm mb-2"
+              style={`color:${inst.color};`}
+            >
+              {inst.name}
+            </h3>
+            <p style="font-size:14px;color:var(--color-body);line-height:1.6;margin-bottom:16px;">
+              {inst.description}
+            </p>
+
+            <ul class="flex flex-col gap-2" style="list-style:none;padding:0;margin:0;">
+              {inst.features.map((f) => (
+                <li class="flex items-center gap-2" style="font-size:13px;color:var(--color-body);">
+                  <span
+                    class="rounded-full flex-shrink-0"
+                    style={`width:6px;height:6px;background:${inst.color};`}
+                  />
+                  {f}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))
+      }
+    </div>
+
+    <!-- "Coming soon" note for future instruments -->
+    <p
+      class="text-center mt-8"
+      style="font-size:13px;color:var(--color-mute);"
+    >
+      Bass guitar, banjo & violin support coming soon. &nbsp;
+      <a href="#" style="color:var(--color-violet);text-decoration:none;font-weight:500;">
+        Join the waitlist →
+      </a>
+    </p>
+  </div>
+</section>

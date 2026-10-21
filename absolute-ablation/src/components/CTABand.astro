@@ -1,0 +1,100 @@
+---
+---
+
+<section
+  class="relative overflow-hidden"
+  style="
+    background:var(--color-primary);
+    padding: var(--space-5xl) var(--space-lg);
+  "
+>
+  <!-- Ambient blobs -->
+  <div
+    class="absolute pointer-events-none"
+    style="top:-100px;left:-100px;width:500px;height:500px;background:radial-gradient(ellipse, #7c3aed30, transparent);z-index:0;"
+  ></div>
+  <div
+    class="absolute pointer-events-none"
+    style="bottom:-80px;right:-60px;width:400px;height:400px;background:radial-gradient(ellipse, #f59e0b18, transparent);z-index:0;"
+  ></div>
+
+  <div class="max-w-3xl mx-auto text-center relative" style="z-index:1;">
+    <!-- Musical note decoration -->
+    <div class="flex items-center justify-center gap-3 mb-6 opacity-60">
+      {
+        ["Am", "G", "C", "F", "Em", "D"].map((chord, i) => (
+          <div
+            class="chord-pill"
+            style={`
+              background:#1a0533;
+              color:#c4b5fd;
+              box-shadow:0 0 0 1.5px #7c3aed33;
+              transform:rotate(${-6 + i * 2.5}deg);
+              opacity:${0.4 + i * 0.1};
+            `}
+          >
+            {chord}
+          </div>
+        ))
+      }
+    </div>
+
+    <h2 class="display-xl" style="color:white;margin-bottom:16px;text-wrap:balance;">
+      Your next song is<br />
+      <span style="color:var(--color-accent);">one click away.</span>
+    </h2>
+    <p style="font-size:18px;color:#c4b5fd;max-width:480px;margin:0 auto 40px;line-height:1.6;">
+      Join millions of musicians who use TheChordify to learn faster, play
+      better, and enjoy music more deeply.
+    </p>
+
+    <div class="flex items-center justify-center gap-3 flex-wrap">
+      <a
+        href="#"
+        class="inline-flex items-center gap-2 rounded-full font-semibold"
+        style="
+          height:52px;
+          padding:0 var(--space-xl);
+          font-size:16px;
+          background:var(--color-accent);
+          color:var(--color-on-accent);
+          text-decoration:none;
+          transition:background 0.15s;
+        "
+        onmouseover="this.style.background='var(--color-accent-deep)'"
+        onmouseout="this.style.background='var(--color-accent)'"
+      >
+        Start jamming free
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </a>
+      <a
+        href="#"
+        class="inline-flex items-center gap-2 rounded-full font-medium"
+        style="
+          height:52px;
+          padding:0 var(--space-xl);
+          font-size:16px;
+          color:white;
+          border:1px solid #7c3aed55;
+          text-decoration:none;
+          transition:border-color 0.15s;
+          background:transparent;
+        "
+        onmouseover="this.style.borderColor='#7c3aed99'"
+        onmouseout="this.style.borderColor='#7c3aed55'"
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.2"/>
+          <path d="M6 5.5l5 2.5-5 2.5V5.5z" fill="currentColor"/>
+        </svg>
+        See how it works
+      </a>
+    </div>
+
+    <p class="mt-6" style="font-size:13px;color:#8b7fa8;">
+      No credit card required · Free forever plan · Cancel anytime
+    </p>
+  </div>
+</section>

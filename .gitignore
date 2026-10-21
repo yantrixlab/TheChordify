@@ -1,0 +1,17 @@
+# dependencies / build output
+node_modules/
+dist/
+.astro/
+venv/
+__pycache__/
+
+# logs and local files
+*.log
+.env
+.env.*
+.DS_Store
+.idea/
+.claude/settings.local.json
+
+# model weights: fetch with backend/scripts/fetch_models.py
+backend/models/*.pt

@@ -1,0 +1,331 @@
+---
+// Simulated chord timeline for the demo mockup
+const chords = [
+  { name: "Am", beat: 1 },
+  { name: "G", beat: 2 },
+  { name: "C", beat: 3 },
+  { name: "F", beat: 4 },
+  { name: "Am", beat: 5 },
+  { name: "Em", beat: 6 },
+  { name: "Dm", beat: 7 },
+  { name: "E7", beat: 8 },
+];
+
+const guitarDiagram = [
+  { string: "E", fret: "0", finger: "" },
+  { string: "B", fret: "1", finger: "1" },
+  { string: "G", fret: "2", finger: "2" },
+  { string: "D", fret: "2", finger: "3" },
+  { string: "A", fret: "0", finger: "" },
+  { string: "E", fret: "×", finger: "" },
+];
+---
+
+<section
+  class="gradient-mesh relative overflow-hidden"
+  style="padding: var(--space-5xl) var(--space-lg);"
+>
+  <!-- Ambient glow -->
+  <div
+    class="absolute inset-0 pointer-events-none"
+    style="background:radial-gradient(ellipse 70% 50% at 50% 50%, #7c3aed22, transparent);"
+  ></div>
+
+  <div class="max-w-6xl mx-auto relative" style="z-index:1;">
+    <div class="grid lg:grid-cols-2 gap-12 items-center">
+      <!-- Left: copy -->
+      <div>
+        <div
+          class="inline-block rounded-full mb-5"
+          style="
+            padding:4px 12px;
+            background:#7c3aed22;
+            border:1px solid #7c3aed44;
+            font-size:12px;
+            font-weight:600;
+            color:#c4b5fd;
+            font-family:var(--font-mono);
+            text-transform:uppercase;
+            letter-spacing:0.08em;
+          "
+        >
+          Real-time playback
+        </div>
+        <h2 class="display-lg" style="color:white;margin-bottom:16px;">
+          Chords scroll with<br />
+          <span style="color:var(--color-accent);">every beat.</span>
+        </h2>
+        <p style="font-size:17px;color:#c4b5fd;line-height:1.6;margin-bottom:32px;">
+          Watch chords highlight in perfect sync with the music. Loop any
+          section, slow it down, and nail that tricky progression — at your own
+          pace.
+        </p>
+
+        <ul class="flex flex-col gap-3" style="list-style:none;padding:0;margin:0;">
+          {
+            [
+              "Live chord scrolling synced to audio",
+              "Visual fingering diagrams for all 4 instruments",
+              "Slow-down mode — 0.5× to 1× speed",
+              "Loop any section with A–B repeat",
+              "Transpose up/down to match your key",
+            ].map((item) => (
+              <li class="flex items-start gap-3" style="font-size:15px;color:#e0d7f5;">
+                <span
+                  class="flex-shrink-0 rounded-full flex items-center justify-center"
+                  style="width:20px;height:20px;background:var(--color-accent);margin-top:1px;"
+                >
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                    <path d="M2 5l2 2 4-4" stroke="var(--color-on-accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                </span>
+                {item}
+              </li>
+            ))
+          }
+        </ul>
+
+        <div class="flex gap-3 mt-10">
+          <a
+            href="#"
+            class="inline-flex items-center gap-2 rounded-full font-semibold"
+            style="
+              height:48px;
+              padding:0 var(--space-lg);
+              font-size:15px;
+              background:var(--color-accent);
+              color:var(--color-on-accent);
+              text-decoration:none;
+              transition:background 0.15s;
+            "
+            onmouseover="this.style.background='var(--color-accent-deep)'"
+            onmouseout="this.style.background='var(--color-accent)'"
+          >
+            Try it free
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path d="M3 7h8M7 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </a>
+          <a
+            href="#"
+            class="inline-flex items-center gap-2 rounded-full font-medium"
+            style="
+              height:48px;
+              padding:0 var(--space-md);
+              font-size:15px;
+              color:#c4b5fd;
+              text-decoration:none;
+            "
+          >
+            Watch demo
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.2"/>
+              <path d="M5.5 5l4 2-4 2V5z" fill="currentColor"/>
+            </svg>
+          </a>
+        </div>
+      </div>
+
+      <!-- Right: chord player mockup -->
+      <div>
+        <div
+          class="rounded-2xl overflow-hidden shadow-float"
+          style="
+            background:#0d0019;
+            border:1px solid #7c3aed33;
+          "
+        >
+          <!-- Mock player header -->
+          <div
+            class="flex items-center gap-3 px-5 py-4"
+            style="border-bottom:1px solid #7c3aed22;"
+          >
+            <div class="flex gap-1.5">
+              <div class="rounded-full" style="width:10px;height:10px;background:#ff5f57;"></div>
+              <div class="rounded-full" style="width:10px;height:10px;background:#febc2e;"></div>
+              <div class="rounded-full" style="width:10px;height:10px;background:#28c840;"></div>
+            </div>
+            <div
+              class="flex-1 rounded-full text-center"
+              style="
+                background:#1a0533;
+                padding:4px 12px;
+                font-family:var(--font-mono);
+                font-size:11px;
+                color:#8b7fa8;
+              "
+            >
+              Hotel California — Eagles
+            </div>
+            <div style="font-family:var(--font-mono);font-size:12px;color:var(--color-accent);">
+              ♩ = 74 BPM
+            </div>
+          </div>
+
+          <!-- Chord timeline -->
+          <div class="px-5 py-5">
+            <div style="font-family:var(--font-mono);font-size:11px;color:#8b7fa8;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.06em;">
+              Chord progression
+            </div>
+            <div class="flex flex-wrap gap-2 mb-5">
+              {
+                chords.map((c, i) => (
+                  <div
+                    class={`chord-pill ${i === 1 ? "active" : ""}`}
+                    style={`
+                      background:${i === 1 ? "var(--color-accent)" : "#1a0533"};
+                      color:${i === 1 ? "var(--color-on-accent)" : "#c4b5fd"};
+                      box-shadow:${i === 1 ? "0 0 12px var(--color-accent)44" : "0 0 0 1px #7c3aed33"};
+                    `}
+                  >
+                    {c.name}
+                  </div>
+                ))
+              }
+            </div>
+
+            <!-- Progress bar -->
+            <div
+              class="rounded-full relative mb-5"
+              style="height:4px;background:#1a0533;overflow:hidden;"
+            >
+              <div
+                class="absolute left-0 top-0 h-full rounded-full"
+                style="width:28%;background:linear-gradient(90deg, var(--color-violet), var(--color-accent));"
+              ></div>
+            </div>
+
+            <!-- Guitar diagram for Am -->
+            <div style="border-top:1px solid #7c3aed22;padding-top:16px;">
+              <div style="font-family:var(--font-mono);font-size:11px;color:#8b7fa8;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.06em;">
+                Am — Guitar fingering
+              </div>
+              <div class="flex items-start gap-6">
+                <!-- Chord grid -->
+                <div
+                  style="
+                    display:grid;
+                    grid-template-columns:repeat(6,1fr);
+                    gap:0;
+                    width:96px;
+                  "
+                >
+                  {
+                    guitarDiagram.map((s) => (
+                      <div class="flex flex-col items-center">
+                        <div
+                          style={`
+                            font-family:var(--font-mono);
+                            font-size:10px;
+                            color:${s.fret === "×" ? "#ef4444" : s.fret === "0" ? "var(--color-accent)" : "#8b7fa8"};
+                            margin-bottom:4px;
+                          `}
+                        >
+                          {s.fret}
+                        </div>
+                        {s.finger && (
+                          <div
+                            class="rounded-full flex items-center justify-center"
+                            style="width:16px;height:16px;background:var(--color-violet);font-size:9px;color:white;font-weight:600;"
+                          >
+                            {s.finger}
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  }
+                </div>
+
+                <!-- Notes -->
+                <div class="flex flex-col gap-1.5">
+                  {
+                    [
+                      { label: "Root", value: "A" },
+                      { label: "Key", value: "A minor" },
+                      { label: "Notes", value: "A C E" },
+                    ].map((item) => (
+                      <div class="flex gap-2 items-center">
+                        <span style="font-family:var(--font-mono);font-size:10px;color:#8b7fa8;min-width:36px;">{item.label}</span>
+                        <span style="font-family:var(--font-mono);font-size:11px;color:#c4b5fd;font-weight:600;">{item.value}</span>
+                      </div>
+                    ))
+                  }
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Playback controls -->
+          <div
+            class="flex items-center justify-between px-5 py-4"
+            style="border-top:1px solid #7c3aed22;background:#0a0015;"
+            role="group"
+            aria-label="Playback controls"
+          >
+            <div class="flex items-center gap-3">
+              <!-- Rewind -->
+              <button
+                class="flex items-center justify-center rounded-full"
+                style="width:32px;height:32px;background:#1a0533;border:none;cursor:pointer;"
+                aria-label="Skip backward"
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                  <path d="M10 3L5 7l5 4V3z" fill="#8b7fa8"/>
+                  <rect x="2" y="3" width="2" height="8" rx="1" fill="#8b7fa8"/>
+                </svg>
+              </button>
+              <!-- Play -->
+              <button
+                class="flex items-center justify-center rounded-full"
+                style="width:40px;height:40px;background:var(--color-accent);border:none;cursor:pointer;"
+                aria-label="Play"
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                  <path d="M4 2.5l7 4.5-7 4.5V2.5z" fill="var(--color-on-accent)"/>
+                </svg>
+              </button>
+              <!-- Fast forward -->
+              <button
+                class="flex items-center justify-center rounded-full"
+                style="width:32px;height:32px;background:#1a0533;border:none;cursor:pointer;"
+                aria-label="Skip forward"
+              >
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                  <path d="M4 3l5 4-5 4V3z" fill="#8b7fa8"/>
+                  <rect x="10" y="3" width="2" height="8" rx="1" fill="#8b7fa8"/>
+                </svg>
+              </button>
+            </div>
+            <div
+              class="flex items-center gap-2"
+              style="font-family:var(--font-mono);font-size:12px;color:#8b7fa8;font-variant-numeric:tabular-nums;"
+              aria-label="Playback position: 0 minutes 48 seconds of 6 minutes 30 seconds"
+            >
+              <span aria-hidden="true">0:48</span>
+              <span aria-hidden="true">/</span>
+              <span aria-hidden="true">6:30</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <button
+                class="rounded font-mono"
+                style="padding:4px 8px;background:#1a0533;border:1px solid #7c3aed33;color:var(--color-accent);font-size:11px;cursor:pointer;"
+                aria-label="Playback speed: 0.75×"
+                aria-pressed="true"
+              >
+                0.75×
+              </button>
+              <button
+                class="rounded font-mono"
+                style="padding:4px 8px;background:#1a0533;border:1px solid #7c3aed33;color:#8b7fa8;font-size:11px;cursor:pointer;"
+                aria-label="A–B loop: off"
+                aria-pressed="false"
+              >
+                A–B
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

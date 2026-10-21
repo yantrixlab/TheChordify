@@ -1,0 +1,1012 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Nav from "../components/Nav.astro";
+---
+
+<Layout title="Play along — The Chordify">
+  <Nav />
+  <main id="main-content" class="gradient-mesh" style="min-height:100vh;padding:96px var(--space-lg) var(--space-3xl);">
+    <div class="max-w-4xl mx-auto" style="color:white;">
+      <div id="loading-state" style="text-align:center;padding:80px 0;color:#c4b5fd;">
+        Loading your song…
+      </div>
+
+      <div id="error-state" class="hidden" style="text-align:center;padding:80px 0;">
+        <p style="color:var(--color-error);font-size:16px;margin-bottom:16px;" id="error-message"></p>
+        <a href="/" style="color:var(--color-accent);text-decoration:underline;">Back to home</a>
+      </div>
+
+      <div id="player-state" class="hidden">
+        <!-- Instrument selector -->
+        <div class="flex items-center gap-2 mb-8 flex-wrap" role="group" aria-label="Instrument">
+          {
+            [
+              { id: "guitar", label: "Guitar", icon: "🎸" },
+              { id: "piano", label: "Piano", icon: "🎹" },
+              { id: "ukulele", label: "Ukulele", icon: "🪗" },
+              { id: "mandolin", label: "Mandolin", icon: "🎵" },
+            ].map((inst, i) => (
+              <button
+                type="button"
+                class="instrument-tab rounded-full font-medium"
+                data-inst={inst.id}
+                aria-pressed={i === 0 ? "true" : "false"}
+                style={`
+                  height:32px;padding:0 14px;font-size:13px;cursor:pointer;
+                  border:1px solid ${i === 0 ? "var(--color-accent)" : "#7c3aed44"};
+                  background:${i === 0 ? "var(--color-accent)" : "transparent"};
+                  color:${i === 0 ? "var(--color-on-accent)" : "#c4b5fd"};
+                `}
+              >
+                <span aria-hidden="true">{inst.icon}</span> {inst.label}
+              </button>
+            ))
+          }
+        </div>
+
+        <!-- Current chord, large -->
+        <div class="rounded-2xl mb-6" style="background:#0d0019;border:1px solid #7c3aed33;padding:32px;text-align:center;">
+          <div style="font-family:var(--font-mono);font-size:11px;color:#8b7fa8;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">
+            Now playing
+          </div>
+          <div id="current-chord" style="font-size:56px;font-weight:700;color:var(--color-accent);line-height:1;">—</div>
+          <div id="current-chord-key" style="font-size:14px;color:#c4b5fd;margin-top:8px;"></div>
+
+          <!-- Guitar diagram -->
+          <div id="guitar-diagram" class="flex items-center justify-center gap-8 mt-6"></div>
+          <!-- Notes fallback for piano/ukulele/mandolin -->
+          <div id="notes-display" class="hidden mt-6" style="font-family:var(--font-mono);font-size:15px;color:#e0d7f5;"></div>
+        </div>
+
+        <!-- Toolbar: volume, loop, tempo, capo, transpose -->
+        <div
+          class="rounded-t-2xl flex items-center"
+          style="background:var(--color-canvas);border:1px solid var(--color-hairline);border-bottom:none;padding:8px 16px;overflow-x:auto;gap:4px;"
+        >
+          {
+            [
+              { id: "volume", label: "Volume" },
+              { id: "loop", label: "Loop" },
+              { id: "tempo", label: "Tempo" },
+              { id: "capo", label: "Capo" },
+              { id: "transpose", label: "Transpose" },
+            ].map((tool, i) => (
+              <div
+                class="flex flex-col items-center justify-center"
+                style={`padding:6px 14px;${i > 0 ? "border-left:1px solid var(--color-hairline);" : ""}min-width:84px;`}
+              >
+                <div style="font-size:16px;line-height:1;margin-bottom:4px;" aria-hidden="true">
+                  {tool.id === "volume" && "🔊"}
+                  {tool.id === "loop" && "∞"}
+                  {tool.id === "tempo" && "🐢"}
+                  {tool.id === "capo" && "🪕"}
+                  {tool.id === "transpose" && "♯"}
+                </div>
+                {tool.id === "volume" && (
+                  <input
+                    id="volume-slider"
+                    type="range"
+                    min="0"
+                    max="100"
+                    value="100"
+                    style="width:64px;height:14px;"
+                    aria-label="Volume"
+                  />
+                )}
+                {tool.id === "loop" && (
+                  <button
+                    id="loop-toggle"
+                    type="button"
+                    aria-pressed="false"
+                    style="font-size:11px;color:var(--color-body);background:none;border:none;cursor:pointer;font-weight:600;"
+                  >
+                    Off
+                  </button>
+                )}
+                {tool.id === "tempo" && (
+                  <div class="flex items-center gap-1">
+                    <button id="tempo-down" type="button" aria-label="Slower" style="background:none;border:none;cursor:pointer;color:var(--color-mute);font-size:12px;">◂</button>
+                    <span id="tempo-value" style="font-family:var(--font-mono);font-size:11px;color:var(--color-ink);font-weight:600;min-width:34px;text-align:center;">100%</span>
+                    <button id="tempo-up" type="button" aria-label="Faster" style="background:none;border:none;cursor:pointer;color:var(--color-mute);font-size:12px;">▸</button>
+                  </div>
+                )}
+                {tool.id === "capo" && (
+                  <div class="flex items-center gap-1">
+                    <button id="capo-down" type="button" aria-label="Capo down" style="background:none;border:none;cursor:pointer;color:var(--color-mute);font-size:12px;">◂</button>
+                    <span id="capo-value" style="font-family:var(--font-mono);font-size:11px;color:var(--color-ink);font-weight:600;min-width:20px;text-align:center;">0</span>
+                    <button id="capo-up" type="button" aria-label="Capo up" style="background:none;border:none;cursor:pointer;color:var(--color-mute);font-size:12px;">▸</button>
+                  </div>
+                )}
+                {tool.id === "transpose" && (
+                  <div class="flex items-center gap-1">
+                    <button id="transpose-down" type="button" aria-label="Transpose down" style="background:none;border:none;cursor:pointer;color:var(--color-mute);font-size:12px;">◂</button>
+                    <span id="transpose-value" style="font-family:var(--font-mono);font-size:11px;color:var(--color-ink);font-weight:600;min-width:24px;text-align:center;">0</span>
+                    <button id="transpose-up" type="button" aria-label="Transpose up" style="background:none;border:none;cursor:pointer;color:var(--color-mute);font-size:12px;">▸</button>
+                  </div>
+                )}
+                <div style="font-size:9px;color:var(--color-mute);text-transform:uppercase;letter-spacing:0.05em;margin-top:2px;">{tool.label}</div>
+              </div>
+            ))
+          }
+        </div>
+
+        <!-- View switcher: Chord diagrams (sliding window) / Chord overview (full song grid) -->
+        <div class="rounded-2xl" style="background:var(--color-canvas);border:1px solid var(--color-hairline);overflow:hidden;">
+          <div class="flex items-center" style="border-bottom:1px solid var(--color-hairline);">
+            <button
+              id="view-tab-diagrams"
+              type="button"
+              aria-pressed="true"
+              style="padding:12px 18px;font-size:14px;font-weight:600;background:var(--color-canvas-soft);color:var(--color-ink);border:none;border-right:1px solid var(--color-hairline);cursor:pointer;"
+            >
+              ✓ Chord diagrams
+            </button>
+            <button
+              id="view-tab-overview"
+              type="button"
+              aria-pressed="false"
+              style="padding:12px 18px;font-size:14px;font-weight:600;background:transparent;color:var(--color-mute);border:none;border-right:1px solid var(--color-hairline);cursor:pointer;"
+            >
+              Chord overview
+            </button>
+          </div>
+
+          <!-- Compact bar/beat strip (same grid as the overview, single row) plus a
+               larger sliding window: just-played (dimmed) → now playing (highlighted)
+               → upcoming chords. -->
+          <div id="panel-diagrams">
+            <div id="diagram-row-scroll" style="overflow-x:auto;border-bottom:1px solid var(--color-hairline);">
+              <div id="diagram-row" style="display:flex;"></div>
+            </div>
+            <div style="padding:24px;overflow-x:auto;">
+              <div id="diagram-window" class="flex items-center gap-4" style="min-height:170px;"></div>
+            </div>
+          </div>
+
+          <!-- Full-song grid: every bar, beats divided 4 to a bar -->
+          <div id="panel-overview" class="hidden" style="padding:20px;overflow-x:auto;">
+            <div id="overview-grid"></div>
+          </div>
+        </div>
+
+        <!-- Source: YouTube iframe or native audio -->
+        <div id="youtube-mount" class="hidden rounded-2xl overflow-hidden mt-6" style="aspect-ratio:16/9;background:#000;"></div>
+        <audio id="audio-el" class="hidden w-full mt-6" controls></audio>
+      </div>
+    </div>
+  </main>
+</Layout>
+
+<script>
+  import { getGuitarShape, chordNotes, chordKeyLabel, transposeChord, type GuitarShape } from "../lib/chordShapes";
+  import { API_BASE, type ExtractResult, type ChordSegment, type Bar } from "../lib/api";
+
+  const params = new URLSearchParams(window.location.search);
+  const sessionId = params.get("session");
+
+  const loadingState = document.getElementById("loading-state")!;
+  const errorState = document.getElementById("error-state")!;
+  const errorMessage = document.getElementById("error-message")!;
+  const playerState = document.getElementById("player-state")!;
+  const youtubeMount = document.getElementById("youtube-mount")!;
+  const audioEl = document.getElementById("audio-el") as HTMLAudioElement;
+  const currentChordEl = document.getElementById("current-chord")!;
+  const currentChordKeyEl = document.getElementById("current-chord-key")!;
+  const guitarDiagramEl = document.getElementById("guitar-diagram")!;
+  const notesDisplayEl = document.getElementById("notes-display")!;
+  const viewTabDiagrams = document.getElementById("view-tab-diagrams") as HTMLButtonElement;
+  const viewTabOverview = document.getElementById("view-tab-overview") as HTMLButtonElement;
+  const panelDiagrams = document.getElementById("panel-diagrams")!;
+  const panelOverview = document.getElementById("panel-overview")!;
+  const diagramRowEl = document.getElementById("diagram-row")!;
+  const diagramRowScrollEl = document.getElementById("diagram-row-scroll")!;
+  const diagramWindowEl = document.getElementById("diagram-window")!;
+  const overviewGridEl = document.getElementById("overview-grid")!;
+
+  const volumeSlider = document.getElementById("volume-slider") as HTMLInputElement;
+  const loopToggle = document.getElementById("loop-toggle") as HTMLButtonElement;
+  const tempoDown = document.getElementById("tempo-down") as HTMLButtonElement;
+  const tempoUp = document.getElementById("tempo-up") as HTMLButtonElement;
+  const tempoValueEl = document.getElementById("tempo-value")!;
+  const capoDown = document.getElementById("capo-down") as HTMLButtonElement;
+  const capoUp = document.getElementById("capo-up") as HTMLButtonElement;
+  const capoValueEl = document.getElementById("capo-value")!;
+  const transposeDown = document.getElementById("transpose-down") as HTMLButtonElement;
+  const transposeUp = document.getElementById("transpose-up") as HTMLButtonElement;
+  const transposeValueEl = document.getElementById("transpose-value")!;
+
+  const SEMITONE_NAMES = ["0", "+1", "+2", "+3", "+4", "+5", "+6", "-5", "-4", "-3", "-2", "-1"];
+  const BARS_PER_ROW = 4; // how many bars the "Chord overview" grid wraps per row
+  const WINDOW_BEFORE = 1; // chords shown before "now playing" in the sliding window
+  const WINDOW_AFTER = 4; // chords shown after
+
+  let activeInstrument = "guitar";
+  let chords: ChordSegment[] = [];
+  let chordEvents: { chordIndex: number; chord: string; start: number }[] = [];
+  let bars: Bar[] = [];
+  let duration = 0;
+  let lastActiveIndex = -1;
+  let loopEnabled = false;
+  let tempoPct = 100;
+  let capo = 0;
+  let transposeSteps = 0;
+  let activeView: "diagrams" | "overview" = "diagrams";
+
+  function semitoneLabel(n: number): string {
+    const wrapped = ((n % 12) + 12) % 12;
+    return SEMITONE_NAMES[wrapped];
+  }
+
+  /** The chord as the player should sing/call it (after Transpose). */
+  function displayChord(rawChord: string): string {
+    return transposeChord(rawChord, transposeSteps);
+  }
+
+  /** The shape to actually finger on the instrument (after Transpose, undone by Capo). */
+  function fingeringChord(rawChord: string): string {
+    return transposeChord(rawChord, transposeSteps - capo);
+  }
+
+  /** Sets a beat cell's chord label, shrinking long names (C#m7b5/G#) to fit the cell. */
+  function setCellLabel(cell: HTMLElement, label: string) {
+    cell.textContent = label;
+    cell.style.fontSize = label.length > 7 ? "10px" : label.length > 5 ? "11.5px" : "13px";
+    cell.style.whiteSpace = "nowrap";
+  }
+
+  function fail(message: string) {
+    loadingState.classList.add("hidden");
+    errorState.classList.remove("hidden");
+    errorMessage.textContent = message;
+  }
+
+  /** Find which chord segment is sounding at time `t` (binary-search-free, fine at this size). */
+  function chordAt(t: number): string {
+    const seg = chords.find((s) => t >= s.start && t < s.end);
+    return seg ? seg.chord : "N";
+  }
+
+  /** Rebuilds the ordered list of actual chord changes (skipping silence), each
+   *  pointing back at its index in `chords` so we can seek/highlight correctly. */
+  function buildChordEvents() {
+    chordEvents = [];
+    chords.forEach((seg, i) => {
+      if (seg.chord === "N") return;
+      chordEvents.push({ chordIndex: i, chord: seg.chord, start: seg.start });
+    });
+  }
+
+  /** "Chord diagrams" tab, lower section: a larger sliding window — just-played
+   *  chord dimmed, the chord now playing highlighted, then upcoming chords. */
+  function renderDiagramWindow() {
+    diagramWindowEl.innerHTML = "";
+    if (chordEvents.length === 0) return;
+
+    const eventPos = Math.max(
+      0,
+      chordEvents.findIndex((e) => e.chordIndex === lastActiveIndex),
+    );
+    const from = Math.max(0, eventPos - WINDOW_BEFORE);
+    const to = Math.min(chordEvents.length, eventPos + WINDOW_AFTER + 1);
+
+    for (let pos = from; pos < to; pos++) {
+      const event = chordEvents[pos];
+      const isCurrent = pos === eventPos;
+      const isPast = pos < eventPos;
+
+      const fChord = fingeringChord(event.chord);
+      const shape = getGuitarShape(fChord);
+      const card = shape ? buildFretDiagram(fChord, shape, 1) : buildNoteFallbackCard(fChord);
+      card.dataset.chordIndex = String(event.chordIndex);
+      card.style.flexShrink = "0";
+      card.style.cursor = "pointer";
+      card.style.opacity = isPast ? "0.45" : "1";
+      card.style.outline = isCurrent ? "3px solid var(--color-accent)" : "3px solid transparent";
+      card.style.boxShadow = isCurrent
+        ? "0 0 0 1px var(--color-accent), 0 4px 12px var(--color-accent)44"
+        : "none";
+      card.addEventListener("click", () => seekTo(event.start));
+      diagramWindowEl.appendChild(card);
+    }
+  }
+
+  /** "Chord diagrams" tab, upper strip: the exact same per-beat cell grid as the
+   *  "Chord overview" tab — same cell rendering, same dark-active-beat + progress
+   *  bar — but laid out as one continuous, non-wrapping, auto-scrolling row. */
+  function renderDiagramRow() {
+    diagramRowEl.innerHTML = "";
+    if (bars.length === 0) return;
+
+    const CELL_W = 56;
+    const CELL_H = 54;
+
+    bars.forEach((bar, barIndex) => {
+      const beats = bar.beats;
+      const isLeadingRest = barIndex === 0 && chordAt(beats[0] + 0.05) === "N" && chordAt(beats[3] - 0.05) === "N";
+
+      const barEl = document.createElement("div");
+      barEl.style.display = "grid";
+      barEl.style.flexShrink = "0";
+      barEl.style.gridTemplateColumns = `repeat(4, ${CELL_W}px)`;
+      barEl.style.borderRight = "2px solid var(--color-hairline-strong)";
+
+      for (let b = 0; b < 4; b++) {
+        const beatStart = beats[b];
+        const beatEnd = beats[b + 1];
+        const isRestCell = isLeadingRest && b === 0;
+
+        const cell = document.createElement("div");
+        cell.dataset.beatStart = String(beatStart);
+        cell.dataset.beatEnd = String(beatEnd);
+        cell.dataset.isRest = String(isRestCell);
+        cell.style.height = `${CELL_H}px`;
+        cell.style.borderRight = b < 3 ? "1px solid var(--color-hairline)" : "none";
+        cell.style.borderBottom = "1px solid var(--color-hairline)";
+        cell.style.display = "flex";
+        cell.style.alignItems = "flex-start";
+        cell.style.justifyContent = "flex-start";
+        cell.style.padding = "4px 6px";
+        cell.style.fontSize = "13px";
+        cell.style.fontWeight = "700";
+        cell.style.color = "var(--color-ink)";
+        cell.style.position = "relative";
+        cell.style.background = "var(--color-canvas)";
+        cell.style.transition = "background-color 0.15s, color 0.15s";
+        cell.style.cursor = "pointer";
+
+        if (isRestCell) {
+          cell.style.background = "var(--color-ink)";
+          cell.style.color = "white";
+          cell.style.alignItems = "center";
+          cell.style.justifyContent = "center";
+          cell.textContent = "𝅘𝅥𝅮";
+        } else {
+          const startingHere = chords.find(
+            (seg) => seg.chord !== "N" && seg.start >= beatStart && seg.start < beatEnd,
+          );
+          const ownLabel = startingHere ? displayChord(startingHere.chord) : "";
+          const held = chordAt(beatStart);
+          cell.dataset.ownLabel = ownLabel;
+          cell.dataset.heldChord = held === "N" ? "" : displayChord(held);
+          setCellLabel(cell, ownLabel);
+        }
+
+        cell.addEventListener("click", (e) => {
+          e.stopPropagation();
+          seekTo(beatStart);
+        });
+
+        barEl.appendChild(cell);
+      }
+
+      diagramRowEl.appendChild(barEl);
+    });
+  }
+
+  /** Highlights the active beat cell in the diagram row (same look as the overview
+   *  tab's per-beat highlight) and auto-scrolls the row to keep it in view. */
+  function highlightDiagramRow(currentTime: number) {
+    let activeCell: HTMLElement | null = null;
+    let progress = 0;
+
+    diagramRowEl.querySelectorAll<HTMLElement>("[data-beat-start]").forEach((cell) => {
+      const beatStart = Number(cell.dataset.beatStart);
+      const beatEnd = Number(cell.dataset.beatEnd);
+      const isActive = currentTime >= beatStart && currentTime < beatEnd;
+      const isRest = cell.dataset.isRest === "true";
+
+      if (isActive) {
+        activeCell = cell;
+        progress = (currentTime - beatStart) / Math.max(beatEnd - beatStart, 0.001);
+      }
+
+      if (!isRest) {
+        cell.style.background = isActive ? "var(--color-ink)" : "var(--color-canvas)";
+        cell.style.color = isActive ? "white" : "var(--color-ink)";
+        const ownLabel = cell.dataset.ownLabel || "";
+        const heldChord = cell.dataset.heldChord || "";
+        setCellLabel(cell, isActive ? ownLabel || heldChord : ownLabel);
+      }
+    });
+
+    if (activeCell) {
+      diagramRowProgressEl.style.width = `${Math.min(100, Math.max(0, progress * 100))}%`;
+      activeCell.appendChild(diagramRowProgressEl);
+
+      const cellLeft = activeCell.offsetLeft;
+      const margin = 150;
+      if (
+        cellLeft < diagramRowScrollEl.scrollLeft + margin ||
+        cellLeft > diagramRowScrollEl.scrollLeft + diagramRowScrollEl.clientWidth - margin
+      ) {
+        diagramRowScrollEl.scrollTo({
+          left: Math.max(cellLeft - diagramRowScrollEl.clientWidth / 2, 0),
+          behavior: "smooth",
+        });
+      }
+    }
+  }
+
+  function buildNoteFallbackCard(fChord: string): HTMLElement {
+    const card = document.createElement("div");
+    card.style.boxSizing = "border-box";
+    card.style.width = "114px";
+    card.style.display = "flex";
+    card.style.flexDirection = "column";
+    card.style.alignItems = "center";
+    card.style.justifyContent = "center";
+    card.style.background = "var(--color-canvas)";
+    card.style.border = "1px solid var(--color-hairline)";
+    card.style.borderRadius = "10px";
+    card.style.padding = "16px 10px";
+    card.style.textAlign = "center";
+    card.innerHTML = `<div style="font-weight:700;font-size:14px;color:var(--color-ink);margin-bottom:6px;">${fChord}</div><div style="font-size:11px;color:var(--color-mute);">${chordNotes(fChord).join(", ")}</div>`;
+    return card;
+  }
+
+  /** "Chord overview" tab: the entire song's bar/beat grid, wrapped into rows of
+   *  BARS_PER_ROW bars, with each chord's label placed at the beat it starts on.
+   *  Note: there's no real verse/chorus structure detection here — rows are just
+   *  grouped sequentially, not labeled by actual song section. */
+  function renderOverviewGrid() {
+    overviewGridEl.innerHTML = "";
+    if (bars.length === 0) return;
+
+    const CELL_W = 56;
+    const CELL_H = 44;
+
+    for (let rowStart = 0; rowStart < bars.length; rowStart += BARS_PER_ROW) {
+      const rowBars = bars.slice(rowStart, rowStart + BARS_PER_ROW);
+      const row = document.createElement("div");
+      row.style.display = "flex";
+      row.style.marginBottom = "2px";
+
+      rowBars.forEach((bar, idxInRow) => {
+        const barIndex = rowStart + idxInRow;
+        const beats = bar.beats;
+        const barEl = document.createElement("div");
+        barEl.dataset.barIndex = String(barIndex);
+        barEl.style.display = "grid";
+        barEl.style.gridTemplateColumns = `repeat(4, ${CELL_W}px)`;
+        barEl.style.borderRight = "2px solid var(--color-hairline-strong)";
+        barEl.style.cursor = "pointer";
+        barEl.addEventListener("click", () => seekTo(beats[0]));
+
+        const isLeadingRest = barIndex === 0 && chordAt(beats[0] + 0.05) === "N" && chordAt(beats[3] - 0.05) === "N";
+
+        for (let b = 0; b < 4; b++) {
+          const beatStart = beats[b];
+          const beatEnd = beats[b + 1];
+          const isRestCell = isLeadingRest && b === 0;
+
+          const cell = document.createElement("div");
+          cell.dataset.beatStart = String(beatStart);
+          cell.dataset.beatEnd = String(beatEnd);
+          cell.dataset.isRest = String(isRestCell);
+          cell.style.height = `${CELL_H}px`;
+          cell.style.borderRight = b < 3 ? "1px solid var(--color-hairline)" : "none";
+          cell.style.borderBottom = "1px solid var(--color-hairline)";
+          cell.style.display = "flex";
+          cell.style.alignItems = "flex-start";
+          cell.style.justifyContent = "flex-start";
+          cell.style.padding = "4px 6px";
+          cell.style.fontSize = "13px";
+          cell.style.fontWeight = "700";
+          cell.style.color = "var(--color-ink)";
+          cell.style.position = "relative";
+          cell.style.background = "var(--color-canvas)";
+          cell.style.transition = "background-color 0.15s, color 0.15s";
+
+          if (isRestCell) {
+            cell.style.background = "var(--color-ink)";
+            cell.style.color = "white";
+            cell.style.alignItems = "center";
+            cell.style.justifyContent = "center";
+            cell.textContent = "𝅘𝅥𝅮";
+          } else {
+            const startingHere = chords.find(
+              (seg) => seg.chord !== "N" && seg.start >= beatStart && seg.start < beatEnd,
+            );
+            const ownLabel = startingHere ? displayChord(startingHere.chord) : "";
+            const held = chordAt(beatStart);
+            cell.dataset.ownLabel = ownLabel;
+            cell.dataset.heldChord = held === "N" ? "" : displayChord(held);
+            setCellLabel(cell, ownLabel);
+          }
+
+          cell.addEventListener("click", (e) => {
+            e.stopPropagation();
+            seekTo(beatStart);
+          });
+
+          barEl.appendChild(cell);
+        }
+
+        row.appendChild(barEl);
+      });
+
+      overviewGridEl.appendChild(row);
+    }
+  }
+
+  const overviewProgressEl = document.createElement("div");
+  overviewProgressEl.style.position = "absolute";
+  overviewProgressEl.style.left = "0";
+  overviewProgressEl.style.bottom = "0";
+  overviewProgressEl.style.height = "3px";
+  overviewProgressEl.style.background = "var(--color-success)";
+  overviewProgressEl.style.width = "0%";
+
+  const diagramRowProgressEl = document.createElement("div");
+  diagramRowProgressEl.style.position = "absolute";
+  diagramRowProgressEl.style.left = "0";
+  diagramRowProgressEl.style.bottom = "0";
+  diagramRowProgressEl.style.height = "3px";
+  diagramRowProgressEl.style.background = "var(--color-success)";
+  diagramRowProgressEl.style.width = "0%";
+  diagramRowProgressEl.style.zIndex = "2";
+
+  /** Highlights the single beat cell currently playing (solid dark fill, like a
+   *  metronome tick) and fills a small progress bar across it as it plays. */
+  function highlightOverviewBeat(currentTime: number) {
+    let activeCell: HTMLElement | null = null;
+    let progress = 0;
+
+    overviewGridEl.querySelectorAll<HTMLElement>("[data-beat-start]").forEach((cell) => {
+      const beatStart = Number(cell.dataset.beatStart);
+      const beatEnd = Number(cell.dataset.beatEnd);
+      const isActive = currentTime >= beatStart && currentTime < beatEnd;
+      const isRest = cell.dataset.isRest === "true";
+
+      if (isActive) {
+        activeCell = cell;
+        progress = (currentTime - beatStart) / Math.max(beatEnd - beatStart, 0.001);
+      }
+
+      if (!isRest) {
+        cell.style.background = isActive ? "var(--color-ink)" : "var(--color-canvas)";
+        cell.style.color = isActive ? "white" : "var(--color-ink)";
+        // Continuation beats render blank normally (standard chord-chart style),
+        // but while active they show the held chord so the progress bar never
+        // sits next to an unlabeled box.
+        const ownLabel = cell.dataset.ownLabel || "";
+        const heldChord = cell.dataset.heldChord || "";
+        setCellLabel(cell, isActive ? ownLabel || heldChord : ownLabel);
+      }
+    });
+
+    if (activeCell) {
+      overviewProgressEl.style.width = `${Math.min(100, Math.max(0, progress * 100))}%`;
+      activeCell.appendChild(overviewProgressEl);
+    }
+  }
+
+  function renderInstrumentView(rawChord: string) {
+    guitarDiagramEl.innerHTML = "";
+    notesDisplayEl.classList.add("hidden");
+    guitarDiagramEl.classList.add("hidden");
+
+    if (rawChord === "N") {
+      return;
+    }
+
+    const fChord = fingeringChord(rawChord);
+
+    if (activeInstrument === "guitar") {
+      const shape = getGuitarShape(fChord);
+      guitarDiagramEl.classList.remove("hidden");
+      if (!shape) {
+        notesDisplayEl.classList.remove("hidden");
+        notesDisplayEl.textContent = `No diagram available. Notes: ${chordNotes(fChord).join(", ")}`;
+        return;
+      }
+      guitarDiagramEl.appendChild(buildFretDiagram(fChord, shape, 1.2));
+    } else {
+      notesDisplayEl.classList.remove("hidden");
+      const label = activeInstrument.charAt(0).toUpperCase() + activeInstrument.slice(1);
+      notesDisplayEl.textContent = `${label} notes: ${chordNotes(fChord).join(" – ")}`;
+    }
+  }
+
+  /**
+   * Builds a real fretboard diagram (strings, frets, barre bars, finger dots) out of
+   * plain divs — no SVG. Detects barres by finding 2+ strings sharing the same
+   * finger at the same fret row and drawing one bar across them instead of
+   * separate dots, matching standard chord-chart conventions.
+   */
+  function buildFretDiagram(label: string, shape: GuitarShape, scale = 1): HTMLElement {
+    const W = 90 * scale;
+    const GRID_H = 100 * scale;
+    const ROWS = 4;
+    const colX = (i: number) => (W * i) / 5;
+    const rowY = (r: number) => (GRID_H * r) / ROWS;
+
+    const wrap = document.createElement("div");
+    wrap.style.boxSizing = "border-box";
+    wrap.style.display = "flex";
+    wrap.style.flexDirection = "column";
+    wrap.style.alignItems = "center";
+    wrap.style.justifyContent = "center";
+    wrap.style.width = `${W + 24 * scale}px`;
+    wrap.style.height = "100%";
+    wrap.style.background = "var(--color-canvas)";
+    wrap.style.border = "1px solid var(--color-hairline)";
+    wrap.style.borderRadius = "10px";
+    wrap.style.boxShadow = "0 1px 2px rgba(13, 0, 31, 0.06)";
+    wrap.style.padding = `${10 * scale}px`;
+
+    const baseFret = shape.baseFret ?? 1;
+
+    const markerRow = document.createElement("div");
+    markerRow.style.position = "relative";
+    markerRow.style.width = `${W}px`;
+    markerRow.style.height = `${14 * scale}px`;
+    markerRow.style.marginLeft = `${12 * scale}px`;
+    shape.frets.forEach((fret, i) => {
+      if (fret !== "x" && fret !== "0") return;
+      const marker = document.createElement("div");
+      marker.textContent = fret === "x" ? "×" : "○";
+      marker.style.position = "absolute";
+      marker.style.left = `${colX(i)}px`;
+      marker.style.top = "0";
+      marker.style.transform = "translateX(-50%)";
+      marker.style.fontSize = `${11 * scale}px`;
+      marker.style.color = fret === "x" ? "var(--color-error)" : "var(--color-ink)";
+      markerRow.appendChild(marker);
+    });
+    wrap.appendChild(markerRow);
+
+    const gridWrap = document.createElement("div");
+    gridWrap.style.position = "relative";
+    gridWrap.style.width = `${W + 24 * scale}px`;
+    gridWrap.style.height = `${GRID_H}px`;
+
+    const grid = document.createElement("div");
+    grid.style.position = "absolute";
+    grid.style.left = `${12 * scale}px`;
+    grid.style.top = "0";
+    grid.style.width = `${W}px`;
+    grid.style.height = `${GRID_H}px`;
+    gridWrap.appendChild(grid);
+
+    // Nut (thick top line) when the diagram starts at fret 1, otherwise a thin
+    // top line plus the starting fret number written beside row 1.
+    const nut = document.createElement("div");
+    nut.style.position = "absolute";
+    nut.style.left = "0";
+    nut.style.top = "0";
+    nut.style.width = `${W}px`;
+    nut.style.height = baseFret === 1 ? "3px" : "1px";
+    nut.style.background = "var(--color-ink)";
+    grid.appendChild(nut);
+
+    if (baseFret > 1) {
+      const posLabel = document.createElement("div");
+      posLabel.textContent = String(baseFret);
+      posLabel.style.position = "absolute";
+      posLabel.style.left = `-${10 * scale}px`;
+      posLabel.style.top = `${rowY(0) + (GRID_H / ROWS) / 2 - 6 * scale}px`;
+      posLabel.style.fontSize = `${11 * scale}px`;
+      posLabel.style.color = "var(--color-mute)";
+      grid.appendChild(posLabel);
+    }
+
+    // String (vertical) lines.
+    for (let i = 0; i < 6; i++) {
+      const line = document.createElement("div");
+      line.style.position = "absolute";
+      line.style.left = `${colX(i)}px`;
+      line.style.top = "0";
+      line.style.width = "1px";
+      line.style.height = `${GRID_H}px`;
+      line.style.background = "var(--color-hairline-strong)";
+      grid.appendChild(line);
+    }
+    // Fret (horizontal) lines.
+    for (let r = 1; r <= ROWS; r++) {
+      const line = document.createElement("div");
+      line.style.position = "absolute";
+      line.style.left = "0";
+      line.style.top = `${rowY(r)}px`;
+      line.style.width = `${W}px`;
+      line.style.height = "1px";
+      line.style.background = "var(--color-hairline)";
+      grid.appendChild(line);
+    }
+
+    // Collect fretted positions, then group by (row, finger) to detect barres.
+    type Pos = { string: number; row: number; finger: string };
+    const positions: Pos[] = [];
+    shape.frets.forEach((fret, i) => {
+      if (fret === "x" || fret === "0") return;
+      const row = parseInt(fret, 10) - baseFret + 1;
+      if (row < 1 || row > ROWS) return;
+      positions.push({ string: i, row, finger: shape.fingers[i] || "" });
+    });
+
+    const groups = new Map<string, Pos[]>();
+    positions.forEach((p) => {
+      const key = `${p.row}-${p.finger}`;
+      const arr = groups.get(key) || [];
+      arr.push(p);
+      groups.set(key, arr);
+    });
+
+    const dotSize = 18 * scale;
+    groups.forEach((group) => {
+      const rowCenter = rowY(group[0].row) - (GRID_H / ROWS) / 2;
+      if (group.length >= 2 && group[0].finger) {
+        const minString = Math.min(...group.map((p) => p.string));
+        const maxString = Math.max(...group.map((p) => p.string));
+        const bar = document.createElement("div");
+        bar.style.position = "absolute";
+        bar.style.left = `${colX(minString)}px`;
+        bar.style.top = `${rowCenter - dotSize / 2}px`;
+        bar.style.width = `${colX(maxString) - colX(minString)}px`;
+        bar.style.height = `${dotSize}px`;
+        bar.style.background = "var(--color-ink)";
+        bar.style.borderRadius = `${dotSize / 2}px`;
+        grid.appendChild(bar);
+
+        [minString, maxString].forEach((stringIdx) => {
+          const finger = document.createElement("div");
+          finger.textContent = group[0].finger;
+          finger.style.position = "absolute";
+          finger.style.left = `${colX(stringIdx)}px`;
+          finger.style.top = `${rowCenter}px`;
+          finger.style.transform = "translate(-50%, -50%)";
+          finger.style.color = "white";
+          finger.style.fontSize = `${10 * scale}px`;
+          finger.style.fontWeight = "700";
+          grid.appendChild(finger);
+        });
+      } else {
+        group.forEach((p) => {
+          const dot = document.createElement("div");
+          dot.textContent = p.finger;
+          dot.style.position = "absolute";
+          dot.style.left = `${colX(p.string)}px`;
+          dot.style.top = `${rowCenter}px`;
+          dot.style.transform = "translate(-50%, -50%)";
+          dot.style.width = `${dotSize}px`;
+          dot.style.height = `${dotSize}px`;
+          dot.style.borderRadius = "50%";
+          dot.style.background = "var(--color-ink)";
+          dot.style.color = "white";
+          dot.style.fontSize = `${10 * scale}px`;
+          dot.style.fontWeight = "700";
+          dot.style.display = "flex";
+          dot.style.alignItems = "center";
+          dot.style.justifyContent = "center";
+          grid.appendChild(dot);
+        });
+      }
+    });
+
+    wrap.appendChild(gridWrap);
+
+    const labelEl = document.createElement("div");
+    labelEl.textContent = label;
+    labelEl.style.marginTop = `${6 * scale}px`;
+    labelEl.style.fontWeight = "700";
+    labelEl.style.fontSize = `${14 * scale}px`;
+    labelEl.style.color = "var(--color-ink)";
+    wrap.appendChild(labelEl);
+
+    return wrap;
+  }
+
+  function setCurrentChord(rawChord: string) {
+    const shown = displayChord(rawChord);
+    currentChordEl.textContent = rawChord === "N" ? "—" : shown;
+    currentChordKeyEl.textContent = chordKeyLabel(shown);
+    renderInstrumentView(rawChord);
+  }
+
+  /** Re-renders both views after a Transpose/Capo change (chord names/shapes shift). */
+  function refreshViews() {
+    renderDiagramRow();
+    renderDiagramWindow();
+    renderOverviewGrid();
+    if (lastActiveIndex >= 0 && chords[lastActiveIndex]) {
+      highlightOverviewBeat(chords[lastActiveIndex].start);
+      highlightDiagramRow(chords[lastActiveIndex].start);
+      setCurrentChord(chords[lastActiveIndex].chord);
+    }
+  }
+
+  function onTimeUpdate(currentTime: number) {
+    highlightOverviewBeat(currentTime);
+    highlightDiagramRow(currentTime);
+
+    const index = chords.findIndex((s) => currentTime >= s.start && currentTime < s.end);
+    if (index === -1 || index === lastActiveIndex) return;
+    lastActiveIndex = index;
+    const seg = chords[index];
+    setCurrentChord(seg.chord);
+    renderDiagramWindow();
+  }
+
+  function seekTo(time: number) {
+    if (!audioEl.classList.contains("hidden")) {
+      audioEl.currentTime = time;
+      audioEl.play();
+    } else if (ytPlayer) {
+      ytPlayer.seekTo(time, true);
+      ytPlayer.playVideo();
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let ytPlayer: any = null;
+
+  function extractYoutubeId(url: string): string | null {
+    const match = url.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{6,})/);
+    return match ? match[1] : null;
+  }
+
+  function setupYoutubePlayer(videoId: string) {
+    youtubeMount.classList.remove("hidden");
+    const div = document.createElement("div");
+    div.id = "yt-player-target";
+    youtubeMount.appendChild(div);
+
+    const script = document.createElement("script");
+    script.src = "https://www.youtube.com/iframe_api";
+    document.head.appendChild(script);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (window as any).onYouTubeIframeAPIReady = () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ytPlayer = new (window as any).YT.Player("yt-player-target", {
+        videoId,
+        playerVars: { rel: 0 },
+        events: {
+          onReady: () => {
+            setInterval(() => {
+              if (ytPlayer && typeof ytPlayer.getCurrentTime === "function") {
+                onTimeUpdate(ytPlayer.getCurrentTime());
+              }
+            }, 250);
+          },
+        },
+      });
+    };
+  }
+
+  async function init() {
+    if (!sessionId) {
+      fail("No song selected. Go back and paste a link or upload a song.");
+      return;
+    }
+
+    let result: ExtractResult;
+    try {
+      const res = await fetch(`${API_BASE}/api/result/${sessionId}`);
+      if (!res.ok) throw new Error(`Could not load this song (${res.status})`);
+      result = await res.json();
+    } catch (err) {
+      fail(err instanceof Error ? err.message : "Could not load this song.");
+      return;
+    }
+
+    chords = result.chords;
+    bars = result.bars;
+    duration = result.duration;
+    buildChordEvents();
+    loadingState.classList.add("hidden");
+    playerState.classList.remove("hidden");
+    renderDiagramRow();
+    renderDiagramWindow();
+    renderOverviewGrid();
+
+    if (result.source === "youtube" && result.sourceUrl) {
+      const videoId = extractYoutubeId(result.sourceUrl);
+      if (videoId) {
+        setupYoutubePlayer(videoId);
+      } else {
+        fail("Could not determine the YouTube video to play.");
+        return;
+      }
+    } else {
+      audioEl.classList.remove("hidden");
+      audioEl.src = `${API_BASE}${result.audioUrl}`;
+      audioEl.addEventListener("timeupdate", () => onTimeUpdate(audioEl.currentTime));
+      audioEl.addEventListener("ended", () => {
+        if (loopEnabled) seekTo(0);
+      });
+    }
+
+    if (chords.length > 0) setCurrentChord(chords[0].chord);
+  }
+
+  document.querySelectorAll<HTMLButtonElement>(".instrument-tab").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      activeInstrument = btn.dataset.inst || "guitar";
+      document.querySelectorAll<HTMLButtonElement>(".instrument-tab").forEach((b) => {
+        const active = b === btn;
+        b.style.background = active ? "var(--color-accent)" : "transparent";
+        b.style.color = active ? "var(--color-on-accent)" : "#c4b5fd";
+        b.style.borderColor = active ? "var(--color-accent)" : "#7c3aed44";
+        b.setAttribute("aria-pressed", String(active));
+      });
+      if (lastActiveIndex >= 0) renderInstrumentView(chords[lastActiveIndex].chord);
+    });
+  });
+
+  // Toolbar: volume
+  volumeSlider.addEventListener("input", () => {
+    const v = Number(volumeSlider.value) / 100;
+    audioEl.volume = v;
+    if (ytPlayer && typeof ytPlayer.setVolume === "function") ytPlayer.setVolume(v * 100);
+  });
+
+  // Toolbar: loop (loop the whole song)
+  loopToggle.addEventListener("click", () => {
+    loopEnabled = !loopEnabled;
+    audioEl.loop = loopEnabled;
+    loopToggle.textContent = loopEnabled ? "On" : "Off";
+    loopToggle.style.color = loopEnabled ? "var(--color-violet)" : "var(--color-body)";
+    loopToggle.setAttribute("aria-pressed", String(loopEnabled));
+  });
+
+  // Toolbar: tempo (playback speed, 50%-150%)
+  function applyTempo() {
+    tempoValueEl.textContent = `${tempoPct}%`;
+    const rate = tempoPct / 100;
+    audioEl.playbackRate = rate;
+    if (ytPlayer && typeof ytPlayer.setPlaybackRate === "function") ytPlayer.setPlaybackRate(rate);
+  }
+  tempoDown.addEventListener("click", () => {
+    tempoPct = Math.max(50, tempoPct - 10);
+    applyTempo();
+  });
+  tempoUp.addEventListener("click", () => {
+    tempoPct = Math.min(150, tempoPct + 10);
+    applyTempo();
+  });
+
+  // Toolbar: capo (shifts which guitar shape is shown, not the sounding pitch)
+  capoDown.addEventListener("click", () => {
+    capo = Math.max(0, capo - 1);
+    capoValueEl.textContent = String(capo);
+    refreshViews();
+  });
+  capoUp.addEventListener("click", () => {
+    capo = Math.min(7, capo + 1);
+    capoValueEl.textContent = String(capo);
+    refreshViews();
+  });
+
+  // Toolbar: transpose (shifts the chord names everywhere — sing/play in a different key)
+  transposeDown.addEventListener("click", () => {
+    transposeSteps -= 1;
+    transposeValueEl.textContent = semitoneLabel(transposeSteps);
+    refreshViews();
+  });
+  transposeUp.addEventListener("click", () => {
+    transposeSteps += 1;
+    transposeValueEl.textContent = semitoneLabel(transposeSteps);
+    refreshViews();
+  });
+
+  // View switcher: Chord diagrams / Chord overview
+  function setActiveView(view: "diagrams" | "overview") {
+    activeView = view;
+    const isDiagrams = view === "diagrams";
+    panelDiagrams.classList.toggle("hidden", !isDiagrams);
+    panelOverview.classList.toggle("hidden", isDiagrams);
+    viewTabDiagrams.style.background = isDiagrams ? "var(--color-canvas-soft)" : "transparent";
+    viewTabDiagrams.style.color = isDiagrams ? "var(--color-ink)" : "var(--color-mute)";
+    viewTabDiagrams.textContent = isDiagrams ? "✓ Chord diagrams" : "Chord diagrams";
+    viewTabDiagrams.setAttribute("aria-pressed", String(isDiagrams));
+    viewTabOverview.style.background = !isDiagrams ? "var(--color-canvas-soft)" : "transparent";
+    viewTabOverview.style.color = !isDiagrams ? "var(--color-ink)" : "var(--color-mute)";
+    viewTabOverview.textContent = !isDiagrams ? "✓ Chord overview" : "Chord overview";
+    viewTabOverview.setAttribute("aria-pressed", String(!isDiagrams));
+  }
+  viewTabDiagrams.addEventListener("click", () => setActiveView("diagrams"));
+  viewTabOverview.addEventListener("click", () => setActiveView("overview"));
+
+  init();
+</script>
