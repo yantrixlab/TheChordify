@@ -12,15 +12,28 @@ export interface ChordSegment {
 
 export interface Bar {
   start: number;
-  beats: number[]; // 5 timestamps: start of each of the 4 beats + the start of the next bar
+  // 4 beat starts + the start of the next bar; null where the beat does not exist (a pickup bar, a short last bar)
+  beats: (number | null)[];
+}
+
+export interface Section {
+  label: string; // "Silence", "Intro", "Verse 1", "Chorus 2", or "Part A" when the parts can't be named reliably
+  start: number;
+  end: number;
+  startBar: number | null; // index into `bars`; null for the silence before the music
+  endBar: number | null;
 }
 
 export interface ExtractResult {
   sessionId: string;
   source: "youtube" | "upload";
   sourceUrl?: string;
+  title?: string;
+  artist?: string;
   duration: number;
-  chords: ChordSegment[];
+  chords: ChordSegment[]; // the song's core chords (major/minor)
+  chordsDetailed?: ChordSegment[]; // every chord type the model recognises (7ths, sus, slash chords...)
+  sections?: Section[];
   tempo: number;
   beatTimes: number[];
   bars: Bar[];

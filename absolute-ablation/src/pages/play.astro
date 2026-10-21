@@ -6,7 +6,7 @@ import Nav from "../components/Nav.astro";
 <Layout title="Play along — The Chordify">
   <Nav />
   <main id="main-content" class="gradient-mesh" style="min-height:100vh;padding:96px var(--space-lg) var(--space-3xl);">
-    <div class="max-w-4xl mx-auto" style="color:white;">
+    <div class="mx-auto" style="max-width:1180px;color:white;">
       <div id="loading-state" style="text-align:center;padding:80px 0;color:#c4b5fd;">
         Loading your song…
       </div>
@@ -16,164 +16,229 @@ import Nav from "../components/Nav.astro";
         <a href="/" style="color:var(--color-accent);text-decoration:underline;">Back to home</a>
       </div>
 
-      <div id="player-state" class="hidden">
-        <!-- Instrument selector -->
-        <div class="flex items-center gap-2 mb-8 flex-wrap" role="group" aria-label="Instrument">
-          {
-            [
-              { id: "guitar", label: "Guitar", icon: "🎸" },
-              { id: "piano", label: "Piano", icon: "🎹" },
-              { id: "ukulele", label: "Ukulele", icon: "🪗" },
-              { id: "mandolin", label: "Mandolin", icon: "🎵" },
-            ].map((inst, i) => (
-              <button
-                type="button"
-                class="instrument-tab rounded-full font-medium"
-                data-inst={inst.id}
-                aria-pressed={i === 0 ? "true" : "false"}
-                style={`
-                  height:32px;padding:0 14px;font-size:13px;cursor:pointer;
-                  border:1px solid ${i === 0 ? "var(--color-accent)" : "#7c3aed44"};
-                  background:${i === 0 ? "var(--color-accent)" : "transparent"};
-                  color:${i === 0 ? "var(--color-on-accent)" : "#c4b5fd"};
-                `}
-              >
-                <span aria-hidden="true">{inst.icon}</span> {inst.label}
-              </button>
-            ))
-          }
-        </div>
-
-        <!-- Current chord, large -->
-        <div class="rounded-2xl mb-6" style="background:#0d0019;border:1px solid #7c3aed33;padding:32px;text-align:center;">
-          <div style="font-family:var(--font-mono);font-size:11px;color:#8b7fa8;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">
-            Now playing
-          </div>
-          <div id="current-chord" style="font-size:56px;font-weight:700;color:var(--color-accent);line-height:1;">—</div>
-          <div id="current-chord-key" style="font-size:14px;color:#c4b5fd;margin-top:8px;"></div>
-
-          <!-- Guitar diagram -->
-          <div id="guitar-diagram" class="flex items-center justify-center gap-8 mt-6"></div>
-          <!-- Notes fallback for piano/ukulele/mandolin -->
-          <div id="notes-display" class="hidden mt-6" style="font-family:var(--font-mono);font-size:15px;color:#e0d7f5;"></div>
-        </div>
-
-        <!-- Toolbar: volume, loop, tempo, capo, transpose -->
-        <div
-          class="rounded-t-2xl flex items-center"
-          style="background:var(--color-canvas);border:1px solid var(--color-hairline);border-bottom:none;padding:8px 16px;overflow-x:auto;gap:4px;"
-        >
-          {
-            [
-              { id: "volume", label: "Volume" },
-              { id: "loop", label: "Loop" },
-              { id: "tempo", label: "Tempo" },
-              { id: "capo", label: "Capo" },
-              { id: "transpose", label: "Transpose" },
-            ].map((tool, i) => (
-              <div
-                class="flex flex-col items-center justify-center"
-                style={`padding:6px 14px;${i > 0 ? "border-left:1px solid var(--color-hairline);" : ""}min-width:84px;`}
-              >
-                <div style="font-size:16px;line-height:1;margin-bottom:4px;" aria-hidden="true">
-                  {tool.id === "volume" && "🔊"}
-                  {tool.id === "loop" && "∞"}
-                  {tool.id === "tempo" && "🐢"}
-                  {tool.id === "capo" && "🪕"}
-                  {tool.id === "transpose" && "♯"}
+      <div id="player-state" class="hidden pl">
+        <div class="pl-main">
+          <!-- Player header: title, transport, section-aware progress bar and the toolbar, all sticky together -->
+          <div id="player-header" class="ph">
+            <div class="ph-head">
+              <div class="ph-titles">
+                <div class="ph-title">
+                  <h1 id="song-title">Your song</h1>
+                  <span id="song-artist" class="ph-by"></span>
                 </div>
-                {tool.id === "volume" && (
-                  <input
-                    id="volume-slider"
-                    type="range"
-                    min="0"
-                    max="100"
-                    value="100"
-                    style="width:64px;height:14px;"
-                    aria-label="Volume"
-                  />
-                )}
-                {tool.id === "loop" && (
-                  <button
-                    id="loop-toggle"
-                    type="button"
-                    aria-pressed="false"
-                    style="font-size:11px;color:var(--color-body);background:none;border:none;cursor:pointer;font-weight:600;"
-                  >
-                    Off
-                  </button>
-                )}
-                {tool.id === "tempo" && (
-                  <div class="flex items-center gap-1">
-                    <button id="tempo-down" type="button" aria-label="Slower" style="background:none;border:none;cursor:pointer;color:var(--color-mute);font-size:12px;">◂</button>
-                    <span id="tempo-value" style="font-family:var(--font-mono);font-size:11px;color:var(--color-ink);font-weight:600;min-width:34px;text-align:center;">100%</span>
-                    <button id="tempo-up" type="button" aria-label="Faster" style="background:none;border:none;cursor:pointer;color:var(--color-mute);font-size:12px;">▸</button>
-                  </div>
-                )}
-                {tool.id === "capo" && (
-                  <div class="flex items-center gap-1">
-                    <button id="capo-down" type="button" aria-label="Capo down" style="background:none;border:none;cursor:pointer;color:var(--color-mute);font-size:12px;">◂</button>
-                    <span id="capo-value" style="font-family:var(--font-mono);font-size:11px;color:var(--color-ink);font-weight:600;min-width:20px;text-align:center;">0</span>
-                    <button id="capo-up" type="button" aria-label="Capo up" style="background:none;border:none;cursor:pointer;color:var(--color-mute);font-size:12px;">▸</button>
-                  </div>
-                )}
-                {tool.id === "transpose" && (
-                  <div class="flex items-center gap-1">
-                    <button id="transpose-down" type="button" aria-label="Transpose down" style="background:none;border:none;cursor:pointer;color:var(--color-mute);font-size:12px;">◂</button>
-                    <span id="transpose-value" style="font-family:var(--font-mono);font-size:11px;color:var(--color-ink);font-weight:600;min-width:24px;text-align:center;">0</span>
-                    <button id="transpose-up" type="button" aria-label="Transpose up" style="background:none;border:none;cursor:pointer;color:var(--color-mute);font-size:12px;">▸</button>
-                  </div>
-                )}
-                <div style="font-size:9px;color:var(--color-mute);text-transform:uppercase;letter-spacing:0.05em;margin-top:2px;">{tool.label}</div>
+                <div id="song-sub" class="ph-sub">Transcription by TheChordify</div>
               </div>
-            ))
-          }
+              <button id="btn-share" type="button" class="ph-share">Share</button>
+            </div>
+            <div class="ph-controls">
+              <button id="btn-restart" type="button" class="ph-btn" aria-label="Back to the start">
+                <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M6 5h2v14H6zM20 5v14L9 12z" fill="currentColor" /></svg>
+              </button>
+              <button id="btn-play" type="button" class="ph-play" aria-label="Play">
+                <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M8 5v14l11-7z" fill="currentColor" /></svg>
+              </button>
+              <div class="ph-track">
+                <div class="ph-row">
+                  <span id="time-now">0:00</span>
+                  <span aria-hidden="true">•</span>
+                  <select id="section-select" aria-label="Jump to a section"></select>
+                </div>
+                <div id="progress" class="pb" role="slider" tabindex="0" aria-label="Song position" aria-valuemin="0" aria-valuenow="0"></div>
+              </div>
+              <div id="time-total" class="ph-total">0:00</div>
+            </div>
+          <div class="ph-tools">
+            {
+              [
+                { id: "countin", label: "Count-in" },
+                { id: "volume", label: "Volume" },
+                { id: "loop", label: "Loop" },
+                { id: "tempo", label: "Tempo" },
+                { id: "capo", label: "Capo" },
+                { id: "transpose", label: "Transpose" },
+                { id: "sections", label: "Sections" },
+                { id: "detail", label: "Chords" },
+              ].map((tool, i) => (
+                <div
+                  class="flex flex-col items-center justify-center"
+                  style={`padding:6px 14px;${i > 0 ? "border-left:1px solid var(--color-hairline);" : ""}min-width:78px;`}
+                >
+                  <div style="font-size:16px;line-height:1;margin-bottom:4px;" aria-hidden="true">
+                    {tool.id === "volume" && "🔊"}
+                    {tool.id === "loop" && "∞"}
+                    {tool.id === "tempo" && "🐢"}
+                    {tool.id === "capo" && "🪕"}
+                    {tool.id === "transpose" && "♯"}
+                    {tool.id === "countin" && "③"}
+                    {tool.id === "sections" && "☰"}
+                    {tool.id === "detail" && "♬"}
+                  </div>
+                  {tool.id === "volume" && (
+                    <input
+                      id="volume-slider"
+                      type="range"
+                      min="0"
+                      max="100"
+                      value="100"
+                      style="width:64px;height:14px;"
+                      aria-label="Volume"
+                    />
+                  )}
+                  {tool.id === "loop" && (
+                    <button
+                      id="loop-toggle"
+                      type="button"
+                      aria-pressed="false"
+                      style="font-size:11px;color:var(--color-body);background:none;border:none;cursor:pointer;font-weight:600;"
+                    >
+                      Off
+                    </button>
+                  )}
+                  {tool.id === "tempo" && (
+                    <div class="flex items-center gap-1">
+                      <button id="tempo-down" type="button" aria-label="Slower" style="background:none;border:none;cursor:pointer;color:var(--color-mute);font-size:12px;">◂</button>
+                      <span id="tempo-value" style="font-family:var(--font-mono);font-size:11px;color:var(--color-ink);font-weight:600;min-width:34px;text-align:center;">100%</span>
+                      <button id="tempo-up" type="button" aria-label="Faster" style="background:none;border:none;cursor:pointer;color:var(--color-mute);font-size:12px;">▸</button>
+                    </div>
+                  )}
+                  {tool.id === "capo" && (
+                    <div class="flex items-center gap-1">
+                      <button id="capo-down" type="button" aria-label="Capo down" style="background:none;border:none;cursor:pointer;color:var(--color-mute);font-size:12px;">◂</button>
+                      <span id="capo-value" style="font-family:var(--font-mono);font-size:11px;color:var(--color-ink);font-weight:600;min-width:20px;text-align:center;">0</span>
+                      <button id="capo-up" type="button" aria-label="Capo up" style="background:none;border:none;cursor:pointer;color:var(--color-mute);font-size:12px;">▸</button>
+                    </div>
+                  )}
+                  {tool.id === "transpose" && (
+                    <div class="flex items-center gap-1">
+                      <button id="transpose-down" type="button" aria-label="Transpose down" style="background:none;border:none;cursor:pointer;color:var(--color-mute);font-size:12px;">◂</button>
+                      <span id="transpose-value" style="font-family:var(--font-mono);font-size:11px;color:var(--color-ink);font-weight:600;min-width:24px;text-align:center;">0</span>
+                      <button id="transpose-up" type="button" aria-label="Transpose up" style="background:none;border:none;cursor:pointer;color:var(--color-mute);font-size:12px;">▸</button>
+                    </div>
+                  )}
+                  {tool.id === "countin" && (
+                    <button id="countin-toggle" type="button" aria-pressed="false" style="font-size:11px;color:var(--color-body);background:none;border:none;cursor:pointer;font-weight:600;">Off</button>
+                  )}
+                  {tool.id === "sections" && (
+                    <button id="sections-toggle" type="button" aria-pressed="true" style="font-size:11px;color:var(--color-violet);background:none;border:none;cursor:pointer;font-weight:600;">On</button>
+                  )}
+                  {tool.id === "detail" && (
+                    <button id="detail-toggle" type="button" aria-pressed="false" style="font-size:11px;color:var(--color-body);background:none;border:none;cursor:pointer;font-weight:600;">Simple</button>
+                  )}
+                  <div style="font-size:9px;color:var(--color-mute);text-transform:uppercase;letter-spacing:0.05em;margin-top:2px;">{tool.label}</div>
+                </div>
+              ))
+            }
+          </div>
+
+          </div>
+
+          <!-- Views: Chords grid (every bar, grouped into sections) / Chord diagrams (timeline + sliding window) -->
+          <div class="rounded-2xl tl-card">
+            <div class="tl-tabs">
+              <div class="tl-seg" role="group" aria-label="Chord view">
+                <button id="view-tab-grid" type="button" class="tl-tab is-active" aria-pressed="true">Chords grid</button>
+                <button id="view-tab-diagrams" type="button" class="tl-tab" aria-pressed="false">Chord diagrams</button>
+              </div>
+            </div>
+
+            <div id="panel-grid" class="grid-panel">
+              <div id="chord-grid"></div>
+            </div>
+
+            <!-- Chord diagrams: animated (timeline + sliding window) or a summary of every chord in the song -->
+            <div id="panel-diagrams" class="hidden">
+              <div class="dg-bar">
+                <div class="tl-seg" role="group" aria-label="Diagram style">
+                  <button id="dg-animated" type="button" class="tl-tab is-active" aria-pressed="true">Animated</button>
+                  <button id="dg-summary" type="button" class="tl-tab" aria-pressed="false">Summary</button>
+                </div>
+              </div>
+              <div id="dg-animated-panel">
+              <div class="tl">
+                <div class="tl-now">
+                  <span class="tl-now-label">Now</span>
+                  <strong id="timeline-now-chord">—</strong>
+                </div>
+                <div id="diagram-row-scroll" class="tl-scroll">
+                  <div id="diagram-row" class="tl-track" role="list" aria-label="Chord timeline"></div>
+                </div>
+              </div>
+              <div style="padding:24px;overflow-x:auto;">
+                <div id="diagram-window" class="flex items-center gap-4" style="min-height:170px;"></div>
+              </div>
+              </div>
+              <div id="dg-summary-panel" class="hidden">
+                <div id="summary-grid" class="sum-grid"></div>
+              </div>
+            </div>
+          </div>
+
         </div>
 
-        <!-- View switcher: Chord diagrams (timeline + sliding window) / Chord overview (full song grid) -->
-        <div class="rounded-2xl tl-card">
-          <div class="tl-tabs">
-            <div class="tl-seg" role="group" aria-label="Chord view">
-              <button id="view-tab-diagrams" type="button" class="tl-tab is-active" aria-pressed="true">Chord diagrams</button>
-              <button id="view-tab-overview" type="button" class="tl-tab" aria-pressed="false">Chord overview</button>
-            </div>
+        <aside class="pl-side" aria-label="Video and song details">
+          <div id="youtube-mount" class="side-card video-card hidden"></div>
+          <div class="side-card now-card">
+          <div class="flex items-center justify-center gap-2 mb-4 flex-wrap" role="group" aria-label="Instrument">
+            {
+              [
+                { id: "guitar", label: "Guitar", icon: "🎸" },
+                { id: "piano", label: "Piano", icon: "🎹" },
+                { id: "ukulele", label: "Ukulele", icon: "🪗" },
+                { id: "mandolin", label: "Mandolin", icon: "🎵" },
+              ].map((inst, i) => (
+                <button
+                  type="button"
+                  class="instrument-tab rounded-full font-medium"
+                  data-inst={inst.id}
+                  aria-pressed={i === 0 ? "true" : "false"}
+                  style={`
+                    height:32px;padding:0 14px;font-size:13px;cursor:pointer;
+                    border:1px solid ${i === 0 ? "var(--color-accent)" : "#7c3aed44"};
+                    background:${i === 0 ? "var(--color-accent)" : "transparent"};
+                    color:${i === 0 ? "var(--color-on-accent)" : "#c4b5fd"};
+                  `}
+                >
+                  <span aria-hidden="true">{inst.icon}</span> {inst.label}
+                </button>
+              ))
+            }
           </div>
 
-          <!-- Chord timeline: one card per chord, the playing one highlighted. The "Now" panel is
-               fixed, so the current chord is visible even while the strip is being scrolled. -->
-          <div id="panel-diagrams">
-            <div class="tl">
-              <div class="tl-now">
-                <span class="tl-now-label">Now</span>
-                <strong id="timeline-now-chord">—</strong>
-              </div>
-              <div id="diagram-row-scroll" class="tl-scroll">
-                <div id="diagram-row" class="tl-track" role="list" aria-label="Chord timeline"></div>
-              </div>
+            <div style="font-family:var(--font-mono);font-size:11px;color:#8b7fa8;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">
+              Now playing
             </div>
-            <div style="padding:24px;overflow-x:auto;">
-              <div id="diagram-window" class="flex items-center gap-4" style="min-height:170px;"></div>
-            </div>
-          </div>
+            <div id="current-chord" style="font-size:48px;font-weight:700;color:var(--color-accent);line-height:1;">—</div>
+            <div id="current-chord-key" style="font-size:14px;color:#c4b5fd;margin-top:8px;"></div>
 
-          <!-- Full-song grid: every bar, beats divided 4 to a bar -->
-          <div id="panel-overview" class="hidden" style="padding:20px;overflow-x:auto;">
-            <div id="overview-grid"></div>
+            <!-- Guitar diagram -->
+            <div id="guitar-diagram" class="flex items-center justify-center gap-8 mt-4"></div>
+            <!-- Notes fallback for piano/ukulele/mandolin -->
+            <div id="notes-display" class="hidden mt-4" style="font-family:var(--font-mono);font-size:15px;color:#e0d7f5;"></div>
           </div>
-        </div>
-
-        <!-- Source: YouTube iframe or native audio -->
-        <div id="youtube-mount" class="hidden rounded-2xl overflow-hidden mt-6" style="aspect-ratio:16/9;background:#000;"></div>
-        <audio id="audio-el" class="hidden w-full mt-6" controls></audio>
+          <div class="side-card details-card">
+            <h2 class="sd-title">Song details</h2>
+            <dl class="sd-list">
+              <div><dt>Chords</dt><dd id="sd-chords" class="sd-chips"></dd></div>
+              <div><dt>Key</dt><dd id="sd-key">—</dd></div>
+              <div><dt>Tempo</dt><dd id="sd-tempo">—</dd></div>
+              <div><dt>Sections</dt><dd id="sd-sections">—</dd></div>
+              <div><dt>Transcription</dt><dd>TheChordify (automatic)</dd></div>
+            </dl>
+          </div>
+        </aside>
+        <audio id="audio-el" class="hidden" preload="metadata"></audio>
       </div>
     </div>
   </main>
 </Layout>
 
 <style is:global>
-  .tl-card { background: var(--color-canvas); border: 1px solid var(--color-hairline); overflow: hidden;
+  .tl-card { background: var(--color-canvas); border: 1px solid var(--color-hairline); overflow: clip;
     box-shadow: 0 1px 2px rgba(13, 0, 31, 0.04), 0 12px 32px -12px rgba(91, 33, 182, 0.18); }
-  .tl-tabs { padding: 10px 12px; border-bottom: 1px solid var(--color-hairline); background: var(--color-canvas-soft); }
+  /* The view switch floats over the top-left of the content and stays put, just under the sticky header. */
+  .tl-tabs { position: sticky; top: calc(72px + var(--ph-h, 190px) + 8px); z-index: 25; padding: 8px 10px; height: 0; overflow: visible; pointer-events: none; }
+  .tl-tabs .tl-seg { pointer-events: auto; background: rgba(237, 233, 254, 0.92); backdrop-filter: blur(6px); box-shadow: 0 2px 8px -2px rgba(13, 0, 31, 0.25); }
+  .dg-bar { padding: 10px 12px; display: flex; justify-content: flex-end; border-bottom: 1px solid var(--color-hairline); background: var(--color-canvas-soft); }
   .tl-seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--color-violet-soft); }
   .tl-tab { height: 32px; padding: 0 16px; border: 0; border-radius: 999px; background: transparent;
     color: var(--color-violet-deep); font-size: 13px; font-weight: 600; cursor: pointer;
@@ -220,11 +285,122 @@ import Nav from "../components/Nav.astro";
   @media (prefers-reduced-motion: reduce) {
     .tl-chip, .tl-fill, .tl-tab { transition: none; }
   }
+
+  /* Page layout: the player on the left, video + current chord + song details on the right */
+  #player-state:not(.hidden) { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; align-items: start; }
+  .pl-main { min-width: 0; }
+  .pl-side { position: sticky; top: 88px; max-height: calc(100vh - 104px); overflow-y: auto; scrollbar-width: thin;
+    display: flex; flex-direction: column; gap: 16px; }
+  .side-card { border-radius: 16px; overflow: hidden; flex: 0 0 auto; }
+  .video-card { aspect-ratio: 16 / 9; background: #000; }
+  .video-card iframe { width: 100% !important; height: 100% !important; display: block; }
+  .now-card { background: #0d0019; border: 1px solid #7c3aed33; padding: 16px 14px 18px; text-align: center; }
+  .details-card { background: var(--color-canvas); color: var(--color-ink); border: 1px solid var(--color-hairline); padding: 16px 18px; }
+  .sd-title { margin: 0 0 12px; font-size: 15px; font-weight: 700; }
+  .sd-list { margin: 0; display: grid; gap: 10px; }
+  .sd-list > div { display: grid; grid-template-columns: 92px minmax(0, 1fr); align-items: center; gap: 8px; font-size: 14px; }
+  .sd-list dt { font: 600 10px/1 var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-mute); }
+  .sd-list dd { margin: 0; font-weight: 600; }
+  .sd-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .sd-chip { padding: 3px 10px; border-radius: 999px; background: var(--color-violet-soft); color: var(--color-violet-deep); font-size: 13px; font-weight: 700; }
+
+  /* Player header (sticky): title, transport, toolbar */
+  .ph { position: sticky; top: 72px; z-index: 30; margin-bottom: 16px; padding: 14px 18px 8px; border-radius: 14px;
+    background: var(--color-canvas); color: var(--color-ink); border: 1px solid var(--color-hairline);
+    box-shadow: 0 14px 34px -16px rgba(13, 0, 31, 0.55); }
+  .ph-head { display: flex; align-items: flex-start; gap: 12px; }
+  .ph-titles { min-width: 0; flex: 1 1 auto; }
+  .ph-title { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .ph-title h1 { margin: 0; font-size: 22px; font-weight: 700; line-height: 1.2; letter-spacing: -0.01em; }
+  .ph-by { font-size: 14px; color: var(--color-mute); }
+  .ph-sub { margin-top: 3px; font-size: 13px; color: var(--color-mute); }
+  .ph-share { flex: 0 0 auto; height: 32px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--color-violet-soft);
+    color: var(--color-violet-deep); font-size: 13px; font-weight: 600; cursor: pointer; }
+  .ph-share:hover { background: #ddd2fb; }
+  .ph.is-compact { padding-top: 10px; }
+  .ph.is-compact .ph-sub { display: none; }
+  .ph.is-compact .ph-title h1 { font-size: 17px; }
+  .ph-controls { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: 12px; margin-top: 10px; }
+  .ph-tools { display: flex; overflow-x: auto; margin: 10px -6px 0; padding-top: 8px; border-top: 1px solid var(--color-hairline); scrollbar-width: none; }
+  .ph-tools::-webkit-scrollbar { display: none; }
+  .ph-btn, .ph-play { display: grid; place-items: center; border: 0; border-radius: 50%; cursor: pointer;
+    transition: transform 0.12s, box-shadow 0.12s, background-color 0.12s; }
+  .ph-btn { width: 40px; height: 40px; background: var(--color-violet-soft); color: var(--color-violet-deep); }
+  .ph-btn:hover { background: #ddd2fb; }
+  .ph-play { width: 50px; height: 50px; color: var(--color-on-accent);
+    background: linear-gradient(135deg, var(--color-accent), var(--color-accent-deep)); box-shadow: 0 10px 20px -8px rgba(245, 158, 11, 0.7); }
+  .ph-play:hover { transform: scale(1.05); }
+  .ph-btn:focus-visible, .ph-play:focus-visible, .ph-share:focus-visible, .pb:focus-visible, .gc:focus-visible, .gs-tag:focus-visible { outline: 2px solid var(--color-violet); outline-offset: 2px; }
+  .ph-track { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+  .ph-row { display: flex; align-items: center; gap: 8px; font: 600 13px var(--font-mono); color: var(--color-body); }
+  .ph-row select { max-width: 55%; padding: 3px 10px; border: 1px solid var(--color-hairline-strong); border-radius: 8px; background: var(--color-canvas);
+    color: var(--color-ink); font: 600 12px/1.5 inherit; cursor: pointer; }
+  .pb { display: flex; align-items: center; gap: 3px; height: 14px; cursor: pointer; touch-action: none; }
+  .pb-seg { position: relative; height: 6px; border-radius: 3px; background: var(--color-hairline); overflow: hidden; transition: height 0.12s; }
+  .pb:hover .pb-seg, .pb:focus-visible .pb-seg { height: 10px; }
+  .pb-fill { position: absolute; inset: 0 auto 0 0; width: 0; background: linear-gradient(90deg, var(--color-violet), var(--color-violet-deep)); }
+  .ph-total { font: 600 13px var(--font-mono); color: var(--color-mute); }
+
+  /* Chords grid: flat cells, dark bar lines, the playing beat filled in, sections as slim coloured tabs */
+  .grid-panel { background: #e9e6f0; }
+  #chord-grid { padding: 46px 10px 55vh; }
+  .gs { display: flex; margin-bottom: 10px; }
+  .gs-tag { flex: 0 0 22px; padding: 8px 0; border: 0; border-radius: 0; color: var(--color-ink); cursor: pointer;
+    writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; font: 600 11px/1 inherit; letter-spacing: 0.03em; }
+  .gs-tag:hover { filter: brightness(0.95); }
+  .grid-hide-tags .gs-tag { display: none; }
+  .gs-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+  .gr { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-bottom: 1px solid #e3deee; }
+  .gb { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); background: #faf9fd; }
+  .gb + .gb { border-left: 3px solid #4b4560; }
+  .gb.is-current { background: #f3f0fc; }
+  .gc { min-width: 0; height: 44px; display: flex; align-items: center; padding: 0 3px 0 6px; border: 0; border-left: 1px solid #ece8f5;
+    border-radius: 0; background: transparent; color: var(--color-ink); font-weight: 500; font-size: 20px; text-align: left;
+    white-space: nowrap; overflow: hidden; cursor: pointer; transition: background-color 0.12s, color 0.12s; }
+  .gb > .gc:first-child { border-left: 0; }
+  .gc[data-len="3"] { font-size: 17px; }
+  .gc[data-len="4"] { font-size: 14px; }
+  .gc[data-len="5"] { font-size: 12px; }
+  .gc[data-len="6"] { font-size: 10.5px; }
+  .gc:hover { background: #ebe6fa; }
+  .gc.is-empty { background: transparent; cursor: default; }
+  .gc.is-rest { color: var(--color-mute); font-weight: 400; }
+  .gc.is-active { background: #2d2a3a; color: #fff; border-radius: 3px; }
+  .gc.is-silence { font-family: "Segoe UI Symbol", "Noto Music", "Apple Symbols", sans-serif; font-size: 22px; font-weight: 400; color: var(--color-mute); }
+
+  /* Chord diagrams: summary of every chord used in the song */
+  .sum-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 14px; padding: 20px; justify-items: center; }
+
+  @media (max-width: 1000px) {
+    #player-state:not(.hidden) { grid-template-columns: minmax(0, 1fr); }
+    .pl-side { position: static; max-height: none; overflow: visible; }
+    .video-card { max-width: 560px; width: 100%; }
+  }
+  @media (max-width: 640px) {
+    .ph { top: 64px; padding: 10px 12px 6px; border-radius: 12px; }
+    .ph-title h1 { font-size: 18px; }
+    .ph-share { height: 30px; padding: 0 10px; font-size: 12px; }
+    .ph-controls { gap: 8px; }
+    .ph-btn { width: 36px; height: 36px; }
+    .ph-play { width: 44px; height: 44px; }
+    .ph.is-compact .ph-tools { display: none; }
+    .tl-tabs { top: calc(64px + var(--ph-h, 150px) + 6px); }
+    #chord-grid { padding: 44px 6px 55vh; }
+    .gs { flex-direction: column; gap: 0; }
+    .gs-tag { flex: 0 0 auto; align-self: flex-start; padding: 4px 12px; writing-mode: horizontal-tb; transform: none; }
+    .gr { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .gb:nth-child(odd) { border-left: 0; }
+    .gc { height: 40px; padding: 0 2px 0 4px; font-size: 16px; }
+    .gc[data-len="3"] { font-size: 13px; }
+    .gc[data-len="4"] { font-size: 11.5px; }
+    .gc[data-len="5"] { font-size: 10.5px; }
+    .gc[data-len="6"] { font-size: 9.5px; }
+  }
 </style>
 
 <script>
   import { getGuitarShape, chordNotes, chordKeyLabel, transposeChord, type GuitarShape } from "../lib/chordShapes";
-  import { API_BASE, type ExtractResult, type ChordSegment, type Bar } from "../lib/api";
+  import { API_BASE, type ExtractResult, type ChordSegment, type Bar, type Section } from "../lib/api";
 
   const params = new URLSearchParams(window.location.search);
   const sessionId = params.get("session");
@@ -240,13 +416,13 @@ import Nav from "../components/Nav.astro";
   const guitarDiagramEl = document.getElementById("guitar-diagram")!;
   const notesDisplayEl = document.getElementById("notes-display")!;
   const viewTabDiagrams = document.getElementById("view-tab-diagrams") as HTMLButtonElement;
-  const viewTabOverview = document.getElementById("view-tab-overview") as HTMLButtonElement;
+  const viewTabGrid = document.getElementById("view-tab-grid") as HTMLButtonElement;
   const panelDiagrams = document.getElementById("panel-diagrams")!;
-  const panelOverview = document.getElementById("panel-overview")!;
+  const panelGrid = document.getElementById("panel-grid")!;
   const diagramRowEl = document.getElementById("diagram-row")!;
   const diagramRowScrollEl = document.getElementById("diagram-row-scroll")!;
   const diagramWindowEl = document.getElementById("diagram-window")!;
-  const overviewGridEl = document.getElementById("overview-grid")!;
+  const chordGridEl = document.getElementById("chord-grid")!;
 
   const volumeSlider = document.getElementById("volume-slider") as HTMLInputElement;
   const loopToggle = document.getElementById("loop-toggle") as HTMLButtonElement;
@@ -259,24 +435,52 @@ import Nav from "../components/Nav.astro";
   const transposeDown = document.getElementById("transpose-down") as HTMLButtonElement;
   const transposeUp = document.getElementById("transpose-up") as HTMLButtonElement;
   const transposeValueEl = document.getElementById("transpose-value")!;
+  const countInToggle = document.getElementById("countin-toggle") as HTMLButtonElement;
+  const sectionsToggle = document.getElementById("sections-toggle") as HTMLButtonElement;
+  const detailToggle = document.getElementById("detail-toggle") as HTMLButtonElement;
+
+  const headerEl = document.getElementById("player-header")!;
+  const songTitleEl = document.getElementById("song-title")!;
+  const songArtistEl = document.getElementById("song-artist")!;
+  const songSubEl = document.getElementById("song-sub")!;
+  const btnPlay = document.getElementById("btn-play") as HTMLButtonElement;
+  const btnRestart = document.getElementById("btn-restart") as HTMLButtonElement;
+  const timeNowEl = document.getElementById("time-now")!;
+  const timeTotalEl = document.getElementById("time-total")!;
+  const progressEl = document.getElementById("progress")!;
+  const sectionSelect = document.getElementById("section-select") as HTMLSelectElement;
+  const btnShare = document.getElementById("btn-share") as HTMLButtonElement;
+  const sdChipsEl = document.getElementById("sd-chords")!;
+  const sdKeyEl = document.getElementById("sd-key")!;
+  const sdTempoEl = document.getElementById("sd-tempo")!;
+  const sdSectionsEl = document.getElementById("sd-sections")!;
+  const dgAnimated = document.getElementById("dg-animated") as HTMLButtonElement;
+  const dgSummary = document.getElementById("dg-summary") as HTMLButtonElement;
+  const dgAnimatedPanel = document.getElementById("dg-animated-panel")!;
+  const dgSummaryPanel = document.getElementById("dg-summary-panel")!;
+  const summaryGridEl = document.getElementById("summary-grid")!;
 
   const SEMITONE_NAMES = ["0", "+1", "+2", "+3", "+4", "+5", "+6", "-5", "-4", "-3", "-2", "-1"];
-  const BARS_PER_ROW = 4; // how many bars the "Chord overview" grid wraps per row
+  const BARS_PER_ROW = 4; // bars per row in the chords grid
   const WINDOW_BEFORE = 1; // chords shown before "now playing" in the sliding window
   const WINDOW_AFTER = 4; // chords shown after
 
   let activeInstrument = "guitar";
-  let chords: ChordSegment[] = [];
+  let chords: ChordSegment[] = []; // the set being shown: simple (core chords) or detailed
+  let chordsSimple: ChordSegment[] = [];
+  let chordsDetailed: ChordSegment[] = [];
+  let sections: Section[] = [];
   let chordEvents: { chordIndex: number; chord: string; start: number }[] = [];
   let bars: Bar[] = [];
   let duration = 0;
   let tempo = 120;
+  let songKey = ""; // estimated key of the song, e.g. "G" or "F#m"
   let lastActiveIndex = -1;
   let loopEnabled = false;
   let tempoPct = 100;
   let capo = 0;
   let transposeSteps = 0;
-  let activeView: "diagrams" | "overview" = "diagrams";
+  let activeView: "diagrams" | "grid" = "grid";
 
   function semitoneLabel(n: number): string {
     const wrapped = ((n % 12) + 12) % 12;
@@ -291,13 +495,6 @@ import Nav from "../components/Nav.astro";
   /** The shape to actually finger on the instrument (after Transpose, undone by Capo). */
   function fingeringChord(rawChord: string): string {
     return transposeChord(rawChord, transposeSteps - capo);
-  }
-
-  /** Sets a beat cell's chord label, shrinking long names (C#m7b5/G#) to fit the cell. */
-  function setCellLabel(cell: HTMLElement, label: string) {
-    cell.textContent = label;
-    cell.style.fontSize = label.length > 7 ? "10px" : label.length > 5 ? "11.5px" : "13px";
-    cell.style.whiteSpace = "nowrap";
   }
 
   function fail(message: string) {
@@ -476,132 +673,267 @@ import Nav from "../components/Nav.astro";
     return card;
   }
 
-  /** "Chord overview" tab: the entire song's bar/beat grid, wrapped into rows of
-   *  BARS_PER_ROW bars, with each chord's label placed at the beat it starts on.
-   *  Note: there's no real verse/chorus structure detection here — rows are just
-   *  grouped sequentially, not labeled by actual song section. */
-  function renderOverviewGrid() {
-    overviewGridEl.innerHTML = "";
-    if (bars.length === 0) return;
+  // ---- Player header: title, play/pause and a progress bar that is split into the song's sections --------
+  const ICON_PLAY = '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>';
+  const ICON_PAUSE = '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z" fill="currentColor"/></svg>';
+  let progressSegs: { fill: HTMLElement; start: number; end: number }[] = [];
+  let currentSectionIdx = -1;
 
-    const CELL_W = 56;
-    const CELL_H = 44;
+  function setPlayingUi(playing: boolean) {
+    if (playing) {
+      lastFollowedRow = null; // re-centre the grid on the playing row as soon as playback starts
+      gridActive = -1;
+    }
+    btnPlay.innerHTML = playing ? ICON_PAUSE : ICON_PLAY;
+    btnPlay.setAttribute("aria-label", playing ? "Pause" : "Play");
+  }
 
-    for (let rowStart = 0; rowStart < bars.length; rowStart += BARS_PER_ROW) {
-      const rowBars = bars.slice(rowStart, rowStart + BARS_PER_ROW);
-      const row = document.createElement("div");
-      row.style.display = "flex";
-      row.style.marginBottom = "2px";
+  /** One progress segment (and one "jump to" option) per section; a single one when there are none. */
+  function renderProgress() {
+    progressEl.innerHTML = "";
+    sectionSelect.innerHTML = "";
+    progressSegs = [];
+    currentSectionIdx = -1;
+    const parts = sections.length > 0 ? sections : [{ label: "Song", start: 0, end: duration }];
 
-      rowBars.forEach((bar, idxInRow) => {
-        const barIndex = rowStart + idxInRow;
-        const beats = bar.beats;
-        const barEl = document.createElement("div");
-        barEl.dataset.barIndex = String(barIndex);
-        barEl.style.display = "grid";
-        barEl.style.gridTemplateColumns = `repeat(4, ${CELL_W}px)`;
-        barEl.style.borderRight = "2px solid var(--color-hairline-strong)";
-        barEl.style.cursor = "pointer";
-        barEl.addEventListener("click", () => seekTo(beats[0]));
+    parts.forEach((part, i) => {
+      const seg = document.createElement("div");
+      seg.className = "pb-seg";
+      seg.style.flex = `${Math.max(part.end - part.start, 0.5)} 1 0`;
+      seg.title = part.label;
+      const fill = document.createElement("div");
+      fill.className = "pb-fill";
+      seg.appendChild(fill);
+      progressEl.appendChild(seg);
+      progressSegs.push({ fill, start: part.start, end: part.end });
 
-        const isLeadingRest = barIndex === 0 && chordAt(beats[0] + 0.05) === "N" && chordAt(beats[3] - 0.05) === "N";
+      const option = document.createElement("option");
+      option.value = String(i);
+      option.textContent = part.label;
+      sectionSelect.appendChild(option);
+    });
+    sectionSelect.hidden = sections.length === 0;
+    progressEl.setAttribute("aria-valuemax", String(Math.round(duration)));
+    timeTotalEl.textContent = formatClock(duration);
+  }
 
-        for (let b = 0; b < 4; b++) {
-          const beatStart = beats[b];
-          const beatEnd = beats[b + 1];
-          const isRestCell = isLeadingRest && b === 0;
-
-          const cell = document.createElement("div");
-          cell.dataset.beatStart = String(beatStart);
-          cell.dataset.beatEnd = String(beatEnd);
-          cell.dataset.isRest = String(isRestCell);
-          cell.style.height = `${CELL_H}px`;
-          cell.style.borderRight = b < 3 ? "1px solid var(--color-hairline)" : "none";
-          cell.style.borderBottom = "1px solid var(--color-hairline)";
-          cell.style.display = "flex";
-          cell.style.alignItems = "flex-start";
-          cell.style.justifyContent = "flex-start";
-          cell.style.padding = "4px 6px";
-          cell.style.fontSize = "13px";
-          cell.style.fontWeight = "700";
-          cell.style.color = "var(--color-ink)";
-          cell.style.position = "relative";
-          cell.style.background = "var(--color-canvas)";
-          cell.style.transition = "background-color 0.15s, color 0.15s";
-
-          if (isRestCell) {
-            cell.style.background = "var(--color-ink)";
-            cell.style.color = "white";
-            cell.style.alignItems = "center";
-            cell.style.justifyContent = "center";
-            cell.textContent = "𝅘𝅥𝅮";
-          } else {
-            const startingHere = chords.find(
-              (seg) => seg.chord !== "N" && seg.start >= beatStart && seg.start < beatEnd,
-            );
-            const ownLabel = startingHere ? displayChord(startingHere.chord) : "";
-            const held = chordAt(beatStart);
-            cell.dataset.ownLabel = ownLabel;
-            cell.dataset.heldChord = held === "N" ? "" : displayChord(held);
-            setCellLabel(cell, ownLabel);
-          }
-
-          cell.addEventListener("click", (e) => {
-            e.stopPropagation();
-            seekTo(beatStart);
-          });
-
-          barEl.appendChild(cell);
-        }
-
-        row.appendChild(barEl);
-      });
-
-      overviewGridEl.appendChild(row);
+  /** Time label, progress fills and the section picker. Cheap enough to run every frame. */
+  function updateTransport(t: number) {
+    timeNowEl.textContent = formatClock(t);
+    progressEl.setAttribute("aria-valuenow", String(Math.round(t)));
+    let current = -1;
+    progressSegs.forEach((seg, i) => {
+      const fraction = Math.min(1, Math.max(0, (t - seg.start) / Math.max(seg.end - seg.start, 0.001)));
+      seg.fill.style.width = `${fraction * 100}%`;
+      if (t >= seg.start && t < seg.end) current = i;
+    });
+    if (current !== -1 && current !== currentSectionIdx) {
+      currentSectionIdx = current;
+      sectionSelect.value = String(current);
     }
   }
 
-  const overviewProgressEl = document.createElement("div");
-  overviewProgressEl.style.position = "absolute";
-  overviewProgressEl.style.left = "0";
-  overviewProgressEl.style.bottom = "0";
-  overviewProgressEl.style.height = "3px";
-  overviewProgressEl.style.background = "var(--color-success)";
-  overviewProgressEl.style.width = "0%";
+  /** Click or tap on the progress bar: jump to that point inside whichever section was hit. */
+  function seekFromProgress(event: PointerEvent) {
+    const segEls = Array.from(progressEl.children) as HTMLElement[];
+    const index = segEls.findIndex((el) => {
+      const r = el.getBoundingClientRect();
+      return event.clientX >= r.left - 1.5 && event.clientX <= r.right + 1.5;
+    });
+    if (index === -1) return;
+    const r = segEls[index].getBoundingClientRect();
+    const fraction = Math.min(1, Math.max(0, (event.clientX - r.left) / Math.max(r.width, 1)));
+    const seg = progressSegs[index];
+    seekTo(seg.start + fraction * (seg.end - seg.start));
+  }
 
-  /** Highlights the single beat cell currently playing (solid dark fill, like a
-   *  metronome tick) and fills a small progress bar across it as it plays. */
-  function highlightOverviewBeat(currentTime: number) {
-    let activeCell: HTMLElement | null = null;
-    let progress = 0;
+  // ---- Chords grid: every bar of the song, grouped into sections ---------------------------------------
+  const BEAT_CELLS = 4;
+  interface GridCell {
+    el: HTMLElement;
+    start: number;
+    bar: HTMLElement;
+    row: HTMLElement;
+  }
+  let gridCells: GridCell[] = [];
+  let gridActive = -1;
+  let gridFollowPausedUntil = 0; // while the person scrolls the page themselves, don't fight them
 
-    overviewGridEl.querySelectorAll<HTMLElement>("[data-beat-start]").forEach((cell) => {
-      const beatStart = Number(cell.dataset.beatStart);
-      const beatEnd = Number(cell.dataset.beatEnd);
-      const isActive = currentTime >= beatStart && currentTime < beatEnd;
-      const isRest = cell.dataset.isRest === "true";
+  const SECTION_COLORS: Record<string, string> = {
+    silence: "#e5e7eb",
+    intro: "#fde68a",
+    verse: "#bfdbfe",
+    chorus: "#bbf7d0",
+    bridge: "#fed7aa",
+    outro: "#e9d5ff",
+  };
+  const PART_COLORS = ["#c7d2fe", "#fbcfe8", "#a7f3d0", "#fde68a", "#bae6fd", "#fecaca"];
 
-      if (isActive) {
-        activeCell = cell;
-        progress = (currentTime - beatStart) / Math.max(beatEnd - beatStart, 0.001);
-      }
+  function sectionColor(label: string): string {
+    const kind = label.split(" ")[0].toLowerCase();
+    if (SECTION_COLORS[kind]) return SECTION_COLORS[kind];
+    const letter = label.startsWith("Part ") ? label.charCodeAt(5) - 65 : 0;
+    return PART_COLORS[((letter % PART_COLORS.length) + PART_COLORS.length) % PART_COLORS.length];
+  }
 
-      if (!isRest) {
-        cell.style.background = isActive ? "var(--color-ink)" : "var(--color-canvas)";
-        cell.style.color = isActive ? "white" : "var(--color-ink)";
-        // Continuation beats render blank normally (standard chord-chart style),
-        // but while active they show the held chord so the progress bar never
-        // sits next to an unlabeled box.
-        const ownLabel = cell.dataset.ownLabel || "";
-        const heldChord = cell.dataset.heldChord || "";
-        setCellLabel(cell, isActive ? ownLabel || heldChord : ownLabel);
-      }
+  function firstNumber(values: (number | null)[]): number | null {
+    for (const v of values) if (v !== null) return v;
+    return null;
+  }
+
+  /** Sections as colour-coded blocks; each row is four bars, each bar four beat cells. A chord is written in the
+   *  cell of the beat it starts on and left blank while it keeps ringing; the playing beat is filled in. */
+  function renderChordGrid() {
+    chordGridEl.innerHTML = "";
+    gridCells = [];
+    gridActive = -1;
+    if (bars.length === 0) return;
+
+    const blocks: Section[] =
+      sections.length > 0
+        ? sections
+        : [{ label: "", start: bars[0].start, end: duration, startBar: 0, endBar: bars.length - 1 }];
+    const firstReal = blocks.findIndex((sec) => sec.startBar !== null);
+    let lastReal = -1;
+    blocks.forEach((sec, i) => {
+      if (sec.startBar !== null) lastReal = i;
     });
 
-    if (activeCell) {
-      overviewProgressEl.style.width = `${Math.min(100, Math.max(0, progress * 100))}%`;
-      activeCell.appendChild(overviewProgressEl);
+    let next = 0; // next chord segment not yet placed; cells and chords are both in time order
+    const makeCell = (label: string, kind: string): HTMLButtonElement => {
+      const cell = document.createElement("button");
+      cell.type = "button";
+      cell.className = `gc ${kind}`.trim();
+      if (label) {
+        cell.textContent = label;
+        cell.title = label;
+        cell.dataset.len = String(Math.min(label.length, 6)); // CSS shrinks long names to fit the cell
+      }
+      return cell;
+    };
+
+    blocks.forEach((section, si) => {
+      const block = document.createElement("section");
+      block.className = "gs";
+      if (section.label) {
+        const tag = document.createElement("button");
+        tag.type = "button";
+        tag.className = "gs-tag";
+        tag.textContent = section.label;
+        tag.style.background = sectionColor(section.label);
+        tag.setAttribute("aria-label", `Go to ${section.label}`);
+        tag.addEventListener("click", () => seekTo(section.start));
+        block.appendChild(tag);
+      }
+      const body = document.createElement("div");
+      body.className = "gs-body";
+      block.appendChild(body);
+
+      if (section.startBar === null) {
+        // Silence before the music starts: one rest cell.
+        const row = document.createElement("div");
+        row.className = "gr";
+        const bar = document.createElement("div");
+        bar.className = "gb";
+        const cell = makeCell("𝄽", "is-silence");
+        cell.addEventListener("click", () => seekTo(section.start));
+        bar.appendChild(cell);
+        row.appendChild(bar);
+        body.appendChild(row);
+        gridCells.push({ el: cell, start: section.start, bar, row });
+        chordGridEl.appendChild(block);
+        return;
+      }
+
+      // Bars before the first / after the last section (a pickup, a short final bar) belong to those sections.
+      const hasSilence = blocks[0].startBar === null;
+      const from = si === firstReal && !hasSilence ? 0 : (section.startBar as number);
+      const to = si === lastReal ? bars.length - 1 : (section.endBar as number);
+
+      for (let rowStart = from; rowStart <= to; rowStart += BARS_PER_ROW) {
+        const row = document.createElement("div");
+        row.className = "gr";
+        for (let b = rowStart; b < Math.min(rowStart + BARS_PER_ROW, to + 1); b++) {
+          const bar = document.createElement("div");
+          bar.className = "gb";
+          const beats = bars[b].beats;
+          for (let k = 0; k < BEAT_CELLS; k++) {
+            const t0 = beats[k];
+            if (t0 === null) {
+              const empty = makeCell("", "is-empty");
+              empty.disabled = true;
+              bar.appendChild(empty);
+              continue;
+            }
+            const t1 = firstNumber(beats.slice(k + 1)) ?? duration;
+            const half = Math.max(t1 - t0, 0.05) / 2;
+            while (next < chords.length && chords[next].start < t0 - half) next++;
+            let cell: HTMLButtonElement;
+            if (next < chords.length && chords[next].start < t0 + half) {
+              const seg = chords[next++];
+              cell = seg.chord === "N" ? makeCell("—", "is-rest") : makeCell(displayChord(seg.chord), "");
+            } else {
+              cell = makeCell("", "");
+            }
+            cell.addEventListener("click", () => seekTo(t0));
+            bar.appendChild(cell);
+            gridCells.push({ el: cell, start: t0, bar, row });
+          }
+          row.appendChild(bar);
+        }
+        body.appendChild(row);
+      }
+      chordGridEl.appendChild(block);
+    });
+  }
+
+  /** Keeps the playing row at one fixed spot just under the header (like a teleprompter): the grid scrolls up
+   *  by a row each time playback moves to the next one. */
+  let lastFollowedRow: HTMLElement | null = null;
+  function followGridRow(row: HTMLElement) {
+    if (row === lastFollowedRow) return;
+    lastFollowedRow = row;
+    const target = headerEl.getBoundingClientRect().bottom + 72;
+    const delta = row.getBoundingClientRect().top - target;
+    if (Math.abs(delta) < 4) return;
+    window.scrollTo({ top: window.scrollY + delta, behavior: reducedMotion ? "auto" : "smooth" });
+  }
+
+  ["wheel", "touchmove"].forEach((type) =>
+    window.addEventListener(type, () => (gridFollowPausedUntil = performance.now() + 4000), { passive: true }),
+  );
+  window.addEventListener("keydown", (e) => {
+    if (["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End"].includes(e.code)) {
+      gridFollowPausedUntil = performance.now() + 4000;
     }
+  });
+
+  /** Fills in the beat cell that is playing. */
+  function highlightChordGrid(t: number) {
+    if (gridCells.length === 0) return;
+    let lo = 0;
+    let hi = gridCells.length - 1;
+    let index = -1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (gridCells[mid].start <= t) {
+        index = mid;
+        lo = mid + 1;
+      } else {
+        hi = mid - 1;
+      }
+    }
+    if (index === gridActive) return;
+    if (gridActive >= 0) {
+      gridCells[gridActive].el.classList.remove("is-active");
+      gridCells[gridActive].bar.classList.remove("is-current");
+    }
+    gridActive = index;
+    if (index < 0) return;
+    const cell = gridCells[index];
+    cell.el.classList.add("is-active");
+    cell.bar.classList.add("is-current");
+    if (activeView === "grid" && isPlaying() && performance.now() >= gridFollowPausedUntil) followGridRow(cell.row);
   }
 
   function renderInstrumentView(rawChord: string) {
@@ -826,28 +1158,82 @@ import Nav from "../components/Nav.astro";
     renderInstrumentView(rawChord);
   }
 
-  /** Re-renders both views after a Transpose/Capo change (chord names/shapes shift). */
+  /** Song details card: the chords used (most time first), key, tempo and number of sections. */
+  function renderDetails() {
+    const totals = new Map<string, number>();
+    chords.forEach((seg) => {
+      if (seg.chord !== "N") totals.set(seg.chord, (totals.get(seg.chord) ?? 0) + seg.end - seg.start);
+    });
+    sdChipsEl.innerHTML = "";
+    [...totals.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .forEach(([raw]) => {
+        const chip = document.createElement("span");
+        chip.className = "sd-chip";
+        chip.textContent = displayChord(raw);
+        sdChipsEl.appendChild(chip);
+      });
+    sdKeyEl.textContent = songKey ? chordKeyLabel(transposeChord(songKey, transposeSteps)) : "—";
+    sdTempoEl.textContent = `${Math.round(tempo)} BPM`;
+    const named = sections.filter((sec) => sec.startBar !== null).length;
+    sdSectionsEl.textContent = named > 0 ? String(named) : "—";
+  }
+
+  /** The Transpose control shows the song's key (after transposing), or the semitone offset when it is unknown. */
+  function updateTransposeLabel() {
+    transposeValueEl.textContent = songKey ? transposeChord(songKey, transposeSteps) : semitoneLabel(transposeSteps);
+    transposeValueEl.title = `Transposed ${semitoneLabel(transposeSteps)} semitones`;
+  }
+
+  /** "Summary" view: a diagram of every chord in the song, most used first. */
+  function renderSummary() {
+    summaryGridEl.innerHTML = "";
+    const totals = new Map<string, number>();
+    chords.forEach((seg) => {
+      if (seg.chord !== "N") totals.set(seg.chord, (totals.get(seg.chord) ?? 0) + seg.end - seg.start);
+    });
+    const all = [...totals.values()].reduce((a, b) => a + b, 0) || 1;
+    [...totals.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .forEach(([raw, seconds]) => {
+        const fChord = fingeringChord(raw);
+        const shape = activeInstrument === "guitar" ? getGuitarShape(fChord) : undefined;
+        const card = shape ? buildFretDiagram(fChord, shape, 1) : buildNoteFallbackCard(fChord);
+        card.title = `${displayChord(raw)} — ${Math.round((100 * seconds) / all)}% of the song`;
+        summaryGridEl.appendChild(card);
+      });
+  }
+
+  function setDiagramMode(mode: "animated" | "summary") {
+    const animated = mode === "animated";
+    dgAnimatedPanel.classList.toggle("hidden", !animated);
+    dgSummaryPanel.classList.toggle("hidden", animated);
+    dgAnimated.classList.toggle("is-active", animated);
+    dgAnimated.setAttribute("aria-pressed", String(animated));
+    dgSummary.classList.toggle("is-active", !animated);
+    dgSummary.setAttribute("aria-pressed", String(!animated));
+  }
+
+  /** Re-renders every view after a Transpose/Capo/chord-detail change (chord names and shapes shift). */
   function refreshViews() {
     renderDiagramRow();
     renderDiagramWindow();
-    renderOverviewGrid();
-    if (lastActiveIndex >= 0 && chords[lastActiveIndex]) {
-      highlightOverviewBeat(chords[lastActiveIndex].start);
-      highlightDiagramRow(chords[lastActiveIndex].start);
-      setCurrentChord(chords[lastActiveIndex].chord);
-    }
+    renderChordGrid();
+    renderSummary();
+    renderDetails();
+    updateTransposeLabel();
+    if (lastActiveIndex >= 0 && chords[lastActiveIndex]) setCurrentChord(chords[lastActiveIndex].chord);
+    const t = playerTime();
+    highlightDiagramRow(t);
+    highlightChordGrid(t);
   }
 
-  let lastOverviewPaint = 0;
-
   function onTimeUpdate(currentTime: number) {
-    // The overview grid repaints every cell, so keep it to ~10 Hz and only while it is on screen.
-    const now = performance.now();
-    if (activeView === "overview" && now - lastOverviewPaint > 100) {
-      lastOverviewPaint = now;
-      highlightOverviewBeat(currentTime);
-    }
     highlightDiagramRow(currentTime);
+    highlightChordGrid(currentTime);
+    updateTransport(currentTime);
+    applyLoop(currentTime);
 
     const index = chords.findIndex((s) => currentTime >= s.start && currentTime < s.end);
     if (index === -1 || index === lastActiveIndex) return;
@@ -859,7 +1245,7 @@ import Nav from "../components/Nav.astro";
 
   /** The player's clock in seconds, whichever player is in use. */
   function playerTime(): number {
-    if (!audioEl.classList.contains("hidden")) return audioEl.currentTime;
+    if (usingAudio()) return audioEl.currentTime;
     return ytPlayer && typeof ytPlayer.getCurrentTime === "function" ? ytPlayer.getCurrentTime() : 0;
   }
 
@@ -880,14 +1266,84 @@ import Nav from "../components/Nav.astro";
     onTimeUpdate(playerTime());
   }
 
+  /** True when an uploaded file is playing through <audio>; false for the YouTube player. */
+  function usingAudio(): boolean {
+    return audioEl.dataset.mode === "audio";
+  }
+
+  function isPlaying(): boolean {
+    if (usingAudio()) return !audioEl.paused;
+    return !!ytPlayer && typeof ytPlayer.getPlayerState === "function" && ytPlayer.getPlayerState() === 1;
+  }
+
+  function seekQuiet(time: number) {
+    if (usingAudio()) audioEl.currentTime = time;
+    else if (ytPlayer) ytPlayer.seekTo(time, true);
+    onTimeUpdate(time);
+  }
+
   function seekTo(time: number) {
-    if (!audioEl.classList.contains("hidden")) {
-      audioEl.currentTime = time;
-      audioEl.play();
-    } else if (ytPlayer) {
-      ytPlayer.seekTo(time, true);
-      ytPlayer.playVideo();
+    seekQuiet(time);
+    if (usingAudio()) void audioEl.play();
+    else if (ytPlayer) ytPlayer.playVideo();
+  }
+
+  function rawPause() {
+    if (usingAudio()) audioEl.pause();
+    else if (ytPlayer) ytPlayer.pauseVideo();
+  }
+
+  // Count-in: three clicks at the song's tempo before playback starts.
+  let countInEnabled = false;
+  let audioCtx: AudioContext | null = null;
+  function clickSound(accent: boolean) {
+    audioCtx = audioCtx ?? new AudioContext();
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.frequency.value = accent ? 1568 : 1046;
+    gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.09);
+  }
+  async function runCountIn() {
+    const beatMs = 60000 / (tempo * (tempoPct / 100));
+    const shownChord = currentChordEl.textContent;
+    const shownKey = currentChordKeyEl.textContent;
+    for (let n = 3; n >= 1; n--) {
+      currentChordEl.textContent = String(n);
+      currentChordKeyEl.textContent = "Get ready";
+      clickSound(n === 3);
+      await new Promise((resolve) => setTimeout(resolve, beatMs));
     }
+    currentChordEl.textContent = shownChord;
+    currentChordKeyEl.textContent = shownKey;
+  }
+
+  let counting = false;
+  async function togglePlay() {
+    if (counting) return;
+    if (isPlaying()) {
+      rawPause();
+      return;
+    }
+    if (countInEnabled) {
+      counting = true;
+      await runCountIn();
+      counting = false;
+    }
+    if (usingAudio()) void audioEl.play();
+    else if (ytPlayer) ytPlayer.playVideo();
+  }
+
+  // Loop: off -> whole song -> the section that was playing when it was switched on.
+  let loopMode: "off" | "song" | "section" = "off";
+  let loopSection = -1;
+  function applyLoop(t: number) {
+    if (loopMode !== "section" || loopSection < 0 || !isPlaying()) return;
+    const seg = progressSegs[loopSection];
+    if (seg && t >= seg.end - 0.04) seekQuiet(seg.start);
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -921,7 +1377,12 @@ import Nav from "../components/Nav.astro";
           },
           // 1 = playing, 2 = paused, 0 = ended, 3 = buffering
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          onStateChange: (event: any) => (event.data === 1 ? startSyncLoop() : stopSyncLoop()),
+          onStateChange: (event: any) => {
+            setPlayingUi(event.data === 1);
+            if (event.data === 1) startSyncLoop();
+            else stopSyncLoop();
+            if (event.data === 0 && loopMode === "song") seekTo(0);
+          },
         },
       });
     };
@@ -943,16 +1404,34 @@ import Nav from "../components/Nav.astro";
       return;
     }
 
-    chords = result.chords;
+    chordsSimple = result.chords;
+    chordsDetailed = result.chordsDetailed ?? result.chords;
+    chords = chordsSimple;
     bars = result.bars;
+    sections = result.sections ?? [];
+    songKey = result.key ?? "";
     duration = result.duration;
     tempo = result.tempo || 120;
+
+    const title = result.title || "Your song";
+    songTitleEl.textContent = title;
+    songArtistEl.textContent = result.artist ? `by ${result.artist}` : "";
+    songSubEl.textContent = "Transcription by TheChordify";
+    document.title = `${title} chords — The Chordify`;
+    detailToggle.hidden = chordsDetailed === chordsSimple;
+
     buildChordEvents();
     loadingState.classList.add("hidden");
     playerState.classList.remove("hidden");
+    renderProgress();
+    setPlayingUi(false);
     renderDiagramRow();
     renderDiagramWindow();
-    renderOverviewGrid();
+    renderChordGrid();
+    renderSummary();
+    renderDetails();
+    updateTransposeLabel();
+    syncHeaderSize();
 
     if (result.source === "youtube" && result.sourceUrl) {
       const videoId = extractYoutubeId(result.sourceUrl);
@@ -963,16 +1442,16 @@ import Nav from "../components/Nav.astro";
         return;
       }
     } else {
-      audioEl.classList.remove("hidden");
+      audioEl.dataset.mode = "audio";
       audioEl.src = `${API_BASE}${result.audioUrl}`;
+      audioEl.addEventListener("play", () => setPlayingUi(true));
+      audioEl.addEventListener("pause", () => setPlayingUi(false));
       audioEl.addEventListener("timeupdate", () => onTimeUpdate(audioEl.currentTime));
       audioEl.addEventListener("seeked", () => onTimeUpdate(audioEl.currentTime));
       audioEl.addEventListener("play", startSyncLoop);
       audioEl.addEventListener("pause", stopSyncLoop);
       audioEl.addEventListener("ended", stopSyncLoop);
-      audioEl.addEventListener("ended", () => {
-        if (loopEnabled) seekTo(0);
-      });
+      audioEl.addEventListener("ended", () => setPlayingUi(false));
     }
 
     if (chords.length > 0) setCurrentChord(chords[0].chord);
@@ -989,6 +1468,7 @@ import Nav from "../components/Nav.astro";
         b.setAttribute("aria-pressed", String(active));
       });
       if (lastActiveIndex >= 0) renderInstrumentView(chords[lastActiveIndex].chord);
+      renderSummary();
     });
   });
 
@@ -999,13 +1479,14 @@ import Nav from "../components/Nav.astro";
     if (ytPlayer && typeof ytPlayer.setVolume === "function") ytPlayer.setVolume(v * 100);
   });
 
-  // Toolbar: loop (loop the whole song)
+  // Toolbar: loop (off -> whole song -> current section)
   loopToggle.addEventListener("click", () => {
-    loopEnabled = !loopEnabled;
-    audioEl.loop = loopEnabled;
-    loopToggle.textContent = loopEnabled ? "On" : "Off";
-    loopToggle.style.color = loopEnabled ? "var(--color-violet)" : "var(--color-body)";
-    loopToggle.setAttribute("aria-pressed", String(loopEnabled));
+    loopMode = loopMode === "off" ? "song" : loopMode === "song" && sections.length > 0 ? "section" : "off";
+    loopSection = loopMode === "section" ? Math.max(0, currentSectionIdx) : -1;
+    audioEl.loop = loopMode === "song";
+    loopToggle.textContent = loopMode === "off" ? "Off" : loopMode === "song" ? "Song" : "Section";
+    loopToggle.style.color = loopMode === "off" ? "var(--color-body)" : "var(--color-violet)";
+    loopToggle.setAttribute("aria-pressed", String(loopMode !== "off"));
   });
 
   // Toolbar: tempo (playback speed, 50%-150%)
@@ -1039,32 +1520,95 @@ import Nav from "../components/Nav.astro";
   // Toolbar: transpose (shifts the chord names everywhere — sing/play in a different key)
   transposeDown.addEventListener("click", () => {
     transposeSteps -= 1;
-    transposeValueEl.textContent = semitoneLabel(transposeSteps);
+    updateTransposeLabel();
     refreshViews();
   });
   transposeUp.addEventListener("click", () => {
     transposeSteps += 1;
-    transposeValueEl.textContent = semitoneLabel(transposeSteps);
+    updateTransposeLabel();
     refreshViews();
   });
 
-  // View switcher: Chord diagrams / Chord overview
-  function setActiveView(view: "diagrams" | "overview") {
+  // View switcher: Chords grid / Chord diagrams
+  function setActiveView(view: "diagrams" | "grid") {
     activeView = view;
     const isDiagrams = view === "diagrams";
     panelDiagrams.classList.toggle("hidden", !isDiagrams);
-    panelOverview.classList.toggle("hidden", isDiagrams);
+    panelGrid.classList.toggle("hidden", isDiagrams);
     viewTabDiagrams.classList.toggle("is-active", isDiagrams);
     viewTabDiagrams.setAttribute("aria-pressed", String(isDiagrams));
-    viewTabOverview.classList.toggle("is-active", !isDiagrams);
-    viewTabOverview.setAttribute("aria-pressed", String(!isDiagrams));
+    viewTabGrid.classList.toggle("is-active", !isDiagrams);
+    viewTabGrid.setAttribute("aria-pressed", String(!isDiagrams));
     // the strip can't be measured while hidden, so bring the playing chord back into view on return
     if (isDiagrams && timelineActive >= 0) followActiveChip(timelineChips[timelineActive]);
-    // the overview only repaints while it is visible, so paint it once on arrival
-    if (!isDiagrams) highlightOverviewBeat(playerTime());
   }
   viewTabDiagrams.addEventListener("click", () => setActiveView("diagrams"));
-  viewTabOverview.addEventListener("click", () => setActiveView("overview"));
+  viewTabGrid.addEventListener("click", () => setActiveView("grid"));
+
+  // Header: share, compact-on-scroll, transport, progress bar, section picker
+  btnShare.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      btnShare.textContent = "Link copied";
+    } catch {
+      window.prompt("Copy this link", window.location.href);
+    }
+    setTimeout(() => (btnShare.textContent = "Share"), 1800);
+  });
+  const syncHeaderSize = () => {
+    headerEl.classList.toggle("is-compact", window.scrollY > 70);
+    document.documentElement.style.setProperty("--ph-h", `${headerEl.offsetHeight}px`);
+  };
+  window.addEventListener("scroll", syncHeaderSize, { passive: true });
+  window.addEventListener("resize", syncHeaderSize);
+  new ResizeObserver(syncHeaderSize).observe(headerEl);
+  dgAnimated.addEventListener("click", () => setDiagramMode("animated"));
+  dgSummary.addEventListener("click", () => setDiagramMode("summary"));
+  btnPlay.addEventListener("click", () => void togglePlay());
+  btnRestart.addEventListener("click", () => seekQuiet(0));
+  progressEl.addEventListener("pointerdown", seekFromProgress);
+  progressEl.addEventListener("keydown", (e) => {
+    if (e.code === "ArrowRight") seekQuiet(Math.min(duration, playerTime() + 5));
+    else if (e.code === "ArrowLeft") seekQuiet(Math.max(0, playerTime() - 5));
+    else return;
+    e.preventDefault();
+  });
+  sectionSelect.addEventListener("change", () => {
+    const seg = progressSegs[Number(sectionSelect.value)];
+    if (seg) seekTo(seg.start);
+  });
+  window.addEventListener("keydown", (e) => {
+    const target = e.target as HTMLElement;
+    if (e.code === "Space" && (target === document.body || target === playerState)) {
+      e.preventDefault();
+      void togglePlay();
+    }
+  });
+
+  // Toolbar: count-in, section labels, simple/detailed chords
+  countInToggle.addEventListener("click", () => {
+    countInEnabled = !countInEnabled;
+    countInToggle.textContent = countInEnabled ? "On" : "Off";
+    countInToggle.style.color = countInEnabled ? "var(--color-violet)" : "var(--color-body)";
+    countInToggle.setAttribute("aria-pressed", String(countInEnabled));
+  });
+  sectionsToggle.addEventListener("click", () => {
+    const showing = chordGridEl.classList.toggle("grid-hide-tags") === false;
+    sectionsToggle.textContent = showing ? "On" : "Off";
+    sectionsToggle.style.color = showing ? "var(--color-violet)" : "var(--color-body)";
+    sectionsToggle.setAttribute("aria-pressed", String(showing));
+  });
+  detailToggle.addEventListener("click", () => {
+    const detailed = chords === chordsSimple;
+    chords = detailed ? chordsDetailed : chordsSimple;
+    detailToggle.textContent = detailed ? "Detailed" : "Simple";
+    detailToggle.style.color = detailed ? "var(--color-violet)" : "var(--color-body)";
+    detailToggle.setAttribute("aria-pressed", String(detailed));
+    buildChordEvents();
+    lastActiveIndex = -1;
+    refreshViews();
+    onTimeUpdate(playerTime());
+  });
 
   init();
 </script>
