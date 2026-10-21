@@ -247,11 +247,11 @@ def run_synthetic(n_tracks: int, seed: int) -> None:
     print_summary("Synthetic progressions", rows, dict(totals))
 
 
-def run_songs(folder: str) -> None:
+def run_songs(folder: str, lab_ext: str = ".lab") -> None:
     rows, totals = [], collections.defaultdict(lambda: [0, 0, 0])
     audio_files = sorted(p for ext in ("mp3", "wav", "flac", "m4a") for p in glob.glob(os.path.join(folder, f"*.{ext}")))
     for path in audio_files:
-        lab = os.path.splitext(path)[0] + ".lab"
+        lab = os.path.splitext(path)[0] + lab_ext
         if not os.path.exists(lab):
             print(f"  skipping {os.path.basename(path)}: no .lab file")
             continue
@@ -276,11 +276,12 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--synthetic", type=int, metavar="N", help="score N random synthetic progressions")
     ap.add_argument("--songs", metavar="DIR", help="score real songs (audio + .lab) in DIR")
+    ap.add_argument("--lab-ext", default=".lab", help="reference file suffix, e.g. .performed.lab")
     ap.add_argument("--seed", type=int, default=7)
     args = ap.parse_args()
     if args.synthetic:
         run_synthetic(args.synthetic, args.seed)
     if args.songs:
-        run_songs(args.songs)
+        run_songs(args.songs, args.lab_ext)
     if not (args.synthetic or args.songs):
         ap.print_help()

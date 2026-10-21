@@ -17,10 +17,12 @@ from __future__ import annotations
 
 import os
 import threading
+from dataclasses import dataclass
 from typing import Callable, Optional
 
 import librosa
 import numpy as np
+from scipy.ndimage import uniform_filter1d
 
 from .chord_detection import NOTE_NAMES, estimate_beats, build_bars
 
@@ -165,26 +167,22 @@ def _label(root: int, quality: str, bass: Optional[int] = None) -> str:
     return f"{name}/{NOTE_NAMES[bass]}" if bass is not None and bass != root else name
 
 
-def _aggregate_beats(probs: np.ndarray, boundaries: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """Average frame probabilities inside each beat interval -> (beats, 170) soft votes."""
-    n = probs.shape[0]
-    idx = np.clip(np.round(boundaries * FRAMES_PER_SECOND).astype(int), 0, n)
-    rows = []
-    for a, b in zip(idx[:-1], idx[1:]):
-        b = max(b, a + 1)
-        window = probs[min(a, n - 1) : min(b, n)]
-        rows.append(window.mean(axis=0))
-    votes = np.stack(rows)
-    return votes.argmax(axis=1), votes.max(axis=1)
+def _shifted_probs(feature: np.ndarray, semitones: int) -> np.ndarray:
+    """Model probabilities for the song as if transposed by `semitones`, mapped back to the real key.
 
-
-def _despeckle(classes: list[int], conf: np.ndarray, floor: float = 0.6) -> list[int]:
-    """Drop a one-beat chord between two identical neighbours when the model was unsure of it."""
-    out = list(classes)
-    for i in range(1, len(classes) - 1):
-        if classes[i - 1] == classes[i + 1] != classes[i] and conf[i] < floor:
-            out[i] = classes[i - 1]
-    return out
+    A semitone is two CQT bins at 24 bins per octave, so transposing is a shift of the input.
+    """
+    if semitones == 0:
+        return _predict_probs(feature)
+    moved = np.roll(feature, 2 * semitones, axis=1)
+    if semitones > 0:
+        moved[:, : 2 * semitones] = feature[:, :1]
+    else:
+        moved[:, 2 * semitones :] = feature[:, -1:]
+    p = _predict_probs(moved)
+    chords = p[:, :_UNKNOWN_IDX].reshape(-1, 12, 14)  # [frame, root, quality]
+    unshifted = np.roll(chords, -semitones, axis=1).reshape(-1, _UNKNOWN_IDX)  # predicted root r+s is really r
+    return np.concatenate([unshifted, p[:, _UNKNOWN_IDX:]], axis=1)
 
 
 def _bass_for_segment(bass_chroma: np.ndarray, frames: slice, root: int, quality: str) -> Optional[int]:
@@ -207,14 +205,57 @@ def _bass_for_segment(bass_chroma: np.ndarray, frames: slice, root: int, quality
     return bass
 
 
-def detect_chords_ai(audio_path: str, on_progress: Optional[ProgressFn] = None) -> dict:
-    progress = on_progress or (lambda _p, _s: None)
+@dataclass
+class Features:
+    """Everything the (slow) audio analysis produces; decode() turns it into chords cheaply."""
 
-    progress(3, "Loading the chord model")
-    _load_model()
+    duration: float
+    bpm: float
+    boundaries: np.ndarray  # beat boundaries in seconds, 0 and the track duration included
+    probs: np.ndarray  # (frames, 170) model class probabilities
+    bass_chroma: np.ndarray  # (12, frames) low-register chroma
+    chroma: np.ndarray  # (12, frames) full-range chroma
 
-    progress(8, "Loading audio")
-    y, _ = librosa.load(audio_path, sr=SAMPLE_RATE, mono=True)
+
+@dataclass
+class DecodeOptions:
+    smooth: int = 5  # frames of moving-average smoothing over the model output (~0.1 s each)
+    snap: float = 0.1  # pull a chord change onto the nearest beat if it is this close (seconds)
+    # How much the notes actually sounding in a chord can overrule the model's choice of chord
+    # type (0 = trust the model). The model tends to flatten maj7/m7/6 into plain major/minor;
+    # 8 recovered about a third more maj7s and an eighth more 7ths on real guitar recordings
+    # without touching plain major/minor. Set CHORD_COLOR_WEIGHT=0 to turn it off.
+    color_weight: float = float(os.environ.get("CHORD_COLOR_WEIGHT", "8"))
+
+
+def _unit_template(quality: str) -> np.ndarray:
+    t = np.zeros(12)
+    t[list(_QUALITY_INTERVALS[quality])] = 1
+    return t / np.linalg.norm(t)
+
+
+_QUALITY_TEMPLATES = np.stack([_unit_template(q) for q in _BTC_QUALITIES])
+
+
+def _refine_quality(f: "Features", root: int, lo: int, hi: int, weight: float) -> str:
+    """Pick the chord type for a segment from the model's per-type probabilities plus how well the
+    segment's average chroma (rotated to the root) matches each chord shape."""
+    model = f.probs[lo:hi, root * 14 : root * 14 + 14].mean(axis=0)
+    chroma = np.roll(f.chroma[:, lo:hi].mean(axis=1), -root)
+    chroma = chroma / (np.linalg.norm(chroma) + 1e-9)
+    score = np.log(model + 1e-3) + weight * (_QUALITY_TEMPLATES @ chroma)
+    return _BTC_QUALITIES[int(score.argmax())]
+
+
+# Measured on the benchmark (eval/run_eval.py): decoding at the model's own frame rate and
+# snapping to beats beat forcing every change onto the beat grid (+1.8 root on real guitar),
+# and averaging over +-1 semitone shifted copies added a further ~0.3-0.9 points.
+TTA_SHIFTS = (-1, 0, 1)
+
+
+def extract_features(y: np.ndarray, progress: Optional[ProgressFn] = None, tta: tuple[int, ...] = TTA_SHIFTS) -> Features:
+    """Run beat tracking, the chord model and the chroma analyses on mono 22.05 kHz audio."""
+    progress = progress or (lambda _p, _s: None)
     duration = float(librosa.get_duration(y=y, sr=SAMPLE_RATE))
 
     progress(20, "Listening for rhythm")
@@ -230,52 +271,81 @@ def detect_chords_ai(audio_path: str, on_progress: Optional[ProgressFn] = None) 
     feature = _cqt_features(y)
 
     progress(60, "Recognising chords")
-    probs = _predict_probs(feature)
+    probs = np.mean([_shifted_probs(feature, s) for s in tta], axis=0)
 
     progress(85, "Finding the bass line")
     bass_chroma = librosa.feature.chroma_cqt(
         y=y, sr=SAMPLE_RATE, hop_length=HOP_LENGTH, fmin=librosa.note_to_hz("C1"), n_octaves=3, norm=None
     )
+    chroma = librosa.feature.chroma_cqt(y=y, sr=SAMPLE_RATE, hop_length=HOP_LENGTH)
+    return Features(duration, bpm, boundaries, probs, bass_chroma, chroma)
 
-    progress(92, "Building the chord timeline")
-    classes, conf = _aggregate_beats(probs, boundaries)
-    classes = _despeckle([int(c) for c in classes], conf)
 
-    # Merge consecutive beats of the same class into segments.
-    runs: list[list] = []  # [start_beat, end_beat, class, summed confidence]
+def decode(f: Features, opts: Optional[DecodeOptions] = None) -> list[dict]:
+    """Chord segments (start, end, chord, confidence) from analysed features."""
+    opts = opts or DecodeOptions()
+    probs = uniform_filter1d(f.probs, size=opts.smooth, axis=0, mode="nearest") if opts.smooth > 1 else f.probs
+    classes = probs.argmax(axis=1)
+    classes[classes == _UNKNOWN_IDX] = _NO_CHORD_IDX
+
+    # Runs of identical frames -> [start, end, class], in seconds.
+    runs: list[list] = []
     for i, cls in enumerate(classes):
-        if cls == _UNKNOWN_IDX:
-            cls = _NO_CHORD_IDX
+        cls = int(cls)
         if runs and runs[-1][2] == cls:
             runs[-1][1] = i + 1
-            runs[-1][3] += float(conf[i])
         else:
-            runs.append([i, i + 1, cls, float(conf[i])])
+            runs.append([i, i + 1, cls])
+    segs = [[start / FRAMES_PER_SECOND, end / FRAMES_PER_SECOND, cls] for start, end, cls in runs]
+    segs[0][0] = 0.0
+    segs[-1][1] = f.duration
 
-    segments: list[dict] = []
-    for start_beat, end_beat, cls, conf_sum in runs:
-        start, end = float(boundaries[start_beat]), float(boundaries[end_beat])
+    # Real chord changes land on the beat, so pull nearby ones onto the beat grid.
+    for i in range(1, len(segs)):
+        nearest = float(f.boundaries[int(np.argmin(np.abs(f.boundaries - segs[i][0])))])
+        if abs(nearest - segs[i][0]) <= opts.snap:
+            segs[i - 1][1] = segs[i][0] = nearest
+    segs = [s for s in segs if s[1] - s[0] > 1e-3]
+
+    out: list[dict] = []
+    for start, end, cls in segs:
+        lo = int(start * FRAMES_PER_SECOND)
+        hi = max(lo + 1, int(end * FRAMES_PER_SECOND))
         parts = _class_to_parts(cls)
         if parts is None:
             label = "N"
         else:
             root, quality = parts
-            lo = int(start * FRAMES_PER_SECOND)
-            hi = max(lo + 1, int(end * FRAMES_PER_SECOND))
-            label = _label(root, quality, _bass_for_segment(bass_chroma, slice(lo, hi), root, quality))
-        segments.append(
-            {"start": start, "end": end, "chord": label, "confidence": round(conf_sum / (end_beat - start_beat), 2)}
-        )
+            if opts.color_weight > 0:
+                quality = _refine_quality(f, root, lo, hi, opts.color_weight)
+            label = _label(root, quality, _bass_for_segment(f.bass_chroma, slice(lo, hi), root, quality))
+        confidence = float(probs[lo:hi, cls].mean())
+        out.append({"start": float(start), "end": float(end), "chord": label, "confidence": round(confidence, 2)})
+    return out
 
-    beat_list = [float(t) for t in boundaries[:-1]]
+
+def detect_chords_ai(audio_path: str, on_progress: Optional[ProgressFn] = None) -> dict:
+    progress = on_progress or (lambda _p, _s: None)
+
+    progress(3, "Loading the chord model")
+    _load_model()
+
+    progress(8, "Loading audio")
+    y, _ = librosa.load(audio_path, sr=SAMPLE_RATE, mono=True)
+    features = extract_features(y, progress=progress)
+
+    progress(92, "Building the chord timeline")
+    segments = decode(features)
+
+    beat_list = [float(t) for t in features.boundaries[:-1]]
     if beat_list and beat_list[0] > 0.01:
         beat_list = [0.0] + beat_list
-    beat_list.append(duration)
+    beat_list.append(features.duration)
 
     return {
-        "duration": duration,
+        "duration": features.duration,
         "chords": segments,
-        "tempo": round(bpm, 1),
+        "tempo": round(features.bpm, 1),
         "beatTimes": beat_list,
         "bars": build_bars(beat_list),
     }

@@ -5,8 +5,12 @@ recordings of an acoustic guitar with chord annotations. It is not part of BTC's
 data, so it is a fair held-out test. We only fetch what we need: the 39 MB annotation zip,
 then individual audio files out of the 657 MB mono-mic zip via HTTP range requests.
 
-Each song becomes eval/songs/guitarset/NAME.wav + NAME.lab. Labels are the "instructed"
-chord chart (lead-sheet level: major, minor, 7, half-diminished), one chord per bar.
+Each song becomes eval/songs/guitarset/NAME.wav plus two reference files:
+  NAME.lab            the "instructed" chord chart (lead-sheet level: major, minor, 7,
+                      half-diminished), one chord per bar
+  NAME.performed.lab  the chords actually played (semi-automatically transcribed, manually
+                      verified), reduced to our 14 chord types: maj6, maj7, sus2, 9ths -> 7 ...
+                      Dyads / bare interval sets have no chord symbol and become X (ignored).
 
     python eval/prepare_guitarset.py [--per-combo 2]
 """
@@ -25,6 +29,21 @@ import zipfile
 BASE = "https://zenodo.org/records/3371780/files"
 OUT = os.path.join(os.path.dirname(__file__), "songs", "guitarset")
 ANNOTATION_MD5 = "b39b78e63d3446f2e54ddb7a54df9b10"
+
+OUR_QUALITIES = {"maj", "min", "7", "maj7", "min7", "hdim7", "maj6", "min6", "sus2", "sus4", "aug", "dim", "dim7", "minmaj7"}
+EXTENDED = {"9": "7", "11": "7", "13": "7", "min9": "min7", "min11": "min7", "min13": "min7",
+            "maj9": "maj7", "maj11": "maj7", "maj13": "maj7"}
+
+
+def simplify(label: str) -> str:
+    """Harte label with extensions/omissions (maj7(*5), maj(#11), 9(13)) -> one of our 14 types, or X."""
+    if label in ("N", "X"):
+        return label
+    chord, _, _bass = label.partition("/")
+    root, _, rest = chord.partition(":")
+    quality = rest.split("(")[0]
+    quality = EXTENDED.get(quality, quality)
+    return f"{root}:{quality}" if quality in OUR_QUALITIES else "X"
 
 
 class RangeFile(io.RawIOBase):
@@ -105,7 +124,8 @@ def main() -> None:
         wav = f"{stem}_mic.wav"
         jams_name = next(n for n in annotations.namelist() if n.endswith(f"{stem}.jams"))
         chords = json.loads(annotations.read(jams_name))["annotations"]
-        instructed = [a for a in chords if a["namespace"] == "chord"][0]["data"]
+        chord_annotations = [a for a in chords if a["namespace"] == "chord"]
+        instructed, performed = chord_annotations[0]["data"], chord_annotations[1]["data"]
 
         wav_path = os.path.join(OUT, f"{stem}.wav")
         if not os.path.exists(wav_path):
@@ -114,6 +134,9 @@ def main() -> None:
         with open(os.path.join(OUT, f"{stem}.lab"), "w", encoding="utf-8") as f:
             for c in instructed:
                 f.write(f"{c['time']:.3f} {c['time'] + c['duration']:.3f} {c['value']}\n")
+        with open(os.path.join(OUT, f"{stem}.performed.lab"), "w", encoding="utf-8") as f:
+            for c in performed:
+                f.write(f"{c['time']:.3f} {c['time'] + c['duration']:.3f} {simplify(c['value'])}\n")
         print(f"  {stem}")
     print(f"{len(chosen)} songs in {os.path.abspath(OUT)}")
 
