@@ -25,7 +25,8 @@ os.makedirs(RESULT_DIR, exist_ok=True)
 # 2: frame times no longer drift against the audio clock.
 # 3: simple (core chords) vs detailed chords, bars aligned to the downbeat, song sections.
 # 4: song key.
-ANALYSIS_VERSION = 4
+# 5: a soft intro stays in the bar grid (Silence is only true silence); beat grid covers quiet passages.
+ANALYSIS_VERSION = 5
 
 ALLOWED_UPLOAD_EXTENSIONS ={".mp3", ".wav", ".flac", ".m4a"}
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50MB

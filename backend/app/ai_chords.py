@@ -26,7 +26,7 @@ from scipy.interpolate import interp1d
 from scipy.ndimage import uniform_filter1d
 
 from .chord_detection import NOTE_NAMES, estimate_beats
-from .structure import analyze_structure, estimate_key
+from .structure import analyze_structure, audible_start, estimate_key, regularize_beats
 
 ProgressFn = Callable[[int, str], None]
 
@@ -227,6 +227,7 @@ class Features:
     rms: np.ndarray = None  # type: ignore[assignment]  # (frames,) loudness
     mfcc: np.ndarray = None  # type: ignore[assignment]  # (13, frames) timbre
     beats: np.ndarray = None  # type: ignore[assignment]  # real beat times in seconds (no artificial 0.0)
+    audible_start: float = 0.0  # when sound begins (quiet playing counts); the opening before it is silence
 
 
 @dataclass
@@ -310,9 +311,14 @@ def extract_features(y: np.ndarray, progress: Optional[ProgressFn] = None, tta: 
     duration = float(librosa.get_duration(y=y, sr=SAMPLE_RATE))
 
     progress(20, "Listening for rhythm")
+    # Loudness tells when sound begins; a soft intro must still get its own bars.
+    rms = librosa.feature.rms(y=y, hop_length=HOP_LENGTH)[0]
+    sound_starts = audible_start(rms)
     bpm, beat_frames = estimate_beats(y, SAMPLE_RATE, HOP_LENGTH)
     if len(beat_frames) >= 2:
-        beat_times = librosa.frames_to_time(beat_frames, sr=SAMPLE_RATE, hop_length=HOP_LENGTH)
+        beat_times = regularize_beats(
+            librosa.frames_to_time(beat_frames, sr=SAMPLE_RATE, hop_length=HOP_LENGTH), sound_starts
+        )
     else:
         bpm = 120.0
         beat_times = np.arange(0.0, duration, 60.0 / bpm)
@@ -335,11 +341,11 @@ def extract_features(y: np.ndarray, progress: Optional[ProgressFn] = None, tta: 
     uniform_times = np.arange(chroma.shape[1]) / FRAMES_PER_SECOND
     probs = interp1d(frame_times, probs, axis=0, bounds_error=False, fill_value=(probs[0], probs[-1]))(uniform_times)
     # Loudness and timbre tell choruses from verses when they share the same chords (see structure.py).
-    rms = librosa.feature.rms(y=y, hop_length=HOP_LENGTH)[0]
     mfcc = librosa.feature.mfcc(y=y, sr=SAMPLE_RATE, n_mfcc=13, hop_length=HOP_LENGTH)
     n = chroma.shape[1]
     return Features(
-        duration, bpm, boundaries, probs, bass_chroma, chroma, rms[:n], mfcc[:, :n], np.asarray(beat_times, dtype=float)
+        duration, bpm, boundaries, probs, bass_chroma, chroma, rms[:n], mfcc[:, :n],
+        np.asarray(beat_times, dtype=float), sound_starts,
     )
 
 
@@ -408,7 +414,9 @@ def detect_chords_ai(audio_path: str, on_progress: Optional[ProgressFn] = None) 
     detailed = decode(features, DecodeOptions(detail="full"))
 
     progress(96, "Finding the song's sections")
-    structure = analyze_structure(simple, features.beats, features.duration, features.chroma, features.mfcc, features.rms)
+    structure = analyze_structure(
+        simple, features.beats, features.duration, features.chroma, features.mfcc, features.rms, features.audible_start
+    )
 
     beat_list = [float(t) for t in features.boundaries[:-1]]
     if beat_list and beat_list[0] > 0.01:

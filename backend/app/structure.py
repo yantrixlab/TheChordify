@@ -27,7 +27,37 @@ from sklearn.metrics import silhouette_score
 FRAMES_PER_SECOND = 22050 / 2048
 BEATS_PER_BAR = 4
 PHRASE = 4  # bars per phrase: sections start and end on this grid
-SILENCE_RMS = 0.02  # fraction of the loudest bar's RMS below which the opening counts as silence
+AUDIBLE_RMS = 0.003  # about -50 dBFS: below this nothing can be heard; above it (however soft) it is music
+
+
+def audible_start(rms: np.ndarray) -> float:
+    """When sound begins. Quiet playing counts: only an opening that is practically silent is skipped."""
+    above = np.flatnonzero(rms > AUDIBLE_RMS)
+    return float(above[0]) / FRAMES_PER_SECOND if len(above) else 0.0
+
+
+def regularize_beats(beats: np.ndarray, start: float) -> np.ndarray:
+    """Make the beat grid cover the whole song.
+
+    The beat tracker locks on where the rhythm is clear and can miss a soft intro or a quiet passage, which
+    would leave those bars out of the chord grid. Beats are extended back to `start` and any gap longer than
+    1.5 beats is filled at the song's own tempo.
+    """
+    if len(beats) < 4:
+        return beats
+    period = float(np.median(np.diff(beats)))
+    filled = [float(beats[0])]
+    for t in beats[1:]:
+        last = filled[-1]
+        gap = float(t) - last
+        steps = int(round(gap / period))
+        if steps > 1 and gap > 1.5 * period:
+            filled.extend([last + gap * k / steps for k in range(1, steps)])
+        filled.append(float(t))
+    first = filled[0]
+    count = int(np.floor((first - start) / period + 0.5))
+    prefix = [first - period * i for i in range(count, 0, -1)]
+    return np.array([t for t in prefix if t >= 0.0] + filled)
 
 
 def downbeat_phase(beats: np.ndarray, chords: list[dict]) -> int:
@@ -94,6 +124,7 @@ def analyze_structure(
     chroma: np.ndarray,
     mfcc: np.ndarray,
     rms: np.ndarray,
+    audible_start_s: float = 0.0,
 ) -> dict:
     """Returns {"bars": [...], "sections": [{"label","start","end","startBar","endBar"}], "downbeatPhase": int}."""
     phase = downbeat_phase(beats, chords)
@@ -181,18 +212,12 @@ def analyze_structure(
     labels = _name_sections(segments, clusters, energy_db, separation)
 
     sections = []
-    # Silence before the first beat or while the music has not started yet
-    first_audible = bars[full[0]]["start"]
-    quiet = energy < SILENCE_RMS * energy.max()
-    lead = 0
-    while lead < n and quiet[lead]:
-        lead += 1
-    if first_audible > 1.0 or lead > 0:
-        lead_end = bars[full[lead]]["start"] if lead < n else first_audible
-        if lead_end > 0.5:
-            sections.append(_section("Silence", 0.0, lead_end, None, None))
-    for (a, b), label in zip(segments, labels):
-        start_bar, end_bar = full[a], full[b - 1]
+    # Silence is only an opening in which nothing can be heard. A soft intro is music and is part of the grid.
+    if audible_start_s > 0.5:
+        sections.append(_section("Silence", 0.0, audible_start_s, None, None))
+    for index, ((a, b), label) in enumerate(zip(segments, labels)):
+        # the first section also owns a pickup bar before the first full bar
+        start_bar, end_bar = (0 if index == 0 else full[a]), full[b - 1]
         end_time = bars[end_bar]["beats"][-1]
         # extend the last section over a short trailing partial bar so nothing is left uncovered
         if b == n:
