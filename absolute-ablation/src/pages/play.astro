@@ -838,8 +838,15 @@ import Nav from "../components/Nav.astro";
     }
   }
 
+  let lastOverviewPaint = 0;
+
   function onTimeUpdate(currentTime: number) {
-    highlightOverviewBeat(currentTime);
+    // The overview grid repaints every cell, so keep it to ~10 Hz and only while it is on screen.
+    const now = performance.now();
+    if (activeView === "overview" && now - lastOverviewPaint > 100) {
+      lastOverviewPaint = now;
+      highlightOverviewBeat(currentTime);
+    }
     highlightDiagramRow(currentTime);
 
     const index = chords.findIndex((s) => currentTime >= s.start && currentTime < s.end);
@@ -848,6 +855,29 @@ import Nav from "../components/Nav.astro";
     const seg = chords[index];
     setCurrentChord(seg.chord);
     renderDiagramWindow();
+  }
+
+  /** The player's clock in seconds, whichever player is in use. */
+  function playerTime(): number {
+    if (!audioEl.classList.contains("hidden")) return audioEl.currentTime;
+    return ytPlayer && typeof ytPlayer.getCurrentTime === "function" ? ytPlayer.getCurrentTime() : 0;
+  }
+
+  // `timeupdate` (and a 250 ms timer) only refresh ~4 times a second, so a chord change could show up to
+  // a quarter-second late. While playing, read the clock on every display frame instead.
+  let syncFrame = 0;
+  function startSyncLoop() {
+    if (syncFrame) return;
+    const tick = () => {
+      onTimeUpdate(playerTime());
+      syncFrame = requestAnimationFrame(tick);
+    };
+    syncFrame = requestAnimationFrame(tick);
+  }
+  function stopSyncLoop() {
+    cancelAnimationFrame(syncFrame);
+    syncFrame = 0;
+    onTimeUpdate(playerTime());
   }
 
   function seekTo(time: number) {
@@ -886,12 +916,12 @@ import Nav from "../components/Nav.astro";
         playerVars: { rel: 0 },
         events: {
           onReady: () => {
-            setInterval(() => {
-              if (ytPlayer && typeof ytPlayer.getCurrentTime === "function") {
-                onTimeUpdate(ytPlayer.getCurrentTime());
-              }
-            }, 250);
+            // slow poll keeps the display right after seeks while paused; the frame loop runs while playing
+            setInterval(() => onTimeUpdate(playerTime()), 500);
           },
+          // 1 = playing, 2 = paused, 0 = ended, 3 = buffering
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          onStateChange: (event: any) => (event.data === 1 ? startSyncLoop() : stopSyncLoop()),
         },
       });
     };
@@ -936,6 +966,10 @@ import Nav from "../components/Nav.astro";
       audioEl.classList.remove("hidden");
       audioEl.src = `${API_BASE}${result.audioUrl}`;
       audioEl.addEventListener("timeupdate", () => onTimeUpdate(audioEl.currentTime));
+      audioEl.addEventListener("seeked", () => onTimeUpdate(audioEl.currentTime));
+      audioEl.addEventListener("play", startSyncLoop);
+      audioEl.addEventListener("pause", stopSyncLoop);
+      audioEl.addEventListener("ended", stopSyncLoop);
       audioEl.addEventListener("ended", () => {
         if (loopEnabled) seekTo(0);
       });
@@ -1026,6 +1060,8 @@ import Nav from "../components/Nav.astro";
     viewTabOverview.setAttribute("aria-pressed", String(!isDiagrams));
     // the strip can't be measured while hidden, so bring the playing chord back into view on return
     if (isDiagrams && timelineActive >= 0) followActiveChip(timelineChips[timelineActive]);
+    // the overview only repaints while it is visible, so paint it once on arrival
+    if (!isDiagrams) highlightOverviewBeat(playerTime());
   }
   viewTabDiagrams.addEventListener("click", () => setActiveView("diagrams"));
   viewTabOverview.addEventListener("click", () => setActiveView("overview"));

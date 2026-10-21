@@ -22,6 +22,7 @@ from typing import Callable, Optional
 
 import librosa
 import numpy as np
+from scipy.interpolate import interp1d
 from scipy.ndimage import uniform_filter1d
 
 from .chord_detection import NOTE_NAMES, estimate_beats, build_bars
@@ -116,17 +117,24 @@ def _load_model():
         return _model
 
 
-def _cqt_features(y: np.ndarray) -> np.ndarray:
-    """Log-CQT, computed per 10 s instance exactly as the model was trained. Shape (frames, 144)."""
+def _cqt_features(y: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Log-CQT computed per 10 s instance exactly as the model was trained: (frames x 144, frame times)."""
     instance = int(SAMPLE_RATE * INSTANCE_SECONDS)
     parts = []
+    times = []
     start = 0
-    while len(y) > start + instance:
-        parts.append(_cqt(y[start : start + instance]))
+    while True:
+        last = len(y) <= start + instance
+        part = _cqt(y[start:] if last else y[start : start + instance])
+        parts.append(part)
+        # A 10 s piece yields 108 frames spaced 2048/22050 s apart, i.e. a little over 10 s, so frame
+        # numbers drift against the clock (~0.19 s per minute). Keep each frame's true time instead.
+        times.append(start / SAMPLE_RATE + np.arange(part.shape[1]) * HOP_LENGTH / SAMPLE_RATE)
+        if last:
+            break
         start += instance
-    parts.append(_cqt(y[start:]))
     feature = np.concatenate(parts, axis=1)
-    return np.log(np.abs(feature) + 1e-6).T
+    return np.log(np.abs(feature) + 1e-6).T, np.concatenate(times)
 
 
 def _cqt(chunk: np.ndarray) -> np.ndarray:
@@ -268,7 +276,7 @@ def extract_features(y: np.ndarray, progress: Optional[ProgressFn] = None, tta: 
     boundaries = np.unique(np.concatenate([[0.0], beat_times[beat_times < duration], [duration]]))
 
     progress(35, "Analysing harmony")
-    feature = _cqt_features(y)
+    feature, frame_times = _cqt_features(y)
 
     progress(60, "Recognising chords")
     probs = np.mean([_shifted_probs(feature, s) for s in tta], axis=0)
@@ -278,6 +286,11 @@ def extract_features(y: np.ndarray, progress: Optional[ProgressFn] = None, tta: 
         y=y, sr=SAMPLE_RATE, hop_length=HOP_LENGTH, fmin=librosa.note_to_hz("C1"), n_octaves=3, norm=None
     )
     chroma = librosa.feature.chroma_cqt(y=y, sr=SAMPLE_RATE, hop_length=HOP_LENGTH)
+
+    # Put the model output on the same uniform clock (frame i = i * 2048 / 22050 s) as the chroma arrays
+    # and the beat grid, so every later time <-> frame conversion is a single multiplication.
+    uniform_times = np.arange(chroma.shape[1]) / FRAMES_PER_SECOND
+    probs = interp1d(frame_times, probs, axis=0, bounds_error=False, fill_value=(probs[0], probs[-1]))(uniform_times)
     return Features(duration, bpm, boundaries, probs, bass_chroma, chroma)
 
 

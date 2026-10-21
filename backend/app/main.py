@@ -21,7 +21,11 @@ RESULT_DIR = os.path.join(CACHE_DIR, "results")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(RESULT_DIR, exist_ok=True)
 
-ALLOWED_UPLOAD_EXTENSIONS = {".mp3", ".wav", ".flac", ".m4a"}
+# Bump whenever the detector's output changes, so songs cached by an older version are analysed again.
+# 2: frame times no longer drift against the audio clock.
+ANALYSIS_VERSION = 2
+
+ALLOWED_UPLOAD_EXTENSIONS ={".mp3", ".wav", ".flac", ".m4a"}
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50MB
 
 app = FastAPI(title="TheChordify chord extraction API")
@@ -70,9 +74,11 @@ def _load_cached_result(key: str) -> Optional[dict]:
     if os.path.exists(path):
         try:
             with open(path, "r", encoding="utf-8") as f:
-                return json.load(f)
+                result = json.load(f)
         except (OSError, ValueError):
             return None  # unreadable/partial cache entry: treat as a miss and re-analyse
+        # Results from an older detector (e.g. before the timing-drift fix) are re-analysed.
+        return result if result.get("analysisVersion") == ANALYSIS_VERSION else None
     return None
 
 
@@ -81,7 +87,7 @@ def _save_result(key: str, result: dict) -> None:
     path = _result_path(key)
     tmp = f"{path}.tmp"
     with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(result, f)
+        json.dump({**result, "analysisVersion": ANALYSIS_VERSION}, f)
     os.replace(tmp, path)
 
 
