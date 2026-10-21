@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from .engine import analyze
-from .youtube import download_audio, InvalidUrlError
+from .youtube import download_audio, video_info, InvalidUrlError
 
 CACHE_DIR = os.path.join(tempfile.gettempdir(), "thechordify-cache")
 UPLOAD_DIR = os.path.join(CACHE_DIR, "uploads")
@@ -23,7 +23,9 @@ os.makedirs(RESULT_DIR, exist_ok=True)
 
 # Bump whenever the detector's output changes, so songs cached by an older version are analysed again.
 # 2: frame times no longer drift against the audio clock.
-ANALYSIS_VERSION = 2
+# 3: simple (core chords) vs detailed chords, bars aligned to the downbeat, song sections.
+# 4: song key.
+ANALYSIS_VERSION = 4
 
 ALLOWED_UPLOAD_EXTENSIONS ={".mp3", ".wav", ".flac", ".m4a"}
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50MB
@@ -112,12 +114,16 @@ def _run_youtube_job(session_id: str, url: str) -> None:
             "sessionId": session_id,
             "source": "youtube",
             "sourceUrl": url,
+            **video_info(url),  # title, artist
             "duration": analysis["duration"],
             "chords": analysis["chords"],
             "tempo": analysis["tempo"],
             "beatTimes": analysis["beatTimes"],
             "bars": analysis["bars"],
             "engine": analysis["engine"],
+            "chordsDetailed": analysis.get("chordsDetailed", analysis["chords"]),
+            "sections": analysis.get("sections", []),
+            "key": analysis.get("key", ""),
             "audioUrl": f"/media/{os.path.basename(audio_path)}",
         }
         _save_result(session_id, result)
@@ -139,7 +145,9 @@ def _run_youtube_job(session_id: str, url: str) -> None:
         )
 
 
-def _run_analysis_job(session_id: str, audio_path: str, source: str, source_url: Optional[str] = None) -> None:
+def _run_analysis_job(
+    session_id: str, audio_path: str, source: str, source_url: Optional[str] = None, title: str = ""
+) -> None:
     try:
         _set_job(session_id, status="analyzing", progress=5, stage="Loading audio")
 
@@ -151,12 +159,17 @@ def _run_analysis_job(session_id: str, audio_path: str, source: str, source_url:
         result = {
             "sessionId": session_id,
             "source": source,
+            "title": title,
+            "artist": "",
             "duration": analysis["duration"],
             "chords": analysis["chords"],
             "tempo": analysis["tempo"],
             "beatTimes": analysis["beatTimes"],
             "bars": analysis["bars"],
             "engine": analysis["engine"],
+            "chordsDetailed": analysis.get("chordsDetailed", analysis["chords"]),
+            "sections": analysis.get("sections", []),
+            "key": analysis.get("key", ""),
             "audioUrl": f"/media/{os.path.basename(audio_path)}",
         }
         if source_url:
@@ -221,7 +234,9 @@ async def extract_from_upload(file: UploadFile = File(...)) -> dict:
 
     _set_job(session_id, status="queued", progress=0, stage="Queued")
     thread = threading.Thread(
-        target=_run_analysis_job, args=(session_id, stored_path, "upload"), daemon=True
+        target=_run_analysis_job,
+        args=(session_id, stored_path, "upload", None, os.path.splitext(file.filename or "")[0]),
+        daemon=True,
     )
     thread.start()
 

@@ -40,6 +40,21 @@ def cache_key_for_url(url: str) -> str:
     return hashlib.sha256(url.encode("utf-8")).hexdigest()[:24]
 
 
+def video_info(url: str) -> dict:
+    """Title and artist/uploader for the player header. A missing title is never fatal."""
+    try:
+        validate_url(url)
+        opts = {"quiet": True, "no_warnings": True, "noplaylist": True, "skip_download": True}
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            info = ydl.extract_info(url, download=False) or {}
+        return {
+            "title": info.get("track") or info.get("title") or "",
+            "artist": info.get("artist") or info.get("creator") or info.get("uploader") or "",
+        }
+    except Exception:
+        return {"title": "", "artist": ""}
+
+
 def download_audio(url: str, out_dir: str) -> str:
     """Download the best audio stream for `url` into `out_dir` as a .wav file.
 

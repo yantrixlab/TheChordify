@@ -8,3 +8,4 @@ soundfile==0.13.0
 scipy==1.14.1
 # CPU-only wheel on a VPS: pip install torch --index-url https://download.pytorch.org/whl/cpu
 torch>=2.4
+scikit-learn>=1.3

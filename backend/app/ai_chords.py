@@ -25,7 +25,8 @@ import numpy as np
 from scipy.interpolate import interp1d
 from scipy.ndimage import uniform_filter1d
 
-from .chord_detection import NOTE_NAMES, estimate_beats, build_bars
+from .chord_detection import NOTE_NAMES, estimate_beats
+from .structure import analyze_structure, estimate_key
 
 ProgressFn = Callable[[int, str], None]
 
@@ -223,6 +224,9 @@ class Features:
     probs: np.ndarray  # (frames, 170) model class probabilities
     bass_chroma: np.ndarray  # (12, frames) low-register chroma
     chroma: np.ndarray  # (12, frames) full-range chroma
+    rms: np.ndarray = None  # type: ignore[assignment]  # (frames,) loudness
+    mfcc: np.ndarray = None  # type: ignore[assignment]  # (13, frames) timbre
+    beats: np.ndarray = None  # type: ignore[assignment]  # real beat times in seconds (no artificial 0.0)
 
 
 @dataclass
@@ -234,6 +238,45 @@ class DecodeOptions:
     # 8 recovered about a third more maj7s and an eighth more 7ths on real guitar recordings
     # without touching plain major/minor. Set CHORD_COLOR_WEIGHT=0 to turn it off.
     color_weight: float = float(os.environ.get("CHORD_COLOR_WEIGHT", "8"))
+    # "full": every chord type the model knows (7ths, sus, slash chords...). "simple": only the song's
+    # core major/minor chords, which is what most players want on screen.
+    detail: str = "full"
+    core_share: float = 0.03  # simple mode: a chord must fill at least this share of the song to be kept
+    max_core: int = 10  # simple mode: at most this many different chords per song
+
+
+# Simple mode folds the model's 14 chord types into three triad families per root.
+_FAMILY_QUALITY = ("maj", "min", "dim")
+_FAMILY_BTC_INDEX = np.array([1, 0, 2])  # BTC class offsets of maj, min, dim within a root's 14 types
+_FOLD = np.zeros((NUM_CHORDS, 37))  # model class -> (family * 12 + root), 36 = no chord
+for _cls in range(_UNKNOWN_IDX):
+    _quality = _BTC_QUALITIES[_cls % 14]
+    _family = 1 if _quality in ("min", "min6", "min7", "minmaj7") else 2 if _quality in ("dim", "dim7", "hdim7") else 0
+    _FOLD[_cls, _family * 12 + _cls // 14] = 1  # maj, 6, maj7, 7, aug, sus2, sus4 all count as the major triad
+_FOLD[_UNKNOWN_IDX:, 36] = 1
+
+
+def _core_chord_classes(probs: np.ndarray, opts: "DecodeOptions") -> tuple[np.ndarray, np.ndarray]:
+    """Label every frame using only the song's core chords.
+
+    The model picks the best of 170 chords for each moment, so a noisy bar can surface a chord the
+    song never really uses. Instead: fold the probabilities down to major/minor/diminished triads
+    (adding up all the 7th/sus/6th variants), find which few chords carry the song, then re-pick each
+    frame among just those. Returns (model class per frame, confidence per frame).
+    """
+    folded = probs @ _FOLD  # (frames, 37)
+    share = np.bincount(folded.argmax(axis=1), minlength=37)[:36] / len(folded)
+    ranked = np.argsort(-share)
+    core = [int(c) for c in ranked[: opts.max_core] if share[c] >= opts.core_share]
+    if len(core) < 3:
+        core = [int(c) for c in ranked[:3]]
+    allowed = np.zeros(37, dtype=bool)
+    allowed[core] = True
+    allowed[36] = True  # silence stays possible
+    restricted = np.where(allowed, folded, -1.0)
+    pick = restricted.argmax(axis=1)
+    classes = np.where(pick == 36, _NO_CHORD_IDX, (pick % 12) * 14 + _FAMILY_BTC_INDEX[np.minimum(pick // 12, 2)])
+    return classes, folded[np.arange(len(pick)), pick]
 
 
 def _unit_template(quality: str) -> np.ndarray:
@@ -291,15 +334,25 @@ def extract_features(y: np.ndarray, progress: Optional[ProgressFn] = None, tta: 
     # and the beat grid, so every later time <-> frame conversion is a single multiplication.
     uniform_times = np.arange(chroma.shape[1]) / FRAMES_PER_SECOND
     probs = interp1d(frame_times, probs, axis=0, bounds_error=False, fill_value=(probs[0], probs[-1]))(uniform_times)
-    return Features(duration, bpm, boundaries, probs, bass_chroma, chroma)
+    # Loudness and timbre tell choruses from verses when they share the same chords (see structure.py).
+    rms = librosa.feature.rms(y=y, hop_length=HOP_LENGTH)[0]
+    mfcc = librosa.feature.mfcc(y=y, sr=SAMPLE_RATE, n_mfcc=13, hop_length=HOP_LENGTH)
+    n = chroma.shape[1]
+    return Features(
+        duration, bpm, boundaries, probs, bass_chroma, chroma, rms[:n], mfcc[:, :n], np.asarray(beat_times, dtype=float)
+    )
 
 
 def decode(f: Features, opts: Optional[DecodeOptions] = None) -> list[dict]:
     """Chord segments (start, end, chord, confidence) from analysed features."""
     opts = opts or DecodeOptions()
     probs = uniform_filter1d(f.probs, size=opts.smooth, axis=0, mode="nearest") if opts.smooth > 1 else f.probs
-    classes = probs.argmax(axis=1)
-    classes[classes == _UNKNOWN_IDX] = _NO_CHORD_IDX
+    if opts.detail == "simple":
+        classes, conf = _core_chord_classes(probs, opts)
+    else:
+        classes = probs.argmax(axis=1)
+        classes[classes == _UNKNOWN_IDX] = _NO_CHORD_IDX
+        conf = probs[np.arange(len(classes)), classes]
 
     # Runs of identical frames -> [start, end, class], in seconds.
     runs: list[list] = []
@@ -329,10 +382,13 @@ def decode(f: Features, opts: Optional[DecodeOptions] = None) -> list[dict]:
             label = "N"
         else:
             root, quality = parts
-            if opts.color_weight > 0:
-                quality = _refine_quality(f, root, lo, hi, opts.color_weight)
-            label = _label(root, quality, _bass_for_segment(f.bass_chroma, slice(lo, hi), root, quality))
-        confidence = float(probs[lo:hi, cls].mean())
+            if opts.detail == "simple":
+                label = _label(root, quality)
+            else:
+                if opts.color_weight > 0:
+                    quality = _refine_quality(f, root, lo, hi, opts.color_weight)
+                label = _label(root, quality, _bass_for_segment(f.bass_chroma, slice(lo, hi), root, quality))
+        confidence = float(conf[lo:hi].mean())
         out.append({"start": float(start), "end": float(end), "chord": label, "confidence": round(confidence, 2)})
     return out
 
@@ -348,7 +404,11 @@ def detect_chords_ai(audio_path: str, on_progress: Optional[ProgressFn] = None) 
     features = extract_features(y, progress=progress)
 
     progress(92, "Building the chord timeline")
-    segments = decode(features)
+    simple = decode(features, DecodeOptions(detail="simple"))
+    detailed = decode(features, DecodeOptions(detail="full"))
+
+    progress(96, "Finding the song's sections")
+    structure = analyze_structure(simple, features.beats, features.duration, features.chroma, features.mfcc, features.rms)
 
     beat_list = [float(t) for t in features.boundaries[:-1]]
     if beat_list and beat_list[0] > 0.01:
@@ -357,8 +417,12 @@ def detect_chords_ai(audio_path: str, on_progress: Optional[ProgressFn] = None) 
 
     return {
         "duration": features.duration,
-        "chords": segments,
+        "chords": simple,  # the song's core chords (what the player shows by default)
+        "chordsDetailed": detailed,  # every chord type the model recognises
+        "key": estimate_key(simple),
         "tempo": round(features.bpm, 1),
         "beatTimes": beat_list,
-        "bars": build_bars(beat_list),
+        # bars of four beats starting where chords tend to change; a pickup / short last bar has null beats
+        "bars": structure["bars"],
+        "sections": structure["sections"],
     }

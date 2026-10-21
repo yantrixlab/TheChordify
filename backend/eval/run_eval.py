@@ -191,9 +191,13 @@ def quality_breakdown(ref, est, step: float = 0.05) -> dict[str, tuple[int, int,
     return {k: tuple(v) for k, v in stats.items()}  # type: ignore[misc]
 
 
+DETAIL = "full"  # which of the detector's two outputs to score: "simple" (core chords) or "full"
+
+
 def detect(path: str):
     result = detect_chords_ai(path)
-    return [(c["start"], c["end"], c["chord"]) for c in result["chords"]]
+    chords = result["chordsDetailed"] if DETAIL == "full" else result["chords"]
+    return [(c["start"], c["end"], c["chord"]) for c in chords]
 
 
 def harte_to_ours(label: str) -> str:
@@ -277,8 +281,10 @@ if __name__ == "__main__":
     ap.add_argument("--synthetic", type=int, metavar="N", help="score N random synthetic progressions")
     ap.add_argument("--songs", metavar="DIR", help="score real songs (audio + .lab) in DIR")
     ap.add_argument("--lab-ext", default=".lab", help="reference file suffix, e.g. .performed.lab")
+    ap.add_argument("--detail", choices=["simple", "full"], default="full", help="score the core-chord or the full output")
     ap.add_argument("--seed", type=int, default=7)
     args = ap.parse_args()
+    DETAIL = args.detail
     if args.synthetic:
         run_synthetic(args.synthetic, args.seed)
     if args.songs:
