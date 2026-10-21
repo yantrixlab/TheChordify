@@ -130,33 +130,26 @@ import Nav from "../components/Nav.astro";
           }
         </div>
 
-        <!-- View switcher: Chord diagrams (sliding window) / Chord overview (full song grid) -->
-        <div class="rounded-2xl" style="background:var(--color-canvas);border:1px solid var(--color-hairline);overflow:hidden;">
-          <div class="flex items-center" style="border-bottom:1px solid var(--color-hairline);">
-            <button
-              id="view-tab-diagrams"
-              type="button"
-              aria-pressed="true"
-              style="padding:12px 18px;font-size:14px;font-weight:600;background:var(--color-canvas-soft);color:var(--color-ink);border:none;border-right:1px solid var(--color-hairline);cursor:pointer;"
-            >
-              ✓ Chord diagrams
-            </button>
-            <button
-              id="view-tab-overview"
-              type="button"
-              aria-pressed="false"
-              style="padding:12px 18px;font-size:14px;font-weight:600;background:transparent;color:var(--color-mute);border:none;border-right:1px solid var(--color-hairline);cursor:pointer;"
-            >
-              Chord overview
-            </button>
+        <!-- View switcher: Chord diagrams (timeline + sliding window) / Chord overview (full song grid) -->
+        <div class="rounded-2xl tl-card">
+          <div class="tl-tabs">
+            <div class="tl-seg" role="group" aria-label="Chord view">
+              <button id="view-tab-diagrams" type="button" class="tl-tab is-active" aria-pressed="true">Chord diagrams</button>
+              <button id="view-tab-overview" type="button" class="tl-tab" aria-pressed="false">Chord overview</button>
+            </div>
           </div>
 
-          <!-- Compact bar/beat strip (same grid as the overview, single row) plus a
-               larger sliding window: just-played (dimmed) → now playing (highlighted)
-               → upcoming chords. -->
+          <!-- Chord timeline: one card per chord, the playing one highlighted. The "Now" panel is
+               fixed, so the current chord is visible even while the strip is being scrolled. -->
           <div id="panel-diagrams">
-            <div id="diagram-row-scroll" style="overflow-x:auto;border-bottom:1px solid var(--color-hairline);">
-              <div id="diagram-row" style="display:flex;"></div>
+            <div class="tl">
+              <div class="tl-now">
+                <span class="tl-now-label">Now</span>
+                <strong id="timeline-now-chord">—</strong>
+              </div>
+              <div id="diagram-row-scroll" class="tl-scroll">
+                <div id="diagram-row" class="tl-track" role="list" aria-label="Chord timeline"></div>
+              </div>
             </div>
             <div style="padding:24px;overflow-x:auto;">
               <div id="diagram-window" class="flex items-center gap-4" style="min-height:170px;"></div>
@@ -176,6 +169,58 @@ import Nav from "../components/Nav.astro";
     </div>
   </main>
 </Layout>
+
+<style is:global>
+  .tl-card { background: var(--color-canvas); border: 1px solid var(--color-hairline); overflow: hidden;
+    box-shadow: 0 1px 2px rgba(13, 0, 31, 0.04), 0 12px 32px -12px rgba(91, 33, 182, 0.18); }
+  .tl-tabs { padding: 10px 12px; border-bottom: 1px solid var(--color-hairline); background: var(--color-canvas-soft); }
+  .tl-seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: 999px; background: var(--color-violet-soft); }
+  .tl-tab { height: 32px; padding: 0 16px; border: 0; border-radius: 999px; background: transparent;
+    color: var(--color-violet-deep); font-size: 13px; font-weight: 600; cursor: pointer;
+    transition: background-color 0.15s, color 0.15s, box-shadow 0.15s; }
+  .tl-tab:hover { color: var(--color-ink); }
+  .tl-tab.is-active { background: var(--color-canvas); color: var(--color-ink); box-shadow: 0 1px 3px rgba(13, 0, 31, 0.14); }
+  .tl-tab:focus-visible, .tl-chip:focus-visible { outline: 2px solid var(--color-violet); outline-offset: 2px; }
+
+  .tl { display: flex; align-items: stretch; border-bottom: 1px solid var(--color-hairline); background: var(--color-canvas); }
+  .tl-now { flex: 0 0 auto; min-width: 96px; max-width: 150px; padding: 10px 16px; display: flex; flex-direction: column;
+    justify-content: center; gap: 4px; position: relative; z-index: 1; color: var(--color-on-primary);
+    background: linear-gradient(160deg, var(--color-primary), var(--color-primary-deep));
+    box-shadow: 8px 0 18px -10px rgba(13, 0, 31, 0.6); }
+  .tl-now-label { font: 600 10px/1 var(--font-mono); letter-spacing: 0.12em; text-transform: uppercase; color: #a78bfa; }
+  .tl-now strong { font-size: 26px; line-height: 1.1; color: var(--color-accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .tl-scroll { flex: 1 1 auto; min-width: 0; overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain;
+    scrollbar-width: thin; scrollbar-color: var(--color-hairline-strong) transparent;
+    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 40px), transparent 100%);
+    mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 40px), transparent 100%); }
+  .tl-track { position: relative; display: flex; gap: 6px; width: max-content; padding: 14px 40px 14px 16px; }
+
+  .tl-chip { position: relative; flex: 0 0 auto; height: 62px; box-sizing: border-box; padding: 0 10px; display: flex;
+    align-items: flex-end; padding-bottom: 12px; border: 1px solid var(--color-hairline); border-radius: 12px;
+    background: var(--color-canvas); color: var(--color-ink); font-weight: 700; white-space: nowrap; cursor: pointer; overflow: hidden;
+    transition: background-color 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.2s, opacity 0.2s; }
+  .tl-chip:hover { border-color: var(--color-violet); }
+  .tl-chip.is-past { opacity: 0.5; }
+  .tl-chip.is-rest { border-style: dashed; background: transparent; color: var(--color-mute); }
+  .tl-chip.is-active { opacity: 1; transform: translateY(-1px); border-color: var(--color-accent-deep); color: var(--color-on-accent);
+    background: linear-gradient(135deg, var(--color-accent), var(--color-accent-deep));
+    box-shadow: 0 8px 18px -6px rgba(245, 158, 11, 0.6); }
+  .tl-bar { position: absolute; top: 6px; left: 9px; font: 600 10px/1 var(--font-mono); color: var(--color-mute); }
+  .tl-chip.is-active .tl-bar { color: rgba(26, 5, 51, 0.65); }
+  .tl-fill { position: absolute; left: 0; bottom: 0; height: 3px; width: calc(var(--p, 0) * 100%); background: rgba(26, 5, 51, 0.55);
+    transition: width 0.25s linear; display: none; }
+  .tl-chip.is-active .tl-fill { display: block; }
+
+  @media (max-width: 520px) {
+    .tl-now { min-width: 76px; padding: 8px 12px; }
+    .tl-now strong { font-size: 21px; }
+    .tl-chip { height: 56px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .tl-chip, .tl-fill, .tl-tab { transition: none; }
+  }
+</style>
 
 <script>
   import { getGuitarShape, chordNotes, chordKeyLabel, transposeChord, type GuitarShape } from "../lib/chordShapes";
@@ -225,6 +270,7 @@ import Nav from "../components/Nav.astro";
   let chordEvents: { chordIndex: number; chord: string; start: number }[] = [];
   let bars: Bar[] = [];
   let duration = 0;
+  let tempo = 120;
   let lastActiveIndex = -1;
   let loopEnabled = false;
   let tempoPct = 100;
@@ -310,121 +356,107 @@ import Nav from "../components/Nav.astro";
     }
   }
 
-  /** "Chord diagrams" tab, upper strip: the exact same per-beat cell grid as the
-   *  "Chord overview" tab — same cell rendering, same dark-active-beat + progress
-   *  bar — but laid out as one continuous, non-wrapping, auto-scrolling row. */
+  // ---- Chord timeline: the strip at the top of the "Chord diagrams" tab ----------------------------
+  const PX_PER_BEAT = 46;
+  const timelineNowEl = document.getElementById("timeline-now-chord")!;
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let timelineChips: HTMLButtonElement[] = [];
+  let timelineActive = -1;
+  let timelineUserBusyUntil = 0; // while the person is scrolling the strip themselves, don't fight them
+
+  function formatClock(t: number): string {
+    return `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
+  }
+
+  /** One card per chord, as wide as the chord lasts, with the bar number where a bar begins. */
   function renderDiagramRow() {
     diagramRowEl.innerHTML = "";
-    if (bars.length === 0) return;
+    timelineChips = [];
+    timelineActive = -1;
+    if (chords.length === 0) return;
 
-    const CELL_W = 56;
-    const CELL_H = 54;
+    const pxPerSec = (PX_PER_BEAT * tempo) / 60;
+    const barStarts = bars.map((b) => b.start);
+    let nextBar = 0;
 
-    bars.forEach((bar, barIndex) => {
-      const beats = bar.beats;
-      const isLeadingRest = barIndex === 0 && chordAt(beats[0] + 0.05) === "N" && chordAt(beats[3] - 0.05) === "N";
+    chords.forEach((seg) => {
+      const isRest = seg.chord === "N";
+      const label = isRest ? "" : displayChord(seg.chord);
 
-      const barEl = document.createElement("div");
-      barEl.style.display = "grid";
-      barEl.style.flexShrink = "0";
-      barEl.style.gridTemplateColumns = `repeat(4, ${CELL_W}px)`;
-      barEl.style.borderRight = "2px solid var(--color-hairline-strong)";
+      while (nextBar < barStarts.length && barStarts[nextBar] < seg.start - 0.12) nextBar++;
+      const startsBar = nextBar < barStarts.length && Math.abs(barStarts[nextBar] - seg.start) <= 0.12;
+      const barNumber = startsBar ? nextBar + 1 : 0;
 
-      for (let b = 0; b < 4; b++) {
-        const beatStart = beats[b];
-        const beatEnd = beats[b + 1];
-        const isRestCell = isLeadingRest && b === 0;
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = isRest ? "tl-chip is-rest" : "tl-chip";
+      chip.setAttribute("role", "listitem");
+      chip.setAttribute("aria-label", isRest ? `Rest at ${formatClock(seg.start)}` : `${label} at ${formatClock(seg.start)}`);
+      chip.style.width = `${Math.max(isRest ? 34 : 58, (seg.end - seg.start) * pxPerSec - 6)}px`;
+      chip.style.fontSize = label.length > 7 ? "12px" : label.length > 4 ? "15px" : "19px";
 
-        const cell = document.createElement("div");
-        cell.dataset.beatStart = String(beatStart);
-        cell.dataset.beatEnd = String(beatEnd);
-        cell.dataset.isRest = String(isRestCell);
-        cell.style.height = `${CELL_H}px`;
-        cell.style.borderRight = b < 3 ? "1px solid var(--color-hairline)" : "none";
-        cell.style.borderBottom = "1px solid var(--color-hairline)";
-        cell.style.display = "flex";
-        cell.style.alignItems = "flex-start";
-        cell.style.justifyContent = "flex-start";
-        cell.style.padding = "4px 6px";
-        cell.style.fontSize = "13px";
-        cell.style.fontWeight = "700";
-        cell.style.color = "var(--color-ink)";
-        cell.style.position = "relative";
-        cell.style.background = "var(--color-canvas)";
-        cell.style.transition = "background-color 0.15s, color 0.15s";
-        cell.style.cursor = "pointer";
-
-        if (isRestCell) {
-          cell.style.background = "var(--color-ink)";
-          cell.style.color = "white";
-          cell.style.alignItems = "center";
-          cell.style.justifyContent = "center";
-          cell.textContent = "𝅘𝅥𝅮";
-        } else {
-          const startingHere = chords.find(
-            (seg) => seg.chord !== "N" && seg.start >= beatStart && seg.start < beatEnd,
-          );
-          const ownLabel = startingHere ? displayChord(startingHere.chord) : "";
-          const held = chordAt(beatStart);
-          cell.dataset.ownLabel = ownLabel;
-          cell.dataset.heldChord = held === "N" ? "" : displayChord(held);
-          setCellLabel(cell, ownLabel);
-        }
-
-        cell.addEventListener("click", (e) => {
-          e.stopPropagation();
-          seekTo(beatStart);
-        });
-
-        barEl.appendChild(cell);
+      if (barNumber) {
+        const bar = document.createElement("span");
+        bar.className = "tl-bar";
+        bar.textContent = String(barNumber);
+        chip.appendChild(bar);
       }
+      const name = document.createElement("span");
+      name.textContent = isRest ? "·" : label;
+      chip.appendChild(name);
+      const fill = document.createElement("span");
+      fill.className = "tl-fill";
+      chip.appendChild(fill);
 
-      diagramRowEl.appendChild(barEl);
+      chip.addEventListener("click", () => seekTo(seg.start));
+      diagramRowEl.appendChild(chip);
+      timelineChips.push(chip);
     });
   }
 
-  /** Highlights the active beat cell in the diagram row (same look as the overview
-   *  tab's per-beat highlight) and auto-scrolls the row to keep it in view. */
-  function highlightDiagramRow(currentTime: number) {
-    let activeCell: HTMLElement | null = null;
-    let progress = 0;
+  // Manual scrolling pauses auto-follow for a moment (programmatic scrolls fire none of these).
+  ["wheel", "pointerdown", "touchstart", "keydown"].forEach((type) =>
+    diagramRowScrollEl.addEventListener(type, () => (timelineUserBusyUntil = performance.now() + 2500), { passive: true }),
+  );
 
-    diagramRowEl.querySelectorAll<HTMLElement>("[data-beat-start]").forEach((cell) => {
-      const beatStart = Number(cell.dataset.beatStart);
-      const beatEnd = Number(cell.dataset.beatEnd);
-      const isActive = currentTime >= beatStart && currentTime < beatEnd;
-      const isRest = cell.dataset.isRest === "true";
-
-      if (isActive) {
-        activeCell = cell;
-        progress = (currentTime - beatStart) / Math.max(beatEnd - beatStart, 0.001);
-      }
-
-      if (!isRest) {
-        cell.style.background = isActive ? "var(--color-ink)" : "var(--color-canvas)";
-        cell.style.color = isActive ? "white" : "var(--color-ink)";
-        const ownLabel = cell.dataset.ownLabel || "";
-        const heldChord = cell.dataset.heldChord || "";
-        setCellLabel(cell, isActive ? ownLabel || heldChord : ownLabel);
-      }
+  /** Scrolls the strip so the playing chord sits about a quarter in, with what's coming next to its right. */
+  function followActiveChip(chip: HTMLElement) {
+    diagramRowScrollEl.scrollTo({
+      left: Math.max(0, chip.offsetLeft - diagramRowScrollEl.clientWidth * 0.22),
+      behavior: reducedMotion ? "auto" : "smooth",
     });
+  }
 
-    if (activeCell) {
-      diagramRowProgressEl.style.width = `${Math.min(100, Math.max(0, progress * 100))}%`;
-      activeCell.appendChild(diagramRowProgressEl);
+  /** Is the chip's start comfortably on screen, with room to its right to see what comes next? */
+  function chipInComfortZone(chip: HTMLElement): boolean {
+    const left = chip.offsetLeft - diagramRowScrollEl.scrollLeft;
+    return left >= 8 && left <= diagramRowScrollEl.clientWidth * 0.55;
+  }
 
-      const cellLeft = activeCell.offsetLeft;
-      const margin = 150;
-      if (
-        cellLeft < diagramRowScrollEl.scrollLeft + margin ||
-        cellLeft > diagramRowScrollEl.scrollLeft + diagramRowScrollEl.clientWidth - margin
-      ) {
-        diagramRowScrollEl.scrollTo({
-          left: Math.max(cellLeft - diagramRowScrollEl.clientWidth / 2, 0),
-          behavior: "smooth",
-        });
-      }
+  /** Marks the playing chord, fills its progress bar and keeps it on screen. Called every tick. */
+  function highlightDiagramRow(currentTime: number) {
+    const index = chords.findIndex((s) => currentTime >= s.start && currentTime < s.end);
+    if (index === -1 || timelineChips.length === 0) return;
+    const chip = timelineChips[index];
+    const seg = chords[index];
+
+    if (index !== timelineActive) {
+      timelineChips.forEach((c, i) => {
+        c.classList.toggle("is-active", i === index);
+        c.classList.toggle("is-past", i < index);
+        if (i === index) c.setAttribute("aria-current", "true");
+        else c.removeAttribute("aria-current");
+      });
+      timelineActive = index;
+      timelineNowEl.textContent = seg.chord === "N" ? "—" : displayChord(seg.chord);
     }
+
+    const fraction = (currentTime - seg.start) / Math.max(seg.end - seg.start, 0.001);
+    chip.style.setProperty("--p", String(Math.min(1, Math.max(0, fraction))));
+
+    // The check runs every tick (not just on chord changes), so a chord that slips out of view for any
+    // reason — a seek, a resize, the end of a manual scroll — is brought back.
+    if (performance.now() >= timelineUserBusyUntil && !chipInComfortZone(chip)) followActiveChip(chip);
   }
 
   function buildNoteFallbackCard(fChord: string): HTMLElement {
@@ -536,15 +568,6 @@ import Nav from "../components/Nav.astro";
   overviewProgressEl.style.height = "3px";
   overviewProgressEl.style.background = "var(--color-success)";
   overviewProgressEl.style.width = "0%";
-
-  const diagramRowProgressEl = document.createElement("div");
-  diagramRowProgressEl.style.position = "absolute";
-  diagramRowProgressEl.style.left = "0";
-  diagramRowProgressEl.style.bottom = "0";
-  diagramRowProgressEl.style.height = "3px";
-  diagramRowProgressEl.style.background = "var(--color-success)";
-  diagramRowProgressEl.style.width = "0%";
-  diagramRowProgressEl.style.zIndex = "2";
 
   /** Highlights the single beat cell currently playing (solid dark fill, like a
    *  metronome tick) and fills a small progress bar across it as it plays. */
@@ -893,6 +916,7 @@ import Nav from "../components/Nav.astro";
     chords = result.chords;
     bars = result.bars;
     duration = result.duration;
+    tempo = result.tempo || 120;
     buildChordEvents();
     loadingState.classList.add("hidden");
     playerState.classList.remove("hidden");
@@ -996,14 +1020,12 @@ import Nav from "../components/Nav.astro";
     const isDiagrams = view === "diagrams";
     panelDiagrams.classList.toggle("hidden", !isDiagrams);
     panelOverview.classList.toggle("hidden", isDiagrams);
-    viewTabDiagrams.style.background = isDiagrams ? "var(--color-canvas-soft)" : "transparent";
-    viewTabDiagrams.style.color = isDiagrams ? "var(--color-ink)" : "var(--color-mute)";
-    viewTabDiagrams.textContent = isDiagrams ? "✓ Chord diagrams" : "Chord diagrams";
+    viewTabDiagrams.classList.toggle("is-active", isDiagrams);
     viewTabDiagrams.setAttribute("aria-pressed", String(isDiagrams));
-    viewTabOverview.style.background = !isDiagrams ? "var(--color-canvas-soft)" : "transparent";
-    viewTabOverview.style.color = !isDiagrams ? "var(--color-ink)" : "var(--color-mute)";
-    viewTabOverview.textContent = !isDiagrams ? "✓ Chord overview" : "Chord overview";
+    viewTabOverview.classList.toggle("is-active", !isDiagrams);
     viewTabOverview.setAttribute("aria-pressed", String(!isDiagrams));
+    // the strip can't be measured while hidden, so bring the playing chord back into view on return
+    if (isDiagrams && timelineActive >= 0) followActiveChip(timelineChips[timelineActive]);
   }
   viewTabDiagrams.addEventListener("click", () => setActiveView("diagrams"));
   viewTabOverview.addEventListener("click", () => setActiveView("overview"));
