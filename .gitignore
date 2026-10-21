@@ -15,3 +15,6 @@ __pycache__/
 
 # model weights: fetch with backend/scripts/fetch_models.py
 backend/models/*.pt
+
+# downloaded benchmark audio
+backend/eval/songs/
