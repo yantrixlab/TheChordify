@@ -8,8 +8,9 @@ COPY absolute-ablation/ ./
 RUN npm run build
 
 FROM python:3.12-slim
-RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg libsndfile1 \
-    && rm -rf /var/lib/apt/lists/*
+# yt-dlp needs ffmpeg/ffprobe. Static binaries are ~130 MB versus ~470 MB and 200 packages from apt,
+# which matters on a busy VPS. soundfile's wheel bundles libsndfile (with MP3), so no apt packages are needed.
+COPY --from=mwader/static-ffmpeg:9.0.2 /ffmpeg /ffprobe /usr/local/bin/
 WORKDIR /app/backend
 
 COPY backend/requirements.txt ./
