@@ -239,3 +239,10 @@ def get_result(session_id: str) -> dict:
     if not cached:
         raise HTTPException(status_code=404, detail="Unknown session")
     return cached
+
+
+# Serve the built Astro site from the same origin (the Docker image copies it to STATIC_DIR).
+# Mounted last so /api and /media routes win; absent in local dev, where Astro runs its own server.
+_STATIC_DIR = os.environ.get("STATIC_DIR", os.path.join(os.path.dirname(__file__), "..", "static"))
+if os.path.isdir(_STATIC_DIR):
+    app.mount("/", StaticFiles(directory=_STATIC_DIR, html=True), name="site")
