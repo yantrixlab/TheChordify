@@ -84,7 +84,7 @@ const sparkles = [
     </p>
 
     <!-- Input card -->
-    <div class="card">
+    <div id="find" class="card">
       <div class="card-body">
         <div class="tabs" role="tablist" aria-label="Input method">
           <button id="tab-search" class="tab" role="tab" aria-selected="true" aria-controls="panel-search" type="button">
@@ -260,7 +260,7 @@ const sparkles = [
   /* ── input card: glass, with a slowly turning gradient edge ── */
   @property --edge { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
   .card {
-    position: relative; max-width: 660px; margin: 0 auto; padding: 1.5px; border-radius: 26px;
+    position: relative; max-width: 660px; margin: 0 auto; padding: 1.5px; border-radius: 26px; scroll-margin-top: 120px; /* clear of the fixed menu */
     background: conic-gradient(from var(--edge), #7c3aed, #ec4899, #f59e0b, #22d3ee, #7c3aed);
     animation: edge 12s linear infinite;
     box-shadow: 0 30px 60px -28px #5b21b680, 0 12px 28px -12px #1a053340;
@@ -391,6 +391,15 @@ const sparkles = [
     panelSearch.classList.toggle("hidden", !isSearch);
     panelUp.classList.toggle("hidden", isSearch);
   }
+
+  // The "Discover" link in the menu lands here (/#find): open the search tab and put the cursor in the box.
+  function arriveAtSearch() {
+    if (window.location.hash !== "#find") return;
+    setTab("search");
+    (document.getElementById("hero-q") as HTMLInputElement | null)?.focus({ preventScroll: true });
+  }
+  window.addEventListener("hashchange", arriveAtSearch);
+  arriveAtSearch();
 
   tabSearch.addEventListener("click", () => setTab("search"));
   tabUp.addEventListener("click", () => setTab("upload"));
