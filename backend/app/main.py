@@ -316,7 +316,10 @@ def search(request: Request, q: str = "") -> dict:
         songs = search_songs(query)
         known = catalog.lookup([song["videoId"] for song in songs])
         # Songs somebody has already chordified come with their main chords and jam count, and open straight away.
-        return {"query": query, "results": [{**song, **known.get(song["videoId"], {})} for song in songs]}
+        results = [{**song, **known.get(song["videoId"], {})} for song in songs]
+        # Ready-made songs lead (the most jammed first); the rest keep their relevance order (the sort is stable).
+        results.sort(key=lambda song: (0, -song["jams"]) if "jams" in song else (1, 0))
+        return {"query": query, "results": results}
     except SearchUnavailable as exc:
         log.warning("Song search failed: %s", exc)
         raise HTTPException(status_code=502, detail="Song search is unavailable right now. Please try again in a moment.")
