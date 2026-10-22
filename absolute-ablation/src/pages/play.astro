@@ -171,43 +171,32 @@ import Nav from "../components/Nav.astro";
 
         <aside class="pl-side" aria-label="Video and song details">
           <div id="youtube-mount" class="side-card video-card hidden"></div>
-          <div class="side-card now-card">
-          <div class="flex items-center justify-center gap-2 mb-4 flex-wrap" role="group" aria-label="Instrument">
-            {
-              [
-                { id: "guitar", label: "Guitar", icon: "🎸" },
-                { id: "piano", label: "Piano", icon: "🎹" },
-                { id: "ukulele", label: "Ukulele", icon: "🪗" },
-                { id: "mandolin", label: "Mandolin", icon: "🎵" },
-              ].map((inst, i) => (
-                <button
-                  type="button"
-                  class="instrument-tab rounded-full font-medium"
-                  data-inst={inst.id}
-                  aria-pressed={i === 0 ? "true" : "false"}
-                  style={`
-                    height:32px;padding:0 14px;font-size:13px;cursor:pointer;
-                    border:1px solid ${i === 0 ? "var(--color-accent)" : "#7c3aed44"};
-                    background:${i === 0 ? "var(--color-accent)" : "transparent"};
-                    color:${i === 0 ? "var(--color-on-accent)" : "#c4b5fd"};
-                  `}
-                >
-                  <span aria-hidden="true">{inst.icon}</span> {inst.label}
-                </button>
-              ))
-            }
-          </div>
-
-            <div style="font-family:var(--font-mono);font-size:11px;color:#8b7fa8;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;">
-              Now playing
+          <div class="side-card inst-card">
+            <div class="flex items-center justify-center gap-2 flex-wrap" role="group" aria-label="Instrument">
+              {
+                [
+                  { id: "guitar", label: "Guitar", icon: "🎸" },
+                  { id: "piano", label: "Piano", icon: "🎹" },
+                  { id: "ukulele", label: "Ukulele", icon: "🪗" },
+                  { id: "mandolin", label: "Mandolin", icon: "🎵" },
+                ].map((inst, i) => (
+                  <button
+                    type="button"
+                    class="instrument-tab rounded-full font-medium"
+                    data-inst={inst.id}
+                    aria-pressed={i === 0 ? "true" : "false"}
+                    style={`
+                      height:32px;padding:0 14px;font-size:13px;cursor:pointer;
+                      border:1px solid ${i === 0 ? "var(--color-accent)" : "#7c3aed44"};
+                      background:${i === 0 ? "var(--color-accent)" : "transparent"};
+                      color:${i === 0 ? "var(--color-on-accent)" : "#c4b5fd"};
+                    `}
+                  >
+                    <span aria-hidden="true">{inst.icon}</span> {inst.label}
+                  </button>
+                ))
+              }
             </div>
-            <div id="current-chord" style="font-size:48px;font-weight:700;color:var(--color-accent);line-height:1;">—</div>
-            <div id="current-chord-key" style="font-size:14px;color:#c4b5fd;margin-top:8px;"></div>
-
-            <!-- Guitar diagram -->
-            <div id="guitar-diagram" class="flex items-center justify-center gap-8 mt-4"></div>
-            <!-- Notes fallback for piano/ukulele/mandolin -->
-            <div id="notes-display" class="hidden mt-4" style="font-family:var(--font-mono);font-size:15px;color:#e0d7f5;"></div>
           </div>
           <div class="side-card details-card">
             <h2 class="sd-title">Song details</h2>
@@ -312,7 +301,7 @@ import Nav from "../components/Nav.astro";
   .side-card { border-radius: 16px; overflow: hidden; flex: 0 0 auto; }
   .video-card { aspect-ratio: 16 / 9; background: #000; }
   .video-card iframe { width: 100% !important; height: 100% !important; display: block; }
-  .now-card { background: #0d0019; border: 1px solid #7c3aed33; padding: 16px 14px 18px; text-align: center; }
+  .inst-card { background: #0d0019; border: 1px solid #7c3aed33; padding: 12px 12px; }
   .details-card { background: var(--color-canvas); color: var(--color-ink); border: 1px solid var(--color-hairline); padding: 16px 18px; }
   .sd-title { margin: 0 0 12px; font-size: 15px; font-weight: 700; }
   .sd-list { margin: 0; display: grid; gap: 10px; }
@@ -457,10 +446,6 @@ import Nav from "../components/Nav.astro";
   const playerState = document.getElementById("player-state")!;
   const youtubeMount = document.getElementById("youtube-mount")!;
   const audioEl = document.getElementById("audio-el") as HTMLAudioElement;
-  const currentChordEl = document.getElementById("current-chord")!;
-  const currentChordKeyEl = document.getElementById("current-chord-key")!;
-  const guitarDiagramEl = document.getElementById("guitar-diagram")!;
-  const notesDisplayEl = document.getElementById("notes-display")!;
   const viewTabDiagrams = document.getElementById("view-tab-diagrams") as HTMLButtonElement;
   const viewTabGrid = document.getElementById("view-tab-grid") as HTMLButtonElement;
   const panelDiagrams = document.getElementById("panel-diagrams")!;
@@ -515,7 +500,6 @@ import Nav from "../components/Nav.astro";
   let duration = 0;
   let tempo = 120;
   let songKey = ""; // estimated key of the song, e.g. "G" or "F#m"
-  let lastActiveIndex = -1;
   let loopEnabled = false;
   let tempoPct = 100;
   let capo = 0;
@@ -797,7 +781,7 @@ import Nav from "../components/Nav.astro";
             card.textContent = "𝄽";
           } else {
             const fChord = fingeringChord(chord);
-            const shape = activeInstrument === "guitar" ? getGuitarShape(fChord) : undefined;
+            const shape = getGuitarShape(fChord);
             card.appendChild(shape ? buildFretDiagram(displayChord(chord), shape, 1) : buildNoteFallbackCard(displayChord(chord)));
           }
           item.appendChild(card);
@@ -1082,33 +1066,6 @@ import Nav from "../components/Nav.astro";
     if (activeView === "grid" && isPlaying() && performance.now() >= gridFollowPausedUntil) followGridRow(cell.row);
   }
 
-  function renderInstrumentView(rawChord: string) {
-    guitarDiagramEl.innerHTML = "";
-    notesDisplayEl.classList.add("hidden");
-    guitarDiagramEl.classList.add("hidden");
-
-    if (rawChord === "N") {
-      return;
-    }
-
-    const fChord = fingeringChord(rawChord);
-
-    if (activeInstrument === "guitar") {
-      const shape = getGuitarShape(fChord);
-      guitarDiagramEl.classList.remove("hidden");
-      if (!shape) {
-        notesDisplayEl.classList.remove("hidden");
-        notesDisplayEl.textContent = `No diagram available. Notes: ${chordNotes(fChord).join(", ")}`;
-        return;
-      }
-      guitarDiagramEl.appendChild(buildFretDiagram(fChord, shape, 1.2));
-    } else {
-      notesDisplayEl.classList.remove("hidden");
-      const label = activeInstrument.charAt(0).toUpperCase() + activeInstrument.slice(1);
-      notesDisplayEl.textContent = `${label} notes: ${chordNotes(fChord).join(" – ")}`;
-    }
-  }
-
   /**
    * Builds a real fretboard diagram (strings, frets, barre bars, finger dots) out of
    * plain divs — no SVG. Detects barres by finding 2+ strings sharing the same
@@ -1309,13 +1266,6 @@ import Nav from "../components/Nav.astro";
     return wrap;
   }
 
-  function setCurrentChord(rawChord: string) {
-    const shown = displayChord(rawChord);
-    currentChordEl.textContent = rawChord === "N" ? "—" : shown;
-    currentChordKeyEl.textContent = chordKeyLabel(shown);
-    renderInstrumentView(rawChord);
-  }
-
   /** Song details card: the chords used (most time first), key, tempo and number of sections. */
   function renderDetails() {
     const totals = new Map<string, number>();
@@ -1356,7 +1306,7 @@ import Nav from "../components/Nav.astro";
       .sort((a, b) => b[1] - a[1])
       .forEach(([raw, seconds]) => {
         const fChord = fingeringChord(raw);
-        const shape = activeInstrument === "guitar" ? getGuitarShape(fChord) : undefined;
+        const shape = getGuitarShape(fChord);
         const card = shape ? buildFretDiagram(fChord, shape, 1) : buildNoteFallbackCard(fChord);
         card.title = `${displayChord(raw)} — ${Math.round((100 * seconds) / all)}% of the song`;
         summaryGridEl.appendChild(card);
@@ -1382,7 +1332,6 @@ import Nav from "../components/Nav.astro";
     renderSummary();
     renderDetails();
     updateTransposeLabel();
-    if (lastActiveIndex >= 0 && chords[lastActiveIndex]) setCurrentChord(chords[lastActiveIndex].chord);
     const t = playerTime();
     highlightChordGrid(t);
   }
@@ -1428,11 +1377,6 @@ import Nav from "../components/Nav.astro";
     updateTransport(currentTime);
     applyLoop(currentTime);
 
-    const index = chords.findIndex((s) => currentTime >= s.start && currentTime < s.end);
-    if (index === -1 || index === lastActiveIndex) return;
-    lastActiveIndex = index;
-    const seg = chords[index];
-    setCurrentChord(seg.chord);
   }
 
   /** The player's clock in seconds, whichever player is in use. */
@@ -1501,16 +1445,14 @@ import Nav from "../components/Nav.astro";
   }
   async function runCountIn() {
     const beatMs = 60000 / (tempo * (tempoPct / 100));
-    const shownChord = currentChordEl.textContent;
-    const shownKey = currentChordKeyEl.textContent;
+    timeNowEl.style.color = "var(--color-violet)";
     for (let n = 3; n >= 1; n--) {
-      currentChordEl.textContent = String(n);
-      currentChordKeyEl.textContent = "Get ready";
+      timeNowEl.textContent = String(n); // 3, 2, 1 in the clock beside the play button
       clickSound(n === 3);
       await new Promise((resolve) => setTimeout(resolve, beatMs));
     }
-    currentChordEl.textContent = shownChord;
-    currentChordKeyEl.textContent = shownKey;
+    timeNowEl.style.color = "";
+    timeNowEl.textContent = formatClock(playerTime());
   }
 
   let counting = false;
@@ -1645,24 +1587,37 @@ import Nav from "../components/Nav.astro";
       audioEl.addEventListener("ended", () => setPlayingUi(false));
     }
 
-    if (chords.length > 0) setCurrentChord(chords[0].chord);
     if (result.sectionsPending) watchForBetterSections();
   }
 
-  document.querySelectorAll<HTMLButtonElement>(".instrument-tab").forEach((btn) => {
+  // Instrument tabs only keep the choice for now (the diagrams are guitar diagrams until the others are built).
+  const instrumentTabs = document.querySelectorAll<HTMLButtonElement>(".instrument-tab");
+  function chooseInstrument(id: string) {
+    activeInstrument = id;
+    instrumentTabs.forEach((b) => {
+      const active = b.dataset.inst === id;
+      b.style.background = active ? "var(--color-accent)" : "transparent";
+      b.style.color = active ? "var(--color-on-accent)" : "#c4b5fd";
+      b.style.borderColor = active ? "var(--color-accent)" : "#7c3aed44";
+      b.setAttribute("aria-pressed", String(active));
+    });
+  }
+  instrumentTabs.forEach((btn) => {
     btn.addEventListener("click", () => {
-      activeInstrument = btn.dataset.inst || "guitar";
-      document.querySelectorAll<HTMLButtonElement>(".instrument-tab").forEach((b) => {
-        const active = b === btn;
-        b.style.background = active ? "var(--color-accent)" : "transparent";
-        b.style.color = active ? "var(--color-on-accent)" : "#c4b5fd";
-        b.style.borderColor = active ? "var(--color-accent)" : "#7c3aed44";
-        b.setAttribute("aria-pressed", String(active));
-      });
-      if (lastActiveIndex >= 0) renderInstrumentView(chords[lastActiveIndex].chord);
-      renderSummary();
+      chooseInstrument(btn.dataset.inst || "guitar");
+      try {
+        localStorage.setItem("chordsuno-instrument", activeInstrument);
+      } catch {
+        // storage can be blocked; the choice just is not remembered
+      }
     });
   });
+  try {
+    const saved = localStorage.getItem("chordsuno-instrument");
+    if (saved && [...instrumentTabs].some((b) => b.dataset.inst === saved)) chooseInstrument(saved);
+  } catch {
+    // no storage: stay on guitar
+  }
 
   // Toolbar: volume
   volumeSlider.addEventListener("input", () => {
@@ -1796,7 +1751,6 @@ import Nav from "../components/Nav.astro";
     detailToggle.textContent = detailed ? "Detailed" : "Simple";
     detailToggle.style.color = detailed ? "var(--color-violet)" : "var(--color-body)";
     detailToggle.setAttribute("aria-pressed", String(detailed));
-    lastActiveIndex = -1;
     refreshViews();
     onTimeUpdate(playerTime());
   });
