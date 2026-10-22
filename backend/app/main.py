@@ -33,7 +33,8 @@ os.makedirs(RESULT_DIR, exist_ok=True)
 # 9: those sections arrive in the background after the chords (sectionsPending), instead of holding the analysis up.
 # 10: a pickup bar gets real beat cells (the first cell is the first beat; no leading Silence section), and a section
 #     starts where its chords do.
-ANALYSIS_VERSION = 10
+# 11: chords that recur on the same beat of nearby bars are favoured there (restores faint repeats); slivers under 0.3 s are absorbed.
+ANALYSIS_VERSION = 11
 
 ALLOWED_UPLOAD_EXTENSIONS ={".mp3", ".wav", ".flac", ".m4a"}
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50MB

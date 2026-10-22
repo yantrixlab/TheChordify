@@ -254,6 +254,12 @@ class DecodeOptions:
     detail: str = "full"
     core_share: float = 0.03  # simple mode: a chord must fill at least this share of the song to be kept
     max_core: int = 10  # simple mode: at most this many different chords per song
+    # How strongly a chord that keeps coming back on the same beat of nearby bars is favoured there (0 = off). Strumming
+    # patterns and chord loops repeat bar after bar, but in a dense passage the model hears only a trace of a chord that
+    # it hears clearly elsewhere in the same loop; see _repeat_weights.
+    repeat: float = float(os.environ.get("CHORD_REPEAT", "2.0"))
+    # A chord shorter than this (seconds) is a glitch between two longer ones and is absorbed by the longer neighbour.
+    min_len: float = float(os.environ.get("CHORD_MIN_LEN", "0.3"))
 
 
 # Simple mode folds the model's 14 chord types into three triad families per root.
@@ -397,10 +403,95 @@ def extract_features(y: np.ndarray, progress: Optional[ProgressFn] = None, tta: 
     )
 
 
+_FOLD_INDEX = np.array([int(np.argmax(_FOLD[c])) for c in range(NUM_CHORDS)])  # model class -> triad class (36 = none)
+_REPEAT_BARS = 4  # nearby = this many bars either side
+_REPEAT_MIN_MEAN = float(os.environ.get("CHORD_REPEAT_MIN_MEAN", "0.12"))  # a chord must average at least this at a beat position to be boosted there
+_REPEAT_MIN_BARS = int(os.environ.get("CHORD_REPEAT_MIN_BARS", "5"))  # ...and show up (>= 0.05) in at least this many bars
+_REPEAT_MIN_SAME = int(os.environ.get("CHORD_REPEAT_MIN_SAME", "7"))  # ...out of at least this many bars that have that beat
+_REPEAT_MAX_BOOST = 6.0
+_REPEAT_BLEND = float(os.environ.get("CHORD_REPEAT_BLEND", "0"))
+
+
+def _repeat_weights(f: Features, probs: np.ndarray, strength: float) -> np.ndarray:
+    """Per-frame multipliers (frames, 170) that favour chords which recur on the same beat of nearby bars.
+
+    In a loop like "C . . F | C . . F | C . . F" the F on beat 4 may be loud in one bar and faint in the next
+    when the playing gets denser. For every beat the triad probabilities are compared across the same beat of the
+    bars around it with the average over all beats of those bars: a chord that is clearly more likely at this beat
+    position than elsewhere (and recurs in several bars) is boosted here, and the chords it is rarer than are
+    softened. Beats are four to a bar, so only beat counts matter, not which beat starts a bar.
+    """
+    beats = f.beats
+    weights = np.ones((len(probs), NUM_CHORDS))
+    if strength <= 0 or beats is None or len(beats) < 4 * (_REPEAT_MIN_BARS + 1):
+        return weights
+    folded = probs @ _FOLD  # (frames, 37)
+    nb = len(beats)
+    edges = np.append(beats, f.duration)
+    frame_lo = np.clip((edges[:-1] * FRAMES_PER_SECOND).astype(int), 0, len(probs) - 1)
+    frame_hi = np.clip((edges[1:] * FRAMES_PER_SECOND).astype(int), frame_lo + 1, len(probs))
+    beat_p = np.array([folded[lo:hi].mean(axis=0) for lo, hi in zip(frame_lo, frame_hi)])  # (beats, 37)
+
+    boost = np.ones((nb, 37))
+    reach = 4 * _REPEAT_BARS
+    for b in range(nb):
+        near = np.arange(max(0, b - reach), min(nb, b + reach + 1))
+        same = near[(near - b) % 4 == 0]
+        if len(same) < _REPEAT_MIN_SAME:
+            continue
+        at_position = beat_p[same].mean(axis=0)
+        everywhere = beat_p[near].mean(axis=0)
+        recurring = (beat_p[same] >= 0.05).sum(axis=0) >= _REPEAT_MIN_BARS
+        ratio = (at_position + 0.02) / (everywhere + 0.02)
+        up = recurring & (at_position >= _REPEAT_MIN_MEAN) & (ratio > 1.0)
+        down = (ratio < 1.0) & (everywhere >= _REPEAT_MIN_MEAN)
+        if not up.any():
+            continue  # nothing recurs here: leave the beat as the model heard it
+        boost[b] = np.where(up, np.minimum(ratio**strength, _REPEAT_MAX_BOOST), np.where(down, np.maximum(ratio ** (0.5 * strength), 0.5), 1.0))
+        boost[b, 36] = 1.0  # silence is left alone
+
+    t = np.arange(len(probs)) / FRAMES_PER_SECOND
+    if _REPEAT_BLEND > 0:
+        # Blend the multipliers from one beat's middle to the next so a boost does not start or stop abruptly at a beat line.
+        centers = (beats + edges[1:]) / 2
+        log_boost = np.log(boost)
+        blended = np.stack([np.interp(t, centers, log_boost[:, k]) for k in range(37)], axis=1)
+        per_beat = np.exp(blended)
+    else:
+        beat_of_frame = np.clip(np.searchsorted(beats, t, side="right") - 1, 0, nb - 1)
+        per_beat = boost[beat_of_frame]
+    per_beat[t < beats[0]] = 1.0  # nothing is known before the first beat
+    return per_beat[:, _FOLD_INDEX]  # (frames, 170)
+
+
+def _absorb_slivers(segs: list[list], min_len: float) -> list[list]:
+    """Chords shorter than `min_len` seconds join the longer of their neighbours; equal neighbours then merge."""
+    if min_len <= 0 or len(segs) < 2:
+        return segs
+    segs = [list(s) for s in segs]
+    while len(segs) > 1:
+        i = next((k for k, (a, b, _c) in enumerate(segs) if b - a < min_len), None)
+        if i is None:
+            break
+        left = segs[i - 1] if i > 0 else None
+        right = segs[i + 1] if i + 1 < len(segs) else None
+        if right is None or (left is not None and left[1] - left[0] >= right[1] - right[0]):
+            left[1] = segs[i][1]
+        else:
+            right[0] = segs[i][0]
+        del segs[i]
+        if 0 < i < len(segs) and segs[i - 1][2] == segs[i][2]:  # the neighbours on both sides are now the same chord
+            segs[i - 1][1] = segs[i][1]
+            del segs[i]
+    return segs
+
+
 def decode(f: Features, opts: Optional[DecodeOptions] = None) -> list[dict]:
     """Chord segments (start, end, chord, confidence) from analysed features."""
     opts = opts or DecodeOptions()
     probs = uniform_filter1d(f.probs, size=opts.smooth, axis=0, mode="nearest") if opts.smooth > 1 else f.probs
+    if opts.repeat > 0:
+        probs = probs * _repeat_weights(f, probs, opts.repeat)
     if opts.detail == "simple":
         classes, conf = _core_chord_classes(probs, opts)
     else:
@@ -426,6 +517,7 @@ def decode(f: Features, opts: Optional[DecodeOptions] = None) -> list[dict]:
         if abs(nearest - segs[i][0]) <= opts.snap:
             segs[i - 1][1] = segs[i][0] = nearest
     segs = [s for s in segs if s[1] - s[0] > 1e-3]
+    segs = _absorb_slivers(segs, opts.min_len)
 
     out: list[dict] = []
     for start, end, cls in segs:
