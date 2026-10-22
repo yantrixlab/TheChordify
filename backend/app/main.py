@@ -16,6 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from .engine import analyze
+from .jobs import JobQueue
 from .search import RateLimiter, SearchUnavailable, clean_query, search_songs
 from .store import SongStore
 from . import youtube
@@ -28,6 +29,13 @@ UPLOAD_DIR = os.path.join(CACHE_DIR, "uploads")
 RESULT_DIR = os.path.join(CACHE_DIR, "results")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(RESULT_DIR, exist_ok=True)
+# Slow work (download + analysis) waits in line here, first come first served, with a visible place in line.
+job_queue = JobQueue(
+    workers=int(os.environ.get("JOB_WORKERS") or os.environ.get("CHORD_WORKERS", "1")),
+    max_waiting=int(os.environ.get("MAX_WAITING_SONGS", "25")),
+)
+# New songs one visitor may start per hour (songs already in the catalog are free). 0 turns the limit off.
+NEW_SONGS_PER_HOUR = int(os.environ.get("NEW_SONGS_PER_HOUR", "8"))
 catalog = SongStore(os.path.join(CACHE_DIR, "songs.db"))
 youtube.configure(CACHE_DIR)  # where cookies pasted on the admin page are kept
 
@@ -242,19 +250,18 @@ def _run_youtube_job(session_id: str, url: str, meta: dict) -> None:
         _set_job(session_id, status="error", progress=0, error=str(exc))
     except Exception as exc:
         _remove(audio_path)
-        error_text = str(exc)
-        if "Sign in to confirm" in error_text or "not a bot" in error_text:
+        error_text = str(exc).lower()
+        if "sign in to confirm" in error_text or "not a bot" in error_text or "http error 403" in error_text:
             log.warning("YouTube blocked the download of %s (bot check); add or refresh cookies on /admin", session_id)
-            error_text = (
-                "We couldn't fetch that song from YouTube right now. "
-                "Please try another song, or upload the audio file instead."
-            )
-        _set_job(
-            session_id,
-            status="error",
-            progress=0,
-            error=f"Could not process that song: {error_text}",
-        )
+            message = "We couldn't fetch that song from YouTube right now. Please try another song, or upload the audio file instead."
+        elif "private video" in error_text:
+            message = "That video is private, so we can't read it. Try another version of the song."
+        elif "unavailable" in error_text or "has been removed" in error_text or "terminated" in error_text:
+            message = "That video isn't available on YouTube any more. Try another version of the song."
+        else:
+            log.warning("Could not process %s: %s", session_id, exc)
+            message = "Something went wrong while fetching that song. Please try again, or try another version."
+        _set_job(session_id, status="error", progress=0, error=message)
 
 
 def _run_analysis_job(
@@ -331,31 +338,46 @@ def _require_admin(request: Request) -> None:
         raise HTTPException(status_code=401, detail="Wrong admin token")
 
 
-class CookiesBody(BaseModel):
+def _is_admin(request: Request) -> bool:
+    """True if the request carries the admin token (the owner trying things is not held to the visitor limits)."""
+    given = request.headers.get("x-admin-token", "")
+    return bool(_ADMIN_TOKEN) and hmac.compare_digest(given.encode("utf-8"), _ADMIN_TOKEN.encode("utf-8"))
+
+
+class AccountBody(BaseModel):
     cookies: str
+    label: str = ""
 
 
 @app.get("/api/admin/youtube")
 def admin_youtube_status(request: Request, test: bool = False) -> dict:
-    """What the server has for YouTube; with ?test=1 also tries a real (metadata-only) request and reports the result."""
+    """What the server has for YouTube (the accounts and their health); with ?test=1 also tries each one for real."""
     _require_admin(request)
-    return youtube.diagnose(test=test)
+    return {**youtube.diagnose(test=test), "queue": job_queue.stats(), "newSongsPerHour": NEW_SONGS_PER_HOUR}
 
 
-@app.put("/api/admin/youtube/cookies")
-def admin_save_cookies(body: CookiesBody, request: Request) -> dict:
+@app.post("/api/admin/youtube/accounts")
+def admin_add_account(body: AccountBody, request: Request) -> dict:
     _require_admin(request)
     try:
-        return youtube.save_cookies(body.cookies)
+        return youtube.add_account(body.cookies, body.label)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
 
-@app.delete("/api/admin/youtube/cookies")
-def admin_clear_cookies(request: Request) -> dict:
+@app.delete("/api/admin/youtube/accounts/{account_id}")
+def admin_remove_account(account_id: str, request: Request) -> dict:
     _require_admin(request)
-    youtube.clear_cookies()
-    return youtube.cookie_info()
+    if not youtube.remove_account(account_id):
+        raise HTTPException(status_code=404, detail="No such account (accounts set in the environment cannot be removed here)")
+    return {"removed": account_id}
+
+
+@app.post("/api/admin/youtube/accounts/{account_id}/reset")
+def admin_reset_account(account_id: str, request: Request) -> dict:
+    _require_admin(request)
+    youtube.reset_account(account_id)
+    return {"reset": account_id}
 
 
 @app.get("/api/popular")
@@ -381,8 +403,39 @@ def add_jam(video_id: str, request: Request) -> dict:
     return {"counted": True, "jams": jams}
 
 
+_new_song_limiter = RateLimiter(limit=max(NEW_SONGS_PER_HOUR, 1), window=3600.0)
+
+
+def _enqueue(request: Request, session_id: str, task) -> dict:
+    """Starts a new analysis in line. One visitor may only start so many new songs an hour, and the line has a length
+    limit; joining a job that is already waiting or running costs nothing."""
+    existing = _get_job(session_id)
+    if existing and existing.get("status") in ("queued", "downloading", "analyzing"):
+        return {"sessionId": session_id, "status": existing["status"]}
+
+    caller = request.client.host if request.client else "unknown"
+    limited = NEW_SONGS_PER_HOUR > 0 and not _is_admin(request)
+    if limited and not _new_song_limiter.allow(caller):
+        minutes = max(1, int(_new_song_limiter.retry_after(caller) // 60) + 1)
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                f"You have started the most new songs allowed per hour ({NEW_SONGS_PER_HOUR}). Songs that others have already "
+                f"chordified open instantly, and you can start another in about {minutes} minute{'s' if minutes != 1 else ''}."
+            ),
+        )
+    _set_job(session_id, status="queued", progress=0, stage="Queued")
+    outcome = job_queue.submit(session_id, task)
+    if outcome == "full":
+        if limited:
+            _new_song_limiter.refund(caller)
+        _JOBS.pop(session_id, None)
+        raise HTTPException(status_code=503, detail="We're very busy right now. Please try again in a few minutes.")
+    return {"sessionId": session_id, "status": "queued"}
+
+
 @app.post("/api/extract/youtube")
-def extract_from_youtube(payload: YoutubeRequest) -> dict:
+def extract_from_youtube(payload: YoutubeRequest, request: Request) -> dict:
     url = payload.url.strip()
     if not url:
         raise HTTPException(status_code=400, detail="url is required")
@@ -404,19 +457,11 @@ def extract_from_youtube(payload: YoutubeRequest) -> dict:
             _record_song(video_id, session_id, cached, meta)  # songs analysed before the catalog existed join it now
         return {"sessionId": session_id, "status": "done"}
 
-    existing = _get_job(session_id)
-    if existing and existing.get("status") in ("downloading", "analyzing"):
-        return {"sessionId": session_id, "status": existing["status"]}
-
-    _set_job(session_id, status="queued", progress=0, stage="Queued")
-    thread = threading.Thread(target=_run_youtube_job, args=(session_id, url, meta), daemon=True)
-    thread.start()
-
-    return {"sessionId": session_id, "status": "queued"}
+    return _enqueue(request, session_id, lambda: _run_youtube_job(session_id, url, meta))
 
 
 @app.post("/api/extract/upload")
-async def extract_from_upload(file: UploadFile = File(...)) -> dict:
+async def extract_from_upload(request: Request, file: UploadFile = File(...)) -> dict:
     _, ext = os.path.splitext(file.filename or "")
     ext = ext.lower()
     if ext not in ALLOWED_UPLOAD_EXTENSIONS:
@@ -439,19 +484,8 @@ async def extract_from_upload(file: UploadFile = File(...)) -> dict:
         _set_job(session_id, status="done", progress=100, stage="Done", result=cached)
         return {"sessionId": session_id, "status": "done"}
 
-    existing = _get_job(session_id)
-    if existing and existing.get("status") in ("downloading", "analyzing"):
-        return {"sessionId": session_id, "status": existing["status"]}
-
-    _set_job(session_id, status="queued", progress=0, stage="Queued")
-    thread = threading.Thread(
-        target=_run_analysis_job,
-        args=(session_id, stored_path, "upload", None, os.path.splitext(file.filename or "")[0]),
-        daemon=True,
-    )
-    thread.start()
-
-    return {"sessionId": session_id, "status": "queued"}
+    title = os.path.splitext(file.filename or "")[0]
+    return _enqueue(request, session_id, lambda: _run_analysis_job(session_id, stored_path, "upload", None, title))
 
 
 @app.get("/api/job/{session_id}")
@@ -465,6 +499,18 @@ def get_job_status(session_id: str) -> dict:
         raise HTTPException(status_code=404, detail="Unknown session")
     if job.get("result"):
         job["result"] = _with_pending(session_id, job["result"])
+    if job.get("status") == "queued":
+        ahead = job_queue.ahead_of(session_id)
+        if ahead is not None:
+            seconds = job_queue.wait_estimate(ahead)
+            wait = "under a minute" if seconds < 60 else f"about {round(seconds / 60)} min"
+            job["ahead"] = ahead
+            job["etaSeconds"] = seconds
+            job["stage"] = (
+                "Starting your song…"
+                if ahead == 0
+                else f"Waiting for your turn: {ahead} song{'s' if ahead != 1 else ''} ahead of you ({wait})"
+            )
     return {"sessionId": session_id, **job}
 
 

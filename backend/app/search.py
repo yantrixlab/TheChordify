@@ -211,3 +211,16 @@ class RateLimiter:
             if len(self._calls) > 5000:
                 self._calls.clear()
             return True
+
+    def retry_after(self, caller: str) -> float:
+        """Seconds until this caller may go again (0 if they may now)."""
+        now = time.monotonic()
+        with self._lock:
+            recent = [t for t in self._calls.get(caller, []) if now - t < self._window]
+            return 0.0 if len(recent) < self._limit else max(0.0, self._window - (now - recent[0]))
+
+    def refund(self, caller: str) -> None:
+        """Gives back the call just allowed (the work it was for never started)."""
+        with self._lock:
+            if self._calls.get(caller):
+                self._calls[caller].pop()
