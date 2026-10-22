@@ -1,0 +1,305 @@
+---
+// The shelves under the hero: trending songs by language and style, each a single row that scrolls sideways.
+// The server fills them (/api/trending); until then, and if it cannot, this shows placeholders or nothing at all.
+---
+
+<section id="trending" class="tr" aria-labelledby="tr-title" hidden>
+  <div class="tr-wrap">
+    <header class="tr-head">
+      <p class="tr-eyebrow">Trending now</p>
+      <h2 id="tr-title" class="tr-title">Pick a song, get the chords</h2>
+      <p class="tr-sub">What people are playing right now. Songs that others have already chordified open straight away, with their chords and jam sessions on show.</p>
+    </header>
+    <p id="tr-note" class="tr-note" role="alert" hidden></p>
+    <div id="tr-shelves" aria-busy="true"></div>
+  </div>
+</section>
+
+<style is:global>
+  .tr { position: relative; padding: 24px 0 72px; background: linear-gradient(180deg, #fff, #fbf8ff 40%, #fff); }
+  .tr[hidden] { display: none; }
+  .tr-wrap { max-width: 1152px; margin: 0 auto; padding: 0 20px; }
+  .tr-head { max-width: 640px; margin: 0 auto 36px; text-align: center; }
+  .tr-eyebrow { margin: 0 0 10px; font: 700 11.5px/1 var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-violet); }
+  .tr-title { margin: 0 0 10px; font-size: clamp(26px, 4vw, 38px); font-weight: 800; letter-spacing: -0.035em; line-height: 1.1; color: var(--color-ink); }
+  .tr-sub { margin: 0; font-size: 16px; line-height: 1.6; color: var(--color-body); }
+  .tr-note { margin: 0 auto 18px; max-width: 640px; padding: 10px 14px; border-radius: 12px; background: #fef2f2; color: var(--color-error); font-size: 14px; text-align: center; }
+  .tr-note[hidden] { display: none; }
+
+  .tr-shelf { margin-top: 34px; }
+  .tr-shelf:first-child { margin-top: 0; }
+  .tr-bar { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+  .tr-name { margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -0.02em; color: var(--color-ink); }
+  .tr-about { margin: 3px 0 0; font-size: 13.5px; color: var(--color-mute); }
+  .tr-arrows { display: flex; gap: 8px; flex: none; }
+  .tr-arrow { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--color-hairline); background: #fff; color: var(--color-violet-deep);
+    cursor: pointer; transition: background-color 0.15s, border-color 0.15s, color 0.15s, opacity 0.15s; }
+  .tr-arrow:hover:not(:disabled) { background: var(--color-violet-soft); border-color: var(--color-hairline-strong); }
+  .tr-arrow:disabled { opacity: 0.35; cursor: default; }
+  .tr-arrow:focus-visible, .tc:focus-visible { outline: 2px solid var(--color-violet); outline-offset: 3px; }
+
+  /* One row that scrolls sideways. The soft fade at an edge says there is more that way. */
+  .tr-rail { position: relative; margin: 0 -20px; }
+  .tr-row { display: grid; grid-auto-flow: column; grid-auto-columns: 244px; gap: 16px; margin: 0; padding: 6px 20px 18px; list-style: none; overflow-x: auto;
+    scroll-snap-type: x proximity; scroll-padding: 0 20px; overscroll-behavior-x: contain; scrollbar-width: none; }
+  .tr-row::-webkit-scrollbar { display: none; }
+  .tr-rail::before, .tr-rail::after { content: ""; position: absolute; top: 0; bottom: 0; z-index: 2; width: 44px; pointer-events: none; opacity: 0; transition: opacity 0.2s; }
+  .tr-rail::before { left: 0; background: linear-gradient(90deg, #fff, #fff0); }
+  .tr-rail::after { right: 0; background: linear-gradient(270deg, #fff, #fff0); }
+  .tr-rail.more-left::before, .tr-rail.more-right::after { opacity: 1; }
+
+  .tc { all: unset; box-sizing: border-box; display: block; width: 100%; height: 100%; scroll-snap-align: start; cursor: pointer; }
+  .tc-card { display: flex; flex-direction: column; height: 100%; padding: 10px; border-radius: 18px; background: #fff; border: 1px solid var(--color-hairline);
+    box-shadow: 0 1px 2px #1a05330a; transition: border-color 0.18s, box-shadow 0.18s, transform 0.18s; }
+  .tc:hover .tc-card, .tc:focus-visible .tc-card { border-color: #cdbbee; box-shadow: 0 18px 32px -20px #5b21b6a0; transform: translateY(-2px); }
+  .tc[aria-busy="true"] { cursor: progress; }
+  .tc[disabled] { cursor: progress; }
+
+  .tc-art { position: relative; aspect-ratio: 16 / 9; overflow: hidden; border-radius: 12px; background: linear-gradient(135deg, #ede9fe, #fde68a); }
+  .tc-art img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  /* Album covers are square: show them whole, over a blurred copy of themselves, instead of cropping them to a banner. */
+  .tc-art.cover img.back { position: absolute; inset: -12px; width: calc(100% + 24px); height: calc(100% + 24px); filter: blur(16px) saturate(1.2); opacity: 0.75; }
+  .tc-art.cover img.front { position: relative; width: auto; height: 100%; margin: 0 auto; aspect-ratio: 1; border-radius: 8px; box-shadow: 0 6px 18px -6px #0008; }
+  .tc-time { position: absolute; right: 8px; bottom: 8px; padding: 2px 7px; border-radius: 6px; background: #0d0019cc; color: #fff; font: 600 11px/1.5 var(--font-mono); }
+  .tc-jam { position: absolute; left: 8px; top: 8px; display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px 3px 7px; border-radius: 999px;
+    background: #fff; color: var(--color-violet-deep); font: 700 11.5px/1.5 var(--font-sans); box-shadow: 0 4px 10px -4px #1a053366; }
+  .tc-go { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: 8px; background: linear-gradient(180deg, #1a053300, #1a0533bb);
+    color: #fff; font: 700 14px/1 var(--font-sans); opacity: 0; transition: opacity 0.18s; }
+  .tc-go span { display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px; border-radius: 999px; background: linear-gradient(135deg, #7c3aed, #5b21b6); box-shadow: 0 8px 18px -8px #000a; }
+  .tc:hover .tc-go, .tc:focus-visible .tc-go, .tc[aria-busy="true"] .tc-go { opacity: 1; }
+
+  .tc-body { display: flex; flex: 1; flex-direction: column; padding: 11px 4px 4px; }
+  .tc-song { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; margin: 0; min-height: 2.7em; font-size: 14.5px; font-weight: 700; line-height: 1.35; color: var(--color-ink); }
+  .tc-by { margin: 3px 0 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 13px; color: var(--color-body); }
+  .tc-chords { display: flex; align-items: center; gap: 4px; min-height: 24px; margin-top: auto; padding-top: 10px; }
+  .tc-chords span { padding: 2px 7px; border-radius: 6px; background: #f3eeff; color: var(--color-ink); font: 700 11.5px/1.4 var(--font-mono); }
+  .tc-chords .none { padding: 0; background: none; color: var(--color-mute); font: 500 12px/1.4 var(--font-sans); }
+
+  .tc-ghost { height: 262px; border-radius: 18px; background: linear-gradient(100deg, #f3eeff 30%, #fbf9ff 50%, #f3eeff 70%); background-size: 200% 100%; animation: tr-shimmer 1.4s linear infinite; }
+  .tr-ghosthead { width: 220px; height: 22px; margin-bottom: 18px; border-radius: 8px; background: #f3eeff; }
+  @keyframes tr-shimmer { to { background-position: -200% 0; } }
+  .tr-spin { animation: tr-spin 0.7s linear infinite; }
+  @keyframes tr-spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 640px) {
+    .tr { padding-bottom: 48px; }
+    .tr-wrap { padding: 0 16px; }
+    .tr-rail { margin: 0 -16px; }
+    .tr-row { grid-auto-columns: 204px; gap: 12px; padding-left: 16px; padding-right: 16px; }
+    .tr-arrows { display: none; }
+    .tr-rail::before, .tr-rail::after { width: 28px; }
+    .tc-ghost { height: 232px; }
+  }
+  @media (hover: none) { .tc-go { display: none; } .tr-arrows { display: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    .tc-ghost, .tr-spin { animation: none; }
+    .tc-card, .tc-go, .tr-rail::before, .tr-rail::after { transition: none; }
+    .tc:hover .tc-card, .tc:focus-visible .tc-card { transform: none; }
+    .tr-row { scroll-behavior: auto; }
+  }
+</style>
+
+<script>
+  import { getTrending, startExtractFromYoutube, getApiErrorMessage } from "../lib/api";
+  import type { SongHit, TrendingShelf } from "../lib/api";
+  import { clock, jamLabel } from "../lib/format";
+
+  const section = document.getElementById("trending") as HTMLElement;
+  const shelves = document.getElementById("tr-shelves") as HTMLElement;
+  const note = document.getElementById("tr-note") as HTMLElement;
+
+  const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] => {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  };
+
+  const ARROW_LEFT = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M10 3 5 8l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const ARROW_RIGHT = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m6 3 5 5-5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const PLAY = '<svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4 2.5v11l9-5.5z"/></svg>';
+  const WAVE = '<svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M2 6v4M5.5 3v10M9 5v6M12.5 2v12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+  const SPINNER = '<svg class="tr-spin" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.8" stroke-opacity="0.35"/><path d="M14 8a6 6 0 0 0-6-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function placeholders() {
+    shelves.replaceChildren(
+      ...[0, 1].map(() => {
+        const box = el("div", "tr-shelf");
+        box.append(el("div", "tr-ghosthead"));
+        const row = el("div", "tr-row");
+        row.style.overflow = "hidden";
+        for (let i = 0; i < 6; i++) row.append(el("div", "tc-ghost"));
+        box.append(row);
+        return box;
+      }),
+    );
+  }
+
+  function art(song: SongHit): HTMLElement {
+    // YouTube video frames are 16:9; album covers are square.
+    const wide = /ytimg\.com/.test(song.thumbnail || "");
+    const box = el("div", wide ? "tc-art" : "tc-art cover");
+    const make = (className: string) => {
+      const img = el("img", className);
+      img.alt = "";
+      img.loading = "lazy";
+      img.decoding = "async";
+      img.referrerPolicy = "no-referrer";
+      img.src = song.thumbnail;
+      return img;
+    };
+    if (song.thumbnail) {
+      if (wide) box.append(make(""));
+      else box.append(make("back"), make("front"));
+    }
+    if (song.jams && song.jams > 0) {
+      const badge = el("span", "tc-jam");
+      badge.innerHTML = WAVE;
+      badge.append(jamLabel(song.jams));
+      box.append(badge);
+    }
+    if (song.duration > 0) box.append(el("span", "tc-time", clock(song.duration)));
+    const go = el("span", "tc-go");
+    const label = el("span");
+    label.innerHTML = `${PLAY}${song.chords && song.chords.length > 0 ? "Open chords" : "Get chords"}`;
+    go.append(label);
+    box.append(go);
+    return box;
+  }
+
+  function card(song: SongHit): HTMLElement {
+    const item = el("li");
+    item.setAttribute("role", "listitem");
+    const button = el("button", "tc");
+    button.type = "button";
+    button.dataset.video = song.videoId;
+    button.setAttribute("aria-label", `${song.chords && song.chords.length > 0 ? "Open chords for" : "Get chords for"} ${song.title}${song.artist ? ` by ${song.artist}` : ""}`);
+    const surface = el("div", "tc-card");
+    const body = el("div", "tc-body");
+    body.append(el("p", "tc-song", song.title), el("p", "tc-by", song.artist || song.album));
+    const chords = el("div", "tc-chords");
+    if (song.chords && song.chords.length > 0) song.chords.slice(0, 4).forEach((chord) => chords.append(el("span", "", chord)));
+    else chords.append(el("span", "none", "Tap to get chords"));
+    body.append(chords);
+    surface.append(art(song), body);
+    button.append(surface);
+    button.addEventListener("click", () => choose(song, button));
+    item.append(button);
+    return item;
+  }
+
+  async function choose(song: SongHit, button: HTMLButtonElement) {
+    shelves.querySelectorAll<HTMLButtonElement>(".tc").forEach((b) => (b.disabled = true));
+    button.setAttribute("aria-busy", "true");
+    const label = button.querySelector(".tc-go span");
+    if (label) label.innerHTML = `${SPINNER}Starting…`;
+    note.hidden = true;
+    try {
+      const { sessionId } = await startExtractFromYoutube(`https://www.youtube.com/watch?v=${song.videoId}`, {
+        title: song.title,
+        artist: song.artist,
+        album: song.album,
+        thumbnail: song.thumbnail,
+        duration: song.duration,
+      });
+      window.location.href = `/processing?session=${sessionId}`;
+    } catch (err) {
+      shelves.querySelectorAll<HTMLButtonElement>(".tc").forEach((b) => {
+        b.disabled = false;
+        b.removeAttribute("aria-busy");
+      });
+      if (label) label.innerHTML = `${PLAY}${song.chords && song.chords.length > 0 ? "Open chords" : "Get chords"}`;
+      note.textContent = getApiErrorMessage(err, "Could not start that song. Please try again.");
+      note.hidden = false;
+      note.scrollIntoView({ block: "nearest", behavior: reducedMotion ? "auto" : "smooth" });
+    }
+  }
+
+  function shelf(data: TrendingShelf): HTMLElement {
+    const box = el("section", "tr-shelf");
+    const headingId = `tr-${data.id}`;
+    box.setAttribute("aria-labelledby", headingId);
+
+    const bar = el("div", "tr-bar");
+    const titles = el("div");
+    const name = el("h3", "tr-name", data.title);
+    name.id = headingId;
+    titles.append(name, el("p", "tr-about", data.about));
+    const arrows = el("div", "tr-arrows");
+    const left = el("button", "tr-arrow");
+    const right = el("button", "tr-arrow");
+    left.type = right.type = "button";
+    left.innerHTML = ARROW_LEFT;
+    right.innerHTML = ARROW_RIGHT;
+    left.setAttribute("aria-label", `Scroll ${data.title} left`);
+    right.setAttribute("aria-label", `Scroll ${data.title} right`);
+    arrows.append(left, right);
+    bar.append(titles, arrows);
+
+    const rail = el("div", "tr-rail");
+    const row = el("ul", "tr-row");
+    row.setAttribute("role", "list");
+    data.songs.forEach((song) => row.append(card(song)));
+    rail.append(row);
+
+    const update = () => {
+      const max = row.scrollWidth - row.clientWidth - 2;
+      left.disabled = row.scrollLeft <= 2;
+      right.disabled = row.scrollLeft >= max;
+      rail.classList.toggle("more-left", row.scrollLeft > 2);
+      rail.classList.toggle("more-right", row.scrollLeft < max);
+    };
+    const page = (direction: number) => row.scrollBy({ left: direction * row.clientWidth * 0.85, behavior: reducedMotion ? "auto" : "smooth" });
+    left.addEventListener("click", () => page(-1));
+    right.addEventListener("click", () => page(1));
+    row.addEventListener("scroll", update, { passive: true });
+    new ResizeObserver(update).observe(row);
+    requestAnimationFrame(update);
+
+    box.append(bar, rail);
+    return box;
+  }
+
+  let loaded = false;
+  async function load() {
+    if (loaded) return;
+    loaded = true;
+    section.hidden = false;
+    placeholders();
+    let data: TrendingShelf[] = [];
+    try {
+      data = await getTrending();
+    } catch {
+      data = [];
+    }
+    const useful = data.filter((s) => s.songs && s.songs.length > 0);
+    if (useful.length === 0) {
+      section.hidden = true; // nothing to show is better than an empty box
+      return;
+    }
+    shelves.replaceChildren(...useful.map(shelf));
+    shelves.setAttribute("aria-busy", "false");
+  }
+
+  // Fetch when the visitor is about to scroll here, not on every page load.
+  if ("IntersectionObserver" in window) {
+    const watcher = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          watcher.disconnect();
+          load();
+        }
+      },
+      { rootMargin: "500px 0px" },
+    );
+    // The section starts hidden, so watch a marker that is always laid out: the end of the hero.
+    const marker = el("div");
+    marker.style.cssText = "height:1px;margin-top:-1px";
+    section.before(marker);
+    watcher.observe(marker);
+  } else {
+    load();
+  }
+</script>

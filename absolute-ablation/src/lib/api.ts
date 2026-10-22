@@ -183,3 +183,18 @@ export async function getResult(sessionId: string): Promise<ExtractResult> {
   }
   return res.json();
 }
+
+/** One shelf of songs on the home page ("Trending in Hindi"...). Songs already chordified carry their chords and jam count. */
+export interface TrendingShelf {
+  id: string;
+  title: string;
+  about: string;
+  songs: SongHit[];
+}
+
+/** What is trending, shelf by shelf (an empty list if the server cannot say right now). */
+export async function getTrending(): Promise<TrendingShelf[]> {
+  const res = await fetchApi(`${API_BASE}/api/trending`);
+  if (!res.ok) return [];
+  return (await res.json()).shelves ?? [];
+}

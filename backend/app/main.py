@@ -10,7 +10,7 @@ import tempfile
 import threading
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Request, UploadFile, File
+from fastapi import FastAPI, HTTPException, Request, Response, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -19,6 +19,7 @@ from .engine import analyze
 from .jobs import JobQueue
 from .search import RateLimiter, SearchUnavailable, clean_query, search_songs
 from .store import SongStore
+from . import trending as trending_shelves
 from . import youtube
 from .youtube import InvalidUrlError, VideoNotDownloadable, YouTubeBlocked, download_audio, extract_video_id, is_video_id, session_id_for_url, video_info
 
@@ -41,6 +42,8 @@ job_queue = JobQueue(
 NEW_SONGS_PER_HOUR = int(os.environ.get("NEW_SONGS_PER_HOUR", "8"))
 catalog = SongStore(CACHE_DIR)
 youtube.configure(CACHE_DIR)  # where cookies pasted on the admin page are kept
+_TRENDING_KEY = "meta:trending"  # not a valid song id, so it can never be asked for as a result
+trending_shelves.start(lambda: catalog.load_result(_TRENDING_KEY), lambda data: catalog.save_result(_TRENDING_KEY, data))
 try:  # results and songs that older versions kept in files join the database, once
     log.info("Imported from files: %s", catalog.import_files(CACHE_DIR))
 except Exception as exc:
@@ -387,6 +390,20 @@ def admin_reset_account(account_id: str, request: Request) -> dict:
     _require_admin(request)
     youtube.reset_account(account_id)
     return {"reset": account_id}
+
+
+@app.get("/api/trending")
+def trending(response: Response) -> dict:
+    """The shelves under the home page's search box: what is trending, with the chords and jam count of every song that has
+    already been chordified. A shelf of what people jam to on this site comes first once there is enough of it."""
+    shelves = trending_shelves.shelves(lambda data: catalog.save_result(_TRENDING_KEY, data))
+    known = catalog.lookup([song["videoId"] for shelf in shelves for song in shelf["songs"]])
+    out = [{**shelf, "songs": [{**song, **known.get(song["videoId"], {})} for song in shelf["songs"]]} for shelf in shelves]
+    favourites = catalog.popular(16)
+    if len(favourites) >= 3:
+        out.insert(0, {"id": "popular", "title": "Popular on Chord Suno", "about": "What people are jamming to", "songs": favourites})
+    response.headers["Cache-Control"] = "public, max-age=120"
+    return {"shelves": out}
 
 
 @app.get("/api/popular")
