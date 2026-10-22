@@ -6,13 +6,17 @@ verse from a chorus and hear when the singing stops (an instrumental break) - th
 cannot do. CPU only, and heavy: minutes of CPU and a few GB of memory per song (almost all of it Demucs).
 
 So the player never waits for it. The chord analysis finishes first and ships with the model-free sections
-(structure.py); this model runs in the background, one song at a time, in a child process under a time budget,
-and its sections replace the quick ones when ready. If the model is not installed, is too slow for the machine,
-runs out of memory or fails for any reason, the quick sections simply stay.
+(structure.py); only then does this model run, in the background, one song at a time, in a child process under a
+time budget, and its sections replace the quick ones when ready. It never runs next to the chord analysis (their
+memory would add up and could take the whole server down), it is the first process the kernel kills if memory does
+run out, and it does not start at all when too little memory is free. If the model is not installed, is too slow for
+the machine, runs out of memory or fails for any reason, the quick sections simply stay.
 
 SECTION_ENGINE=auto (default) uses the model when installed; "classic" skips it; "model" also forces it on a
 machine with only one or two CPUs, where "auto" skips it as too slow.
 SECTION_BUDGET is the most seconds the model may run once it starts (default 600).
+SECTION_MIN_MEMORY_MB is the free memory it needs to start (default 3500); the tighter of the container limit and
+what the machine has free counts.
 Only the model's section boundaries and names are used: the beat grid, bars and chords stay ours (structure.py
 snaps the boundaries to our bars).
 """
@@ -40,6 +44,7 @@ _MODEL = os.environ.get("SECTION_MODEL", "harmonix-all")
 # Demucs chunk overlap: 0.25 is its default; 0.05 is ~20% faster with the same sections on our test song.
 _OVERLAP = float(os.environ.get("SECTION_OVERLAP", "0.05"))
 _BUDGET = float(os.environ.get("SECTION_BUDGET", "600"))
+_MIN_MEMORY_MB = float(os.environ.get("SECTION_MIN_MEMORY_MB", "3500"))
 _MIN_CPUS = 3  # below this the model takes far longer than the budget, so "auto" does not even start it
 _BACKEND_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -72,12 +77,41 @@ def _analyze(audio_path: str, work: str) -> list[Section]:
 _slot = threading.Semaphore(1)  # one model at a time: it is heavy, and a queue of songs would exhaust memory
 
 
+def available_memory_mb() -> Optional[float]:
+    """Memory this process can still use: the tighter of the container's limit and what the machine has free.
+    None where neither can be read (e.g. on Windows)."""
+    values: list[float] = []
+    try:
+        with open("/proc/meminfo", "r", encoding="ascii") as f:
+            for line in f:
+                if line.startswith("MemAvailable:"):
+                    values.append(int(line.split()[1]) / 1024)
+                    break
+    except (OSError, ValueError):
+        pass
+    for limit_file, used_file in (
+        ("/sys/fs/cgroup/memory.max", "/sys/fs/cgroup/memory.current"),  # cgroup v2
+        ("/sys/fs/cgroup/memory/memory.limit_in_bytes", "/sys/fs/cgroup/memory/memory.usage_in_bytes"),  # v1
+    ):
+        try:
+            with open(limit_file, "r", encoding="ascii") as f:
+                limit = f.read().strip()
+            with open(used_file, "r", encoding="ascii") as f:
+                used = int(f.read().strip())
+            if limit.isdigit() and int(limit) < (1 << 50):  # "max" or a huge number means no limit
+                values.append((int(limit) - used) / (1024 * 1024))
+        except (OSError, ValueError):
+            continue
+    return min(values) if values else None
+
+
 class SectionsJob:
-    """Queues the model for `audio_path` right away; result() waits for it. `enabled` says whether it will run."""
+    """The model for `audio_path`. `enabled` says whether it can run here; result() runs it (waiting its turn) and
+    returns its sections. Call result() only once the chord analysis is finished."""
 
     def __init__(self, audio_path: str) -> None:
         self.enabled = False
-        self._sections: Optional[list[Section]] = None
+        self._audio = audio_path
         if _ENGINE == "classic":
             return
         if _ENGINE != "model" and (os.cpu_count() or 1) < _MIN_CPUS:
@@ -87,18 +121,17 @@ class SectionsJob:
             log.info("all-in-one-infer is not installed; using the model-free section analysis")
             return
         self.enabled = True
-        self._thread = threading.Thread(target=self._run, args=(audio_path,), daemon=True)
-        self._thread.start()
 
     def result(self) -> Optional[list[Section]]:
-        """The model's sections, or None (off, failed or out of time). Waits for the model if it is still running."""
-        if self.enabled:
-            self._thread.join()
-        return self._sections
-
-    def _run(self, audio_path: str) -> None:
+        """The model's sections, or None (off, too little memory, failed or out of time)."""
+        if not self.enabled:
+            return None
         with _slot:
-            self._sections = self._run_child(audio_path)
+            free = available_memory_mb()
+            if free is not None and free < _MIN_MEMORY_MB:
+                log.warning("Only %.0f MB of memory free (need %.0f): keeping the quick sections", free, _MIN_MEMORY_MB)
+                return None
+            return self._run_child(self._audio)
 
     @staticmethod
     def _run_child(audio_path: str) -> Optional[list[Section]]:
@@ -136,6 +169,12 @@ class SectionsJob:
 
 
 def _main(audio_path: str, work: str) -> int:
+    try:
+        # If the machine runs out of memory the kernel should kill this child, not the API server.
+        with open("/proc/self/oom_score_adj", "w", encoding="ascii") as f:
+            f.write("1000")
+    except OSError:
+        pass  # not Linux, or not allowed: nothing to do
     try:
         sections = _analyze(audio_path, work)
         with open(os.path.join(work, "sections.json.tmp"), "w", encoding="utf-8") as f:

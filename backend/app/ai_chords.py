@@ -453,8 +453,8 @@ def detect_chords_ai(audio_path: str, on_progress: Optional[ProgressFn] = None) 
     progress(3, "Loading the chord model")
     _load_model()
 
-    # The structure model is by far the slowest part: it is queued now, works in its own process while the chords
-    # are analysed, and its sections arrive later (see sectionsUpgrade below).
+    # The structure model is by far the slowest and hungriest part. It starts only after the chords are done (see
+    # sectionsUpgrade below), so the two never use memory at the same time.
     sections_job = SectionsJob(audio_path)
 
     progress(8, "Loading audio")

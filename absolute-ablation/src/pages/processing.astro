@@ -44,7 +44,7 @@ import Nav from "../components/Nav.astro";
 </Layout>
 
 <script>
-  import { getJobStatus, getApiErrorMessage } from "../lib/api";
+  import { getJobStatus, getApiErrorMessage, ApiError } from "../lib/api";
 
   const params = new URLSearchParams(window.location.search);
   const sessionId = params.get("session");
@@ -68,6 +68,11 @@ import Nav from "../components/Nav.astro";
     errorText.textContent = message;
   }
 
+  // A restart of the server (a deploy, or the machine running out of memory) answers 502/503/504 or not at all for a
+  // little while. Keep trying for a couple of minutes instead of giving up on the first failure.
+  const RECONNECT_FOR_MS = 2 * 60 * 1000;
+  let offlineSince = 0;
+
   async function poll() {
     if (!sessionId) {
       fail("No song was submitted. Go back and paste a link or upload a song.");
@@ -76,6 +81,7 @@ import Nav from "../components/Nav.astro";
 
     try {
       const job = await getJobStatus(sessionId);
+      offlineSince = 0;
 
       if (job.status === "error") {
         fail(job.error || "Something went wrong while listening to this song.");
@@ -97,6 +103,19 @@ import Nav from "../components/Nav.astro";
 
       setTimeout(poll, 900);
     } catch (err) {
+      const status = err instanceof ApiError ? err.status : 0;
+      if (status === 404) {
+        // the server came back without the job: its progress lives in memory, so a restart loses it
+        fail("The server restarted while your song was being analysed. Please start it again.");
+        return;
+      }
+      const transient = status === 0 || status === 502 || status === 503 || status === 504;
+      offlineSince ||= Date.now();
+      if (transient && Date.now() - offlineSince < RECONNECT_FOR_MS) {
+        stageLabel.textContent = "Reconnecting to the server…";
+        setTimeout(poll, 3000);
+        return;
+      }
       fail(getApiErrorMessage(err, "Lost connection while listening to your song."));
     }
   }

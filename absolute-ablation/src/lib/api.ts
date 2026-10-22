@@ -55,8 +55,12 @@ export interface JobStatus {
 }
 
 export class ApiError extends Error {
-  constructor(message: string) {
+  /** HTTP status when the server answered (502/503/504 mean it is down or restarting); 0 when it could not be reached. */
+  status: number;
+
+  constructor(message: string, status = 0) {
     super(message);
+    this.status = status;
     this.name = "ApiError";
     Object.setPrototypeOf(this, ApiError.prototype);
   }
@@ -112,7 +116,7 @@ export async function getJobStatus(sessionId: string): Promise<JobStatus> {
   const res = await fetchApi(`${API_BASE}/api/job/${sessionId}`);
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new ApiError(body.detail || `Could not check progress (${res.status})`);
+    throw new ApiError(body.detail || `Could not check progress (${res.status})`, res.status);
   }
   return res.json();
 }
