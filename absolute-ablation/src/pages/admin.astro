@@ -236,6 +236,7 @@ import Nav from "../components/Nav.astro";
       const list = $("test-result");
       list.replaceChildren(
         item(info.test.ok, info.test.ok ? "At least one way in works (a real download succeeded)" : "YouTube is blocking every account and anonymous requests — add or replace cookies"),
+        item(info.test.token.ok === null ? "warn" : info.test.token.ok, info.test.token.ok === null ? `Proof-of-origin token: ${info.test.token.note}` : info.test.token.ok ? `Proof-of-origin token made in ${info.test.token.seconds}s` : `Proof-of-origin token failed after ${info.test.token.seconds}s: ${info.test.token.error}`),
         ...info.test.results.map((r: any) => item(r.ok, `${r.label}: ${r.ok ? `downloaded in ${r.attempts[r.attempts.length - 1].seconds}s` : r.attempts[r.attempts.length - 1].result}`)),
       );
     }

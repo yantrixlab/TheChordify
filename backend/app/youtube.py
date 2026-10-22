@@ -509,6 +509,28 @@ def _download_with_fallbacks(url: str, out_template: str, final_path: str, out_d
     raise YouTubeBlocked(str(last_error))
 
 
+def _token_check() -> dict:
+    """Makes one proof-of-origin token the way yt-dlp's plugin does, to see whether the helper works on this server."""
+    if os.environ.get("POT_PROVIDER_URL") or not os.path.exists(_POT_SCRIPT):
+        return {"ok": None, "note": "not using the built-in token script"}
+    import subprocess
+
+    command = ["node", _POT_SCRIPT]
+    if os.environ.get("YTDLP_PROXY"):
+        command += ["--proxy", os.environ["YTDLP_PROXY"]]
+    started = time.time()
+    try:
+        done = subprocess.run(command, capture_output=True, text=True, timeout=90)
+        out = json.loads(done.stdout.strip().splitlines()[-1]) if done.stdout.strip() else {}
+        if out.get("poToken"):
+            return {"ok": True, "seconds": round(time.time() - started)}
+        return {"ok": False, "seconds": round(time.time() - started), "error": ANSI.sub("", (done.stderr or done.stdout))[-300:]}
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "seconds": 90, "error": "no token after 90 seconds (the plugin gives up after 20)"}
+    except Exception as exc:
+        return {"ok": False, "seconds": round(time.time() - started), "error": str(exc)[:300]}
+
+
 def diagnose(test: bool = False) -> dict:
     """What this server has to work with for YouTube, and (with test=True) whether YouTube lets each account in right now."""
     import importlib.util
@@ -557,6 +579,6 @@ def diagnose(test: bool = False) -> dict:
                 results.append({"id": account_id, "label": label, "ok": ok, "attempts": attempts})
         finally:
             shutil.rmtree(scratch, ignore_errors=True)
-        info["test"] = {"results": results, "ok": any(r["ok"] for r in results)}
+        info["test"] = {"results": results, "ok": any(r["ok"] for r in results), "token": _token_check()}
         info["accounts"] = list_accounts()
     return info
