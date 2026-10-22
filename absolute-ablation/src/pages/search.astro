@@ -64,11 +64,15 @@ import Footer from "../components/Footer.astro";
 
   .list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
   .list + div { margin-top: 26px; }  /* the example searches under the popular list */
-  .song { display: grid; grid-template-columns: 60px minmax(0, 1fr) auto auto; align-items: center; gap: 14px; padding: 10px 12px 10px 10px;
+  .song { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 14px; padding: 10px 12px 10px 10px;
     border-radius: 16px; background: #fff; border: 1px solid var(--color-hairline); box-shadow: 0 1px 2px #1a05330a;
     transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s; }
   .song:hover { border-color: #cdbbee; box-shadow: 0 14px 28px -18px #5b21b690; transform: translateY(-1px); }
   .thumb { width: 60px; height: 60px; border-radius: 12px; object-fit: cover; background: linear-gradient(135deg, #ede9fe, #fde68a); }
+  .thumb.wide { width: 98px; height: 55px; border-radius: 10px; }  /* video thumbnails are 16:9 */
+  .kind { display: inline-block; margin-right: 8px; padding: 1px 7px; border-radius: 6px; font: 700 10.5px/1.5 var(--font-mono); letter-spacing: 0.04em; text-transform: uppercase; vertical-align: 1px; }
+  .kind.song { background: #ede9fe; color: var(--color-violet-deep); }
+  .kind.video { background: #f1f5f9; color: #475569; }
   .meta { min-width: 0; }
   .name { margin: 0; font-size: 16px; font-weight: 700; color: var(--color-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .by { margin: 3px 0 0; font-size: 13.5px; color: var(--color-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -101,8 +105,9 @@ import Footer from "../components/Footer.astro";
   @media (max-width: 560px) {
     .sp { padding: 36px 14px 64px; }
     .go { padding: 0 16px; }
-    .song { grid-template-columns: 52px minmax(0, 1fr) auto; gap: 12px; }
+    .song { grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; }
     .thumb { width: 52px; height: 52px; }
+    .thumb.wide { width: 84px; height: 47px; }
     .time { display: none; }
     .pick { padding: 0 12px; }
     .pick .label { display: none; }
@@ -215,14 +220,17 @@ import Footer from "../components/Footer.astro";
     const list = el("ul", "list");
     songs.forEach((song) => {
       const row = el("li", "song");
-      const img = el("img", "thumb");
+      const img = el("img", `thumb ${song.kind === "video" ? "wide" : ""}`.trim());
       img.alt = "";
       img.loading = "lazy";
       img.referrerPolicy = "no-referrer";
       if (song.thumbnail) img.src = song.thumbnail;
       const meta = el("div", "meta");
       meta.append(el("p", "name", song.title));
-      meta.append(el("p", "by", [song.artist, song.album].filter(Boolean).join(" · ")));
+      const by = el("p", "by");
+      by.append(Object.assign(el("span", `kind ${song.kind === "video" ? "video" : "song"}`), { textContent: song.kind === "video" ? "Video" : "Song" }));
+      by.append([song.artist, song.kind === "video" ? song.views : song.album].filter(Boolean).join(" · "));
+      meta.append(by);
       if (song.chords && song.chords.length > 0) {
         // Already chordified: show what people get (its main chords and how often it has been jammed to).
         const stat = el("p", "stat");

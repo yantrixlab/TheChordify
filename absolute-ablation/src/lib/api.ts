@@ -88,6 +88,8 @@ async function fetchApi(input: RequestInfo | URL, init?: RequestInit): Promise<R
 /** A song from the search: only songs come back, never other kinds of videos. */
 export interface SongHit {
   videoId: string;
+  kind?: "song" | "video"; // an official audio track, or another upload of the song (music video, lyrics, cover...)
+  views?: string; // videos: "3.3M views"
   title: string;
   artist: string;
   album: string;
