@@ -20,7 +20,7 @@ from .jobs import JobQueue
 from .search import RateLimiter, SearchUnavailable, clean_query, search_songs
 from .store import SongStore
 from . import youtube
-from .youtube import InvalidUrlError, download_audio, extract_video_id, is_video_id, session_id_for_url, video_info
+from .youtube import InvalidUrlError, VideoNotDownloadable, YouTubeBlocked, download_audio, extract_video_id, is_video_id, session_id_for_url, video_info
 
 # Saved results, uploads and the song catalog. Point DATA_DIR at a persistent volume in production, or every redeploy
 # starts with an empty catalog and re-analyses every song.
@@ -251,9 +251,12 @@ def _run_youtube_job(session_id: str, url: str, meta: dict) -> None:
     except Exception as exc:
         _remove(audio_path)
         error_text = str(exc).lower()
-        if "sign in to confirm" in error_text or "not a bot" in error_text or "http error 403" in error_text:
-            log.warning("YouTube blocked the download of %s (bot check); add or refresh cookies on /admin", session_id)
+        if isinstance(exc, YouTubeBlocked):
+            log.warning("YouTube is blocking downloads (%s); add or refresh cookies on /admin", session_id)
             message = "We couldn't fetch that song from YouTube right now. Please try another song, or upload the audio file instead."
+        elif isinstance(exc, VideoNotDownloadable):
+            log.warning("Video %s cannot be downloaded: %s", session_id, exc)
+            message = "We couldn't fetch this particular video from YouTube. Please try another version of the song."
         elif "private video" in error_text:
             message = "That video is private, so we can't read it. Try another version of the song."
         elif "unavailable" in error_text or "has been removed" in error_text or "terminated" in error_text:

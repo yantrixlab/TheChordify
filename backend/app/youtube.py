@@ -44,6 +44,14 @@ class InvalidUrlError(ValueError):
     pass
 
 
+class YouTubeBlocked(RuntimeError):
+    """YouTube is refusing this server (and its accounts): the bot check, or an address block. Not about one video."""
+
+
+class VideoNotDownloadable(RuntimeError):
+    """YouTube answers this server fine, but this particular video cannot be fetched (region, age, format...)."""
+
+
 def validate_url(url: str) -> None:
     if not re.match(r"^https?://", url):
         raise InvalidUrlError("URL must start with http:// or https://")
@@ -87,6 +95,9 @@ _TEST_VIDEO = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"  # a very widely ava
 HOURLY_CAP = int(os.environ.get("YTDLP_ACCOUNT_HOURLY", "40"))  # downloads per account per hour, then it rests
 _COOLDOWN_BASE = 15 * 60  # first block: rest 15 minutes, doubling each time, up to 6 hours
 _COOLDOWN_MAX = 6 * 3600
+
+# The last few failed downloads, for the admin page: what failed, with which account, and whether it looks like a block.
+recent_failures: deque = deque(maxlen=25)
 
 _download_slot = threading.Semaphore(1)  # one download at a time, spaced out: bursts are what get an account flagged
 
@@ -385,8 +396,26 @@ def _attempt(url: str, out_template: str, final_path: str, out_dir: str, key: st
                     pass
 
 
+def _probe(cookies: Optional[str]) -> bool:
+    """Does YouTube still talk to us (with these cookies, or none)? A quick metadata request for a public video."""
+    try:
+        with yt_dlp.YoutubeDL({**_options(None, cookies), "skip_download": True}) as ydl:
+            ydl.extract_info(_TEST_VIDEO, download=False)
+        return True
+    except Exception:
+        return False
+
+
+def _note_failure(key: str, account: str, error: Exception, verdict: str) -> None:
+    recent_failures.appendleft(
+        {"at": time.time(), "song": key, "account": account, "error": ANSI.sub("", str(error))[:220], "verdict": verdict}
+    )
+
+
 def _download_with_fallbacks(url: str, out_template: str, final_path: str, out_dir: str, key: str) -> str:
     last_error: Optional[Exception] = None
+    server_ok = False  # some request got a normal answer from YouTube: the server and its accounts are not blocked
+    labels = {a["id"]: a["label"] for a in list_accounts()}
     for account_id in _usable_accounts():
         cookies = _cookie_file(account_id)
         _note_use(account_id)
@@ -400,14 +429,26 @@ def _download_with_fallbacks(url: str, out_template: str, final_path: str, out_d
             if any(marker in str(error).lower() for marker in _BLOCKED):
                 blocked = error
         if blocked is not None:
-            _mark_blocked(account_id, str(blocked))  # rest it; the next account (or no account) takes over
+            # One video that will not download must not take the account out: only rest it if it cannot even fetch a
+            # public video's details, which is what a real block looks like.
+            if _probe(cookies):
+                server_ok = True
+                _note_failure(key, labels.get(account_id, account_id), blocked, "this video only; the account is fine")
+            else:
+                _mark_blocked(account_id, str(blocked))  # rest it; the next account (or no account) takes over
+                _note_failure(key, labels.get(account_id, account_id), blocked, "account blocked, resting")
 
     for client in _CLIENTS:  # no account worked, or none is set: ask anonymously, trying each way of asking
         error = _attempt(url, out_template, final_path, out_dir, key, client, None)
         if error is None:
             return final_path
         last_error = error
-    raise last_error or RuntimeError("Could not download that song")
+    if not server_ok:
+        server_ok = _probe(None)
+    _note_failure(key, "no account", last_error or RuntimeError("unknown"), "this video only" if server_ok else "blocked")
+    if server_ok:
+        raise VideoNotDownloadable(str(last_error))
+    raise YouTubeBlocked(str(last_error))
 
 
 def diagnose(test: bool = False) -> dict:
@@ -421,6 +462,7 @@ def diagnose(test: bool = False) -> dict:
         "accounts": list_accounts(),
         "proxy": bool(os.environ.get("YTDLP_PROXY")),
         "hourlyCap": HOURLY_CAP,
+        "recentFailures": list(recent_failures),
     }
     if test:
         results = []

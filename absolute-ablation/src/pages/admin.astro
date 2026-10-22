@@ -32,6 +32,9 @@ import Nav from "../components/Nav.astro";
           <span class="hint">Asks YouTube for a short public video's details with each account (nothing is downloaded).</span>
         </div>
         <ul id="test-result" class="attempts"></ul>
+        <h3>Recent download failures</h3>
+        <p id="failures-empty" class="hint">None since the server last started.</p>
+        <ul id="failures" class="attempts"></ul>
       </section>
 
       <section id="accounts-card" class="card hidden" aria-labelledby="h-accounts">
@@ -154,6 +157,13 @@ import Nav from "../components/Nav.astro";
     );
   }
 
+  function showFailures(failures: any[]) {
+    $("failures-empty").classList.toggle("hidden", failures.length > 0);
+    $("failures").replaceChildren(
+      ...failures.map((f: any) => item(f.verdict.startsWith("this video") ? "warn" : false, `${when(f.at)} · ${f.song} · ${f.account} · ${f.verdict}: ${f.error}`)),
+    );
+  }
+
   function showAccounts(accounts: any[]) {
     $("accounts-empty").classList.toggle("hidden", accounts.length > 0);
     $("accounts").replaceChildren(
@@ -217,6 +227,7 @@ import Nav from "../components/Nav.astro";
     const info = await call(`/api/admin/youtube${test ? "?test=1" : ""}`);
     showStatus(info);
     showAccounts(info.accounts);
+    showFailures(info.recentFailures || []);
     $("status-card").classList.remove("hidden");
     $("accounts-card").classList.remove("hidden");
     if (test) {
