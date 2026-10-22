@@ -243,37 +243,48 @@ import Nav from "../components/Nav.astro";
 
   /* Chord diagrams: a beat strip whose playing beat stays at a fixed spot (the strip steps left one beat at a time),
      above a row of chord diagrams that slides left at each chord change, the playing chord enlarged at the same spot. */
-  .bs { --bw: 46px; position: relative; background: var(--color-canvas); }
+  .bs { --bw: 44px; --gap: 4px; --pad: 7px; position: relative; background: var(--color-canvas); }
   /* Native horizontal scrolling: drag or swipe the strip while paused; playback brings it back to the playing beat. */
   .bs-scroll { overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; scrollbar-width: thin;
     scrollbar-color: var(--color-violet) var(--color-hairline); background: var(--color-hairline); }
   .bs-scroll::-webkit-scrollbar { height: 10px; }
   .bs-scroll::-webkit-scrollbar-track { background: var(--color-hairline); }
   .bs-scroll::-webkit-scrollbar-thumb { background: var(--color-violet); border-radius: 5px; border: 2px solid var(--color-hairline); }
-  .bs-track { position: relative; display: flex; width: max-content; height: 46px; background: var(--color-canvas); }
-  .bs-cell { position: relative; flex: 0 0 var(--bw); height: 100%; box-sizing: border-box; background: var(--color-canvas-soft);
-    box-shadow: inset -2px 0 0 var(--color-canvas); border-left: 1px solid transparent; padding-left: 6px;
-    font-size: 18px; font-weight: 700; line-height: 46px; white-space: nowrap; color: var(--color-ink); cursor: pointer; z-index: 0; }
-  .bs-cell.is-bar { border-left: 3px solid var(--color-body); padding-left: 4px; }
-  .bs-cell.has-chord { z-index: 1; } /* a long name spills over the empty cells after it */
+  .bs-track { position: relative; display: flex; align-items: center; gap: var(--gap); width: max-content;
+    padding: var(--pad) 10px; background: var(--color-canvas); }
+  /* one beat = one square cell with its own outline; a bar starts after a wider gap marked by a dark line */
+  .bs-cell { position: relative; flex: 0 0 var(--bw); width: var(--bw); height: var(--bw); box-sizing: border-box; display: grid; place-items: center;
+    padding: 0; border: 1.5px solid #d9cdf0; border-radius: 9px; background: #f6f2ff; color: var(--color-ink);
+    font-size: 18px; font-weight: 700; line-height: 1; white-space: nowrap; cursor: pointer; }
+  .bs-cell[data-len="3"] { font-size: 15px; }
+  .bs-cell[data-len="4"] { font-size: 13px; }
+  .bs-cell[data-len="5"] { font-size: 11px; }
+  .bs-cell.has-chord { background: #fff; border-color: #bda9ea; }
+  .bs-cell.is-bar { margin-left: 9px; }
+  .bs-cell.is-bar::before { content: ""; position: absolute; left: -9px; top: calc(var(--pad) * -1); bottom: calc(var(--pad) * -1);
+    width: 3px; border-radius: 2px; background: var(--color-body); }
   .bs-cell.is-rest { color: var(--color-mute); font-weight: 400; font-family: "Segoe UI Symbol", "Noto Music", "Apple Symbols", sans-serif; }
   /* The playing beat is a marker that never moves: the strip glides beneath it. Only when the strip has been scrolled by
      hand (it is "free") does the marker step aside and the playing cell itself light up, wherever it has got to. */
-  .bs-marker { position: absolute; top: 0; left: 0; width: var(--bw); height: 46px; box-sizing: border-box; padding-left: 6px;
-    background: var(--color-ink); color: var(--color-canvas); font-size: 18px; font-weight: 700; line-height: 46px; white-space: nowrap;
-    z-index: 3; pointer-events: none; transition-property: none; }
+  .bs-marker { position: absolute; top: var(--pad); left: 0; width: var(--bw); height: var(--bw); box-sizing: border-box; display: grid; place-items: center;
+    border-radius: 9px; background: var(--color-ink); color: var(--color-canvas); font-size: 18px; font-weight: 700; line-height: 1;
+    white-space: nowrap; box-shadow: 0 6px 14px -6px rgba(13, 0, 31, 0.6); z-index: 3; pointer-events: none; transition-property: none; }
+  .bs-marker[data-len="3"] { font-size: 15px; }
+  .bs-marker[data-len="4"] { font-size: 13px; }
+  .bs-marker[data-len="5"] { font-size: 11px; }
   .bs-marker.is-rest { font-weight: 400; font-family: "Segoe UI Symbol", "Noto Music", "Apple Symbols", sans-serif; }
   .bs.is-free .bs-marker { display: none; }
-  .bs.is-free .bs-cell.is-active { background: var(--color-ink); color: var(--color-canvas); z-index: 2; box-shadow: none; }
+  .bs.is-free .bs-cell.is-active { background: var(--color-ink); border-color: var(--color-ink); color: var(--color-canvas); }
 
   .cr { position: relative; overflow: hidden; padding: 22px 0 18px; background: var(--color-canvas); }
   .cr-track { display: flex; align-items: center; width: max-content; will-change: transform;
     transition: transform 0.32s cubic-bezier(0.3, 0.6, 0.2, 1); }
-  .cr-item { flex: 0 0 auto; width: 112px; display: flex; justify-content: center; align-items: center; cursor: pointer;
-    transition: width 0.32s cubic-bezier(0.3, 0.6, 0.2, 1); }
-  .cr-item.is-rest { width: 52px; font-size: 38px; color: var(--color-ink); }
-  .cr-item.is-current { width: 150px; }
-  .cr-item.is-rest.is-current { width: 52px; }
+  /* every diagram gets its own margin left and right, so neighbours (and their fret numbers) never touch */
+  .cr-item { flex: 0 0 auto; display: flex; justify-content: center; align-items: center; padding: 0 16px; cursor: pointer;
+    transition: padding 0.32s cubic-bezier(0.3, 0.6, 0.2, 1); }
+  .cr-item.is-rest { padding: 0 18px; font-size: 38px; color: var(--color-ink); }
+  .cr-item.is-current { padding: 0 36px; } /* the playing chord is drawn 1.3x, so its slot is wider */
+  .cr-item.is-rest.is-current { padding: 0 18px; }
   .cr-card { transition: transform 0.32s cubic-bezier(0.3, 0.6, 0.2, 1); transform-origin: center; }
   .cr-item.is-current .cr-card { transform: scale(1.3); }
   /* the shared diagram builder draws a bordered card; here the diagram stands on the page */
@@ -281,12 +292,13 @@ import Nav from "../components/Nav.astro";
 
   @media (max-width: 520px) {
     .dg-bar { padding-top: 56px; } /* clear of the floating view switch, which is wider than the space beside it */
-    .bs { --bw: 36px; }
-    .bs-track { height: 42px; }
-    .bs-cell { font-size: 16px; line-height: 42px; }
-    .bs-marker { height: 42px; font-size: 16px; line-height: 42px; }
-    .cr-item { width: 96px; }
-    .cr-item.is-current { width: 128px; }
+    .bs { --bw: 38px; --gap: 3px; --pad: 6px; }
+    .bs-cell, .bs-marker { font-size: 16px; }
+    .bs-cell[data-len="3"], .bs-marker[data-len="3"] { font-size: 13px; }
+    .bs-cell[data-len="4"], .bs-marker[data-len="4"] { font-size: 11px; }
+    .bs-cell[data-len="5"], .bs-marker[data-len="5"] { font-size: 9.5px; }
+    .cr-item { padding: 0 12px; }
+    .cr-item.is-current { padding: 0 30px; }
   }
   @media (prefers-reduced-motion: reduce) {
     .cr-track, .cr-item, .cr-card, .tl-tab { transition: none; }
@@ -744,6 +756,7 @@ import Nav from "../components/Nav.astro";
       const cell = document.createElement("div");
       cell.className = `bs-cell ${kind}`.trim();
       cell.textContent = chord === "N" ? "𝄽" : chord ? displayChord(chord) : "";
+      cell.dataset.len = String(Math.min(cell.textContent.length, 5)); // CSS shrinks long names to fit the square
       if (chord === "N") cell.classList.add("is-rest");
       if (chord) cell.classList.add("has-chord");
       if (seek !== null) cell.addEventListener("click", () => seekTo(Math.max(0, seek)));
@@ -825,7 +838,7 @@ import Nav from "../components/Nav.astro";
   function layoutDiagrams() {
     if (stripEl.clientWidth === 0 || stripCells.length === 0) return; // the tab is hidden, or there is nothing to show
     stripCellWidth = stripCells[FIRST_CELL].getBoundingClientRect().width || 46;
-    stripMarkerX = Math.max(1, Math.round((stripScrollEl.clientWidth * ANCHOR) / stripCellWidth)) * stripCellWidth;
+    stripMarkerX = Math.round(stripScrollEl.clientWidth * ANCHOR); // the playing cell's left edge, from the strip's left edge
     stripMarkerEl.style.left = `${stripMarkerX}px`;
     measureCarousel();
     stripActive = -1;
@@ -890,6 +903,7 @@ import Nav from "../components/Nav.astro";
       stripActive = cell;
       stripCells[cell].classList.add("is-active");
       stripMarkerEl.textContent = stripCells[cell].textContent;
+      stripMarkerEl.dataset.len = stripCells[cell].dataset.len ?? "0";
       stripMarkerEl.classList.toggle("is-rest", stripCells[cell].classList.contains("is-rest"));
       // Playing, the strip follows the beat (unless it is being scrolled by hand); after a jump it follows at once.
       if (far || (isPlaying() && performance.now() >= stripBusyUntil)) followStrip(!far);
