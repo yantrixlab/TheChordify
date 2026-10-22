@@ -1,0 +1,256 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Nav from "../components/Nav.astro";
+import Footer from "../components/Footer.astro";
+
+---
+
+<Layout title="Search songs — Chord Suno" description="Find any song and get its chords, synced to the beat, on Chord Suno.">
+  <Nav />
+  <main id="main-content" class="sp">
+    <div class="aurora" aria-hidden="true"><span class="orb o1"></span><span class="orb o2"></span></div>
+
+    <div class="wrap">
+      <h1 class="title">Find a song</h1>
+      <p class="sub">Search by song name, artist or both. Pick a result and we write out its chords.</p>
+
+      <form id="search-form" class="bar" role="search" autocomplete="off">
+        <label for="q" class="sr-only">Song or artist</label>
+        <svg class="bar-icon" width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+          <circle cx="9" cy="9" r="6" stroke="currentColor" stroke-width="1.7" />
+          <path d="m13.5 13.5 3.5 3.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+        </svg>
+        <input id="q" name="q" type="search" placeholder="Search a song or artist…" maxlength="100" enterkeyhint="search" />
+        <button type="submit" class="go">Search</button>
+      </form>
+
+      <section id="panel" aria-live="polite" aria-busy="false">
+        <!-- filled in by the script: examples, loading rows, results, nothing found, or an error -->
+      </section>
+    </div>
+  </main>
+  <Footer />
+</Layout>
+
+<!-- global because the result rows are built by the script, which scoped styles cannot reach; this page's CSS only -->
+<style is:global>
+  .sp { position: relative; overflow: hidden; isolation: isolate; min-height: calc(100vh - 64px); padding: 56px 20px 80px;
+    background: radial-gradient(ellipse 80% 40% at 50% -6%, #7c3aed22, transparent 70%), linear-gradient(180deg, #fbf7ff, #fff 70%); }
+  .aurora { position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+  .orb { position: absolute; border-radius: 50%; filter: blur(80px); opacity: 0.4; }
+  .o1 { width: 420px; height: 420px; left: -120px; top: -100px; background: #a78bfa; }
+  .o2 { width: 360px; height: 360px; right: -100px; top: 140px; background: #fbbf24; opacity: 0.25; }
+  .wrap { max-width: 760px; margin: 0 auto; }
+  .title { margin: 0 0 8px; font-size: clamp(30px, 5vw, 44px); font-weight: 800; letter-spacing: -0.04em; color: var(--color-ink); text-align: center; }
+  .sub { margin: 0 auto 28px; max-width: 520px; text-align: center; color: var(--color-body); font-size: 16px; line-height: 1.6; }
+
+  .bar { position: relative; display: flex; gap: 8px; padding: 8px; border-radius: 20px; background: rgba(255, 255, 255, 0.9);
+    border: 1.5px solid var(--color-hairline); box-shadow: 0 18px 40px -22px #5b21b680, 0 2px 6px #1a053310;
+    transition: border-color 0.18s, box-shadow 0.18s; }
+  .bar:focus-within { border-color: var(--color-violet); box-shadow: 0 18px 40px -20px #5b21b6aa, 0 0 0 4px #7c3aed1f; }
+  .bar-icon { position: absolute; left: 24px; top: 50%; transform: translateY(-50%); color: var(--color-mute); pointer-events: none; }
+  .bar input { flex: 1; min-width: 0; height: 50px; padding: 0 12px 0 40px; border: 0; outline: none; background: transparent;
+    font: 500 17px/1 var(--font-sans); color: var(--color-ink); }
+  .bar input::placeholder { color: #9a8fb5; }
+  .bar input::-webkit-search-cancel-button { cursor: pointer; }
+  .go { flex: none; height: 50px; padding: 0 24px; border: 0; border-radius: 14px; cursor: pointer; color: #fff; font: 700 15px/1 var(--font-sans);
+    background: linear-gradient(135deg, #7c3aed, #5b21b6 60%, #1a0533 140%); box-shadow: 0 8px 18px -8px #5b21b6cc;
+    transition: transform 0.15s, box-shadow 0.15s; }
+  .go:hover { transform: translateY(-1px); box-shadow: 0 12px 22px -8px #5b21b6e6; }
+
+  #panel { margin-top: 28px; }
+  .note { margin: 0 0 14px; font-size: 14px; color: var(--color-mute); }
+  .note strong { color: var(--color-ink); font-weight: 600; }
+
+  .list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+  .song { display: grid; grid-template-columns: 60px minmax(0, 1fr) auto auto; align-items: center; gap: 14px; padding: 10px 12px 10px 10px;
+    border-radius: 16px; background: #fff; border: 1px solid var(--color-hairline); box-shadow: 0 1px 2px #1a05330a;
+    transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s; }
+  .song:hover { border-color: #cdbbee; box-shadow: 0 14px 28px -18px #5b21b690; transform: translateY(-1px); }
+  .thumb { width: 60px; height: 60px; border-radius: 12px; object-fit: cover; background: linear-gradient(135deg, #ede9fe, #fde68a); }
+  .meta { min-width: 0; }
+  .name { margin: 0; font-size: 16px; font-weight: 700; color: var(--color-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .by { margin: 3px 0 0; font-size: 13.5px; color: var(--color-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .time { font: 600 12.5px var(--font-mono); color: var(--color-mute); }
+  .pick { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 16px; border: 0; border-radius: 12px; cursor: pointer;
+    font: 700 14px/1 var(--font-sans); color: var(--color-violet-deep); background: var(--color-violet-soft); transition: background-color 0.15s, color 0.15s; }
+  .song:hover .pick, .pick:focus-visible { background: linear-gradient(135deg, #7c3aed, #5b21b6); color: #fff; }
+  .pick:disabled { cursor: progress; opacity: 0.7; }
+  .spin { animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .ghost { height: 80px; border-radius: 16px; background: linear-gradient(100deg, #f3eeff 30%, #fbf9ff 50%, #f3eeff 70%); background-size: 200% 100%;
+    animation: shimmer 1.4s linear infinite; }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+
+  .empty { padding: 44px 20px; text-align: center; border-radius: 20px; background: #fff; border: 1px dashed #d9cdf0; }
+  .empty h2 { margin: 0 0 6px; font-size: 20px; font-weight: 700; color: var(--color-ink); }
+  .empty p { margin: 0 auto 18px; max-width: 420px; font-size: 14.5px; line-height: 1.6; color: var(--color-body); }
+  .errorbox h2 { color: var(--color-error); }
+  .chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+  .chip { padding: 8px 14px; border-radius: 999px; border: 1px solid var(--color-hairline); background: #fff; font: 600 13.5px/1 var(--font-sans);
+    color: var(--color-violet-deep); cursor: pointer; transition: background-color 0.15s, border-color 0.15s; }
+  .chip:hover { background: var(--color-violet-soft); border-color: var(--color-hairline-strong); }
+  .hint { margin: 0 0 12px; font: 600 11px/1 var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-mute); text-align: center; }
+
+  @media (max-width: 560px) {
+    .sp { padding: 36px 14px 64px; }
+    .go { padding: 0 16px; }
+    .song { grid-template-columns: 52px minmax(0, 1fr) auto; gap: 12px; }
+    .thumb { width: 52px; height: 52px; }
+    .time { display: none; }
+    .pick { padding: 0 12px; }
+    .pick .label { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { .ghost, .spin { animation: none; } .song, .song:hover { transition: none; transform: none; } }
+</style>
+
+<script>
+  import { searchSongs, startExtractFromYoutube, getApiErrorMessage } from "../lib/api";
+
+  // Searches people can try with one tap (shown before anything is typed, and when nothing matches).
+  const examples = ["Perfect Ed Sheeran", "Tum Hi Ho", "Wonderwall", "Let It Be", "Kal Ho Naa Ho"];
+
+  const form = document.getElementById("search-form");
+  const input = document.getElementById("q");
+  const panel = document.getElementById("panel");
+  let controller = null;
+
+  const el = (tag, className, text) => {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  };
+
+  const clock = (seconds) => (seconds > 0 ? `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}` : "");
+
+  function show(...nodes) {
+    panel.replaceChildren(...nodes);
+  }
+
+  function exampleChips(heading) {
+    const box = el("div");
+    if (heading) box.append(el("p", "hint", heading));
+    const chips = el("div", "chips");
+    examples.forEach((text) => {
+      const chip = el("button", "chip", text);
+      chip.type = "button";
+      chip.addEventListener("click", () => run(text));
+      chips.append(chip);
+    });
+    box.append(chips);
+    return box;
+  }
+
+  function showIdle() {
+    show(exampleChips("Try one of these"));
+  }
+
+  function showLoading() {
+    panel.setAttribute("aria-busy", "true");
+    show(...Array.from({ length: 5 }, () => el("div", "ghost")));
+  }
+
+  function showEmpty(query) {
+    const box = el("div", "empty");
+    box.append(el("h2", "", "No songs found"));
+    box.append(el("p", "", `Nothing matched “${query}”. Check the spelling, or try the song name together with the artist.`));
+    box.append(exampleChips(""));
+    show(box);
+  }
+
+  function showError(message, query) {
+    const box = el("div", "empty errorbox");
+    box.append(el("h2", "", "Search didn’t work"));
+    box.append(el("p", "", message));
+    const retry = el("button", "chip", "Try again");
+    retry.type = "button";
+    retry.addEventListener("click", () => run(query));
+    box.append(retry);
+    show(box);
+  }
+
+  const play = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const spinner = '<svg class="spin" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.6" stroke-opacity="0.35"/><path d="M14 8a6 6 0 0 0-6-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
+
+  async function choose(song, button) {
+    document.querySelectorAll(".pick").forEach((b) => (b.disabled = true));
+    button.innerHTML = `${spinner}<span class="label">Starting…</span>`;
+    try {
+      const { sessionId } = await startExtractFromYoutube(`https://www.youtube.com/watch?v=${song.videoId}`, {
+        title: song.title,
+        artist: song.artist,
+      });
+      window.location.href = `/processing?session=${sessionId}`;
+    } catch (err) {
+      document.querySelectorAll(".pick").forEach((b) => {
+        b.disabled = false;
+        b.innerHTML = `<span class="label">Get chords</span>${play}`;
+      });
+      panel.prepend(el("p", "note", getApiErrorMessage(err, "Could not start that song. Please try again.")));
+    }
+  }
+
+  function showResults(query, songs) {
+    const note = el("p", "note");
+    note.append(`${songs.length} song${songs.length === 1 ? "" : "s"} for `, Object.assign(el("strong"), { textContent: `“${query}”` }));
+    const list = el("ul", "list");
+    songs.forEach((song) => {
+      const row = el("li", "song");
+      const img = el("img", "thumb");
+      img.alt = "";
+      img.loading = "lazy";
+      img.referrerPolicy = "no-referrer";
+      if (song.thumbnail) img.src = song.thumbnail;
+      const meta = el("div", "meta");
+      meta.append(el("p", "name", song.title));
+      meta.append(el("p", "by", [song.artist, song.album].filter(Boolean).join(" · ")));
+      const button = el("button", "pick");
+      button.type = "button";
+      button.setAttribute("aria-label", `Get chords for ${song.title}`);
+      button.innerHTML = `<span class="label">Get chords</span>${play}`;
+      button.addEventListener("click", () => choose(song, button));
+      row.append(img, meta, el("span", "time", clock(song.duration)), button);
+      list.append(row);
+    });
+    show(note, list);
+  }
+
+  async function run(text) {
+    const query = text.trim().replace(/\s+/g, " ");
+    input.value = query;
+    if (query.length < 2) {
+      history.replaceState(null, "", "/search");
+      showIdle();
+      return;
+    }
+    history.replaceState(null, "", `/search?q=${encodeURIComponent(query)}`);
+    document.title = `${query} — Search songs — Chord Suno`;
+    controller?.abort();
+    controller = new AbortController();
+    showLoading();
+    try {
+      const songs = await searchSongs(query, controller.signal);
+      panel.setAttribute("aria-busy", "false");
+      if (songs.length === 0) showEmpty(query);
+      else showResults(query, songs);
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return; // replaced by a newer search
+      panel.setAttribute("aria-busy", "false");
+      showError(getApiErrorMessage(err, "Search is unavailable right now. Please try again."), query);
+    }
+  }
+
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    run(input.value);
+  });
+
+  const first = new URLSearchParams(window.location.search).get("q");
+  if (first) run(first);
+  else {
+    showIdle();
+    input.focus();
+  }
+</script>

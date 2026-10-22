@@ -8,12 +8,13 @@ import logging
 import threading
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from .engine import analyze
+from .search import RateLimiter, SearchUnavailable, clean_query, search_songs
 from .youtube import download_audio, video_info, InvalidUrlError
 
 CACHE_DIR = os.path.join(tempfile.gettempdir(), "thechordify-cache")
@@ -78,6 +79,9 @@ def _get_job(session_id: str) -> Optional[dict]:
 
 class YoutubeRequest(BaseModel):
     url: str
+    # What the search results already told us about the song; saves asking YouTube again for the player header.
+    title: str = ""
+    artist: str = ""
 
 
 def _with_pending(session_id: str, result: dict) -> dict:
@@ -139,7 +143,7 @@ def health() -> dict:
     return {"status": "ok"}
 
 
-def _run_youtube_job(session_id: str, url: str) -> None:
+def _run_youtube_job(session_id: str, url: str, title: str = "", artist: str = "") -> None:
     try:
         _set_job(session_id, status="downloading", progress=2, stage="Fetching audio from the link")
         audio_path = download_audio(url, UPLOAD_DIR)
@@ -156,7 +160,7 @@ def _run_youtube_job(session_id: str, url: str) -> None:
             "sessionId": session_id,
             "source": "youtube",
             "sourceUrl": url,
-            **video_info(url),  # title, artist
+            **({"title": title, "artist": artist} if title else video_info(url)),
             "duration": analysis["duration"],
             "chords": analysis["chords"],
             "tempo": analysis["tempo"],
@@ -221,6 +225,25 @@ def _run_analysis_job(
         _set_job(session_id, status="error", progress=0, error=f"Chord analysis failed: {exc}")
 
 
+_search_limiter = RateLimiter(limit=30, window=60.0)
+
+
+@app.get("/api/search")
+def search(request: Request, q: str = "") -> dict:
+    """Songs (YouTube Music's song results only) matching what was typed; an empty list when nothing matches."""
+    query = clean_query(q)
+    if len(query) < 2:
+        return {"query": query, "results": []}
+    caller = request.client.host if request.client else "unknown"
+    if not _search_limiter.allow(caller):
+        raise HTTPException(status_code=429, detail="Too many searches. Please wait a moment and try again.")
+    try:
+        return {"query": query, "results": search_songs(query)}
+    except SearchUnavailable as exc:
+        log.warning("Song search failed: %s", exc)
+        raise HTTPException(status_code=502, detail="Song search is unavailable right now. Please try again in a moment.")
+
+
 @app.post("/api/extract/youtube")
 def extract_from_youtube(payload: YoutubeRequest) -> dict:
     url = payload.url.strip()
@@ -239,7 +262,7 @@ def extract_from_youtube(payload: YoutubeRequest) -> dict:
         return {"sessionId": session_id, "status": existing["status"]}
 
     _set_job(session_id, status="queued", progress=0, stage="Queued")
-    thread = threading.Thread(target=_run_youtube_job, args=(session_id, url), daemon=True)
+    thread = threading.Thread(target=_run_youtube_job, args=(session_id, url, payload.title[:200], payload.artist[:200]), daemon=True)
     thread.start()
 
     return {"sessionId": session_id, "status": "queued"}

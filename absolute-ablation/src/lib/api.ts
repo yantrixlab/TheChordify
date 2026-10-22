@@ -76,19 +76,44 @@ export function getApiErrorMessage(err: unknown, fallback: string): string {
 async function fetchApi(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   try {
     return await fetch(input, init);
-  } catch {
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") throw err; // a search that was replaced, not a failure
     throw new ApiError(
       "Could not reach the chord extraction server. Please check your connection and try again.",
     );
   }
 }
 
+/** A song from the search: only songs come back, never other kinds of videos. */
+export interface SongHit {
+  videoId: string;
+  title: string;
+  artist: string;
+  album: string;
+  duration: number; // seconds
+  thumbnail: string;
+}
+
+/** Songs matching what was typed (an empty list when nothing matches). Pass a signal to cancel a search that was replaced. */
+export async function searchSongs(query: string, signal?: AbortSignal): Promise<SongHit[]> {
+  const res = await fetchApi(`${API_BASE}/api/search?q=${encodeURIComponent(query)}`, { signal });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new ApiError(body.detail || `Search failed (${res.status})`, res.status);
+  }
+  const data = await res.json();
+  return data.results ?? [];
+}
+
 /** Kicks off background extraction and returns immediately with a session id to poll. */
-export async function startExtractFromYoutube(url: string): Promise<{ sessionId: string }> {
+export async function startExtractFromYoutube(
+  url: string,
+  meta: { title?: string; artist?: string } = {},
+): Promise<{ sessionId: string }> {
   const res = await fetchApi(`${API_BASE}/api/extract/youtube`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url }),
+    body: JSON.stringify({ url, title: meta.title ?? "", artist: meta.artist ?? "" }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));

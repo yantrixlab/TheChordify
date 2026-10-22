@@ -8,6 +8,8 @@ FROM python:3.12-slim AS app
 # yt-dlp needs ffmpeg/ffprobe. Static binaries are ~130 MB versus ~470 MB and 200 packages from apt,
 # which matters on a busy VPS. soundfile's wheel bundles libsndfile (with MP3), so no apt packages are needed.
 COPY --from=mwader/static-ffmpeg:9.0.2 /ffmpeg /ffprobe /usr/local/bin/
+# yt-dlp runs YouTube's player scripts in a JavaScript runtime; reuse the Node binary from the image that builds the site.
+COPY --from=node:22-slim /usr/local/bin/node /usr/local/bin/node
 WORKDIR /app/backend
 
 COPY backend/requirements.txt ./
