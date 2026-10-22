@@ -38,10 +38,10 @@ ANALYSIS_VERSION = 10
 ALLOWED_UPLOAD_EXTENSIONS ={".mp3", ".wav", ".flac", ".m4a"}
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50MB
 
-app = FastAPI(title="TheChordify chord extraction API")
+app = FastAPI(title="Chord Suno chord extraction API")
 
 # Local dev origins are always allowed; list production sites in CORS_ORIGINS (comma-separated),
-# e.g. CORS_ORIGINS=https://thechordify.com,https://www.thechordify.com
+# e.g. CORS_ORIGINS=https://chordsuno.com,https://www.chordsuno.com
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()],

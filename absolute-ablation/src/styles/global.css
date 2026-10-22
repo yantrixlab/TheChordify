@@ -217,7 +217,8 @@ body {
 
 /* Respect reduced motion for all animations */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  /* .tw marks gentle opacity-only twinkles (the hero chords), which stay on */
+  *:not(.tw), *:not(.tw)::before, *:not(.tw)::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;

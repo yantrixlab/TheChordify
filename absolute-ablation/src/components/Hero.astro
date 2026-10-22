@@ -6,316 +6,389 @@ const instruments = [
   { id: "mandolin", label: "Mandolin", icon: "🎵" },
 ];
 
-const floatingChords = ["Am", "G", "C", "F", "Em", "D", "Bm", "E7"];
+// Chords that twinkle around the hero like stars. x / y are percentages of the hero, c is the glow colour,
+// t the twinkle period and d the delay (seconds); m marks the ones kept on a phone.
+const stars = [
+  { chord: "Am", x: 5, y: 15, c: "#8b5cf6", t: 5.2, d: -1.2, m: true },
+  { chord: "Em", x: 19, y: 23, c: "#ec4899", t: 4.1, d: -3.4, m: false },
+  { chord: "G", x: 10, y: 39, c: "#f59e0b", t: 6.0, d: -0.4, m: true },
+  { chord: "C", x: 21, y: 57, c: "#22d3ee", t: 4.7, d: -2.6, m: false },
+  { chord: "F", x: 6, y: 67, c: "#8b5cf6", t: 5.6, d: -4.1, m: true },
+  { chord: "Dm", x: 17, y: 81, c: "#ec4899", t: 3.8, d: -1.9, m: false },
+  { chord: "D", x: 91, y: 13, c: "#f59e0b", t: 5.8, d: -2.2, m: true },
+  { chord: "Cmaj7", x: 78, y: 22, c: "#22d3ee", t: 4.4, d: -0.8, m: false },
+  { chord: "Bm", x: 89, y: 38, c: "#ec4899", t: 6.3, d: -3.1, m: true },
+  { chord: "E7", x: 79, y: 56, c: "#8b5cf6", t: 4.9, d: -1.6, m: false },
+  { chord: "F#m", x: 92, y: 66, c: "#f59e0b", t: 5.4, d: -4.6, m: true },
+  { chord: "B7", x: 80, y: 81, c: "#22d3ee", t: 4.2, d: -2.9, m: false },
+];
+
+// Tiny four-point stars between them.
+const sparkles = [
+  { x: 12, y: 8, s: 10, t: 3.4, d: -0.6 }, { x: 30, y: 12, s: 7, t: 4.2, d: -2.1 },
+  { x: 26, y: 40, s: 8, t: 3.0, d: -1.4 }, { x: 4, y: 52, s: 9, t: 4.8, d: -3.3 },
+  { x: 29, y: 74, s: 7, t: 3.6, d: -2.7 }, { x: 11, y: 93, s: 10, t: 4.4, d: -0.2 },
+  { x: 70, y: 9, s: 8, t: 3.8, d: -1.1 }, { x: 85, y: 27, s: 10, t: 4.6, d: -2.4 },
+  { x: 72, y: 44, s: 7, t: 3.2, d: -3.8 }, { x: 96, y: 49, s: 8, t: 4.0, d: -0.9 },
+  { x: 71, y: 72, s: 9, t: 3.5, d: -1.8 }, { x: 88, y: 91, s: 8, t: 4.5, d: -2.2 },
+];
 ---
 
-<section
-  id="main-content"
-  class="gradient-hero relative overflow-hidden"
-  style="padding: var(--space-5xl) var(--space-lg); padding-top: calc(var(--space-5xl) + 16px);"
->
-  <!-- Ambient orbs (decorative) -->
-  <div
-    aria-hidden="true"
-    class="absolute pointer-events-none"
-    style="top:-120px;left:50%;transform:translateX(-50%);width:800px;height:400px;background:radial-gradient(ellipse, #7c3aed1a 0%, transparent 70%);z-index:0;"
-  ></div>
-  <div
-    aria-hidden="true"
-    class="absolute pointer-events-none"
-    style="bottom:0;right:5%;width:400px;height:300px;background:radial-gradient(ellipse, #f59e0b12 0%, transparent 70%);z-index:0;"
-  ></div>
+<section id="main-content" class="hero">
+  <!-- Atmosphere (decorative) -->
+  <div class="aurora" aria-hidden="true">
+    <span class="orb o1"></span>
+    <span class="orb o2"></span>
+    <span class="orb o3"></span>
+  </div>
+  <div class="dots" aria-hidden="true"></div>
 
-  <!-- Floating chord bubbles (purely decorative) -->
-  <div
-    aria-hidden="true"
-    class="absolute inset-0 overflow-hidden pointer-events-none"
-    style="z-index:1;"
-  >
+  <!-- Twinkling chords and stars (decorative) -->
+  <div class="stars" aria-hidden="true">
     {
-      floatingChords.map((chord, i) => (
-        <div
-          class="chord-pill absolute opacity-40"
-          style={`
-            top: ${20 + (i % 4) * 20}%;
-            left: ${5 + i * 11}%;
-            animation: fade-in-up ${1.5 + i * 0.3}s ${i * 0.2}s ease both;
-            transform: rotate(${-10 + i * 4}deg);
-          `}
-        >
-          {chord}
+      stars.map((star) => (
+        <div class={`star ${star.m ? "keep" : ""}`} style={`--x:${star.x}%;--y:${star.y}%;--c:${star.c};--t:${star.t}s;--d:${star.d}s;`}>
+          <span class="chip tw">{star.chord}</span>
         </div>
+      ))
+    }
+    {
+      sparkles.map((sp) => (
+        <svg
+          class="sparkle tw"
+          style={`--x:${sp.x}%;--y:${sp.y}%;--sz:${sp.s}px;--t:${sp.t}s;--d:${sp.d}s;`}
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <path d="M12 0c.9 6.6 5.4 11.1 12 12-6.6.9-11.1 5.4-12 12-.9-6.6-5.4-11.1-12-12 6.6-.9 11.1-5.4 12-12Z" fill="currentColor" />
+        </svg>
       ))
     }
   </div>
 
-  <div class="max-w-4xl mx-auto text-center relative" style="z-index:2;">
-    <!-- Eyebrow badge -->
-    <div
-      class="inline-flex items-center gap-2 rounded-full mb-6"
-      style="
-        padding: 5px 14px 5px 8px;
-        background: var(--color-violet-soft);
-        border: 1px solid #c4b0e0;
-        font-size:13px;
-        color: var(--color-violet-deep);
-        font-weight:500;
-      "
-    >
-      <span
-        class="rounded-full text-white flex items-center justify-center"
-        style="background:var(--color-violet);width:20px;height:20px;font-size:10px;font-weight:700;"
-        aria-hidden="true"
-      >AI</span>
-      World's #1 chord extraction engine
+  <div class="inner">
+    <!-- Eyebrow -->
+    <div class="eyebrow">
+      <span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      <span><strong>Suno</strong> <span class="deva" lang="hi">सुनो</span> means listen</span>
     </div>
 
-    <!-- h1 -->
-    <h1 class="display-xl" style="color:var(--color-ink);margin-bottom:20px;text-wrap:balance;">
+    <h1 class="title">
       Hear every chord.<br />
-      <span class="gradient-accent-text">Play every song.</span>
+      <span class="title-grad">Play every song.</span>
     </h1>
 
-    <!-- Sub-headline -->
-    <p
-      style="
-        font-size:clamp(17px,2vw,20px);
-        color:var(--color-body);
-        max-width:560px;
-        margin:0 auto 40px;
-        line-height:1.6;
-        text-wrap:pretty;
-      "
-    >
-      Extract guitar, piano, ukulele and mandolin chords from any YouTube video
-      or music file — synced live as the track plays.
+    <p class="lede">
+      Paste a YouTube link or upload a song. Chord Suno listens and writes out every chord, synced to the beat, for
+      guitar, piano, ukulele and mandolin.
     </p>
 
-    <!-- Primary input card -->
-    <div
-      class="shadow-float rounded-2xl max-w-2xl mx-auto"
-      style="
-        background:var(--color-canvas);
-        padding:var(--space-lg);
-        border:1px solid var(--color-hairline);
-      "
-    >
-      <!-- Tab row: YouTube / Upload -->
-      <div
-        class="flex rounded-lg mb-4 p-1"
-        style="background:var(--color-canvas-soft);border:1px solid var(--color-hairline);"
-        role="tablist"
-        aria-label="Input method"
-      >
-        <button
-          id="tab-youtube"
-          role="tab"
-          aria-selected="true"
-          aria-controls="panel-youtube"
-          class="flex-1 flex items-center justify-center gap-2 rounded-md font-medium"
-          style="
-            height:36px;
-            font-size:14px;
-            background:var(--color-canvas);
-            color:var(--color-ink);
-            border:1px solid var(--color-hairline);
-            cursor:pointer;
-            transition: background-color 0.15s, color 0.15s;
-          "
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <rect x="1" y="3" width="14" height="10" rx="2" fill="#FF0000"/>
-            <path d="M6.5 5.5l4 2.5-4 2.5V5.5z" fill="white"/>
-          </svg>
-          YouTube link
-        </button>
-        <button
-          id="tab-upload"
-          role="tab"
-          aria-selected="false"
-          aria-controls="panel-upload"
-          class="flex-1 flex items-center justify-center gap-2 rounded-md font-medium"
-          style="
-            height:36px;
-            font-size:14px;
-            background:transparent;
-            color:var(--color-body);
-            border:none;
-            cursor:pointer;
-            transition: background-color 0.15s, color 0.15s;
-          "
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <path d="M8 2v9M4 6l4-4 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M2 12h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-          </svg>
-          Upload song
-        </button>
-      </div>
-
-      <!-- YouTube panel -->
-      <div id="panel-youtube" role="tabpanel" aria-labelledby="tab-youtube">
-        <!-- Stack on mobile, row on sm+ -->
-        <div class="flex flex-col sm:flex-row gap-2">
-          <label for="youtube-url" class="sr-only">YouTube or SoundCloud URL</label>
-          <input
-            id="youtube-url"
-            type="url"
-            name="song-url"
-            autocomplete="url"
-            placeholder="Paste YouTube or SoundCloud URL…"
-            class="flex-1 rounded-lg"
-            style="
-              height:44px;
-              padding: 0 var(--space-sm);
-              font-size:15px;
-              color:var(--color-ink);
-              background:var(--color-canvas-soft);
-              border:1px solid var(--color-hairline);
-              outline:none;
-              transition: border-color 0.15s;
-              font-family: var(--font-sans);
-              min-width: 0;
-            "
-            onfocus="this.style.borderColor='var(--color-violet)'"
-            onblur="this.style.borderColor='var(--color-hairline)'"
-          />
-          <button
-            id="extract-btn"
-            type="button"
-            class="flex items-center justify-center gap-2 rounded-lg font-semibold"
-            style="
-              height:44px;
-              padding:0 var(--space-md);
-              font-size:15px;
-              background:var(--color-primary);
-              color:var(--color-on-primary);
-              border:none;
-              cursor:pointer;
-              white-space:nowrap;
-              transition: background-color 0.15s;
-              flex-shrink:0;
-            "
-            onmouseover="this.style.background='var(--color-primary-deep)'"
-            onmouseout="this.style.background='var(--color-primary)'"
-          >
-            <span id="extract-btn-label">Extract chords</span>
-            <svg id="extract-btn-arrow" width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-              <path d="M3 7h8M7 3l4 4-4 4" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- Input card -->
+    <div class="card">
+      <div class="card-body">
+        <div class="tabs" role="tablist" aria-label="Input method">
+          <button id="tab-youtube" class="tab" role="tab" aria-selected="true" aria-controls="panel-youtube" type="button">
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <rect x="1" y="3" width="14" height="10" rx="2.5" fill="#FF0000" />
+              <path d="M6.5 5.5l4 2.5-4 2.5V5.5z" fill="white" />
             </svg>
-            <svg id="extract-btn-spinner" class="hidden" width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true" style="animation: spin 0.7s linear infinite;">
-              <circle cx="7" cy="7" r="5.5" stroke="white" stroke-width="1.5" stroke-opacity="0.35" />
-              <path d="M12.5 7a5.5 5.5 0 0 0-5.5-5.5" stroke="white" stroke-width="1.5" stroke-linecap="round" />
+            YouTube link
+          </button>
+          <button id="tab-upload" class="tab" role="tab" aria-selected="false" aria-controls="panel-upload" type="button">
+            <svg width="18" height="18" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M8 11V2.5M4.5 5.5 8 2l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M2.5 11v1.5a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
             </svg>
+            Upload song
           </button>
         </div>
-        <p
-          id="extract-status"
-          class="hidden"
-          role="status"
-          aria-live="polite"
-          style="font-size:13px;margin-top:10px;text-align:left;"
-        ></p>
-      </div>
 
-      <!-- Upload panel (hidden by default) -->
-      <div id="panel-upload" role="tabpanel" aria-labelledby="tab-upload" class="hidden">
-        <label
-          class="rounded-lg flex flex-col items-center justify-center gap-3 cursor-pointer"
-          style="
-            height:90px;
-            border:2px dashed var(--color-hairline);
-            background:var(--color-canvas-soft);
-            transition: border-color 0.15s, background-color 0.15s;
-          "
-          onmouseover="this.style.borderColor='var(--color-violet)';this.style.background='var(--color-violet-soft)'"
-          onmouseout="this.style.borderColor='var(--color-hairline)';this.style.background='var(--color-canvas-soft)'"
-        >
-          <input id="audio-file-input" type="file" accept=".mp3,.wav,.flac,.m4a" class="sr-only" name="audio-file" />
-          <svg id="upload-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M12 4v12M6 9l6-6 6 6" stroke="var(--color-violet)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-            <path d="M4 18h16" stroke="var(--color-violet)" stroke-width="1.5" stroke-linecap="round"/>
-          </svg>
-          <svg id="upload-spinner" class="hidden" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true" style="animation: spin 0.7s linear infinite;">
-            <circle cx="12" cy="12" r="9" stroke="var(--color-violet)" stroke-width="1.5" stroke-opacity="0.35" />
-            <path d="M21 12a9 9 0 0 0-9-9" stroke="var(--color-violet)" stroke-width="1.5" stroke-linecap="round" />
-          </svg>
-          <p id="upload-label" style="font-size:14px;color:var(--color-body);margin:0;">
-            <strong style="color:var(--color-violet)">Click to upload</strong> or drag &amp; drop
-            <span style="color:var(--color-mute);"> · MP3, WAV, FLAC, M4A</span>
-          </p>
-        </label>
-        <p
-          id="upload-status"
-          class="hidden"
-          role="status"
-          aria-live="polite"
-          style="font-size:13px;margin-top:10px;"
-        ></p>
-      </div>
-
-      <!-- Instrument quick-select -->
-      <fieldset
-        class="flex items-center gap-2 mt-4 flex-wrap"
-        style="border:none;padding:0;margin:0;"
-      >
-        <legend style="font-size:12px;color:var(--color-mute);font-weight:500;float:left;margin-right:8px;">
-          FOR:
-        </legend>
-        {
-          instruments.map((inst, i) => (
-            <button
-              type="button"
-              class="instrument-btn rounded-full font-medium"
-              data-inst={inst.id}
-              aria-pressed={i === 0 ? "true" : "false"}
-              style={`
-                height:28px;
-                padding:0 10px;
-                font-size:12px;
-                cursor:pointer;
-                border:1px solid ${i === 0 ? "var(--color-primary)" : "var(--color-hairline)"};
-                background:${i === 0 ? "var(--color-primary)" : "var(--color-canvas)"};
-                color:${i === 0 ? "var(--color-on-primary)" : "var(--color-body)"};
-                transition: background-color 0.15s, color 0.15s, border-color 0.15s;
-              `}
-            >
-              <span aria-hidden="true">{inst.icon}</span> {inst.label}
+        <!-- YouTube panel -->
+        <div id="panel-youtube" role="tabpanel" aria-labelledby="tab-youtube">
+          <div class="row">
+            <label for="youtube-url" class="sr-only">YouTube or SoundCloud URL</label>
+            <div class="field">
+              <svg class="field-icon" width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                <path d="M8.5 11.5a3.5 3.5 0 0 0 5 0l2.5-2.5a3.5 3.5 0 0 0-5-5l-.8.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+                <path d="M11.5 8.5a3.5 3.5 0 0 0-5 0L4 11a3.5 3.5 0 0 0 5 5l.8-.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+              </svg>
+              <input
+                id="youtube-url"
+                type="url"
+                name="song-url"
+                autocomplete="url"
+                placeholder="YouTube or SoundCloud link…"
+              />
+            </div>
+            <button id="extract-btn" class="go" type="button">
+              <span id="extract-btn-label">Extract chords</span>
+              <svg id="extract-btn-arrow" width="16" height="16" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                <path d="M3 7h8M7 3l4 4-4 4" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <svg id="extract-btn-spinner" class="hidden spin" width="16" height="16" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                <circle cx="7" cy="7" r="5.5" stroke="white" stroke-width="1.5" stroke-opacity="0.35" />
+                <path d="M12.5 7a5.5 5.5 0 0 0-5.5-5.5" stroke="white" stroke-width="1.5" stroke-linecap="round" />
+              </svg>
             </button>
-          ))
-        }
-      </fieldset>
+          </div>
+          <p id="extract-status" class="status hidden" role="status" aria-live="polite"></p>
+        </div>
+
+        <!-- Upload panel -->
+        <div id="panel-upload" role="tabpanel" aria-labelledby="tab-upload" class="hidden">
+          <label class="drop" id="dropzone">
+            <input id="audio-file-input" type="file" accept=".mp3,.wav,.flac,.m4a" class="sr-only" name="audio-file" />
+            <span class="drop-icon">
+              <svg id="upload-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M12 16V4M7 8.5 12 3.5l5 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+              </svg>
+              <svg id="upload-spinner" class="hidden spin" width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.7" stroke-opacity="0.3" />
+                <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+              </svg>
+            </span>
+            <p id="upload-label">
+              <strong>Click to upload</strong> or drag &amp; drop
+              <span class="muted"> · MP3, WAV, FLAC, M4A</span>
+            </p>
+          </label>
+          <p id="upload-status" class="status hidden" role="status" aria-live="polite"></p>
+        </div>
+
+        <!-- Instrument quick-select -->
+        <fieldset class="chips">
+          <legend>Chords for</legend>
+          {
+            instruments.map((inst, i) => (
+              <button type="button" class="chip-btn instrument-btn" data-inst={inst.id} aria-pressed={i === 0 ? "true" : "false"}>
+                <span aria-hidden="true">{inst.icon}</span> {inst.label}
+              </button>
+            ))
+          }
+        </fieldset>
+      </div>
     </div>
 
     <!-- Trust strip -->
-    <div
-      class="flex items-center justify-center flex-wrap gap-5 mt-8"
-      style="font-size:13px;color:var(--color-mute);"
-      aria-label="Key features"
-    >
+    <ul class="trust" aria-label="Key features">
       {
-        [
-          "Free to start",
-          "No credit card required",
-          "4 instruments supported",
-          "Works on any device",
-        ].map((item) => (
-          <span class="flex items-center gap-1.5">
+        ["Free to start", "No credit card required", "4 instruments", "Works on any device"].map((item) => (
+          <li>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-              <path d="M2 7l3 3 7-7" stroke="var(--color-success)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M2 7l3 3 7-7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
             {item}
-          </span>
+          </li>
         ))
       }
-    </div>
+    </ul>
   </div>
 </section>
+
+<style>
+  .hero {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    padding: 112px 24px 88px;
+    background:
+      radial-gradient(ellipse 80% 55% at 50% -8%, #7c3aed26, transparent 70%),
+      linear-gradient(180deg, #fbf7ff 0%, #fdf9ff 60%, #fff 100%);
+  }
+  .hidden { display: none !important; }
+
+  /* ── atmosphere ── */
+  .aurora { position: absolute; inset: 0; z-index: -3; overflow: hidden; pointer-events: none; }
+  .orb { position: absolute; border-radius: 50%; filter: blur(70px); opacity: 0.55; will-change: transform; }
+  .o1 { width: 520px; height: 520px; left: -140px; top: -120px; background: #a78bfa; animation: drift-a 22s ease-in-out infinite alternate; }
+  .o2 { width: 460px; height: 460px; right: -120px; top: 80px; background: #fbbf24; opacity: 0.32; animation: drift-b 26s ease-in-out infinite alternate; }
+  .o3 { width: 420px; height: 420px; left: 38%; bottom: -200px; background: #f0abfc; opacity: 0.38; animation: drift-a 30s ease-in-out infinite alternate-reverse; }
+  .dots {
+    position: absolute; inset: 0; z-index: -2; pointer-events: none;
+    background-image: radial-gradient(#7c3aed2e 1px, transparent 1.3px);
+    background-size: 26px 26px;
+    -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 38%, #000 25%, transparent 75%);
+    mask-image: radial-gradient(ellipse 70% 60% at 50% 38%, #000 25%, transparent 75%);
+  }
+
+  /* ── twinkling chords ── */
+  .stars { position: absolute; inset: 0; z-index: -1; pointer-events: none; }
+  .star { position: absolute; left: var(--x); top: var(--y); animation: bob calc(var(--t) * 1.7) ease-in-out var(--d) infinite alternate; }
+  .chip {
+    position: relative; display: inline-flex; align-items: center; justify-content: center;
+    padding: 6px 13px; border-radius: 12px;
+    font: 600 14px/1 var(--font-mono);
+    color: color-mix(in srgb, var(--c) 78%, #1a0533);
+    background: color-mix(in srgb, var(--c) 9%, rgba(255, 255, 255, 0.78));
+    border: 1px solid color-mix(in srgb, var(--c) 45%, transparent);
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    opacity: 0.14;
+    animation: twinkle var(--t) ease-in-out var(--d) infinite;
+  }
+  /* the glow behind each chord blinks in step with it, in the chord's own colour */
+  .chip::before {
+    content: ""; position: absolute; inset: -18px; z-index: -1; border-radius: 999px;
+    background: radial-gradient(closest-side, color-mix(in srgb, var(--c) 70%, transparent), transparent 72%);
+    filter: blur(5px); opacity: 0;
+    animation: halo var(--t) ease-in-out var(--d) infinite;
+  }
+  .sparkle {
+    position: absolute; left: var(--x); top: var(--y); width: var(--sz); height: var(--sz);
+    color: #a78bfa; opacity: 0.1; filter: drop-shadow(0 0 5px currentColor);
+    animation: twinkle-star var(--t) ease-in-out var(--d) infinite;
+  }
+  .sparkle:nth-of-type(3n) { color: #f59e0b; }
+  .sparkle:nth-of-type(3n + 1) { color: #ec4899; }
+
+  /* ── content ── */
+  .inner { position: relative; max-width: 760px; margin: 0 auto; text-align: center; }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 10px; margin-bottom: 26px;
+    padding: 6px 16px 6px 10px; border-radius: 999px;
+    font-size: 13px; font-weight: 500; color: var(--color-violet-deep);
+    background: rgba(255, 255, 255, 0.7); border: 1px solid #ddd0f5;
+    box-shadow: 0 1px 2px #1a05330a, 0 8px 24px -12px #7c3aed55;
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  }
+  .eyebrow strong { font-weight: 700; }
+  .deva { font-weight: 600; margin: 0 2px; }
+  .eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 16px; padding: 3px 6px; border-radius: 999px; background: var(--color-primary); }
+  .eq i { width: 2.5px; height: 100%; border-radius: 2px; background: #fbbf24; transform-origin: bottom; animation: eq 1.1s ease-in-out infinite; }
+  .eq i:nth-child(2) { animation-delay: -0.35s; background: #fff; }
+  .eq i:nth-child(3) { animation-delay: -0.7s; }
+  .eq i:nth-child(4) { animation-delay: -0.15s; background: #fff; }
+
+  .title { margin: 0 0 22px; color: var(--color-ink); font-size: clamp(40px, 7.4vw, 72px); font-weight: 800; line-height: 1.02; letter-spacing: -0.045em; text-wrap: balance; }
+  .title-grad {
+    background: linear-gradient(100deg, #7c3aed 0%, #c026d3 45%, #f59e0b 100%);
+    background-size: 160% 100%; animation: shine 9s ease-in-out infinite alternate;
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .lede { max-width: 580px; margin: 0 auto 38px; font-size: clamp(16px, 2vw, 19px); line-height: 1.65; color: var(--color-body); text-wrap: pretty; }
+
+  /* ── input card: glass, with a slowly turning gradient edge ── */
+  @property --edge { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+  .card {
+    position: relative; max-width: 660px; margin: 0 auto; padding: 1.5px; border-radius: 26px;
+    background: conic-gradient(from var(--edge), #7c3aed, #ec4899, #f59e0b, #22d3ee, #7c3aed);
+    animation: edge 12s linear infinite;
+    box-shadow: 0 30px 60px -28px #5b21b680, 0 12px 28px -12px #1a053340;
+  }
+  .card::before { content: ""; position: absolute; inset: 14px 24px -22px; z-index: -1; border-radius: 40px; background: inherit; filter: blur(34px); opacity: 0.45; }
+  .card-body { position: relative; padding: 14px; border-radius: 24.5px; background: rgba(255, 255, 255, 0.92); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); text-align: left; }
+
+  .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 12px; padding: 4px; border-radius: 16px; background: #f3eeff; }
+  .tab {
+    display: flex; align-items: center; justify-content: center; gap: 8px; height: 42px; border: 0; border-radius: 12px; cursor: pointer;
+    font: 600 14px/1 var(--font-sans); color: var(--color-body); background: transparent;
+    transition: background-color 0.18s, color 0.18s, box-shadow 0.18s;
+  }
+  .tab:hover { color: var(--color-ink); }
+  .tab[aria-selected="true"] { background: #fff; color: var(--color-ink); box-shadow: 0 1px 2px #1a053314, 0 6px 14px -6px #7c3aed55; }
+
+  .row { display: flex; gap: 10px; }
+  .field { position: relative; flex: 1; min-width: 0; }
+  .field-icon { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--color-mute); pointer-events: none; transition: color 0.18s; }
+  .field input {
+    width: 100%; height: 56px; padding: 0 16px 0 46px; border-radius: 16px; outline: none;
+    font: 500 16px/1 var(--font-sans); color: var(--color-ink);
+    background: #fbf9ff; border: 1.5px solid var(--color-hairline);
+    transition: border-color 0.18s, box-shadow 0.18s, background-color 0.18s;
+  }
+  .field input::placeholder { color: #9a8fb5; }
+  .field input:focus { background: #fff; border-color: var(--color-violet); box-shadow: 0 0 0 4px #7c3aed1f; }
+  .field:focus-within .field-icon { color: var(--color-violet); }
+
+  .go {
+    position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center; gap: 10px; height: 56px; padding: 0 26px;
+    border: 0; border-radius: 16px; cursor: pointer; overflow: hidden; white-space: nowrap;
+    font: 700 16px/1 var(--font-sans); color: #fff;
+    background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 55%, #1a0533 130%);
+    box-shadow: 0 10px 24px -10px #5b21b6cc, inset 0 1px 0 #ffffff33;
+    transition: transform 0.18s, box-shadow 0.18s, filter 0.18s;
+  }
+  .go::after { content: ""; position: absolute; inset: 0; background: linear-gradient(110deg, transparent 30%, #ffffff40 50%, transparent 70%); transform: translateX(-120%); transition: transform 0.6s; }
+  .go:hover { transform: translateY(-1px); box-shadow: 0 14px 28px -10px #5b21b6e6, inset 0 1px 0 #ffffff33; }
+  .go:hover::after { transform: translateX(120%); }
+  .go:active { transform: translateY(0); }
+  .go:disabled { cursor: progress; filter: saturate(0.7) brightness(0.95); transform: none; }
+  .spin { animation: spin 0.7s linear infinite; }
+
+  .drop {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 124px; padding: 18px; border-radius: 16px; cursor: pointer; text-align: center;
+    border: 2px dashed #cdbbee; background: #fbf9ff;
+    transition: border-color 0.18s, background-color 0.18s, transform 0.18s;
+  }
+  .drop:hover, .drop.drag { border-color: var(--color-violet); background: #f3eeff; }
+  .drop.drag { transform: scale(1.01); }
+  .drop-icon { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 14px; color: var(--color-violet); background: #fff; box-shadow: 0 6px 16px -8px #7c3aed99, 0 0 0 1px #e8dff5; }
+  .drop p { margin: 0; font-size: 14.5px; color: var(--color-body); }
+  .drop strong { color: var(--color-violet); }
+  .muted { color: var(--color-mute); }
+  .status { margin: 10px 4px 0; font-size: 13.5px; }
+
+  .chips { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 14px 4px 2px; padding: 0; border: 0; }
+  .chips legend { float: left; margin-right: 4px; padding: 0; font: 600 11px/28px var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-mute); }
+  .chip-btn {
+    height: 32px; padding: 0 13px; border-radius: 999px; cursor: pointer;
+    font: 600 13px/1 var(--font-sans); color: var(--color-body); background: #fff; border: 1px solid var(--color-hairline);
+    transition: background-color 0.18s, color 0.18s, border-color 0.18s, box-shadow 0.18s;
+  }
+  .chip-btn:hover { border-color: var(--color-hairline-strong); color: var(--color-ink); }
+  .chip-btn[aria-pressed="true"] { color: #fff; border-color: transparent; background: linear-gradient(135deg, #5b21b6, #1a0533); box-shadow: 0 6px 14px -6px #5b21b6cc; }
+
+  .trust { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 26px; margin: 34px 0 0; padding: 0; list-style: none; font-size: 13.5px; color: var(--color-body); }
+  .trust li { display: inline-flex; align-items: center; gap: 7px; }
+  .trust svg { color: var(--color-success); }
+
+  /* ── motion ── */
+  @keyframes twinkle {
+    0%, 100% { opacity: 0.14; transform: scale(0.93); }
+    50% { opacity: 1; transform: scale(1.07); }
+  }
+  @keyframes halo {
+    0%, 100% { opacity: 0; transform: scale(0.8); }
+    50% { opacity: 0.95; transform: scale(1.12); }
+  }
+  @keyframes twinkle-star {
+    0%, 100% { opacity: 0.08; transform: scale(0.6) rotate(0deg); }
+    50% { opacity: 0.95; transform: scale(1.15) rotate(45deg); }
+  }
+  @keyframes bob { from { transform: translateY(-7px); } to { transform: translateY(7px); } }
+  @keyframes drift-a { to { transform: translate(60px, 40px) scale(1.12); } }
+  @keyframes drift-b { to { transform: translate(-50px, 50px) scale(0.92); } }
+  @keyframes eq { 0%, 100% { transform: scaleY(0.35); } 50% { transform: scaleY(1); } }
+  @keyframes shine { to { background-position: 100% 0; } }
+  @keyframes edge { to { --edge: 360deg; } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Reduced motion: nothing moves, but the chords still fade softly in and out (opacity only). */
+  @keyframes twinkle-soft { 0%, 100% { opacity: 0.22; } 50% { opacity: 0.85; } }
+  @keyframes halo-soft { 0%, 100% { opacity: 0; } 50% { opacity: 0.6; } }
+  @media (prefers-reduced-motion: reduce) {
+    .chip { animation: twinkle-soft calc(var(--t) * 1.8) ease-in-out var(--d) infinite; }
+    .chip::before { animation: halo-soft calc(var(--t) * 1.8) ease-in-out var(--d) infinite; }
+    .sparkle { animation: twinkle-soft calc(var(--t) * 1.8) ease-in-out var(--d) infinite; transform: none; }
+    .star, .orb, .eq i, .title-grad, .card { animation: none; }
+  }
+
+  /* ── small screens ── */
+  @media (max-width: 720px) {
+    .hero { padding: 88px 18px 64px; }
+    .star:not(.keep), .sparkle:nth-of-type(n + 7) { display: none; }
+    .chip { padding: 5px 10px; font-size: 12px; }
+    .row { flex-direction: column; }
+    .go { width: 100%; }
+    .card-body { padding: 10px; }
+    .orb { filter: blur(54px); }
+  }
+</style>
 
 <script>
   import { startExtractFromYoutube, startExtractFromUpload, getApiErrorMessage } from "../lib/api";
 
-  // Tab switching
+  // Tab switching (the look follows aria-selected)
   const tabYT = document.getElementById("tab-youtube") as HTMLButtonElement;
   const tabUp = document.getElementById("tab-upload") as HTMLButtonElement;
   const panelYT = document.getElementById("panel-youtube")!;
@@ -323,13 +396,7 @@ const floatingChords = ["Am", "G", "C", "F", "Em", "D", "Bm", "E7"];
 
   function setTab(active: "youtube" | "upload") {
     const isYT = active === "youtube";
-    tabYT.style.background = isYT ? "var(--color-canvas)" : "transparent";
-    tabYT.style.color = isYT ? "var(--color-ink)" : "var(--color-body)";
-    tabYT.style.border = isYT ? "1px solid var(--color-hairline)" : "none";
     tabYT.setAttribute("aria-selected", String(isYT));
-    tabUp.style.background = !isYT ? "var(--color-canvas)" : "transparent";
-    tabUp.style.color = !isYT ? "var(--color-ink)" : "var(--color-body)";
-    tabUp.style.border = !isYT ? "1px solid var(--color-hairline)" : "none";
     tabUp.setAttribute("aria-selected", String(!isYT));
     panelYT.classList.toggle("hidden", !isYT);
     panelUp.classList.toggle("hidden", isYT);
@@ -341,15 +408,7 @@ const floatingChords = ["Am", "G", "C", "F", "Em", "D", "Bm", "E7"];
   // Instrument selector
   document.querySelectorAll<HTMLButtonElement>(".instrument-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
-      document.querySelectorAll<HTMLButtonElement>(".instrument-btn").forEach((b) => {
-        b.style.background = "var(--color-canvas)";
-        b.style.color = "var(--color-body)";
-        b.style.borderColor = "var(--color-hairline)";
-        b.setAttribute("aria-pressed", "false");
-      });
-      btn.style.background = "var(--color-primary)";
-      btn.style.color = "var(--color-on-primary)";
-      btn.style.borderColor = "var(--color-primary)";
+      document.querySelectorAll<HTMLButtonElement>(".instrument-btn").forEach((b) => b.setAttribute("aria-pressed", "false"));
       btn.setAttribute("aria-pressed", "true");
     });
   });
@@ -372,18 +431,13 @@ const floatingChords = ["Am", "G", "C", "F", "Em", "D", "Bm", "E7"];
     try {
       const parsed = new URL(value);
       const host = parsed.hostname.replace(/^www\./, "");
-      return (
-        host === "youtube.com" ||
-        host === "youtu.be" ||
-        host === "m.youtube.com" ||
-        host === "soundcloud.com"
-      );
+      return host === "youtube.com" || host === "youtu.be" || host === "m.youtube.com" || host === "soundcloud.com";
     } catch {
       return false;
     }
   }
 
-  extractBtn.addEventListener("click", async () => {
+  async function extract() {
     const value = urlInput.value.trim();
 
     if (!value) {
@@ -412,19 +466,23 @@ const floatingChords = ["Am", "G", "C", "F", "Em", "D", "Bm", "E7"];
       extractLabel.textContent = "Extract chords";
       extractArrow.classList.remove("hidden");
       extractSpinner.classList.add("hidden");
-      showStatus(
-        getApiErrorMessage(err, "Something went wrong extracting that song. Try again."),
-        "error",
-      );
+      showStatus(getApiErrorMessage(err, "Something went wrong extracting that song. Try again."), "error");
     }
+  }
+
+  extractBtn.addEventListener("click", extract);
+  urlInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") extract();
   });
 
   // Upload flow
   const fileInput = document.getElementById("audio-file-input") as HTMLInputElement;
+  const dropzone = document.getElementById("dropzone")!;
   const uploadIcon = document.getElementById("upload-icon")!;
   const uploadSpinner = document.getElementById("upload-spinner")!;
   const uploadLabel = document.getElementById("upload-label")!;
   const uploadStatus = document.getElementById("upload-status") as HTMLParagraphElement;
+  const uploadIdle = uploadLabel.innerHTML;
 
   function showUploadStatus(message: string, tone: "error" | "info") {
     uploadStatus.textContent = message;
@@ -432,10 +490,7 @@ const floatingChords = ["Am", "G", "C", "F", "Em", "D", "Bm", "E7"];
     uploadStatus.classList.remove("hidden");
   }
 
-  fileInput.addEventListener("change", async () => {
-    const file = fileInput.files?.[0];
-    if (!file) return;
-
+  async function upload(file: File) {
     uploadIcon.classList.add("hidden");
     uploadSpinner.classList.remove("hidden");
     uploadLabel.textContent = "Analyzing your song…";
@@ -447,13 +502,28 @@ const floatingChords = ["Am", "G", "C", "F", "Em", "D", "Bm", "E7"];
     } catch (err) {
       uploadIcon.classList.remove("hidden");
       uploadSpinner.classList.add("hidden");
-      uploadLabel.innerHTML =
-        '<strong style="color:var(--color-violet)">Click to upload</strong> or drag &amp; drop<span style="color:var(--color-mute);"> · MP3, WAV, FLAC, M4A</span>';
-      showUploadStatus(
-        getApiErrorMessage(err, "Something went wrong analyzing that file. Try again."),
-        "error",
-      );
+      uploadLabel.innerHTML = uploadIdle;
+      showUploadStatus(getApiErrorMessage(err, "Something went wrong analyzing that file. Try again."), "error");
       fileInput.value = "";
     }
+  }
+
+  fileInput.addEventListener("change", () => {
+    const file = fileInput.files?.[0];
+    if (file) void upload(file);
+  });
+
+  // Drag and drop onto the drop zone
+  ["dragenter", "dragover"].forEach((type) =>
+    dropzone.addEventListener(type, (e) => {
+      e.preventDefault();
+      dropzone.classList.add("drag");
+    }),
+  );
+  ["dragleave", "drop"].forEach((type) => dropzone.addEventListener(type, () => dropzone.classList.remove("drag")));
+  dropzone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    const file = (e as DragEvent).dataTransfer?.files?.[0];
+    if (file) void upload(file);
   });
 </script>

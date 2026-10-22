@@ -3,7 +3,7 @@ import Layout from "../layouts/Layout.astro";
 import Nav from "../components/Nav.astro";
 ---
 
-<Layout title="Play along — The Chordify">
+<Layout title="Play along — Chord Suno">
   <Nav />
   <main id="main-content" class="gradient-mesh" style="min-height:100vh;padding:96px var(--space-lg) var(--space-3xl);">
     <div class="mx-auto" style="max-width:1180px;color:white;">
@@ -26,7 +26,7 @@ import Nav from "../components/Nav.astro";
                   <h1 id="song-title">Your song</h1>
                   <span id="song-artist" class="ph-by"></span>
                 </div>
-                <div id="song-sub" class="ph-sub">Transcription by TheChordify</div>
+                <div id="song-sub" class="ph-sub">Transcription by Chord Suno</div>
               </div>
               <button id="btn-share" type="button" class="ph-share">Share</button>
             </div>
@@ -218,7 +218,7 @@ import Nav from "../components/Nav.astro";
               <div><dt>Key</dt><dd id="sd-key">—</dd></div>
               <div><dt>Tempo</dt><dd id="sd-tempo">—</dd></div>
               <div><dt>Sections</dt><dd id="sd-sections">—</dd></div>
-              <div><dt>Transcription</dt><dd>TheChordify (automatic)</dd></div>
+              <div><dt>Transcription</dt><dd>Chord Suno (automatic)</dd></div>
             </dl>
           </div>
         </aside>
@@ -1296,7 +1296,7 @@ import Nav from "../components/Nav.astro";
   /** The structure model's sections come a few minutes after the chords: check back until they do. */
   function watchForBetterSections() {
     const started = Date.now();
-    const idle = "Transcription by TheChordify";
+    const idle = "Transcription by Chord Suno";
     songSubEl.textContent = `${idle} · refining the sections…`;
     const check = async () => {
       try {
@@ -1504,8 +1504,8 @@ import Nav from "../components/Nav.astro";
     const title = result.title || "Your song";
     songTitleEl.textContent = title;
     songArtistEl.textContent = result.artist ? `by ${result.artist}` : "";
-    songSubEl.textContent = "Transcription by TheChordify";
-    document.title = `${title} chords — The Chordify`;
+    songSubEl.textContent = "Transcription by Chord Suno";
+    document.title = `${title} chords — Chord Suno`;
     detailToggle.hidden = chordsDetailed === chordsSimple;
 
     loadingState.classList.add("hidden");

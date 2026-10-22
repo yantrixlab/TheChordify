@@ -1,4 +1,6 @@
 ---
+import Logo from "./Logo.astro";
+
 const navLinks = [
   { label: "Discover", href: "#discover" },
   { label: "Features", href: "#features" },
@@ -20,29 +22,8 @@ const navLinks = [
     style="padding: 0 var(--space-lg); height: 64px;"
   >
     <!-- Logo -->
-    <a
-      href="/"
-      class="flex items-center gap-2"
-      style="text-decoration:none;"
-      aria-label="The Chordify — home"
-    >
-      <div
-        class="flex items-center justify-center rounded-lg"
-        style="width:32px;height:32px;background:var(--color-primary);"
-        aria-hidden="true"
-      >
-        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-          <circle cx="9" cy="9" r="7" stroke="var(--color-accent)" stroke-width="1.5"/>
-          <path d="M6 9 Q9 5 12 9 Q9 13 6 9Z" fill="var(--color-accent)" opacity="0.9"/>
-          <circle cx="9" cy="9" r="1.5" fill="white"/>
-        </svg>
-      </div>
-      <span
-        class="font-semibold"
-        style="font-size:15px;letter-spacing:-0.02em;color:var(--color-ink);"
-      >
-        The Chordify
-      </span>
+    <a href="/" style="text-decoration:none;" aria-label="Chord Suno — home">
+      <Logo size={34} />
     </a>
 
     <!-- Nav links – desktop -->

@@ -1,4 +1,6 @@
 ---
+import Logo from "./Logo.astro";
+
 const columns = [
   {
     heading: "Product",
@@ -56,23 +58,11 @@ const columns = [
     <div class="grid sm:grid-cols-2 lg:grid-cols-5 gap-10 mb-12">
       <!-- Brand column -->
       <div class="lg:col-span-1">
-        <a href="/" class="flex items-center gap-2 mb-4 no-underline" style="text-decoration:none;">
-          <div
-            class="flex items-center justify-center rounded-lg"
-            style="width:32px;height:32px;background:var(--color-primary);"
-          >
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-              <circle cx="9" cy="9" r="7" stroke="var(--color-accent)" stroke-width="1.5"/>
-              <path d="M6 9 Q9 5 12 9 Q9 13 6 9Z" fill="var(--color-accent)" opacity="0.9"/>
-              <circle cx="9" cy="9" r="1.5" fill="white"/>
-            </svg>
-          </div>
-          <span style="font-size:15px;font-weight:600;letter-spacing:-0.02em;color:var(--color-ink);">
-            The Chordify
-          </span>
+        <a href="/" class="mb-4 inline-block" style="text-decoration:none;" aria-label="Chord Suno — home">
+          <Logo size={32} />
         </a>
-        <p style="font-size:13px;color:var(--color-body);line-height:1.6;max-width:180px;margin-bottom:20px;">
-          Hear every chord. Play every song.
+        <p style="font-size:13px;color:var(--color-body);line-height:1.6;max-width:210px;margin-bottom:20px;">
+          Suno means listen. Hear every chord, play every song.
         </p>
         <!-- Social links -->
         <div class="flex gap-2">
@@ -149,7 +139,7 @@ const columns = [
       style="border-top:1px solid var(--color-hairline);"
     >
       <p style="font-size:13px;color:var(--color-mute);margin:0;">
-        © 2026 The Chordify · thechordify.com
+        © 2026 Chord Suno · chordsuno.com
       </p>
       <div class="flex items-center gap-4">
         {

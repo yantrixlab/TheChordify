@@ -7,8 +7,8 @@ interface Props {
 }
 
 const {
-  title = "The Chordify — Hear Every Chord. Play Every Song.",
-  description = "Extract guitar, piano, ukulele and mandolin chords from any YouTube video or music file. Play along in real-time with AI-powered chord detection.",
+  title = "Chord Suno — Hear Every Chord. Play Every Song.",
+  description = "Chord Suno listens to any YouTube link or audio file and writes out every chord, synced to the beat, for guitar, piano, ukulele and mandolin. Suno means listen.",
 } = Astro.props;
 ---
 
@@ -19,6 +19,8 @@ const {
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content={description} />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="canonical" href={new URL(Astro.url.pathname, "https://chordsuno.com").href} />
+    <meta name="application-name" content="Chord Suno" />
     <meta name="generator" content={Astro.generator} />
     <title>{title}</title>
 
@@ -34,9 +36,10 @@ const {
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://thechordify.com" />
+    <meta property="og:url" content="https://chordsuno.com" />
+    <meta property="og:site_name" content="Chord Suno" />
     <!-- Theme color -->
-    <meta name="theme-color" content="#fdf9ff" />
+    <meta name="theme-color" content="#1a0533" />
   </head>
   <body>
     <slot />

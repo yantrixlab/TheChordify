@@ -3,7 +3,7 @@ import Layout from "../layouts/Layout.astro";
 import Nav from "../components/Nav.astro";
 ---
 
-<Layout title="Chordifying… — The Chordify">
+<Layout title="Listening… — Chord Suno">
   <Nav />
   <main id="main-content" class="gradient-hero" style="min-height:100vh;padding:140px var(--space-lg);">
     <div class="max-w-2xl mx-auto" style="text-align:center;">
@@ -17,7 +17,7 @@ import Nav from "../components/Nav.astro";
         ></div>
 
         <h1 class="display-md" style="color:var(--color-ink);margin-bottom:8px;">
-          Chordifying<span id="dots">…</span>
+          Listening<span id="dots">…</span>
         </h1>
         <p id="stage-label" style="font-size:14px;color:var(--color-mute);margin-bottom:24px;">
           Getting started
@@ -78,7 +78,7 @@ import Nav from "../components/Nav.astro";
       const job = await getJobStatus(sessionId);
 
       if (job.status === "error") {
-        fail(job.error || "Something went wrong while chordifying this song.");
+        fail(job.error || "Something went wrong while listening to this song.");
         return;
       }
 
@@ -97,7 +97,7 @@ import Nav from "../components/Nav.astro";
 
       setTimeout(poll, 900);
     } catch (err) {
-      fail(getApiErrorMessage(err, "Lost connection while chordifying."));
+      fail(getApiErrorMessage(err, "Lost connection while listening to your song."));
     }
   }
 

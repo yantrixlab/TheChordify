@@ -1,0 +1,54 @@
+---
+// Chord Suno logo: a sound-wave mark (suno = "listen") in a violet tile, with the wordmark beside it.
+interface Props {
+  size?: number; // tile size in px
+  wordmark?: boolean;
+  tone?: "light" | "dark"; // dark = for dark backgrounds
+}
+
+const { size = 34, wordmark = true, tone = "light" } = Astro.props;
+const id = `lg-${Math.random().toString(36).slice(2, 8)}`;
+---
+
+<span class="logo" style={`--s:${size}px`}>
+  <svg class="logo-mark" width={size} height={size} viewBox="0 0 40 40" fill="none" aria-hidden="true">
+    <defs>
+      <linearGradient id={`${id}-bg`} x1="4" y1="2" x2="36" y2="38" gradientUnits="userSpaceOnUse">
+        <stop stop-color="#8b5cf6"></stop>
+        <stop offset="0.55" stop-color="#5b21b6"></stop>
+        <stop offset="1" stop-color="#1a0533"></stop>
+      </linearGradient>
+      <linearGradient id={`${id}-bar`} x1="0" y1="0" x2="0" y2="1">
+        <stop stop-color="#fde68a"></stop>
+        <stop offset="1" stop-color="#f59e0b"></stop>
+      </linearGradient>
+    </defs>
+    <rect width="40" height="40" rx="11" fill={`url(#${id}-bg)`}></rect>
+    <rect x="1" y="1" width="38" height="38" rx="10" stroke="white" stroke-opacity="0.14"></rect>
+    <!-- sound wave: five bars, the middle one lit -->
+    <rect x="8.5" y="15.5" width="3.4" height="9" rx="1.7" fill="white" fill-opacity="0.85"></rect>
+    <rect x="14.3" y="10.5" width="3.4" height="19" rx="1.7" fill="white"></rect>
+    <rect x="20.1" y="6.5" width="3.4" height="27" rx="1.7" fill={`url(#${id}-bar)`}></rect>
+    <rect x="25.9" y="12.5" width="3.4" height="15" rx="1.7" fill="white"></rect>
+    <rect x="31.7" y="16.5" width="3.4" height="7" rx="1.7" fill="white" fill-opacity="0.85"></rect>
+  </svg>
+  {
+    wordmark && (
+      <span class={`logo-word ${tone}`}>
+        Chord<span class="logo-suno">Suno</span>
+      </span>
+    )
+  }
+</span>
+
+<style>
+  .logo { display: inline-flex; align-items: center; gap: 10px; line-height: 1; }
+  .logo-mark { flex: none; filter: drop-shadow(0 4px 10px rgba(91, 33, 182, 0.35)); }
+  .logo-word { font-size: calc(var(--s) * 0.56); font-weight: 700; letter-spacing: -0.035em; color: var(--color-ink); white-space: nowrap; }
+  .logo-word.dark { color: #fff; }
+  .logo-suno {
+    margin-left: 0.16em;
+    background: linear-gradient(120deg, #7c3aed 0%, #a855f7 55%, #f59e0b 130%);
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  }
+</style>
