@@ -27,7 +27,7 @@ from scipy.ndimage import uniform_filter1d
 
 from .chord_detection import NOTE_NAMES, estimate_beats
 from .pulse import estimate_pulse_grid
-from .sections_ai import sections_from_model
+from .sections_ai import SectionsJob
 from .structure import (
     analyze_structure,
     audible_start,
@@ -447,30 +447,14 @@ def decode(f: Features, opts: Optional[DecodeOptions] = None) -> list[dict]:
     return out
 
 
-class _SectionsJob:
-    """Runs the structure model in the background; result() waits for it (None if it is off or failed)."""
-
-    def __init__(self, audio_path: str) -> None:
-        self._sections = None
-        self._thread = threading.Thread(target=self._run, args=(audio_path,), daemon=True)
-        self._thread.start()
-
-    def _run(self, audio_path: str) -> None:
-        self._sections = sections_from_model(audio_path)
-
-    def result(self):
-        self._thread.join()
-        return self._sections
-
-
 def detect_chords_ai(audio_path: str, on_progress: Optional[ProgressFn] = None) -> dict:
     progress = on_progress or (lambda _p, _s: None)
 
     progress(3, "Loading the chord model")
     _load_model()
 
-    # The structure model is the slowest part, so it works on its own thread while the chords are analysed.
-    sections_job = _SectionsJob(audio_path)
+    # The structure model is the slowest part, so it works in its own process while the chords are analysed.
+    sections_job = SectionsJob(audio_path)
 
     progress(8, "Loading audio")
     y, _ = librosa.load(audio_path, sr=SAMPLE_RATE, mono=True)
@@ -485,7 +469,9 @@ def detect_chords_ai(audio_path: str, on_progress: Optional[ProgressFn] = None) 
     phase = downbeat_phase(features.beats, simple)
     simple = place_chords_on_grid(simple, features.beats, phase, features.duration)
     detailed = place_chords_on_grid(detailed, features.beats, phase, features.duration)
-    learned = sections_job.result()
+    learned = sections_job.result(
+        on_wait=lambda used: progress(94 + int(5 * min(used, 1.0)), "Finding the song's sections (this can take a few minutes)")
+    )
     structure = analyze_structure(
         simple, features.beats, features.duration, features.chroma, features.mfcc, features.rms,
         features.audible_start, phase, features.texture, learned,
