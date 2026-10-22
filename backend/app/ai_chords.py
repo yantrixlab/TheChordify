@@ -26,7 +26,15 @@ from scipy.interpolate import interp1d
 from scipy.ndimage import uniform_filter1d
 
 from .chord_detection import NOTE_NAMES, estimate_beats
-from .structure import analyze_structure, audible_start, estimate_key, regularize_beats
+from .pulse import estimate_pulse_grid
+from .structure import (
+    analyze_structure,
+    audible_start,
+    downbeat_phase,
+    estimate_key,
+    fit_beat_grid,
+    place_chords_on_grid,
+)
 
 ProgressFn = Callable[[int, str], None]
 
@@ -315,9 +323,13 @@ def extract_features(y: np.ndarray, progress: Optional[ProgressFn] = None, tta: 
     rms = librosa.feature.rms(y=y, hop_length=HOP_LENGTH)[0]
     sound_starts = audible_start(rms)
     bpm, beat_frames = estimate_beats(y, SAMPLE_RATE, HOP_LENGTH)
-    if len(beat_frames) >= 2:
-        beat_times = regularize_beats(
-            librosa.frames_to_time(beat_frames, sr=SAMPLE_RATE, hop_length=HOP_LENGTH), sound_starts
+    pulse = estimate_pulse_grid(y, SAMPLE_RATE, duration, sound_starts)
+    if pulse is not None:
+        # Steady music: the grid found from the onsets themselves (the tracker can be several % off tempo).
+        beat_times, bpm = pulse
+    elif len(beat_frames) >= 2:
+        beat_times = fit_beat_grid(
+            librosa.frames_to_time(beat_frames, sr=SAMPLE_RATE, hop_length=HOP_LENGTH), sound_starts, duration
         )
     else:
         bpm = 120.0
@@ -414,8 +426,13 @@ def detect_chords_ai(audio_path: str, on_progress: Optional[ProgressFn] = None) 
     detailed = decode(features, DecodeOptions(detail="full"))
 
     progress(96, "Finding the song's sections")
+    # Which beat cell of the chord grid each chord is written in (times themselves stay as detected).
+    phase = downbeat_phase(features.beats, simple)
+    simple = place_chords_on_grid(simple, features.beats, phase, features.duration)
+    detailed = place_chords_on_grid(detailed, features.beats, phase, features.duration)
     structure = analyze_structure(
-        simple, features.beats, features.duration, features.chroma, features.mfcc, features.rms, features.audible_start
+        simple, features.beats, features.duration, features.chroma, features.mfcc, features.rms,
+        features.audible_start, phase,
     )
 
     beat_list = [float(t) for t in features.boundaries[:-1]]

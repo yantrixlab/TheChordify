@@ -8,6 +8,8 @@ export interface ChordSegment {
   end: number;
   chord: string; // e.g. "C", "Am7", "Gsus4", "D/F#"; "N" = no chord
   confidence?: number; // 0-1, only from the neural engine
+  // Beat time of the grid cell this chord is written in (null = no cell of its own). `start` stays the real time.
+  gridStart?: number | null;
 }
 
 export interface Bar {

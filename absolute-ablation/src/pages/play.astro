@@ -799,7 +799,12 @@ import Nav from "../components/Nav.astro";
       if (sec.startBar !== null) lastReal = i;
     });
 
-    let next = 0; // next chord segment not yet placed; cells and chords are both in time order
+    // Chords are written in the beat cell the analysis chose for them (gridStart), not necessarily the one nearest
+    // their detected time: that keeps a syncopated or slightly-early change on the same beat from bar to bar.
+    const placed = chords
+      .filter((seg) => seg.gridStart !== null)
+      .map((seg) => ({ chord: seg.chord, start: seg.gridStart ?? seg.start }));
+    let next = 0; // next chord not yet written; cells and chords are both in time order
     const makeCell = (label: string, kind: string): HTMLButtonElement => {
       const cell = document.createElement("button");
       cell.type = "button";
@@ -867,10 +872,10 @@ import Nav from "../components/Nav.astro";
             }
             const t1 = firstNumber(beats.slice(k + 1)) ?? duration;
             const half = Math.max(t1 - t0, 0.05) / 2;
-            while (next < chords.length && chords[next].start < t0 - half) next++;
+            while (next < placed.length && placed[next].start < t0 - half) next++;
             let cell: HTMLButtonElement;
-            if (next < chords.length && chords[next].start < t0 + half) {
-              const seg = chords[next++];
+            if (next < placed.length && placed[next].start < t0 + half) {
+              const seg = placed[next++];
               cell = seg.chord === "N" ? makeCell("—", "is-rest") : makeCell(displayChord(seg.chord), "");
             } else {
               cell = makeCell("", "");

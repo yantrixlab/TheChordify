@@ -27,6 +27,9 @@ from sklearn.metrics import silhouette_score
 FRAMES_PER_SECOND = 22050 / 2048
 BEATS_PER_BAR = 4
 PHRASE = 4  # bars per phrase: sections start and end on this grid
+MAX_MERGED_BARS = 16  # neighbouring look-alike sections are merged only up to this many bars
+MAX_SECTION_BARS = 20  # a section longer than this is split at its strongest internal change...
+MIN_SPLIT_BARS = 8  # ...but never closer than this to either end
 AUDIBLE_RMS = 0.003  # about -50 dBFS: below this nothing can be heard; above it (however soft) it is music
 
 
@@ -125,9 +128,11 @@ def analyze_structure(
     mfcc: np.ndarray,
     rms: np.ndarray,
     audible_start_s: float = 0.0,
+    phase: Optional[int] = None,
 ) -> dict:
     """Returns {"bars": [...], "sections": [{"label","start","end","startBar","endBar"}], "downbeatPhase": int}."""
-    phase = downbeat_phase(beats, chords)
+    if phase is None:
+        phase = downbeat_phase(beats, chords)
     bars = build_bars(beats, duration, phase)
     full = [i for i, b in enumerate(bars) if None not in b["beats"][:BEATS_PER_BAR]]
     if len(full) < 8:  # too short to find structure in
@@ -175,6 +180,20 @@ def analyze_structure(
     if len(segments) >= 2 and segments[0][1] - segments[0][0] < PHRASE:  # a stub before the grid: fold it in
         segments = [(0, segments[1][1])] + segments[2:]
 
+    # A section much longer than a verse or chorus hides the song's structure: split it where the music
+    # changes most, on the same phrase grid.
+    split: list[tuple[int, int]] = []
+    pending = list(segments)
+    while pending:
+        a0, a1 = pending.pop(0)
+        inside = [p for p in range(a0 + MIN_SPLIT_BARS, a1 - MIN_SPLIT_BARS + 1) if (p - offset) % PHRASE == 0]
+        if a1 - a0 > MAX_SECTION_BARS and inside:
+            cut = max(inside, key=lambda p: novelty[p])
+            pending = [(a0, cut), (cut, a1)] + pending
+        else:
+            split.append((a0, a1))
+    segments = split
+
     # Group sections that sound alike: mean similarity of the aligned bars of each pair. The number of
     # groups is whichever (2-4) separates the sections best.
     m = len(segments)
@@ -198,10 +217,11 @@ def analyze_structure(
     elif m == 2:
         clusters = np.array([0, 0 if distance[0, 1] < 0.4 else 1])
 
-    # Neighbouring sections from the same group are one longer section, not separate ones.
+    # Neighbouring sections from the same group read as one longer section, as long as it stays a phrase or two.
+    # A bigger block would hide the song's structure, so those stay separate.
     merged, merged_clusters = [segments[0]], [int(clusters[0])]
     for segment, cluster in zip(segments[1:], clusters[1:]):
-        if int(cluster) == merged_clusters[-1]:
+        if int(cluster) == merged_clusters[-1] and segment[1] - merged[-1][0] <= MAX_MERGED_BARS:
             merged[-1] = (merged[-1][0], segment[1])
         else:
             merged.append(segment)
@@ -311,3 +331,96 @@ def estimate_key(chords: list[dict]) -> str:
             if corr > best:
                 best, key = corr, _NOTE_NAMES[tonic] + suffix
     return key
+
+
+def fit_beat_grid(beats: np.ndarray, start: float, duration: float) -> np.ndarray:
+    """One steady beat grid for the whole song, built from the tracker's beat *times*.
+
+    The tracker's beats are rounded to 93 ms and it can drop or double a beat now and then; if bars are
+    counted from its list, one such slip puts every later chord on the wrong beat. When the tracker's beats
+    sit on a straight line (a constant tempo) they are replaced by that line, extended over the whole song.
+    Music that really changes tempo keeps the tracker's own beats (with gaps filled).
+    """
+    if len(beats) < 16:
+        return regularize_beats(beats, start)
+    period = float(np.median(np.diff(beats)))
+    # Beat number of each tracker beat from its *neighbour* spacing, so a slightly-off period cannot
+    # accumulate into the wrong beat number late in the song.
+    steps = np.maximum(np.round(np.diff(beats) / period), 0)
+    index = np.concatenate([[0.0], np.cumsum(steps)])
+    keep = np.ones(len(beats), dtype=bool)
+    slope, offset = period, float(beats[0])
+    for _ in range(5):
+        slope, offset = np.polyfit(index[keep], beats[keep], 1)
+        close = np.abs(beats - (offset + slope * index)) < 0.2 * slope
+        if close.sum() < 8 or (close == keep).all():
+            break
+        keep = close
+    steady = float(np.mean(np.abs(beats - (offset + slope * index)) < 0.2 * slope))
+    if steady < 0.85:
+        return regularize_beats(beats, start)
+    first = int(np.ceil((max(start, 0.0) - offset) / slope - 0.5))
+    last = int(np.floor((duration - offset) / slope))
+    grid = offset + slope * np.arange(first, last + 1)
+    return grid[grid >= 0.0]
+
+
+def place_chords_on_grid(chords: list[dict], beats: np.ndarray, phase: int, duration: float) -> list[dict]:
+    """Decide which beat cell of the chord grid each chord is written in, using the song's own rhythm.
+
+    Chord times are left exactly as detected (playback and accuracy depend on them). Each chord gets a
+    `gridStart`: the beat time of the cell it is written in, or None when it has no cell of its own.
+
+    A change detected a little early or late would round to the wrong beat (often beat 4 of the bar before),
+    and a change that falls between two beats (a syncopated "and") would flip between neighbouring beats from
+    bar to bar. So each change goes to the beat that is both close and *rhythmically likely*: positions in the
+    bar where this song rarely changes chord cost extra. When the song changes chord only on every other beat,
+    a chord that would have a cell of less than two beats is a flicker and gets no cell.
+    """
+    out = [dict(c, gridStart=c["start"]) for c in chords]
+    if len(beats) < 8 or len(chords) < 3:
+        return out
+    period = float(np.median(np.diff(beats)))
+
+    def nearest(t: float) -> int:
+        return int(np.argmin(np.abs(beats - t)))
+
+    starts = [nearest(c["start"]) for c in chords[1:]]
+    share = np.bincount([(i - phase) % BEATS_PER_BAR for i in starts], minlength=BEATS_PER_BAR) / max(len(starts), 1)
+    penalty = 0.9 * (1.0 - share / max(share.max(), 1e-9))  # beat positions this song rarely changes on cost more
+
+    chosen: list[int] = []
+    for chord in chords[1:]:
+        near = nearest(chord["start"])
+        best, best_cost = near, 1e9
+        for j in range(max(near - 2, 0), min(near + 3, len(beats))):
+            distance = abs(float(beats[j]) - chord["start"]) / period
+            if distance > 1.25:
+                continue
+            cost = distance + penalty[(j - phase) % BEATS_PER_BAR]
+            if cost < best_cost:
+                best, best_cost = j, cost
+        chosen.append(best)
+
+    # Each written chord must come after the previous one; a repeat of the same chord needs no new cell.
+    min_beats = 2 if (share[1] + share[3]) < 0.2 else 1
+    placed: list[tuple[int, int]] = [(0, -1)]  # (index into chords, beat index); the first chord keeps its own time
+    for k, j in enumerate(chosen, start=1):
+        if j <= placed[-1][1] or chords[placed[-1][0]]["chord"] == chords[k]["chord"]:
+            continue
+        placed.append((k, j))
+    if min_beats > 1:
+        kept = [placed[0]]
+        for n in range(1, len(placed)):
+            following = placed[n + 1][1] if n + 1 < len(placed) else None
+            if following is not None and following - placed[n][1] < min_beats:
+                continue  # a flicker: the chord before it carries on
+            if chords[kept[-1][0]]["chord"] != chords[placed[n][0]]["chord"]:
+                kept.append(placed[n])
+        placed = kept
+
+    for chord in out[1:]:
+        chord["gridStart"] = None
+    for k, j in placed[1:]:
+        out[k]["gridStart"] = float(beats[j])
+    return out
