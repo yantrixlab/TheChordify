@@ -12,13 +12,15 @@ COPY --from=mwader/static-ffmpeg:9.0.2 /ffmpeg /ffprobe /usr/local/bin/
 COPY --from=node:22-slim /usr/local/bin/node /usr/local/bin/node
 WORKDIR /app/backend
 
-COPY backend/requirements.txt ./
-# torch is listed in requirements.txt; install the CPU-only wheel first so pip doesn't pull the CUDA build.
+# torch is the big download (~200 MB) and never changes, so it is its own layer, ahead of anything that does: editing
+# requirements.txt then reinstalls only the small packages instead of the whole thing. It is the CPU-only wheel, so pip
+# doesn't pull the CUDA build.
 RUN for i in 1 2 3 4 5; do \
       pip install --no-cache-dir --retries 10 --timeout 60 torch torchaudio --index-url https://download.pytorch.org/whl/cpu && break; \
       [ "$i" = 5 ] && exit 1; echo "download failed, retrying ($i)"; sleep 5; \
-    done \
-    && for i in 1 2 3; do \
+    done
+COPY backend/requirements.txt ./
+RUN for i in 1 2 3; do \
       pip install --no-cache-dir --retries 10 --timeout 60 -r requirements.txt && break; \
       [ "$i" = 3 ] && exit 1; echo "download failed, retrying ($i)"; sleep 5; \
     done
