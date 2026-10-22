@@ -43,8 +43,21 @@ RUN npm ci --fetch-retries=5
 COPY absolute-ablation/ ./
 RUN npm run build
 
+# YouTube's proof-of-origin token maker (bgutil), so downloads from this server look like a browser's and get the "sign in to
+# confirm you're not a bot" wall less often. yt-dlp calls this script when it needs a token (see POT_SCRIPT in youtube.py).
+# Built here because this stage already has Node. The version must match bgutil-ytdlp-pot-provider in requirements.txt.
+# --ignore-scripts skips the optional native canvas build, which the token script does not need.
+ARG BGUTIL_VERSION=2.0.2
+RUN for i in 1 2 3; do \
+      node -e "fetch('https://github.com/Brainicism/bgutil-ytdlp-pot-provider/archive/refs/tags/$BGUTIL_VERSION.tar.gz').then(r=>{if(!r.ok)throw new Error(r.status);return r.arrayBuffer()}).then(b=>require('fs').writeFileSync('/tmp/pot.tgz',Buffer.from(b)))" && break; \
+      [ "$i" = 3 ] && exit 1; sleep 5; \
+    done \
+    && mkdir -p /opt/bgutil && tar xzf /tmp/pot.tgz -C /opt/bgutil --strip-components=1 \
+    && cd /opt/bgutil/server && npm ci --ignore-scripts --fetch-retries=5 && npx tsc && npm prune --omit=dev --ignore-scripts
+
 FROM app
 COPY --from=web /web/dist ./static
+COPY --from=web /opt/bgutil/server /opt/bgutil/server
 
 # Saved results, uploads and the song catalog (songs.db) live in /data. Mount a persistent volume there in Coolify
 # (Storage -> add -> destination /data), or every redeploy starts with an empty catalog and re-analyses every song.

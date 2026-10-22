@@ -3,6 +3,7 @@ uvicorn[standard]==0.34.0
 python-multipart==0.0.20
 yt-dlp[default]>=2026.6.9
 ytmusicapi>=1.8
+bgutil-ytdlp-pot-provider==2.0.2
 psycopg[binary,pool]>=3.2
 librosa==0.10.2.post1
 numpy==2.1.3

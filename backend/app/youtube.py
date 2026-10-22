@@ -317,6 +317,20 @@ def _cookie_file(account_id: str) -> Optional[str]:
 
 
 # ---- downloading -----------------------------------------------------------------------------------------------------
+# YouTube wants a "proof of origin" token with the requests of a real browser; without one a server's requests are far more
+# likely to be told to "sign in to confirm you're not a bot". The bgutil plugin (installed from requirements.txt) makes the
+# tokens, either with a small Node script that the Docker image carries, or by asking a server at POT_PROVIDER_URL.
+_POT_SCRIPT = os.environ.get("POT_SCRIPT") or "/opt/bgutil/server/build/generate_once.js"
+
+
+def _pot_arguments() -> dict:
+    if os.environ.get("POT_PROVIDER_URL"):
+        return {"youtubepot-bgutilhttp": {"base_url": [os.environ["POT_PROVIDER_URL"]]}}
+    if os.path.exists(_POT_SCRIPT):
+        return {"youtubepot-bgutilscript": {"script_path": [_POT_SCRIPT]}}
+    return {}
+
+
 def _options(client: Optional[list[str]], cookies: Optional[str] = None) -> dict:
     opts: dict = {
         "quiet": True,
@@ -331,8 +345,11 @@ def _options(client: Optional[list[str]], cookies: Optional[str] = None) -> dict
         opts["proxy"] = os.environ["YTDLP_PROXY"]
     if cookies:
         opts["cookiefile"] = cookies
+    extractor_args = _pot_arguments()
     if client:
-        opts["extractor_args"] = {"youtube": {"player_client": client}}
+        extractor_args["youtube"] = {"player_client": client}
+    if extractor_args:
+        opts["extractor_args"] = extractor_args
     return opts
 
 
@@ -477,6 +494,10 @@ def diagnose(test: bool = False) -> dict:
         "jsRuntime": {"node": bool(shutil.which("node")), "deno": bool(shutil.which("deno"))},
         "accounts": list_accounts(),
         "proxy": bool(os.environ.get("YTDLP_PROXY")),
+        "potProvider": {
+            "plugin": importlib.util.find_spec("yt_dlp_plugins") is not None,
+            "mode": "http" if os.environ.get("POT_PROVIDER_URL") else "script" if os.path.exists(_POT_SCRIPT) else None,
+        },
         "hourlyCap": HOURLY_CAP,
         "recentFailures": list(recent_failures),
     }
