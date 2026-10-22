@@ -32,6 +32,7 @@ PHRASE = 4  # bars per phrase: sections start and end on this grid
 MAX_MERGED_BARS = 16  # neighbouring look-alike sections are merged only up to this many bars
 MAX_SECTION_BARS = 20  # a section longer than this is split at its strongest internal change...
 MIN_SPLIT_BARS = 8  # ...but never closer than this to either end
+MAX_SHIFT_BARS = 4  # a section start moves on past at most this many bars that have no chord change
 AUDIBLE_RMS = 0.003  # about -50 dBFS: below this nothing can be heard; above it (however soft) it is music
 
 
@@ -83,18 +84,18 @@ def downbeat_phase(beats: np.ndarray, chords: list[dict]) -> int:
 def build_bars(beats: np.ndarray, duration: float, phase: int) -> list[dict]:
     """Bars of four beats. Each bar: {"start", "beats": 4 beat times + the next bar's start}.
 
-    A pickup before the first full bar and a short last bar are padded with None beats.
+    A short last bar is padded with None beats. A pickup (the music starts part-way through a bar) is completed
+    backwards at the song's own beat length, so the first cell of the first bar is the first beat of the song:
+    playback lights it from the very start instead of skipping to the third cell.
     """
     bars: list[dict] = []
     if len(beats) == 0:
         return bars
     if phase > 0:
-        bars.append(
-            {
-                "start": float(beats[0]),
-                "beats": [None] * (BEATS_PER_BAR - phase) + [float(t) for t in beats[:phase]] + [float(beats[phase])],
-            }
-        )
+        period = float(np.median(np.diff(beats))) if len(beats) > 1 else 0.5
+        missing = BEATS_PER_BAR - phase
+        lead = [max(0.0, float(beats[0]) - period * (missing - j)) for j in range(missing)]
+        bars.append({"start": lead[0], "beats": lead + [float(t) for t in beats[:phase]] + [float(beats[phase])]})
     i = phase
     while i < len(beats):
         group = [float(t) for t in beats[i : i + BEATS_PER_BAR]]
@@ -245,6 +246,37 @@ def _classic_segments(similarity: np.ndarray, novelty: np.ndarray, energy: np.nd
     return segments, labels
 
 
+def _early_chord_bars(chords: list[dict], bars: list[dict]) -> set[int]:
+    """Indices into `bars` of the bars where a chord starts on one of the first three beats. A chord only on the
+    last beat is a pickup into the next bar, which does not make its own bar the start of anything."""
+    out: set[int] = set()
+    for chord in chords:
+        t = chord.get("gridStart")
+        if t is None:
+            continue
+        for i, bar in enumerate(bars):
+            if any(bt is not None and abs(bt - t) < 1e-3 for bt in bar["beats"][: BEATS_PER_BAR - 1]):
+                out.add(i)
+                break
+    return out
+
+
+def _start_where_chords_do(
+    segments: list[tuple[int, int]], bars: list[dict], full: list[int], early: set[int], limit: int
+) -> list[tuple[int, int]]:
+    """A section starts where its progression does. Leading bars in which the chord only rings on (or just picks up
+    on the last beat) still belong to the section before, so they stay in it - as in a hand-made chord chart."""
+    out = [list(seg) for seg in segments]
+    for k in range(1, len(out)):
+        a, b = out[k]
+        moved = a
+        while moved < b - PHRASE and moved - a < limit and full[moved] not in early:
+            moved += 1
+        out[k][0] = moved
+        out[k - 1][1] = moved
+    return [(a, b) for a, b in out]
+
+
 def analyze_structure(
     chords: list[dict],
     beats: np.ndarray,
@@ -311,11 +343,16 @@ def analyze_structure(
         segments, labels = _learned_segments(learned, bars, full, novelty, n)
     if not segments:
         segments, labels = _classic_segments(similarity, novelty, energy, n)
+        shift_limit = MAX_SHIFT_BARS
+    else:
+        shift_limit = 1  # a model's boundary is already close; at most a lone pickup bar moves
+    segments = _start_where_chords_do(segments, bars, full, _early_chord_bars(chords, bars), shift_limit)
 
     sections = []
     # Silence is only an opening in which nothing can be heard. A soft intro is music and is part of the grid.
-    if audible_start_s > 0.5:
-        sections.append(_section("Silence", 0.0, audible_start_s, None, None))
+    first_bar_start = float(bars[0]["start"])
+    if audible_start_s > 0.5 and first_bar_start > 0.5:
+        sections.append(_section("Silence", 0.0, min(audible_start_s, first_bar_start), None, None))
     for index, ((a, b), label) in enumerate(zip(segments, labels)):
         # the first section also owns a pickup bar before the first full bar
         start_bar, end_bar = (0 if index == 0 else full[a]), full[b - 1]
@@ -326,6 +363,8 @@ def analyze_structure(
         sections.append(_section(label, bars[start_bar]["start"], end_time, start_bar, end_bar))
     for prev, cur in zip(sections, sections[1:]):  # no gaps or overlaps between neighbours
         prev["end"] = cur["start"]
+    if sections and sections[0]["startBar"] is not None:
+        sections[0]["start"] = 0.0  # no silence section: the song, and its first section, start at 0:00
     return {"bars": bars, "downbeatPhase": phase, "sections": sections}
 
 

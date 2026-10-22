@@ -31,7 +31,9 @@ os.makedirs(RESULT_DIR, exist_ok=True)
 # 7: every detected chord gets a beat cell; sections use texture (loudness, brightness, percussion), so soft builds read as Intro.
 # 8: sections from a trained structure model (all-in-one), snapped to our bars; Instrumental / Outro / Bridge appear.
 # 9: those sections arrive in the background after the chords (sectionsPending), instead of holding the analysis up.
-ANALYSIS_VERSION = 9
+# 10: a pickup bar gets real beat cells (the first cell is the first beat; no leading Silence section), and a section
+#     starts where its chords do.
+ANALYSIS_VERSION = 10
 
 ALLOWED_UPLOAD_EXTENSIONS ={".mp3", ".wav", ".flac", ".m4a"}
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50MB

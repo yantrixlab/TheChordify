@@ -637,8 +637,9 @@ import Nav from "../components/Nav.astro";
    *  (gridStart), not necessarily the one nearest their detected time: that keeps a syncopated or slightly-early
    *  change on the same beat from bar to bar. */
   function placeChordsOnBeats(): (string | null)[][] {
+    const firstSound = chords.findIndex((seg) => seg.chord !== "N");
     const placed = chords
-      .filter((seg) => seg.gridStart !== null)
+      .filter((seg, i) => seg.gridStart !== null && !(seg.chord === "N" && i < firstSound)) // nothing sounds before the song starts
       .map((seg) => ({ chord: seg.chord, start: seg.gridStart ?? seg.start }));
     let next = 0; // next chord not yet written; cells and chords are both in time order
     return bars.map((bar) =>
@@ -975,13 +976,13 @@ import Nav from "../components/Nav.astro";
         hi = mid - 1;
       }
     }
+    if (index < 0) index = 0; // before the first beat the first cell is already the one to play
     if (index === gridActive) return;
     if (gridActive >= 0) {
       gridCells[gridActive].el.classList.remove("is-active");
       gridCells[gridActive].bar.classList.remove("is-current");
     }
     gridActive = index;
-    if (index < 0) return;
     const cell = gridCells[index];
     cell.el.classList.add("is-active");
     cell.bar.classList.add("is-current");
