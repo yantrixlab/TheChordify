@@ -29,7 +29,7 @@ import Nav from "../components/Nav.astro";
         <ul id="status" class="status"></ul>
         <div class="row">
           <button id="test" type="button" class="btn">Test every account now</button>
-          <span class="hint">Asks YouTube for a short public video's details with each account (nothing is downloaded).</span>
+          <span class="hint">Downloads a 19-second public video with each account, for real (it can take a minute or two).</span>
         </div>
         <ul id="test-result" class="attempts"></ul>
         <h3>Recent download failures</h3>
@@ -235,8 +235,8 @@ import Nav from "../components/Nav.astro";
     if (test) {
       const list = $("test-result");
       list.replaceChildren(
-        item(info.test.ok, info.test.ok ? "At least one way in works" : "YouTube is blocking every account and anonymous requests — add or replace cookies"),
-        ...info.test.results.map((r: any) => item(r.ok, `${r.label}: ${r.ok ? "YouTube answered" : r.attempts[r.attempts.length - 1].result}`)),
+        item(info.test.ok, info.test.ok ? "At least one way in works (a real download succeeded)" : "YouTube is blocking every account and anonymous requests — add or replace cookies"),
+        ...info.test.results.map((r: any) => item(r.ok, `${r.label}: ${r.ok ? `downloaded in ${r.attempts[r.attempts.length - 1].seconds}s` : r.attempts[r.attempts.length - 1].result}`)),
       );
     }
   }

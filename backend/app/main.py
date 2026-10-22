@@ -42,6 +42,7 @@ job_queue = JobQueue(
 NEW_SONGS_PER_HOUR = int(os.environ.get("NEW_SONGS_PER_HOUR", "8"))
 catalog = SongStore(CACHE_DIR)
 youtube.configure(CACHE_DIR)  # where cookies pasted on the admin page are kept
+youtube.keep_failures(lambda: catalog.load_result("meta:failures"), lambda data: catalog.save_result("meta:failures", data))
 _TRENDING_KEY = "meta:trending"  # not a valid song id, so it can never be asked for as a result
 trending_shelves.start(lambda: catalog.load_result(_TRENDING_KEY), lambda data: catalog.save_result(_TRENDING_KEY, data))
 try:  # results and songs that older versions kept in files join the database, once

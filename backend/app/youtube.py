@@ -17,6 +17,7 @@ from __future__ import annotations
 import glob
 import hashlib
 import json
+import logging
 import os
 import random
 import re
@@ -26,9 +27,11 @@ import threading
 import time
 import uuid
 from collections import deque
-from typing import Optional
+from typing import Callable, Optional
 
 import yt_dlp
+
+log = logging.getLogger("chordify.youtube")
 
 ALLOWED_HOSTS = (
     "youtube.com",
@@ -94,6 +97,7 @@ _BLOCKED = ("sign in to confirm", "not a bot", "http error 403", "http error 429
 _BOT_CHECK = ("sign in to confirm", "not a bot")
 ANSI = re.compile(r"\x1b\[[0-9;]*m")  # colour codes in yt-dlp messages
 _TEST_VIDEO = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"  # a very widely available public video
+_TEST_DOWNLOAD = "https://www.youtube.com/watch?v=jNQXAC9IVRw"  # the first YouTube video: 19 seconds
 
 HOURLY_CAP = int(os.environ.get("YTDLP_ACCOUNT_HOURLY", "40"))  # downloads per account per hour, then it rests
 _COOLDOWN_BASE = 15 * 60  # first block: rest 15 minutes, doubling each time, up to 6 hours
@@ -430,10 +434,31 @@ def _is_bot_check(error: Exception) -> bool:
     return any(marker in str(error).lower() for marker in _BOT_CHECK)
 
 
+_save_failures: Optional[Callable[[dict], None]] = None
+
+
+def keep_failures(load: Callable[[], Optional[dict]], save: Callable[[dict], None]) -> None:
+    """Remembers the failure list across restarts and redeploys (a failure shown on /admin should not vanish with the server)."""
+    global _save_failures
+    try:
+        saved = load()
+        for entry in reversed((saved or {}).get("failures", [])):
+            recent_failures.appendleft(entry)
+    except Exception as exc:
+        log.warning("Could not read the saved download failures: %s", exc)
+    _save_failures = save
+
+
 def _note_failure(key: str, account: str, error: Exception, verdict: str) -> None:
     recent_failures.appendleft(
         {"at": time.time(), "song": key, "account": account, "error": ANSI.sub("", str(error))[:220], "verdict": verdict}
     )
+    log.warning("Download of %s failed (%s): %s", key, account, verdict)
+    if _save_failures:
+        try:
+            _save_failures({"failures": list(recent_failures)})
+        except Exception as exc:
+            log.warning("Could not save the download failures: %s", exc)
 
 
 def _download_with_fallbacks(url: str, out_template: str, final_path: str, out_dir: str, key: str) -> str:
@@ -502,24 +527,36 @@ def diagnose(test: bool = False) -> dict:
         "recentFailures": list(recent_failures),
     }
     if test:
+        # A real download of a 19-second public video, not just a look at its details: YouTube answers requests for details
+        # for anyone, and it is the download that gets refused when the server or an account is flagged.
         results = []
         targets: list[tuple[Optional[str], str]] = [(a["id"], a["label"]) for a in info["accounts"]] + [(None, "No account")]
-        for account_id, label in targets:
-            cookies = _cookie_file(account_id) if account_id else None
-            attempts = []
-            for client in (_ACCOUNT_CLIENTS if account_id else _CLIENTS):
-                name = ",".join(client) if client else "default"
-                try:
-                    with yt_dlp.YoutubeDL({**_options(client, cookies), "skip_download": True}) as ydl:
-                        ydl.extract_info(_TEST_VIDEO, download=False)
-                    attempts.append({"client": name, "result": "ok"})
-                    break
-                except Exception as exc:
-                    attempts.append({"client": name, "result": ANSI.sub("", str(exc))[:160]})
-            ok = attempts[-1]["result"] == "ok"
-            if account_id and ok:
-                _mark_ok(account_id)  # a good test lifts any rest
-            results.append({"id": account_id, "label": label, "ok": ok, "attempts": attempts})
+        scratch = tempfile.mkdtemp(prefix="yt-test-")
+        try:
+            for account_id, label in targets:
+                cookies = _cookie_file(account_id) if account_id else None
+                attempts = []
+                for client in (_ACCOUNT_CLIENTS if account_id else _CLIENTS):
+                    name = ",".join(client) if client else "default"
+                    started = time.time()
+                    final = os.path.join(scratch, "test.wav")
+                    if os.path.exists(final):
+                        os.remove(final)
+                    try:
+                        error = _attempt(_TEST_DOWNLOAD, os.path.join(scratch, "test.%(ext)s"), final, scratch, "test", client, cookies)
+                    except Exception as exc:  # a removed or private video would end up here
+                        error = exc
+                    seconds = round(time.time() - started)
+                    if error is None:
+                        attempts.append({"client": name, "result": "ok", "seconds": seconds})
+                        break
+                    attempts.append({"client": name, "result": ANSI.sub("", str(error))[:160], "seconds": seconds})
+                ok = attempts[-1]["result"] == "ok"
+                if account_id and ok:
+                    _mark_ok(account_id)  # a good test lifts any rest
+                results.append({"id": account_id, "label": label, "ok": ok, "attempts": attempts})
+        finally:
+            shutil.rmtree(scratch, ignore_errors=True)
         info["test"] = {"results": results, "ok": any(r["ok"] for r in results)}
         info["accounts"] = list_accounts()
     return info
