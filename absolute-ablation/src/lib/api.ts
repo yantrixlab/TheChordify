@@ -38,6 +38,7 @@ export interface ExtractResult {
   sections?: Section[];
   sectionsPending?: boolean; // the structure model is still working: better sections will replace these
   sectionsSource?: "model"; // set once those sections have arrived
+  videoId?: string; // YouTube songs: the video, so a jam session can be counted
   tempo: number;
   beatTimes: number[];
   bars: Bar[];
@@ -92,6 +93,9 @@ export interface SongHit {
   album: string;
   duration: number; // seconds
   thumbnail: string;
+  // Only songs somebody has already chordified have these: their main chords and how many jam sessions they have had.
+  chords?: string[];
+  jams?: number;
 }
 
 /** Songs matching what was typed (an empty list when nothing matches). Pass a signal to cancel a search that was replaced. */
@@ -105,15 +109,38 @@ export async function searchSongs(query: string, signal?: AbortSignal): Promise<
   return data.results ?? [];
 }
 
+/** The most-jammed songs on the site (empty while nobody has played anything yet). */
+export async function getPopularSongs(): Promise<SongHit[]> {
+  const res = await fetchApi(`${API_BASE}/api/popular`);
+  if (!res.ok) return [];
+  return (await res.json()).results ?? [];
+}
+
+/** Tells the catalog someone started playing a song (one jam session; repeats from the same visitor are ignored). */
+export async function registerJam(videoId: string): Promise<void> {
+  try {
+    await fetch(`${API_BASE}/api/songs/${encodeURIComponent(videoId)}/jam`, { method: "POST", keepalive: true });
+  } catch {
+    // counting is best-effort
+  }
+}
+
 /** Kicks off background extraction and returns immediately with a session id to poll. */
 export async function startExtractFromYoutube(
   url: string,
-  meta: { title?: string; artist?: string } = {},
+  meta: Partial<Pick<SongHit, "title" | "artist" | "album" | "thumbnail" | "duration">> = {},
 ): Promise<{ sessionId: string }> {
   const res = await fetchApi(`${API_BASE}/api/extract/youtube`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ url, title: meta.title ?? "", artist: meta.artist ?? "" }),
+    body: JSON.stringify({
+      url,
+      title: meta.title ?? "",
+      artist: meta.artist ?? "",
+      album: meta.album ?? "",
+      thumbnail: meta.thumbnail ?? "",
+      duration: meta.duration ?? 0,
+    }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));

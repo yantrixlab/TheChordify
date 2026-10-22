@@ -44,6 +44,11 @@ RUN npm run build
 FROM app
 COPY --from=web /web/dist ./static
 
+# Saved results, uploads and the song catalog (songs.db) live in /data. Mount a persistent volume there in Coolify
+# (Storage -> add -> destination /data), or every redeploy starts with an empty catalog and re-analyses every song.
+ENV DATA_DIR=/data
+RUN mkdir -p /data
+
 # Job state lives in memory, so keep a single worker.
 ENV CHORD_WORKERS=1
 EXPOSE 8000

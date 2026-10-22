@@ -435,7 +435,7 @@ import Nav from "../components/Nav.astro";
 
 <script>
   import { getGuitarShape, chordNotes, chordKeyLabel, transposeChord, type GuitarShape } from "../lib/chordShapes";
-  import { API_BASE, type ExtractResult, type ChordSegment, type Bar, type Section } from "../lib/api";
+  import { API_BASE, registerJam, type ExtractResult, type ChordSegment, type Bar, type Section } from "../lib/api";
 
   const params = new URLSearchParams(window.location.search);
   const sessionId = params.get("session");
@@ -560,8 +560,18 @@ import Nav from "../components/Nav.astro";
   let progressSegs: { fill: HTMLElement; start: number; end: number }[] = [];
   let currentSectionIdx = -1;
 
+  // A "jam session" is counted once per visit, when playback first starts (YouTube songs only).
+  let jamVideoId = "";
+  function countJamOnce() {
+    if (!jamVideoId) return;
+    const id = jamVideoId;
+    jamVideoId = "";
+    void registerJam(id);
+  }
+
   function setPlayingUi(playing: boolean) {
     if (playing) {
+      countJamOnce();
       lastFollowedRow = null; // re-centre the grid on the playing row as soon as playback starts
       gridActive = -1;
     }
@@ -1538,6 +1548,7 @@ import Nav from "../components/Nav.astro";
       return;
     }
 
+    jamVideoId = result.source === "youtube" ? (result.videoId ?? "") : "";
     chordsSimple = result.chords;
     chordsDetailed = result.chordsDetailed ?? result.chords;
     chords = chordsSimple;

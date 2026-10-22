@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-import os
-import tempfile
 import hashlib
 import json
 import logging
+import os
+import re
+import tempfile
 import threading
 from typing import Optional
 
@@ -15,13 +16,17 @@ from pydantic import BaseModel
 
 from .engine import analyze
 from .search import RateLimiter, SearchUnavailable, clean_query, search_songs
-from .youtube import download_audio, video_info, InvalidUrlError
+from .store import SongStore
+from .youtube import InvalidUrlError, download_audio, extract_video_id, is_video_id, session_id_for_url, video_info
 
-CACHE_DIR = os.path.join(tempfile.gettempdir(), "thechordify-cache")
+# Saved results, uploads and the song catalog. Point DATA_DIR at a persistent volume in production, or every redeploy
+# starts with an empty catalog and re-analyses every song.
+CACHE_DIR = os.environ.get("DATA_DIR") or os.path.join(tempfile.gettempdir(), "thechordify-cache")
 UPLOAD_DIR = os.path.join(CACHE_DIR, "uploads")
 RESULT_DIR = os.path.join(CACHE_DIR, "results")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(RESULT_DIR, exist_ok=True)
+catalog = SongStore(os.path.join(CACHE_DIR, "songs.db"))
 
 # Bump whenever the detector's output changes, so songs cached by an older version are analysed again.
 # 2: frame times no longer drift against the audio clock.
@@ -82,13 +87,61 @@ class YoutubeRequest(BaseModel):
     # What the search results already told us about the song; saves asking YouTube again for the player header.
     title: str = ""
     artist: str = ""
+    album: str = ""
+    thumbnail: str = ""
+    duration: float = 0.0
+
+
+_SAFE_KEY = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+
+def _check_key(session_id: str) -> None:
+    """Session ids become file names, so only plain ones are accepted."""
+    if not _SAFE_KEY.match(session_id):
+        raise HTTPException(status_code=404, detail="Unknown session")
+
+
+def _chord_summary(chords: list[dict], limit: int = 5) -> list[str]:
+    """The song's main chords, the ones that sound longest first (what a search result shows, e.g. C G F)."""
+    time_by_chord: dict[str, float] = {}
+    for seg in chords:
+        if seg["chord"] != "N":
+            time_by_chord[seg["chord"]] = time_by_chord.get(seg["chord"], 0.0) + seg["end"] - seg["start"]
+    return [c for c, _t in sorted(time_by_chord.items(), key=lambda kv: -kv[1])][:limit]
+
+
+def _record_song(video_id: str, session_id: str, result: dict, meta: dict) -> None:
+    """Puts a chordified YouTube song in the catalog. A failure here must never fail the analysis."""
+    try:
+        catalog.save_song(
+            video_id,
+            session_id,
+            title=result.get("title") or meta.get("title") or "",
+            artist=result.get("artist") or meta.get("artist") or "",
+            album=meta.get("album", ""),
+            duration=float(meta.get("duration") or result.get("duration") or 0),
+            thumbnail=meta.get("thumbnail", ""),  # empty keeps the cover the search gave us
+            chords=_chord_summary(result.get("chords", [])),
+            key=result.get("key", ""),
+            tempo=float(result.get("tempo") or 0),
+        )
+    except Exception as exc:
+        log.warning("Could not record %s in the catalog: %s", video_id, exc)
 
 
 def _with_pending(session_id: str, result: dict) -> dict:
     return {**result, "sectionsPending": session_id in _PENDING}
 
 
-def _refine_sections(session_id: str, result: dict, upgrade) -> None:
+def _remove(path: Optional[str]) -> None:
+    if path:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+
+def _refine_sections(session_id: str, result: dict, upgrade, cleanup: Optional[str] = None) -> None:
     """Waits for the structure model (off the request path) and swaps its sections into the saved result."""
     try:
         sections = upgrade()
@@ -100,16 +153,20 @@ def _refine_sections(session_id: str, result: dict, upgrade) -> None:
         log.warning("Refining the sections failed for %s: %s", session_id, exc)
     finally:
         _PENDING.discard(session_id)
+        _remove(cleanup)
 
 
-def _finish(session_id: str, result: dict, upgrade) -> None:
-    """Saves the finished analysis and, if better sections are on their way, refines them in the background."""
+def _finish(session_id: str, result: dict, upgrade, cleanup: Optional[str] = None) -> None:
+    """Saves the finished analysis and, if better sections are on their way, refines them in the background.
+    `cleanup` is a downloaded file to delete once nothing needs it (the section model reads it, then it can go)."""
     if upgrade:
         _PENDING.add(session_id)  # before the job reads "done", so the very first response already says so
     _save_result(session_id, result)
     _set_job(session_id, status="done", progress=100, stage="Done", result=result)
     if upgrade:
-        threading.Thread(target=_refine_sections, args=(session_id, result, upgrade), daemon=True).start()
+        threading.Thread(target=_refine_sections, args=(session_id, result, upgrade, cleanup), daemon=True).start()
+    else:
+        _remove(cleanup)
 
 
 def _result_path(key: str) -> str:
@@ -143,7 +200,8 @@ def health() -> dict:
     return {"status": "ok"}
 
 
-def _run_youtube_job(session_id: str, url: str, title: str = "", artist: str = "") -> None:
+def _run_youtube_job(session_id: str, url: str, meta: dict) -> None:
+    audio_path: Optional[str] = None
     try:
         _set_job(session_id, status="downloading", progress=2, stage="Fetching audio from the link")
         audio_path = download_audio(url, UPLOAD_DIR)
@@ -160,7 +218,8 @@ def _run_youtube_job(session_id: str, url: str, title: str = "", artist: str = "
             "sessionId": session_id,
             "source": "youtube",
             "sourceUrl": url,
-            **({"title": title, "artist": artist} if title else video_info(url)),
+            "videoId": extract_video_id(url) or "",
+            **({"title": meta["title"], "artist": meta.get("artist", "")} if meta.get("title") else video_info(url)),
             "duration": analysis["duration"],
             "chords": analysis["chords"],
             "tempo": analysis["tempo"],
@@ -170,12 +229,16 @@ def _run_youtube_job(session_id: str, url: str, title: str = "", artist: str = "
             "chordsDetailed": analysis.get("chordsDetailed", analysis["chords"]),
             "sections": analysis.get("sections", []),
             "key": analysis.get("key", ""),
-            "audioUrl": f"/media/{os.path.basename(audio_path)}",
+            "audioUrl": "",  # YouTube songs play in YouTube's own player; the downloaded audio is not kept
         }
-        _finish(session_id, result, upgrade)
+        video_id = extract_video_id(url)
+        if video_id:
+            _record_song(video_id, session_id, result, meta)
+        _finish(session_id, result, upgrade, cleanup=audio_path)
     except InvalidUrlError as exc:
         _set_job(session_id, status="error", progress=0, error=str(exc))
     except Exception as exc:
+        _remove(audio_path)
         error_text = str(exc)
         if "Sign in to confirm" in error_text or "not a bot" in error_text:
             error_text = (
@@ -238,10 +301,36 @@ def search(request: Request, q: str = "") -> dict:
     if not _search_limiter.allow(caller):
         raise HTTPException(status_code=429, detail="Too many searches. Please wait a moment and try again.")
     try:
-        return {"query": query, "results": search_songs(query)}
+        songs = search_songs(query)
+        known = catalog.lookup([song["videoId"] for song in songs])
+        # Songs somebody has already chordified come with their main chords and jam count, and open straight away.
+        return {"query": query, "results": [{**song, **known.get(song["videoId"], {})} for song in songs]}
     except SearchUnavailable as exc:
         log.warning("Song search failed: %s", exc)
         raise HTTPException(status_code=502, detail="Song search is unavailable right now. Please try again in a moment.")
+
+
+@app.get("/api/popular")
+def popular() -> dict:
+    """The most-jammed songs on the site, for the search page before anything is typed."""
+    return {"results": catalog.popular(12)}
+
+
+_jam_limiter = RateLimiter(limit=1, window=30 * 60.0)  # one jam session per visitor and song every half hour
+
+
+@app.post("/api/songs/{video_id}/jam")
+def add_jam(video_id: str, request: Request) -> dict:
+    """Counts a jam session: someone pressed play on this song. Repeats from the same visitor are not counted."""
+    if not is_video_id(video_id):
+        raise HTTPException(status_code=404, detail="Unknown song")
+    caller = f"{request.client.host if request.client else 'unknown'}:{video_id}"
+    if not _jam_limiter.allow(caller):
+        return {"counted": False}
+    jams = catalog.add_jam(video_id)
+    if jams is None:
+        raise HTTPException(status_code=404, detail="Unknown song")
+    return {"counted": True, "jams": jams}
 
 
 @app.post("/api/extract/youtube")
@@ -250,11 +339,21 @@ def extract_from_youtube(payload: YoutubeRequest) -> dict:
     if not url:
         raise HTTPException(status_code=400, detail="url is required")
 
-    session_id = hashlib.sha256(url.encode("utf-8")).hexdigest()[:24]
+    session_id = session_id_for_url(url)
+    meta = {
+        "title": payload.title[:200],
+        "artist": payload.artist[:200],
+        "album": payload.album[:200],
+        "thumbnail": payload.thumbnail[:300] if payload.thumbnail.startswith("https://") else "",
+        "duration": max(0.0, min(payload.duration, 6 * 3600)),
+    }
 
     cached = _load_cached_result(session_id)
     if cached:
         _set_job(session_id, status="done", progress=100, stage="Done", result=cached)
+        video_id = extract_video_id(url)
+        if video_id:
+            _record_song(video_id, session_id, cached, meta)  # songs analysed before the catalog existed join it now
         return {"sessionId": session_id, "status": "done"}
 
     existing = _get_job(session_id)
@@ -262,7 +361,7 @@ def extract_from_youtube(payload: YoutubeRequest) -> dict:
         return {"sessionId": session_id, "status": existing["status"]}
 
     _set_job(session_id, status="queued", progress=0, stage="Queued")
-    thread = threading.Thread(target=_run_youtube_job, args=(session_id, url, payload.title[:200], payload.artist[:200]), daemon=True)
+    thread = threading.Thread(target=_run_youtube_job, args=(session_id, url, meta), daemon=True)
     thread.start()
 
     return {"sessionId": session_id, "status": "queued"}
@@ -309,6 +408,7 @@ async def extract_from_upload(file: UploadFile = File(...)) -> dict:
 
 @app.get("/api/job/{session_id}")
 def get_job_status(session_id: str) -> dict:
+    _check_key(session_id)
     job = _get_job(session_id)
     if not job:
         cached = _load_cached_result(session_id)
@@ -322,6 +422,7 @@ def get_job_status(session_id: str) -> dict:
 
 @app.get("/api/result/{session_id}")
 def get_result(session_id: str) -> dict:
+    _check_key(session_id)
     cached = _load_cached_result(session_id)
     if not cached:
         raise HTTPException(status_code=404, detail="Unknown session")

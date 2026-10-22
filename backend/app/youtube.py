@@ -39,6 +39,26 @@ def validate_url(url: str) -> None:
         raise InvalidUrlError("Only YouTube and SoundCloud URLs are supported")
 
 
+_VIDEO_ID = re.compile(r"^[A-Za-z0-9_-]{11}$")
+
+
+def extract_video_id(url: str) -> Optional[str]:
+    """The 11-character YouTube video id in a watch / youtu.be / shorts / embed link, or None."""
+    match = re.search(r"(?:[?&]v=|youtu\.be/|/shorts/|/embed/|/live/)([A-Za-z0-9_-]{11})(?![A-Za-z0-9_-])", url)
+    return match.group(1) if match else None
+
+
+def is_video_id(value: str) -> bool:
+    return bool(_VIDEO_ID.match(value))
+
+
+def session_id_for_url(url: str) -> str:
+    """One id per song: yt_<video id> for YouTube (so the same song is found again whichever link it came from),
+    a hash of the link for anything else."""
+    video_id = extract_video_id(url)
+    return f"yt_{video_id}" if video_id else cache_key_for_url(url)
+
+
 def cache_key_for_url(url: str) -> str:
     return hashlib.sha256(url.encode("utf-8")).hexdigest()[:24]
 
