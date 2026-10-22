@@ -28,7 +28,8 @@ os.makedirs(RESULT_DIR, exist_ok=True)
 # 5: a soft intro stays in the bar grid (Silence is only true silence); beat grid covers quiet passages.
 # 6: tempo and beat grid from the audio's own pulse (the tracker could be several % off); chords carry gridStart.
 # 7: every detected chord gets a beat cell; sections use texture (loudness, brightness, percussion), so soft builds read as Intro.
-ANALYSIS_VERSION = 7
+# 8: sections from a trained structure model (all-in-one), snapped to our bars; Instrumental / Outro / Bridge appear.
+ANALYSIS_VERSION = 8
 
 ALLOWED_UPLOAD_EXTENSIONS ={".mp3", ".wav", ".flac", ".m4a"}
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50MB

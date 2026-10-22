@@ -1,0 +1,5 @@
+# Optional: trained song-structure model (intro / verse / chorus / instrumental / outro), MIT licensed.
+# Without it the app falls back to the model-free section analysis. The Dockerfile installs this separately, so a
+# failure here cannot break the build. torchaudio must match torch: install both from the same CPU index.
+torchaudio
+all-in-one-infer>=3.1

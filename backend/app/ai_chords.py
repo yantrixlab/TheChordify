@@ -27,6 +27,7 @@ from scipy.ndimage import uniform_filter1d
 
 from .chord_detection import NOTE_NAMES, estimate_beats
 from .pulse import estimate_pulse_grid
+from .sections_ai import sections_from_model
 from .structure import (
     analyze_structure,
     audible_start,
@@ -446,11 +447,30 @@ def decode(f: Features, opts: Optional[DecodeOptions] = None) -> list[dict]:
     return out
 
 
+class _SectionsJob:
+    """Runs the structure model in the background; result() waits for it (None if it is off or failed)."""
+
+    def __init__(self, audio_path: str) -> None:
+        self._sections = None
+        self._thread = threading.Thread(target=self._run, args=(audio_path,), daemon=True)
+        self._thread.start()
+
+    def _run(self, audio_path: str) -> None:
+        self._sections = sections_from_model(audio_path)
+
+    def result(self):
+        self._thread.join()
+        return self._sections
+
+
 def detect_chords_ai(audio_path: str, on_progress: Optional[ProgressFn] = None) -> dict:
     progress = on_progress or (lambda _p, _s: None)
 
     progress(3, "Loading the chord model")
     _load_model()
+
+    # The structure model is the slowest part, so it works on its own thread while the chords are analysed.
+    sections_job = _SectionsJob(audio_path)
 
     progress(8, "Loading audio")
     y, _ = librosa.load(audio_path, sr=SAMPLE_RATE, mono=True)
@@ -460,14 +480,15 @@ def detect_chords_ai(audio_path: str, on_progress: Optional[ProgressFn] = None) 
     simple = decode(features, DecodeOptions(detail="simple"))
     detailed = decode(features, DecodeOptions(detail="full"))
 
-    progress(96, "Finding the song's sections")
+    progress(94, "Finding the song's sections")
     # Which beat cell of the chord grid each chord is written in (times themselves stay as detected).
     phase = downbeat_phase(features.beats, simple)
     simple = place_chords_on_grid(simple, features.beats, phase, features.duration)
     detailed = place_chords_on_grid(detailed, features.beats, phase, features.duration)
+    learned = sections_job.result()
     structure = analyze_structure(
         simple, features.beats, features.duration, features.chroma, features.mfcc, features.rms,
-        features.audible_start, phase, features.texture,
+        features.audible_start, phase, features.texture, learned,
     )
 
     beat_list = [float(t) for t in features.boundaries[:-1]]

@@ -3,6 +3,7 @@
 No extra model is needed. Everything comes from what the chord analysis already computed:
 
 1. Bars. Beats are grouped in fours, starting at the beat where chord changes most often land.
+0. Sections can come from a trained model (sections_ai.py); everything below is the model-free fallback.
 2. Boundaries. A "novelty" curve over a bar-by-bar similarity matrix (harmony + timbre) peaks
    where the music changes character; the strongest peaks become section starts.
 3. Grouping. Sections that sound alike (similar harmony and timbre at the same position) are
@@ -121,64 +122,65 @@ def _novelty(similarity: np.ndarray, half: int = 4) -> np.ndarray:
     return out
 
 
-def analyze_structure(
-    chords: list[dict],
-    beats: np.ndarray,
-    duration: float,
-    chroma: np.ndarray,
-    mfcc: np.ndarray,
-    rms: np.ndarray,
-    audible_start_s: float = 0.0,
-    phase: Optional[int] = None,
-    texture: Optional[np.ndarray] = None,
-) -> dict:
-    """Returns {"bars": [...], "sections": [{"label","start","end","startBar","endBar"}], "downbeatPhase": int}."""
-    if phase is None:
-        phase = downbeat_phase(beats, chords)
-    bars = build_bars(beats, duration, phase)
-    full = [i for i, b in enumerate(bars) if None not in b["beats"][:BEATS_PER_BAR]]
-    if len(full) < 8:  # too short to find structure in
-        return {"bars": bars, "downbeatPhase": phase, "sections": _single_section(bars, duration)}
+_LEARNED_NAMES = {
+    "intro": "Intro", "verse": "Verse", "chorus": "Chorus", "bridge": "Bridge",
+    "inst": "Instrumental", "solo": "Instrumental", "break": "Break", "outro": "Outro",
+}
 
-    n_frames = chroma.shape[1]
 
-    def frames(t0: float, t1: float) -> slice:
-        lo = min(int(t0 * FRAMES_PER_SECOND), n_frames - 1)
-        return slice(lo, max(lo + 1, min(int(t1 * FRAMES_PER_SECOND), n_frames)))
+def _learned_segments(
+    learned: list[tuple[float, float, str]], bars: list[dict], full: list[int], novelty: np.ndarray, n: int
+) -> tuple[list[tuple[int, int]], list[str]]:
+    """Put a structure model's sections on our bar grid.
 
-    # Per-bar descriptors: the progression (the four beats' chroma in order) and the texture of the sound
-    # (how loud, bright and percussive it is, plus timbre). Sections often play the same chords and differ
-    # only in texture, so texture carries as much weight as harmony.
-    chroma_seq, texture_bars, energy = [], [], []
-    for i in full:
-        b = bars[i]["beats"]
-        beats_chroma = []
-        for k in range(BEATS_PER_BAR):
-            v = chroma[:, frames(b[k], b[k + 1])].mean(axis=1)
-            beats_chroma.append(v / (np.linalg.norm(v) + 1e-9))
-        chroma_seq.append(np.concatenate(beats_chroma))
-        span = frames(b[0], b[BEATS_PER_BAR])
-        parts = [mfcc[:, span].mean(axis=1)]
-        if texture is not None:
-            parts.append(texture[:, span].mean(axis=1))
-        texture_bars.append(np.concatenate(parts))
-        energy.append(float(rms[span].mean()))
-    chroma_seq = np.array(chroma_seq)
-    energy = np.array(energy)
-    texture_bars = uniform_filter1d(np.array(texture_bars), size=3, axis=0, mode="nearest")  # steady over +-1 bar
-    texture_bars = (texture_bars - texture_bars.mean(axis=0)) / (texture_bars.std(axis=0) + 1e-9)
+    The model's boundary times are only good to about a bar, so each one moves to whichever of the nearest bars
+    shows the biggest change in the audio itself (preferring whole 4-bar phrases from the previous boundary).
+    Neighbouring sections with the same name are one section, as long as they stay under MAX_SECTION_BARS.
+    """
+    bar_starts = np.array([bars[i]["start"] for i in full])
+    bar_len = float(np.median(np.diff(bar_starts)))
+    peak = float(novelty.max()) + 1e-9
+    cuts, names = [0], [learned[0][2]]
+    for start, _end, label in learned[1:]:
+        near = int(np.argmin(np.abs(bar_starts - start)))
+        candidates = [i for i in range(near - 1, near + 2) if cuts[-1] < i < n]
+        if not candidates:
+            continue
 
-    harmony = chroma_seq / np.sqrt(BEATS_PER_BAR)
-    harmony = (harmony - harmony.mean(axis=0)) / np.sqrt(max(harmony.shape[1], 1)) * 3.0
-    features = np.hstack([harmony, texture_bars / np.sqrt(texture_bars.shape[1])])
-    features = features - features.mean(axis=0)
-    unit = features / (np.linalg.norm(features, axis=1, keepdims=True) + 1e-9)
-    similarity = unit @ unit.T
-    n = len(full)
+        def score(i: int) -> float:
+            aligned = 0.15 if (i - cuts[-1]) % PHRASE == 0 else 0.0
+            return float(novelty[i]) / peak - 0.35 * abs(bar_starts[i] - start) / bar_len + aligned
 
+        cuts.append(max(candidates, key=score))
+        names.append(label)
+    segments = [[a, b] for a, b in zip(cuts, cuts[1:] + [n])]
+
+    merged: list[list] = []
+    for (a, b), name in zip(segments, names):
+        if merged and merged[-1][2] == name and b - merged[-1][0] <= MAX_SECTION_BARS:
+            merged[-1][1] = b
+        elif merged and b - a < 2:  # a stub: fold it into the section before it
+            merged[-1][1] = b
+        else:
+            merged.append([a, b, name])
+    if len(merged) >= 2 and merged[0][1] - merged[0][0] < 2:
+        merged[1][0] = merged[0][0]
+        merged.pop(0)
+
+    totals = Counter(name for _a, _b, name in merged)
+    seen: Counter = Counter()
+    labels = []
+    for _a, _b, name in merged:
+        title = _LEARNED_NAMES.get(name, name.capitalize())
+        seen[name] += 1
+        labels.append(f"{title} {seen[name]}" if title in ("Verse", "Chorus") or totals[name] > 1 else title)
+    return [(a, b) for a, b, _ in merged], labels
+
+
+def _classic_segments(similarity: np.ndarray, novelty: np.ndarray, energy: np.ndarray, n: int) -> tuple[list[tuple[int, int]], list[str]]:
+    """Sections from the audio alone: the strongest changes on the 4-bar grid, grouped by how alike they sound."""
     # Songs are built from 4-bar phrases, so sections start on one common 4-bar grid. Find the grid
     # offset where the music changes most, then take the strongest changes on that grid.
-    novelty = _novelty(similarity)
     offset = int(np.argmax([novelty[r::PHRASE].sum() for r in range(PHRASE)]))
     grid = np.arange(offset, n - 3, PHRASE)
     grid = grid[grid >= PHRASE] if offset == 0 else grid
@@ -240,6 +242,75 @@ def analyze_structure(
 
     energy_db = np.array([20 * np.log10(energy[a:b].mean() + 1e-9) for a, b in segments])
     labels = _name_sections(segments, clusters, energy_db, separation)
+    return segments, labels
+
+
+def analyze_structure(
+    chords: list[dict],
+    beats: np.ndarray,
+    duration: float,
+    chroma: np.ndarray,
+    mfcc: np.ndarray,
+    rms: np.ndarray,
+    audible_start_s: float = 0.0,
+    phase: Optional[int] = None,
+    texture: Optional[np.ndarray] = None,
+    learned: Optional[list[tuple[float, float, str]]] = None,
+) -> dict:
+    """Returns {"bars": [...], "sections": [{"label","start","end","startBar","endBar"}], "downbeatPhase": int}.
+
+    `learned` are (start, end, label) sections from a trained structure model (sections_ai.py). Its boundaries are
+    snapped to our own bars and it supplies the names; without it, sections come from the audio alone.
+    """
+    if phase is None:
+        phase = downbeat_phase(beats, chords)
+    bars = build_bars(beats, duration, phase)
+    full = [i for i, b in enumerate(bars) if None not in b["beats"][:BEATS_PER_BAR]]
+    if len(full) < 8:  # too short to find structure in
+        return {"bars": bars, "downbeatPhase": phase, "sections": _single_section(bars, duration)}
+
+    n_frames = chroma.shape[1]
+
+    def frames(t0: float, t1: float) -> slice:
+        lo = min(int(t0 * FRAMES_PER_SECOND), n_frames - 1)
+        return slice(lo, max(lo + 1, min(int(t1 * FRAMES_PER_SECOND), n_frames)))
+
+    # Per-bar descriptors: the progression (the four beats' chroma in order) and the texture of the sound
+    # (how loud, bright and percussive it is, plus timbre). Sections often play the same chords and differ
+    # only in texture, so texture carries as much weight as harmony.
+    chroma_seq, texture_bars, energy = [], [], []
+    for i in full:
+        b = bars[i]["beats"]
+        beats_chroma = []
+        for k in range(BEATS_PER_BAR):
+            v = chroma[:, frames(b[k], b[k + 1])].mean(axis=1)
+            beats_chroma.append(v / (np.linalg.norm(v) + 1e-9))
+        chroma_seq.append(np.concatenate(beats_chroma))
+        span = frames(b[0], b[BEATS_PER_BAR])
+        parts = [mfcc[:, span].mean(axis=1)]
+        if texture is not None:
+            parts.append(texture[:, span].mean(axis=1))
+        texture_bars.append(np.concatenate(parts))
+        energy.append(float(rms[span].mean()))
+    chroma_seq = np.array(chroma_seq)
+    energy = np.array(energy)
+    texture_bars = uniform_filter1d(np.array(texture_bars), size=3, axis=0, mode="nearest")  # steady over +-1 bar
+    texture_bars = (texture_bars - texture_bars.mean(axis=0)) / (texture_bars.std(axis=0) + 1e-9)
+
+    harmony = chroma_seq / np.sqrt(BEATS_PER_BAR)
+    harmony = (harmony - harmony.mean(axis=0)) / np.sqrt(max(harmony.shape[1], 1)) * 3.0
+    features = np.hstack([harmony, texture_bars / np.sqrt(texture_bars.shape[1])])
+    features = features - features.mean(axis=0)
+    unit = features / (np.linalg.norm(features, axis=1, keepdims=True) + 1e-9)
+    similarity = unit @ unit.T
+    n = len(full)
+
+    novelty = _novelty(similarity)
+    segments = labels = None
+    if learned:
+        segments, labels = _learned_segments(learned, bars, full, novelty, n)
+    if not segments:
+        segments, labels = _classic_segments(similarity, novelty, energy, n)
 
     sections = []
     # Silence is only an opening in which nothing can be heard. A soft intro is music and is part of the grid.

@@ -15,14 +15,17 @@ WORKDIR /app/backend
 
 COPY backend/requirements.txt ./
 # torch is listed in requirements.txt; install the CPU-only wheel first so pip doesn't pull the CUDA build.
-RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu \
+RUN pip install --no-cache-dir torch torchaudio --index-url https://download.pytorch.org/whl/cpu \
     && pip install --no-cache-dir -r requirements.txt
+# Trained song-structure model (optional: if it cannot install, sections fall back to the model-free analysis).
+COPY backend/requirements-structure.txt ./
+RUN pip install --no-cache-dir -r requirements-structure.txt || echo "structure model not installed"
 
 COPY backend/ ./
 RUN python scripts/fetch_models.py
 COPY --from=web /web/dist ./static
 
 # Job state lives in memory, so keep a single worker.
-ENV CHORD_WORKERS=2
+ENV CHORD_WORKERS=1
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--proxy-headers", "--forwarded-allow-ips", "*"]
