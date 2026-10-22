@@ -151,12 +151,14 @@ const CURATED_SHAPES: Record<string, GuitarShape> = {
 
 const OPEN_STRINGS = [4, 9, 2, 7, 11, 4]; // E A D G B e as pitch classes
 const MAX_FRET = 15;
+const MAX_ALTERNATIVE_FRET = 10; // the other ways of playing a chord start no higher than this
 const FRET_ROWS = 4; // the diagram shows four fret rows, so a voicing may span at most four frets
 
 interface Voicing {
   frets: number[]; // -1 muted, 0 open, n fretted
   fingers: string[];
-  score: number;
+  score: number; // lower is easier to play
+  fullness: number; // like `score`, but a voicing that leaves strings silent is marked down: the alternatives should sound full
 }
 
 /** Fingers for a voicing (barre on the lowest fret when there are too many notes), or null if unplayable. */
@@ -190,9 +192,21 @@ function assignFingers(frets: number[]): string[] | null {
  * open-position voicings, which only make sense below the fifth fret.
  */
 function buildVoicing(parsed: ParsedChord, allowOpen: boolean): GuitarShape | undefined {
+  const best = searchVoicings(parsed, allowOpen).best;
+  return best ? toShape(best) : undefined;
+}
+
+/** Which stretch of the neck a voicing sits in: near the nut, the 3rd-5th frets, the 6th-8th, or higher up. */
+function neckZone(lowestFret: number): number {
+  return lowestFret <= 2 ? 0 : lowestFret <= 5 ? 1 : lowestFret <= 8 ? 2 : 3;
+}
+
+/** The most comfortable voicing overall, and the most comfortable one in each stretch of the neck. */
+function searchVoicings(parsed: ParsedChord, allowOpen: boolean): { best?: Voicing; zones: Map<number, Voicing> } {
   const { root, quality, bass } = parsed;
+  const zones = new Map<number, Voicing>();
   const tones = new Set(quality.intervals.map((i) => (root + i) % 12));
-  if (!tones.has(bass)) return undefined;
+  if (!tones.has(bass)) return { zones };
 
   // The fifth may be left out of four-note chords; every other tone defines the chord.
   const required = new Set(
@@ -239,7 +253,12 @@ function buildVoicing(parsed: ParsedChord, allowOpen: boolean): GuitarShape | un
       open * 1.2 +
       (barre ? 2 : 0) +
       (fifthMissing ? 0.8 : 0);
-    if (!best || score < best.score) best = { frets: [...frets], fingers, score };
+    const candidate: Voicing = { frets: [...frets], fingers, score, fullness: score + muted * 2.5 };
+    if (!best || score < best.score) best = candidate;
+    if (lowest > MAX_ALTERNATIVE_FRET) return; // an alternative that high up the neck is not one anybody would reach for
+    const zone = neckZone(lowest);
+    const inZone = zones.get(zone);
+    if (!inZone || candidate.fullness < inZone.fullness) zones.set(zone, candidate);
   };
 
   // Depth-first over strings, low to high. `phase` keeps the sounding strings contiguous
@@ -268,8 +287,10 @@ function buildVoicing(parsed: ParsedChord, allowOpen: boolean): GuitarShape | un
   };
   search(0, 0, Infinity, 0);
 
-  if (!best) return undefined;
-  const found: Voicing = best;
+  return { best, zones };
+}
+
+function toShape(found: Voicing): GuitarShape {
   const fretted = found.frets.filter((f) => f > 0);
   const highest = fretted.length ? Math.max(...fretted) : 0;
   const lowest = fretted.length ? Math.min(...fretted) : 0;
@@ -282,6 +303,44 @@ function buildVoicing(parsed: ParsedChord, allowOpen: boolean): GuitarShape | un
 }
 
 const voicingCache = new Map<string, GuitarShape | null>();
+const choicesCache = new Map<string, GuitarShape[]>();
+
+/** How many ways of playing a chord are offered at most (the usual one, and two others further along the neck). */
+export const MAX_VOICINGS = 3;
+
+/** The fret a shape sits at (its lowest pressed fret; 0 when every string is open or muted). */
+const lowestFret = (shape: GuitarShape): number => {
+  const pressed = shape.frets.map(Number).filter((f) => f > 0); // "x" is NaN and drops out
+  return pressed.length ? Math.min(...pressed) : 0;
+};
+
+const sameShape = (a: GuitarShape, b: GuitarShape) => a.frets.join(",") === b.frets.join(",");
+
+/**
+ * The usual fingering first, then up to two other ways of playing the same chord on other parts of the neck
+ * (an open shape, a barre shape, a higher one...), in order up the neck. Every one has the chord's own bass note
+ * and all of its notes, so they can be swapped for one another anywhere in a song.
+ */
+export function getGuitarShapes(chord: string): GuitarShape[] {
+  const cached = choicesCache.get(chord);
+  if (cached) return cached;
+  const usual = getGuitarShape(chord);
+  if (!usual) return [];
+  const choices = [usual];
+  const parsed = parseChord(chord);
+  if (parsed) {
+    const others = [...searchVoicings(parsed, true).zones.values()]
+      .map((voicing) => ({ voicing, shape: toShape(voicing) }))
+      .filter(({ shape }) => !sameShape(shape, usual))
+      .sort((a, b) => a.voicing.fullness - b.voicing.fullness)
+      .slice(0, MAX_VOICINGS - 1)
+      .map(({ shape }) => shape)
+      .sort((a, b) => lowestFret(a) - lowestFret(b));
+    choices.push(...others);
+  }
+  choicesCache.set(chord, choices);
+  return choices;
+}
 
 /** Fingering for any chord the detector can name, or undefined for "N" and unknown names. */
 export function getGuitarShape(chord: string): GuitarShape | undefined {

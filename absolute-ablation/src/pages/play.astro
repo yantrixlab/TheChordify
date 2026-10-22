@@ -276,6 +276,21 @@ import Nav from "../components/Nav.astro";
   .cr-item.is-rest.is-current { padding: 0 18px; }
   .cr-card { transition: transform 0.32s cubic-bezier(0.3, 0.6, 0.2, 1); transform-origin: center; }
   .cr-item.is-current .cr-card { transform: scale(1.3); }
+
+  /* Other ways of playing a chord: arrows either side of its name (on hover on a computer, always on a phone) and dots for which one is showing */
+  .vc-label { display: flex; align-items: center; justify-content: center; gap: 2px; }
+  .vc-arrow { display: grid; place-items: center; flex: none; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 50%; cursor: pointer;
+    background: var(--color-violet-soft); color: var(--color-violet-deep); opacity: 0; transition: opacity 0.15s, background-color 0.15s, color 0.15s; }
+  .vc:hover .vc-arrow, .cr-item:hover .vc-arrow, .vc:focus-within .vc-arrow, .vc-arrow:focus-visible { opacity: 1; }
+  .vc-arrow:hover { background: var(--color-violet); color: #fff; }
+  .vc-arrow:focus-visible { outline: 2px solid var(--color-violet); outline-offset: 1px; }
+  .vc-dots { display: flex; justify-content: center; gap: 4px; height: 6px; margin-top: 3px; }
+  .vc-dots span { width: 5px; height: 5px; border-radius: 50%; background: var(--color-hairline-strong); }
+  .vc-dots span.on { background: var(--color-violet); }
+  @media (hover: none), (max-width: 640px) {
+    .vc-arrow { opacity: 1; width: 26px; height: 26px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .vc-arrow { transition: none; } }
   /* the shared diagram builder draws a bordered card; here the diagram stands on the page */
   .cr-card > div { background: transparent !important; border: 0 !important; box-shadow: none !important; }
 
@@ -434,7 +449,7 @@ import Nav from "../components/Nav.astro";
 </style>
 
 <script>
-  import { getGuitarShape, chordNotes, chordKeyLabel, transposeChord, type GuitarShape } from "../lib/chordShapes";
+  import { getGuitarShapes, chordNotes, chordKeyLabel, transposeChord, type GuitarShape } from "../lib/chordShapes";
   import { API_BASE, registerJam, type ExtractResult, type ChordSegment, type Bar, type Section } from "../lib/api";
 
   const params = new URLSearchParams(window.location.search);
@@ -504,6 +519,58 @@ import Nav from "../components/Nav.astro";
   let tempoPct = 100;
   let capo = 0;
   let transposeSteps = 0;
+
+  // A chord can be played in a few places on the neck. The way a player picks for a chord (0 = the usual one) is used for
+  // that chord everywhere in the song, and kept for next time. It only changes the diagrams, never the detected chords.
+  const VOICING_KEY = "chordsuno-voicings";
+  let voicingPick: Record<string, number> = {};
+  try {
+    voicingPick = JSON.parse(localStorage.getItem(VOICING_KEY) || "{}") || {};
+  } catch {
+    // no storage, or damaged: everyone starts with the usual shapes
+  }
+
+  /** The shape to show for a chord, which of its alternatives that is, and how many there are. */
+  function shapeChoice(fChord: string): { shape: GuitarShape; index: number; count: number } | undefined {
+    const shapes = getGuitarShapes(fChord);
+    if (shapes.length === 0) return undefined;
+    const index = Math.min(Math.max(Number(voicingPick[fChord]) || 0, 0), shapes.length - 1);
+    return { shape: shapes[index], index, count: shapes.length };
+  }
+
+  /** The diagram of a chord with its arrows, or a note card for a chord with no shape. */
+  function chordDiagram(fChord: string, label: string, scale = 1, keyboardArrows = true): HTMLElement {
+    const choice = shapeChoice(fChord);
+    if (!choice) return buildNoteFallbackCard(label);
+    const pick = choice.count > 1 ? { index: choice.index, count: choice.count, step: (delta: number) => stepVoicing(fChord, delta), keyboardArrows } : undefined;
+    const diagram = buildFretDiagram(label, choice.shape, scale, pick);
+    diagram.dataset.fchord = fChord;
+    return diagram;
+  }
+
+  /** Moves a chord to its next (or previous) way of playing, everywhere it appears. */
+  function stepVoicing(fChord: string, delta: number) {
+    const count = getGuitarShapes(fChord).length;
+    if (count < 2) return;
+    const next = ((Number(voicingPick[fChord]) || 0) + delta + count) % count;
+    if (next === 0) delete voicingPick[fChord];
+    else voicingPick[fChord] = next;
+    try {
+      localStorage.setItem(VOICING_KEY, JSON.stringify(voicingPick));
+    } catch {
+      // the choice just is not remembered
+    }
+    // Swap the diagram in place wherever this chord is drawn (the playing strip keeps its position and widths).
+    document.querySelectorAll<HTMLElement>(`.cr-item[data-fchord="${CSS.escape(fChord)}"]`).forEach((item) => {
+      const card = item.querySelector<HTMLElement>(".cr-card");
+      if (card) card.replaceChildren(chordDiagram(fChord, item.dataset.label || fChord, 1, false));
+    });
+    summaryGridEl.querySelectorAll<HTMLElement>(`[data-fchord="${CSS.escape(fChord)}"]`).forEach((card) => {
+      const fresh = chordDiagram(fChord, fChord, 1);
+      fresh.title = card.title;
+      card.replaceWith(fresh);
+    });
+  }
   let activeView: "diagrams" | "grid" = "diagrams"; // the chord diagrams are what people come for
 
   function semitoneLabel(n: number): string {
@@ -791,8 +858,9 @@ import Nav from "../components/Nav.astro";
             card.textContent = "𝄽";
           } else {
             const fChord = fingeringChord(chord);
-            const shape = getGuitarShape(fChord);
-            card.appendChild(shape ? buildFretDiagram(displayChord(chord), shape, 1) : buildNoteFallbackCard(displayChord(chord)));
+            item.dataset.fchord = fChord;
+            item.dataset.label = displayChord(chord);
+            card.appendChild(chordDiagram(fChord, displayChord(chord), 1, false)); // arrows off the tab order: focusing one would scroll this strip
           }
           item.appendChild(card);
           item.addEventListener("click", () => seekTo(start));
@@ -1082,7 +1150,12 @@ import Nav from "../components/Nav.astro";
    * finger at the same fret row and drawing one bar across them instead of
    * separate dots, matching standard chord-chart conventions.
    */
-  function buildFretDiagram(label: string, shape: GuitarShape, scale = 1): HTMLElement {
+  function buildFretDiagram(
+    label: string,
+    shape: GuitarShape,
+    scale = 1,
+    pick?: { index: number; count: number; step: (delta: number) => void; keyboardArrows: boolean },
+  ): HTMLElement {
     const W = 90 * scale;
     const GRID_H = 100 * scale;
     const ROWS = 4;
@@ -1090,6 +1163,7 @@ import Nav from "../components/Nav.astro";
     const rowY = (r: number) => (GRID_H * r) / ROWS;
 
     const wrap = document.createElement("div");
+    wrap.className = "vc";
     wrap.style.boxSizing = "border-box";
     wrap.style.display = "flex";
     wrap.style.flexDirection = "column";
@@ -1267,11 +1341,45 @@ import Nav from "../components/Nav.astro";
 
     const labelEl = document.createElement("div");
     labelEl.textContent = label;
-    labelEl.style.marginTop = `${6 * scale}px`;
     labelEl.style.fontWeight = "700";
     labelEl.style.fontSize = `${14 * scale}px`;
     labelEl.style.color = "var(--color-ink)";
-    wrap.appendChild(labelEl);
+
+    const labelRow = document.createElement("div");
+    labelRow.className = "vc-label";
+    labelRow.style.marginTop = `${4 * scale}px`;
+    if (pick) {
+      // ‹ G › : arrows either side of the name step through the other ways of playing the chord.
+      const arrow = (delta: number) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "vc-arrow";
+        if (!pick.keyboardArrows) button.tabIndex = -1;
+        button.setAttribute("aria-label", `${delta < 0 ? "Previous" : "Next"} way to play ${label} (now ${pick.index + 1} of ${pick.count})`);
+        button.innerHTML = `<svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="${delta < 0 ? "M8 2 4 6l4 4" : "m4 2 4 4-4 4"}" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+        button.addEventListener("click", (event) => {
+          event.stopPropagation(); // not a click on the chord (which would jump the song to it)
+          pick.step(delta);
+        });
+        return button;
+      };
+      labelRow.append(arrow(-1), labelEl, arrow(1));
+    } else {
+      labelRow.append(labelEl);
+    }
+    wrap.appendChild(labelRow);
+
+    if (pick) {
+      const dots = document.createElement("div");
+      dots.className = "vc-dots";
+      dots.title = `Way ${pick.index + 1} of ${pick.count} to play ${label}`;
+      for (let i = 0; i < pick.count; i++) {
+        const dot = document.createElement("span");
+        if (i === pick.index) dot.className = "on";
+        dots.appendChild(dot);
+      }
+      wrap.appendChild(dots);
+    }
 
     return wrap;
   }
@@ -1316,8 +1424,7 @@ import Nav from "../components/Nav.astro";
       .sort((a, b) => b[1] - a[1])
       .forEach(([raw, seconds]) => {
         const fChord = fingeringChord(raw);
-        const shape = getGuitarShape(fChord);
-        const card = shape ? buildFretDiagram(fChord, shape, 1) : buildNoteFallbackCard(fChord);
+        const card = chordDiagram(fChord, fChord, 1);
         card.title = `${displayChord(raw)} — ${Math.round((100 * seconds) / all)}% of the song`;
         summaryGridEl.appendChild(card);
       });
