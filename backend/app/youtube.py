@@ -89,6 +89,9 @@ _CLIENTS: list[Optional[list[str]]] = [None, ["tv"], ["mweb"], ["android_vr"], [
 _ACCOUNT_CLIENTS: list[Optional[list[str]]] = [None, ["mweb"]]  # with cookies, two ways of asking are enough
 _NO_POINT_RETRYING = ("private video", "has been removed", "account associated", "terminated", "members-only", "unsupported url", "not a valid url", "copyright")
 _BLOCKED = ("sign in to confirm", "not a bot", "http error 403", "http error 429", "po token", "requested format is not available", "page needs to be reloaded")
+# YouTube's "prove you are not a bot" wall. It is never about one video: it means the server's address is flagged, or the
+# account's cookies no longer count as signed in (they expire, or YouTube rotates them once a browser has used them).
+_BOT_CHECK = ("sign in to confirm", "not a bot")
 ANSI = re.compile(r"\x1b\[[0-9;]*m")  # colour codes in yt-dlp messages
 _TEST_VIDEO = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"  # a very widely available public video
 
@@ -406,6 +409,10 @@ def _probe(cookies: Optional[str]) -> bool:
         return False
 
 
+def _is_bot_check(error: Exception) -> bool:
+    return any(marker in str(error).lower() for marker in _BOT_CHECK)
+
+
 def _note_failure(key: str, account: str, error: Exception, verdict: str) -> None:
     recent_failures.appendleft(
         {"at": time.time(), "song": key, "account": account, "error": ANSI.sub("", str(error))[:220], "verdict": verdict}
@@ -429,21 +436,30 @@ def _download_with_fallbacks(url: str, out_template: str, final_path: str, out_d
             if any(marker in str(error).lower() for marker in _BLOCKED):
                 blocked = error
         if blocked is not None:
-            # One video that will not download must not take the account out: only rest it if it cannot even fetch a
-            # public video's details, which is what a real block looks like.
-            if _probe(cookies):
+            # The bot check is always a block. Other refusals (403, format missing...) can be one video's problem: for those,
+            # only rest the account if it cannot even fetch a public video's details. (That probe cannot vouch for the
+            # bot check: a popular video's details load for anyone, while the actual download is what gets refused.)
+            if not _is_bot_check(blocked) and _probe(cookies):
                 server_ok = True
                 _note_failure(key, labels.get(account_id, account_id), blocked, "this video only; the account is fine")
             else:
                 _mark_blocked(account_id, str(blocked))  # rest it; the next account (or no account) takes over
-                _note_failure(key, labels.get(account_id, account_id), blocked, "account blocked, resting")
+                _note_failure(
+                    key,
+                    labels.get(account_id, account_id),
+                    blocked,
+                    "bot check: its cookies are probably expired, paste fresh ones; resting" if _is_bot_check(blocked)
+                    else "account blocked, resting",
+                )
 
     for client in _CLIENTS:  # no account worked, or none is set: ask anonymously, trying each way of asking
         error = _attempt(url, out_template, final_path, out_dir, key, client, None)
         if error is None:
             return final_path
         last_error = error
-    if not server_ok:
+    if last_error is not None and _is_bot_check(last_error):
+        server_ok = False
+    elif not server_ok:
         server_ok = _probe(None)
     _note_failure(key, "no account", last_error or RuntimeError("unknown"), "this video only" if server_ok else "blocked")
     if server_ok:
