@@ -4,6 +4,7 @@ import os
 import tempfile
 import hashlib
 import json
+import logging
 import threading
 from typing import Optional
 
@@ -29,7 +30,8 @@ os.makedirs(RESULT_DIR, exist_ok=True)
 # 6: tempo and beat grid from the audio's own pulse (the tracker could be several % off); chords carry gridStart.
 # 7: every detected chord gets a beat cell; sections use texture (loudness, brightness, percussion), so soft builds read as Intro.
 # 8: sections from a trained structure model (all-in-one), snapped to our bars; Instrumental / Outro / Bridge appear.
-ANALYSIS_VERSION = 8
+# 9: those sections arrive in the background after the chords (sectionsPending), instead of holding the analysis up.
+ANALYSIS_VERSION = 9
 
 ALLOWED_UPLOAD_EXTENSIONS ={".mp3", ".wav", ".flac", ".m4a"}
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50MB
@@ -54,6 +56,10 @@ app.mount("/media", StaticFiles(directory=UPLOAD_DIR), name="media")
 _JOBS: dict[str, dict] = {}
 _JOBS_LOCK = threading.Lock()
 
+log = logging.getLogger("thechordify.api")
+# Songs whose chords are ready but whose sections are still being refined by the structure model (in this process).
+_PENDING: set[str] = set()
+
 
 def _set_job(session_id: str, **fields) -> None:
     with _JOBS_LOCK:
@@ -69,6 +75,34 @@ def _get_job(session_id: str) -> Optional[dict]:
 
 class YoutubeRequest(BaseModel):
     url: str
+
+
+def _with_pending(session_id: str, result: dict) -> dict:
+    return {**result, "sectionsPending": session_id in _PENDING}
+
+
+def _refine_sections(session_id: str, result: dict, upgrade) -> None:
+    """Waits for the structure model (off the request path) and swaps its sections into the saved result."""
+    try:
+        sections = upgrade()
+        if sections:
+            result = {**result, "sections": sections, "sectionsSource": "model"}
+            _save_result(session_id, result)
+            _set_job(session_id, result=result)
+    except Exception as exc:
+        log.warning("Refining the sections failed for %s: %s", session_id, exc)
+    finally:
+        _PENDING.discard(session_id)
+
+
+def _finish(session_id: str, result: dict, upgrade) -> None:
+    """Saves the finished analysis and, if better sections are on their way, refines them in the background."""
+    if upgrade:
+        _PENDING.add(session_id)  # before the job reads "done", so the very first response already says so
+    _save_result(session_id, result)
+    _set_job(session_id, status="done", progress=100, stage="Done", result=result)
+    if upgrade:
+        threading.Thread(target=_refine_sections, args=(session_id, result, upgrade), daemon=True).start()
 
 
 def _result_path(key: str) -> str:
@@ -113,6 +147,7 @@ def _run_youtube_job(session_id: str, url: str) -> None:
             _set_job(session_id, status="analyzing", progress=pct, stage=stage)
 
         analysis = analyze(audio_path, on_progress=on_progress)
+        upgrade = analysis.pop("sectionsUpgrade", None)
 
         result = {
             "sessionId": session_id,
@@ -130,8 +165,7 @@ def _run_youtube_job(session_id: str, url: str) -> None:
             "key": analysis.get("key", ""),
             "audioUrl": f"/media/{os.path.basename(audio_path)}",
         }
-        _save_result(session_id, result)
-        _set_job(session_id, status="done", progress=100, stage="Done", result=result)
+        _finish(session_id, result, upgrade)
     except InvalidUrlError as exc:
         _set_job(session_id, status="error", progress=0, error=str(exc))
     except Exception as exc:
@@ -159,6 +193,7 @@ def _run_analysis_job(
             _set_job(session_id, status="analyzing", progress=pct, stage=stage)
 
         analysis = analyze(audio_path, on_progress=on_progress)
+        upgrade = analysis.pop("sectionsUpgrade", None)
 
         result = {
             "sessionId": session_id,
@@ -178,8 +213,7 @@ def _run_analysis_job(
         }
         if source_url:
             result["sourceUrl"] = source_url
-        _save_result(session_id, result)
-        _set_job(session_id, status="done", progress=100, stage="Done", result=result)
+        _finish(session_id, result, upgrade)
     except Exception as exc:
         _set_job(session_id, status="error", progress=0, error=f"Chord analysis failed: {exc}")
 
@@ -253,8 +287,10 @@ def get_job_status(session_id: str) -> dict:
     if not job:
         cached = _load_cached_result(session_id)
         if cached:
-            return {"sessionId": session_id, "status": "done", "progress": 100, "result": cached}
+            return {"sessionId": session_id, "status": "done", "progress": 100, "result": _with_pending(session_id, cached)}
         raise HTTPException(status_code=404, detail="Unknown session")
+    if job.get("result"):
+        job["result"] = _with_pending(session_id, job["result"])
     return {"sessionId": session_id, **job}
 
 
@@ -263,7 +299,7 @@ def get_result(session_id: str) -> dict:
     cached = _load_cached_result(session_id)
     if not cached:
         raise HTTPException(status_code=404, detail="Unknown session")
-    return cached
+    return _with_pending(session_id, cached)
 
 
 # Serve the built Astro site from the same origin (the Docker image copies it to STATIC_DIR).

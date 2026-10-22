@@ -1281,6 +1281,42 @@ import Nav from "../components/Nav.astro";
     highlightChordGrid(t);
   }
 
+  /** Swaps in new sections (the structure model's, once they arrive) without touching the chords. */
+  function applySections(next: Section[]) {
+    sections = next;
+    renderProgress();
+    renderChordGrid();
+    renderDetails();
+    const t = playerTime();
+    updateTransport(t);
+    highlightChordGrid(t);
+  }
+
+  /** The structure model's sections come a few minutes after the chords: check back until they do. */
+  function watchForBetterSections() {
+    const started = Date.now();
+    const idle = "Transcription by TheChordify";
+    songSubEl.textContent = `${idle} · refining the sections…`;
+    const check = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/result/${sessionId}`);
+        if (res.ok) {
+          const latest: ExtractResult = await res.json();
+          if (!latest.sectionsPending) {
+            if (latest.sectionsSource === "model") applySections(latest.sections ?? []);
+            songSubEl.textContent = idle;
+            return;
+          }
+        }
+      } catch {
+        // offline for a moment: try again
+      }
+      if (Date.now() - started < 15 * 60 * 1000) setTimeout(check, 6000);
+      else songSubEl.textContent = idle;
+    };
+    setTimeout(check, 6000);
+  }
+
   function onTimeUpdate(currentTime: number) {
     updateDiagrams(currentTime);
     highlightChordGrid(currentTime);
@@ -1505,6 +1541,7 @@ import Nav from "../components/Nav.astro";
     }
 
     if (chords.length > 0) setCurrentChord(chords[0].chord);
+    if (result.sectionsPending) watchForBetterSections();
   }
 
   document.querySelectorAll<HTMLButtonElement>(".instrument-tab").forEach((btn) => {

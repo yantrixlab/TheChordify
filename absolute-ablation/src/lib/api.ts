@@ -36,6 +36,8 @@ export interface ExtractResult {
   chords: ChordSegment[]; // the song's core chords (major/minor)
   chordsDetailed?: ChordSegment[]; // every chord type the model recognises (7ths, sus, slash chords...)
   sections?: Section[];
+  sectionsPending?: boolean; // the structure model is still working: better sections will replace these
+  sectionsSource?: "model"; // set once those sections have arrived
   tempo: number;
   beatTimes: number[];
   bars: Bar[];

@@ -453,7 +453,8 @@ def detect_chords_ai(audio_path: str, on_progress: Optional[ProgressFn] = None) 
     progress(3, "Loading the chord model")
     _load_model()
 
-    # The structure model is the slowest part, so it works in its own process while the chords are analysed.
+    # The structure model is by far the slowest part: it is queued now, works in its own process while the chords
+    # are analysed, and its sections arrive later (see sectionsUpgrade below).
     sections_job = SectionsJob(audio_path)
 
     progress(8, "Loading audio")
@@ -469,13 +470,18 @@ def detect_chords_ai(audio_path: str, on_progress: Optional[ProgressFn] = None) 
     phase = downbeat_phase(features.beats, simple)
     simple = place_chords_on_grid(simple, features.beats, phase, features.duration)
     detailed = place_chords_on_grid(detailed, features.beats, phase, features.duration)
-    learned = sections_job.result(
-        on_wait=lambda used: progress(94 + int(5 * min(used, 1.0)), "Finding the song's sections (this can take a few minutes)")
+    structure_inputs = (
+        features.beats, features.duration, features.chroma, features.mfcc, features.rms,
+        features.audible_start, phase, features.texture,
     )
-    structure = analyze_structure(
-        simple, features.beats, features.duration, features.chroma, features.mfcc, features.rms,
-        features.audible_start, phase, features.texture, learned,
-    )
+    structure = analyze_structure(simple, *structure_inputs)
+
+    def upgrade_sections() -> Optional[list[dict]]:
+        """Waits for the structure model; its sections on our bars, or None when it gave none."""
+        learned = sections_job.result()
+        if not learned:
+            return None
+        return analyze_structure(simple, *structure_inputs, learned)["sections"]
 
     beat_list = [float(t) for t in features.boundaries[:-1]]
     if beat_list and beat_list[0] > 0.01:
@@ -492,4 +498,6 @@ def detect_chords_ai(audio_path: str, on_progress: Optional[ProgressFn] = None) 
         # bars of four beats starting where chords tend to change; a pickup / short last bar has null beats
         "bars": structure["bars"],
         "sections": structure["sections"],
+        # Better sections from the structure model, for the caller to wait for (and strip before saving), or None.
+        "sectionsUpgrade": upgrade_sections if sections_job.enabled else None,
     }
