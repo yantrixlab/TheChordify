@@ -5,7 +5,7 @@ import Nav from "../components/Nav.astro";
 
 <Layout title="Play along — Chord Suno">
   <Nav />
-  <main id="main-content" class="gradient-mesh" style="min-height:100vh;padding:96px var(--space-lg) var(--space-3xl);">
+  <main id="main-content" class="gradient-mesh" style="min-height:100vh;padding:var(--main-top, 28px) var(--main-x, var(--space-lg)) var(--space-3xl);">
     <div class="mx-auto" style="max-width:1180px;color:white;">
       <div id="loading-state" style="text-align:center;padding:80px 0;color:#c4b5fd;">
         Loading your song…
@@ -26,7 +26,7 @@ import Nav from "../components/Nav.astro";
                   <h1 id="song-title">Your song</h1>
                   <span id="song-artist" class="ph-by"></span>
                 </div>
-                <div id="song-sub" class="ph-sub">Transcription by Chord Suno</div>
+                <div id="song-sub" class="ph-sub"><span class="ph-sub-main">Transcription by Chord Suno</span><span id="song-note" class="ph-note" hidden>Refining the sections…</span></div>
               </div>
               <button id="btn-share" type="button" class="ph-share">Share</button>
             </div>
@@ -59,11 +59,8 @@ import Nav from "../components/Nav.astro";
                 { id: "sections", label: "Sections" },
                 { id: "detail", label: "Chords" },
               ].map((tool, i) => (
-                <div
-                  class="flex flex-col items-center justify-center"
-                  style={`padding:6px 14px;${i > 0 ? "border-left:1px solid var(--color-hairline);" : ""}min-width:78px;`}
-                >
-                  <div style="font-size:16px;line-height:1;margin-bottom:4px;" aria-hidden="true">
+                <div class="ph-tool flex flex-col items-center justify-center" data-tool={tool.id}>
+                  <div class="ph-tool-icon" aria-hidden="true">
                     {tool.id === "volume" && "🔊"}
                     {tool.id === "loop" && "∞"}
                     {tool.id === "tempo" && "🐢"}
@@ -124,7 +121,7 @@ import Nav from "../components/Nav.astro";
                   {tool.id === "detail" && (
                     <button id="detail-toggle" type="button" aria-pressed="false" style="font-size:11px;color:var(--color-body);background:none;border:none;cursor:pointer;font-weight:600;">Simple</button>
                   )}
-                  <div style="font-size:9px;color:var(--color-mute);text-transform:uppercase;letter-spacing:0.05em;margin-top:2px;">{tool.label}</div>
+                  <div class="ph-tool-label">{tool.label}</div>
                 </div>
               ))
             }
@@ -136,17 +133,17 @@ import Nav from "../components/Nav.astro";
           <div class="rounded-2xl tl-card">
             <div class="tl-tabs">
               <div class="tl-seg" role="group" aria-label="Chord view">
-                <button id="view-tab-grid" type="button" class="tl-tab is-active" aria-pressed="true">Chords grid</button>
-                <button id="view-tab-diagrams" type="button" class="tl-tab" aria-pressed="false">Chord diagrams</button>
+                <button id="view-tab-diagrams" type="button" class="tl-tab is-active" aria-pressed="true"><span class="full">Chord diagrams</span><span class="short">Diagrams</span></button>
+                <button id="view-tab-grid" type="button" class="tl-tab" aria-pressed="false"><span class="full">Chords grid</span><span class="short">Grid</span></button>
               </div>
             </div>
 
-            <div id="panel-grid" class="grid-panel">
+            <div id="panel-grid" class="grid-panel hidden">
               <div id="chord-grid"></div>
             </div>
 
             <!-- Chord diagrams: animated (timeline + sliding window) or a summary of every chord in the song -->
-            <div id="panel-diagrams" class="hidden">
+            <div id="panel-diagrams">
               <div class="dg-bar">
                 <div class="tl-seg" role="group" aria-label="Diagram style">
                   <button id="dg-animated" type="button" class="tl-tab is-active" aria-pressed="true">Animated</button>
@@ -320,6 +317,13 @@ import Nav from "../components/Nav.astro";
   .ph.is-compact .ph-title h1 { font-size: 17px; }
   .ph-controls { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: 12px; margin-top: 10px; }
   .ph-tools { display: flex; overflow-x: auto; margin: 10px -6px 0; padding-top: 8px; border-top: 1px solid var(--color-hairline); scrollbar-width: none; }
+  .ph-tool { padding: 6px 14px; min-width: 78px; }
+  .ph-tool + .ph-tool { border-left: 1px solid var(--color-hairline); }
+  .ph-tool-icon { font-size: 16px; line-height: 1; margin-bottom: 4px; }
+  .ph-tool-label { margin-top: 2px; font-size: 9px; color: var(--color-mute); text-transform: uppercase; letter-spacing: 0.05em; }
+  .ph-note::before { content: " · "; }
+  .ph-note { color: var(--color-violet); }
+  .tl-tab .short { display: none; }
   .ph-tools::-webkit-scrollbar { display: none; }
   .ph-btn, .ph-play { display: grid; place-items: center; border: 0; border-radius: 50%; cursor: pointer;
     transition: transform 0.12s, box-shadow 0.12s, background-color 0.12s; }
@@ -375,15 +379,36 @@ import Nav from "../components/Nav.astro";
     .video-card { max-width: 560px; width: 100%; }
   }
   @media (max-width: 640px) {
-    .ph { top: 64px; padding: 10px 12px 6px; border-radius: 12px; }
-    .ph-title h1 { font-size: 18px; }
-    .ph-share { height: 30px; padding: 0 10px; font-size: 12px; }
-    .ph-controls { gap: 8px; }
-    .ph-btn { width: 36px; height: 36px; }
-    .ph-play { width: 44px; height: 44px; }
+    #main-content { --main-top: 10px; --main-x: 10px; }
+    .ph { top: 64px; margin-bottom: 8px; padding: 8px 10px 4px; border-radius: 12px; }
+    .ph-head { align-items: center; gap: 8px; }
+    .ph-title { display: block; }
+    .ph-title h1 { font-size: 15px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ph-by { display: none; }
+    .ph-sub { display: none; }
+    .ph-sub:has(.ph-note:not([hidden])) { display: block; margin-top: 1px; font-size: 11px; }
+    .ph-sub:has(.ph-note:not([hidden])) .ph-sub-main { display: none; }
+    .ph-note::before { content: none; }
+    .ph-share { height: 28px; padding: 0 11px; font-size: 12px; }
+    .ph-controls { gap: 8px; margin-top: 6px; }
+    .ph-btn { width: 34px; height: 34px; }
+    .ph-play { width: 42px; height: 42px; }
+    .ph-track { gap: 5px; }
+    .ph-tools { margin: 6px -2px 0; padding-top: 4px; }
+    .ph-tool { padding: 2px 9px; min-width: 50px; }
+    .ph-tool-icon { font-size: 14px; margin-bottom: 1px; }
+    .ph-tool-label { display: none; }
     .ph.is-compact .ph-tools { display: none; }
-    .tl-tabs { top: calc(64px + var(--ph-h, 150px) + 6px); }
-    #chord-grid { padding: 44px 6px 55vh; }
+    /* view switch and diagram style share one row above the strip */
+    .tl-card { position: relative; border-radius: 14px; }
+    .tl-tabs { position: static; height: auto; padding: 8px 10px; pointer-events: auto; }
+    .tl-tabs .tl-seg { background: var(--color-violet-soft); box-shadow: none; backdrop-filter: none; }
+    .tl-tab { height: 30px; padding: 0 12px; font-size: 12.5px; }
+    .tl-tab .full { display: none; }
+    .tl-tab .short { display: inline; }
+    .dg-bar { position: absolute; top: 8px; right: 10px; padding: 0; border: 0; background: transparent; }
+    .cr { padding: 14px 0 12px; }
+    #chord-grid { padding: 8px 6px 55vh; }
     .gs { flex-direction: column; gap: 0; }
     .gs-tag { flex: 0 0 auto; align-self: flex-start; padding: 4px 12px; writing-mode: horizontal-tb; transform: none; }
     .gr { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -437,7 +462,7 @@ import Nav from "../components/Nav.astro";
   const headerEl = document.getElementById("player-header")!;
   const songTitleEl = document.getElementById("song-title")!;
   const songArtistEl = document.getElementById("song-artist")!;
-  const songSubEl = document.getElementById("song-sub")!;
+  const songNoteEl = document.getElementById("song-note")!;
   const btnPlay = document.getElementById("btn-play") as HTMLButtonElement;
   const btnRestart = document.getElementById("btn-restart") as HTMLButtonElement;
   const timeNowEl = document.getElementById("time-now")!;
@@ -472,7 +497,7 @@ import Nav from "../components/Nav.astro";
   let tempoPct = 100;
   let capo = 0;
   let transposeSteps = 0;
-  let activeView: "diagrams" | "grid" = "grid";
+  let activeView: "diagrams" | "grid" = "diagrams"; // the chord diagrams are what people come for
 
   function semitoneLabel(n: number): string {
     const wrapped = ((n % 12) + 12) % 12;
@@ -1088,17 +1113,6 @@ import Nav from "../components/Nav.astro";
     nut.style.background = "var(--color-ink)";
     grid.appendChild(nut);
 
-    if (baseFret > 1) {
-      const posLabel = document.createElement("div");
-      posLabel.textContent = String(baseFret);
-      posLabel.style.position = "absolute";
-      posLabel.style.left = `-${10 * scale}px`;
-      posLabel.style.top = `${rowY(0) + (GRID_H / ROWS) / 2 - 6 * scale}px`;
-      posLabel.style.fontSize = `${11 * scale}px`;
-      posLabel.style.color = "var(--color-mute)";
-      grid.appendChild(posLabel);
-    }
-
     // String (vertical) lines.
     for (let i = 0; i < 6; i++) {
       const line = document.createElement("div");
@@ -1139,6 +1153,29 @@ import Nav from "../components/Nav.astro";
       arr.push(p);
       groups.set(key, arr);
     });
+
+    // Fret numbers down the left, so it is clear which fret every finger and every barre goes on. The row a barre
+    // sits on (or the first row of a chord higher up the neck) is picked out in bold violet.
+    const barreRows = new Set<number>();
+    groups.forEach((group) => {
+      if (group.length >= 2 && group[0].finger) barreRows.add(group[0].row);
+    });
+    for (let r = 1; r <= ROWS; r++) {
+      const key = barreRows.has(r) || (r === 1 && baseFret > 1);
+      const num = document.createElement("div");
+      num.textContent = String(baseFret + r - 1);
+      num.style.position = "absolute";
+      num.style.left = `${-17 * scale}px`;
+      num.style.width = `${14 * scale}px`;
+      num.style.top = `${rowY(r) - GRID_H / ROWS / 2 - 8 * scale}px`;
+      num.style.height = `${16 * scale}px`;
+      num.style.lineHeight = `${16 * scale}px`;
+      num.style.textAlign = "right";
+      num.style.fontSize = `${(key ? 13 : 10) * scale}px`;
+      num.style.fontWeight = key ? "800" : "500";
+      num.style.color = key ? "var(--color-violet-deep)" : "var(--color-mute)";
+      grid.appendChild(num);
+    }
 
     const dotSize = 18 * scale;
     groups.forEach((group) => {
@@ -1296,8 +1333,7 @@ import Nav from "../components/Nav.astro";
   /** The structure model's sections come a few minutes after the chords: check back until they do. */
   function watchForBetterSections() {
     const started = Date.now();
-    const idle = "Transcription by Chord Suno";
-    songSubEl.textContent = `${idle} · refining the sections…`;
+    songNoteEl.hidden = false;
     const check = async () => {
       try {
         const res = await fetch(`${API_BASE}/api/result/${sessionId}`);
@@ -1305,7 +1341,7 @@ import Nav from "../components/Nav.astro";
           const latest: ExtractResult = await res.json();
           if (!latest.sectionsPending) {
             if (latest.sectionsSource === "model") applySections(latest.sections ?? []);
-            songSubEl.textContent = idle;
+            songNoteEl.hidden = true;
             return;
           }
         }
@@ -1313,7 +1349,7 @@ import Nav from "../components/Nav.astro";
         // offline for a moment: try again
       }
       if (Date.now() - started < 15 * 60 * 1000) setTimeout(check, 6000);
-      else songSubEl.textContent = idle;
+      else songNoteEl.hidden = true;
     };
     setTimeout(check, 6000);
   }
@@ -1504,7 +1540,6 @@ import Nav from "../components/Nav.astro";
     const title = result.title || "Your song";
     songTitleEl.textContent = title;
     songArtistEl.textContent = result.artist ? `by ${result.artist}` : "";
-    songSubEl.textContent = "Transcription by Chord Suno";
     document.title = `${title} chords — Chord Suno`;
     detailToggle.hidden = chordsDetailed === chordsSimple;
 
@@ -1519,6 +1554,7 @@ import Nav from "../components/Nav.astro";
     renderDetails();
     updateTransposeLabel();
     syncHeaderSize();
+    layoutDiagrams(); // the diagrams are the visible view, so they can be measured now
 
     if (result.source === "youtube" && result.sourceUrl) {
       const videoId = extractYoutubeId(result.sourceUrl);
