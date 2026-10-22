@@ -4,9 +4,11 @@ import "../styles/global.css";
 interface Props {
   title?: string;
   description?: string;
+  noindex?: boolean; // keep the page out of search engines (the admin page)
 }
 
 const {
+  noindex = false,
   title = "Chord Suno — Hear Every Chord. Play Every Song.",
   description = "Chord Suno listens to any YouTube link or audio file and writes out every chord, synced to the beat, for guitar, piano, ukulele and mandolin. Suno means listen.",
 } = Astro.props;
@@ -21,6 +23,7 @@ const {
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="canonical" href={new URL(Astro.url.pathname, "https://chordsuno.com").href} />
     <meta name="application-name" content="Chord Suno" />
+    {noindex && <meta name="robots" content="noindex, nofollow" />}
     <meta name="generator" content={Astro.generator} />
     <title>{title}</title>
 

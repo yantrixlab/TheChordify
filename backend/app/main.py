@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import logging
 import os
@@ -17,6 +18,7 @@ from pydantic import BaseModel
 from .engine import analyze
 from .search import RateLimiter, SearchUnavailable, clean_query, search_songs
 from .store import SongStore
+from . import youtube
 from .youtube import InvalidUrlError, download_audio, extract_video_id, is_video_id, session_id_for_url, video_info
 
 # Saved results, uploads and the song catalog. Point DATA_DIR at a persistent volume in production, or every redeploy
@@ -27,6 +29,7 @@ RESULT_DIR = os.path.join(CACHE_DIR, "results")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(RESULT_DIR, exist_ok=True)
 catalog = SongStore(os.path.join(CACHE_DIR, "songs.db"))
+youtube.configure(CACHE_DIR)  # where cookies pasted on the admin page are kept
 
 # Bump whenever the detector's output changes, so songs cached by an older version are analysed again.
 # 2: frame times no longer drift against the audio clock.
@@ -241,9 +244,10 @@ def _run_youtube_job(session_id: str, url: str, meta: dict) -> None:
         _remove(audio_path)
         error_text = str(exc)
         if "Sign in to confirm" in error_text or "not a bot" in error_text:
+            log.warning("YouTube blocked the download of %s (bot check); add or refresh cookies on /admin", session_id)
             error_text = (
-                "YouTube blocked this download with a bot/authentication check. "
-                "Try another link, upload the audio file instead, or configure yt-dlp cookies."
+                "We couldn't fetch that song from YouTube right now. "
+                "Please try another song, or upload the audio file instead."
             )
         _set_job(
             session_id,
@@ -308,6 +312,50 @@ def search(request: Request, q: str = "") -> dict:
     except SearchUnavailable as exc:
         log.warning("Song search failed: %s", exc)
         raise HTTPException(status_code=502, detail="Song search is unavailable right now. Please try again in a moment.")
+
+
+# ---- admin: keep YouTube downloads working (cookies expire; this avoids a redeploy each time) --------------------------
+# Switched on by setting ADMIN_TOKEN (a long random string) in the environment; without it these routes answer 404.
+_ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "")
+_admin_limiter = RateLimiter(limit=20, window=60.0)
+
+
+def _require_admin(request: Request) -> None:
+    if not _ADMIN_TOKEN:
+        raise HTTPException(status_code=404, detail="Not found")
+    caller = request.client.host if request.client else "unknown"
+    if not _admin_limiter.allow(caller):
+        raise HTTPException(status_code=429, detail="Too many attempts. Wait a minute.")
+    given = request.headers.get("x-admin-token", "")
+    if not hmac.compare_digest(given.encode("utf-8"), _ADMIN_TOKEN.encode("utf-8")):
+        raise HTTPException(status_code=401, detail="Wrong admin token")
+
+
+class CookiesBody(BaseModel):
+    cookies: str
+
+
+@app.get("/api/admin/youtube")
+def admin_youtube_status(request: Request, test: bool = False) -> dict:
+    """What the server has for YouTube; with ?test=1 also tries a real (metadata-only) request and reports the result."""
+    _require_admin(request)
+    return youtube.diagnose(test=test)
+
+
+@app.put("/api/admin/youtube/cookies")
+def admin_save_cookies(body: CookiesBody, request: Request) -> dict:
+    _require_admin(request)
+    try:
+        return youtube.save_cookies(body.cookies)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.delete("/api/admin/youtube/cookies")
+def admin_clear_cookies(request: Request) -> dict:
+    _require_admin(request)
+    youtube.clear_cookies()
+    return youtube.cookie_info()
 
 
 @app.get("/api/popular")

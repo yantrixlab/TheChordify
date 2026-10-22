@@ -1,0 +1,212 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Nav from "../components/Nav.astro";
+---
+
+<Layout title="Admin — Chord Suno" noindex>
+  <Nav />
+  <main id="main-content" class="ad">
+    <div class="wrap">
+      <h1>YouTube access</h1>
+      <p class="lead">
+        YouTube often refuses downloads from a server's address. Cookies from a logged-in browser are what get past it.
+        They expire, so paste fresh ones here whenever the check below fails — no redeploy needed.
+      </p>
+
+      <section class="card" aria-labelledby="h-token">
+        <h2 id="h-token">1 · Admin token</h2>
+        <p class="hint">The <code>ADMIN_TOKEN</code> you set in Coolify. It stays in this browser tab only.</p>
+        <form id="token-form" class="row">
+          <input id="token" type="password" autocomplete="off" placeholder="Admin token" />
+          <button type="submit" class="btn">Connect</button>
+        </form>
+        <p id="token-msg" class="msg" role="status"></p>
+      </section>
+
+      <section id="status-card" class="card hidden" aria-labelledby="h-status">
+        <h2 id="h-status">2 · What the server has</h2>
+        <ul id="status" class="status"></ul>
+        <div class="row">
+          <button id="test" type="button" class="btn">Test YouTube now</button>
+          <span id="test-note" class="hint">Asks YouTube for a short public video's details (nothing is downloaded).</span>
+        </div>
+        <ul id="test-result" class="attempts"></ul>
+      </section>
+
+      <section id="cookies-card" class="card hidden" aria-labelledby="h-cookies">
+        <h2 id="h-cookies">3 · Cookies</h2>
+        <details>
+          <summary>How to export them</summary>
+          <ol class="steps">
+            <li>Make a separate Google account for this (YouTube may restrict an account used for downloads — don't use your own).</li>
+            <li>In a <strong>private / incognito window</strong>, sign in to that account on youtube.com.</li>
+            <li>With that tab on youtube.com, use a cookies.txt extension (for example "Get cookies.txt LOCALLY") and export. It must be the <strong>Netscape cookies.txt</strong> format.</li>
+            <li>Close the private window straight away, so the browser does not refresh those cookies and invalidate them.</li>
+            <li>Paste the whole file below and press Save, then Test.</li>
+          </ol>
+        </details>
+        <textarea id="cookies" rows="8" spellcheck="false" placeholder="# Netscape HTTP Cookie File&#10;.youtube.com&#9;TRUE&#9;/&#9;TRUE&#9;1800000000&#9;SAPISID&#9;..."></textarea>
+        <div class="row">
+          <button id="save" type="button" class="btn">Save cookies</button>
+          <button id="clear" type="button" class="btn ghost">Remove cookies</button>
+        </div>
+        <p id="cookies-msg" class="msg" role="status"></p>
+      </section>
+    </div>
+  </main>
+</Layout>
+
+<style is:global>
+  .ad { min-height: calc(100vh - 64px); padding: 48px 20px 80px; background: linear-gradient(180deg, #fbf7ff, #fff 60%); }
+  .ad .wrap { max-width: 720px; margin: 0 auto; }
+  .ad h1 { margin: 0 0 8px; font-size: 30px; font-weight: 800; letter-spacing: -0.03em; color: var(--color-ink); }
+  .ad .lead { margin: 0 0 24px; color: var(--color-body); line-height: 1.6; }
+  .ad .card { margin-bottom: 16px; padding: 20px 22px; border-radius: 18px; background: #fff; border: 1px solid var(--color-hairline); box-shadow: 0 1px 2px #1a05330a; }
+  .ad .card.hidden { display: none; }
+  .ad h2 { margin: 0 0 8px; font-size: 16px; font-weight: 700; color: var(--color-ink); }
+  .ad .hint { margin: 0 0 12px; font-size: 13.5px; color: var(--color-mute); }
+  .ad code { padding: 1px 6px; border-radius: 6px; background: #f3eeff; font: 600 12.5px var(--font-mono); }
+  .ad .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .ad input[type="password"] { flex: 1; min-width: 200px; height: 44px; padding: 0 14px; border-radius: 12px; border: 1.5px solid var(--color-hairline); font: 500 15px var(--font-sans); outline: none; }
+  .ad input:focus, .ad textarea:focus { border-color: var(--color-violet); box-shadow: 0 0 0 3px #7c3aed1f; }
+  .ad textarea { width: 100%; margin: 12px 0; padding: 12px 14px; border-radius: 12px; border: 1.5px solid var(--color-hairline); font: 500 12.5px/1.5 var(--font-mono); resize: vertical; outline: none; }
+  .ad .btn { height: 42px; padding: 0 18px; border: 0; border-radius: 12px; cursor: pointer; color: #fff; font: 700 14px var(--font-sans);
+    background: linear-gradient(135deg, #7c3aed, #5b21b6); }
+  .ad .btn.ghost { color: var(--color-violet-deep); background: var(--color-violet-soft); }
+  .ad .btn:disabled { opacity: 0.6; cursor: progress; }
+  .ad .msg { min-height: 20px; margin: 10px 0 0; font-size: 14px; }
+  .ad .msg.ok { color: var(--color-success); }
+  .ad .msg.bad { color: var(--color-error); }
+  .ad .status, .ad .attempts { margin: 0 0 14px; padding: 0; list-style: none; display: grid; gap: 6px; }
+  .ad .status li, .ad .attempts li { display: flex; gap: 10px; align-items: baseline; font-size: 14px; color: var(--color-body); }
+  .ad .dot { flex: none; width: 10px; height: 10px; margin-top: 4px; border-radius: 50%; background: var(--color-mute); }
+  .ad .dot.ok { background: var(--color-success); }
+  .ad .dot.bad { background: var(--color-error); }
+  .ad .dot.warn { background: var(--color-warning); }
+  .ad .steps { margin: 10px 0 0; padding-left: 20px; color: var(--color-body); font-size: 14px; line-height: 1.7; }
+  .ad details { margin-bottom: 4px; font-size: 14px; }
+  .ad summary { cursor: pointer; font-weight: 600; color: var(--color-violet-deep); }
+</style>
+
+<script>
+  import { API_BASE } from "../lib/api";
+
+  const $ = (id) => document.getElementById(id);
+  const tokenInput = $("token") as HTMLInputElement;
+  const say = (id: string, text: string, kind: "ok" | "bad" | "") => {
+    const node = $(id)!;
+    node.textContent = text;
+    node.className = `msg ${kind}`.trim();
+  };
+
+  let token = "";
+  try {
+    token = sessionStorage.getItem("cs-admin") ?? "";
+  } catch {
+    // no storage: the token is just asked for again
+  }
+
+  async function call(path: string, init: RequestInit = {}) {
+    const res = await fetch(`${API_BASE}${path}`, { ...init, headers: { ...(init.headers ?? {}), "X-Admin-Token": token, "Content-Type": "application/json" } });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.detail || `Request failed (${res.status})`);
+    return body;
+  }
+
+  const item = (ok: boolean | "warn", text: string) => {
+    const li = document.createElement("li");
+    const dot = document.createElement("span");
+    dot.className = `dot ${ok === "warn" ? "warn" : ok ? "ok" : "bad"}`;
+    const label = document.createElement("span");
+    label.textContent = text;
+    li.append(dot, label);
+    return li;
+  };
+
+  function showStatus(info: any) {
+    const list = $("status")!;
+    list.replaceChildren(
+      item(true, `yt-dlp ${info.ytDlp}`),
+      item(info.playerScriptSolver, info.playerScriptSolver ? "Player-script solver installed" : "Player-script solver missing (yt-dlp-ejs): downloads will fail"),
+      item(info.jsRuntime.node || info.jsRuntime.deno, info.jsRuntime.node || info.jsRuntime.deno ? `JavaScript runtime found (${info.jsRuntime.node ? "node" : "deno"})` : "No JavaScript runtime (node or deno) in this image"),
+      item(
+        info.cookies.configured ? (info.cookies.loggedIn ? true : "warn") : "warn",
+        info.cookies.configured
+          ? `Cookies: ${info.cookies.cookies} from ${info.cookies.source}${info.cookies.loggedIn ? ", signed in" : " (no sign-in cookies found)"}${info.cookies.expiresSoonest ? `, the first expires ${new Date(info.cookies.expiresSoonest * 1000).toLocaleDateString()}` : ""}`
+          : "No cookies set",
+      ),
+      item(info.proxy ? true : "warn", info.proxy ? "Proxy configured" : "No proxy"),
+    );
+  }
+
+  async function refresh(test = false) {
+    const info = await call(`/api/admin/youtube${test ? "?test=1" : ""}`);
+    showStatus(info);
+    $("status-card")!.classList.remove("hidden");
+    $("cookies-card")!.classList.remove("hidden");
+    if (test) {
+      const list = $("test-result")!;
+      list.replaceChildren(
+        ...info.test.attempts.map((a: any) => item(a.result === "ok", `${a.client}: ${a.result === "ok" ? "YouTube answered" : a.result}`)),
+      );
+      list.prepend(item(info.test.ok, info.test.ok ? "YouTube lets this server in" : "YouTube is blocking this server — add or refresh cookies"));
+    }
+  }
+
+  $("token-form")!.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    token = tokenInput.value.trim();
+    try {
+      await refresh();
+      try {
+        sessionStorage.setItem("cs-admin", token);
+      } catch {
+        // fine
+      }
+      say("token-msg", "Connected.", "ok");
+    } catch (err) {
+      say("token-msg", err instanceof Error ? err.message : "Could not connect.", "bad");
+    }
+  });
+
+  $("test")!.addEventListener("click", async () => {
+    const button = $("test") as HTMLButtonElement;
+    button.disabled = true;
+    button.textContent = "Testing…";
+    try {
+      await refresh(true);
+    } catch (err) {
+      say("token-msg", err instanceof Error ? err.message : "Test failed.", "bad");
+    } finally {
+      button.disabled = false;
+      button.textContent = "Test YouTube now";
+    }
+  });
+
+  $("save")!.addEventListener("click", async () => {
+    const text = ($("cookies") as HTMLTextAreaElement).value;
+    try {
+      await call("/api/admin/youtube/cookies", { method: "PUT", body: JSON.stringify({ cookies: text }) });
+      ($("cookies") as HTMLTextAreaElement).value = "";
+      say("cookies-msg", "Saved. Press “Test YouTube now” to check they work.", "ok");
+      await refresh();
+    } catch (err) {
+      say("cookies-msg", err instanceof Error ? err.message : "Could not save.", "bad");
+    }
+  });
+
+  $("clear")!.addEventListener("click", async () => {
+    try {
+      await call("/api/admin/youtube/cookies", { method: "DELETE" });
+      say("cookies-msg", "Cookies removed.", "ok");
+      await refresh();
+    } catch (err) {
+      say("cookies-msg", err instanceof Error ? err.message : "Could not remove.", "bad");
+    }
+  });
+
+  if (token) {
+    tokenInput.value = token;
+    refresh().then(() => say("token-msg", "Connected.", "ok")).catch(() => say("token-msg", "", ""));
+  }
+</script>
