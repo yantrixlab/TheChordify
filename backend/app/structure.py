@@ -20,6 +20,7 @@ from collections import Counter
 from typing import Optional
 
 import numpy as np
+from scipy.ndimage import uniform_filter1d
 from scipy.signal import find_peaks
 from sklearn.cluster import AgglomerativeClustering
 from sklearn.metrics import silhouette_score
@@ -129,6 +130,7 @@ def analyze_structure(
     rms: np.ndarray,
     audible_start_s: float = 0.0,
     phase: Optional[int] = None,
+    texture: Optional[np.ndarray] = None,
 ) -> dict:
     """Returns {"bars": [...], "sections": [{"label","start","end","startBar","endBar"}], "downbeatPhase": int}."""
     if phase is None:
@@ -144,8 +146,10 @@ def analyze_structure(
         lo = min(int(t0 * FRAMES_PER_SECOND), n_frames - 1)
         return slice(lo, max(lo + 1, min(int(t1 * FRAMES_PER_SECOND), n_frames)))
 
-    # Per-bar descriptors: the four beats' chroma in order (the progression), timbre, loudness.
-    chroma_seq, timbre, energy = [], [], []
+    # Per-bar descriptors: the progression (the four beats' chroma in order) and the texture of the sound
+    # (how loud, bright and percussive it is, plus timbre). Sections often play the same chords and differ
+    # only in texture, so texture carries as much weight as harmony.
+    chroma_seq, texture_bars, energy = [], [], []
     for i in full:
         b = bars[i]["beats"]
         beats_chroma = []
@@ -153,14 +157,20 @@ def analyze_structure(
             v = chroma[:, frames(b[k], b[k + 1])].mean(axis=1)
             beats_chroma.append(v / (np.linalg.norm(v) + 1e-9))
         chroma_seq.append(np.concatenate(beats_chroma))
-        timbre.append(mfcc[:, frames(b[0], b[BEATS_PER_BAR])].mean(axis=1))
-        energy.append(float(rms[frames(b[0], b[BEATS_PER_BAR])].mean()))
+        span = frames(b[0], b[BEATS_PER_BAR])
+        parts = [mfcc[:, span].mean(axis=1)]
+        if texture is not None:
+            parts.append(texture[:, span].mean(axis=1))
+        texture_bars.append(np.concatenate(parts))
+        energy.append(float(rms[span].mean()))
     chroma_seq = np.array(chroma_seq)
-    timbre = np.array(timbre)
     energy = np.array(energy)
-    timbre = (timbre - timbre.mean(axis=0)) / (timbre.std(axis=0) + 1e-9)
+    texture_bars = uniform_filter1d(np.array(texture_bars), size=3, axis=0, mode="nearest")  # steady over +-1 bar
+    texture_bars = (texture_bars - texture_bars.mean(axis=0)) / (texture_bars.std(axis=0) + 1e-9)
 
-    features = np.hstack([chroma_seq / np.sqrt(BEATS_PER_BAR), 0.35 * timbre / np.sqrt(timbre.shape[1])])
+    harmony = chroma_seq / np.sqrt(BEATS_PER_BAR)
+    harmony = (harmony - harmony.mean(axis=0)) / np.sqrt(max(harmony.shape[1], 1)) * 3.0
+    features = np.hstack([harmony, texture_bars / np.sqrt(texture_bars.shape[1])])
     features = features - features.mean(axis=0)
     unit = features / (np.linalg.norm(features, axis=1, keepdims=True) + 1e-9)
     similarity = unit @ unit.T
@@ -263,8 +273,8 @@ def _name_sections(segments: list[tuple[int, int]], clusters: np.ndarray, energy
 
     Verse / Chorus are only claimed when the loudest repeated group and the biggest other repeated group
     clearly differ (well separated, and at least 1.5 dB apart in loudness). Otherwise parts are labelled
-    A, B, C by how alike they sound, so repeats are still visible without guessing. Intro / Outro need a one-off section at that end that is clearly
-    quieter (2 dB) than the typical section.
+    A, B, C by how alike they sound, so repeats are still visible without guessing. Intro / Outro need a section at that end that is clearly quieter than the
+    typical section (2 dB if it is a one-off, 5 dB otherwise).
     """
     m = len(segments)
     ids = list(dict.fromkeys(int(c) for c in clusters))  # group ids in order of first appearance
@@ -286,10 +296,12 @@ def _name_sections(segments: list[tuple[int, int]], clusters: np.ndarray, energy
 
     typical = float(np.median(energy_db))
     if m > 2:
-        if counts[int(clusters[0])] == 1 and energy_db[0] <= typical - 2:
-            names[0] = "Intro"
-        if counts[int(clusters[-1])] == 1 and energy_db[-1] <= typical - 2:
-            names[-1] = "Outro"
+        # A one-off opening/ending that is a little quieter, or any opening/ending that is far quieter (a song
+        # that builds up from nothing plays the same chords as its verse, so it can look like a repeat).
+        for index, name in ((0, "Intro"), (m - 1, "Outro")):
+            gap = typical - energy_db[index]
+            if (counts[int(clusters[index])] == 1 and gap >= 2) or gap >= 5:
+                names[index] = name
 
     totals = Counter(n for n in names if n)
     seen: Counter = Counter()
@@ -366,16 +378,17 @@ def fit_beat_grid(beats: np.ndarray, start: float, duration: float) -> np.ndarra
 
 
 def place_chords_on_grid(chords: list[dict], beats: np.ndarray, phase: int, duration: float) -> list[dict]:
-    """Decide which beat cell of the chord grid each chord is written in, using the song's own rhythm.
+    """Decide which beat cell of the chord grid each chord is written in.
 
     Chord times are left exactly as detected (playback and accuracy depend on them). Each chord gets a
-    `gridStart`: the beat time of the cell it is written in, or None when it has no cell of its own.
+    `gridStart`: the beat time of the cell it is written in. Every chord that was detected gets a cell, however
+    short: a quick chord on the last beat of a bar (a pickup, an anticipation) is real music.
 
-    A change detected a little early or late would round to the wrong beat (often beat 4 of the bar before),
-    and a change that falls between two beats (a syncopated "and") would flip between neighbouring beats from
-    bar to bar. So each change goes to the beat that is both close and *rhythmically likely*: positions in the
-    bar where this song rarely changes chord cost extra. When the song changes chord only on every other beat,
-    a chord that would have a cell of less than two beats is a flicker and gets no cell.
+    A chord that clearly sits on a beat goes to that beat. One that falls between two beats (a syncopated "and")
+    would flip between neighbouring beats from bar to bar, so ties go to the beat position where this song
+    usually changes chord. Two chords that land on the same beat are written on consecutive beats when they
+    really are that close; a chord is only skipped when it repeats the chord before it or would have to be
+    pushed more than a beat away from where it was heard.
     """
     out = [dict(c, gridStart=c["start"]) for c in chords]
     if len(beats) < 8 or len(chords) < 3:
@@ -385,42 +398,32 @@ def place_chords_on_grid(chords: list[dict], beats: np.ndarray, phase: int, dura
     def nearest(t: float) -> int:
         return int(np.argmin(np.abs(beats - t)))
 
-    starts = [nearest(c["start"]) for c in chords[1:]]
-    share = np.bincount([(i - phase) % BEATS_PER_BAR for i in starts], minlength=BEATS_PER_BAR) / max(len(starts), 1)
-    penalty = 0.9 * (1.0 - share / max(share.max(), 1e-9))  # beat positions this song rarely changes on cost more
+    positions = [(nearest(c["start"]) - phase) % BEATS_PER_BAR for c in chords[1:]]
+    share = np.bincount(positions, minlength=BEATS_PER_BAR) / max(len(positions), 1)
+    penalty = 1.0 - share / max(share.max(), 1e-9)  # 0 where the song often changes chord, 1 where it never does
 
-    chosen: list[int] = []
-    for chord in chords[1:]:
+    out_index = 0
+    last_beat = -1
+    for k in range(1, len(chords)):
+        chord = chords[k]
         near = nearest(chord["start"])
-        best, best_cost = near, 1e9
-        for j in range(max(near - 2, 0), min(near + 3, len(beats))):
-            distance = abs(float(beats[j]) - chord["start"]) / period
-            if distance > 1.25:
-                continue
-            cost = distance + penalty[(j - phase) % BEATS_PER_BAR]
-            if cost < best_cost:
-                best, best_cost = j, cost
-        chosen.append(best)
-
-    # Each written chord must come after the previous one; a repeat of the same chord needs no new cell.
-    min_beats = 2 if (share[1] + share[3]) < 0.2 else 1
-    placed: list[tuple[int, int]] = [(0, -1)]  # (index into chords, beat index); the first chord keeps its own time
-    for k, j in enumerate(chosen, start=1):
-        if j <= placed[-1][1] or chords[placed[-1][0]]["chord"] == chords[k]["chord"]:
+        if abs(float(beats[near]) - chord["start"]) / period <= 0.3:
+            j = near
+        else:  # between two beats: choose by distance plus how likely this bar position is for a change
+            j, best_cost = near, 1e9
+            for candidate in range(max(near - 1, 0), min(near + 2, len(beats))):
+                distance = abs(float(beats[candidate]) - chord["start"]) / period
+                cost = distance + 0.5 * penalty[(candidate - phase) % BEATS_PER_BAR]
+                if distance <= 1.25 and cost < best_cost:
+                    j, best_cost = candidate, cost
+        if chords[out_index]["chord"] == chord["chord"]:
+            out[k]["gridStart"] = None  # the chord before it carries on
             continue
-        placed.append((k, j))
-    if min_beats > 1:
-        kept = [placed[0]]
-        for n in range(1, len(placed)):
-            following = placed[n + 1][1] if n + 1 < len(placed) else None
-            if following is not None and following - placed[n][1] < min_beats:
-                continue  # a flicker: the chord before it carries on
-            if chords[kept[-1][0]]["chord"] != chords[placed[n][0]]["chord"]:
-                kept.append(placed[n])
-        placed = kept
-
-    for chord in out[1:]:
-        chord["gridStart"] = None
-    for k, j in placed[1:]:
+        if j <= last_beat:
+            j = last_beat + 1  # two chords on one beat: the later one takes the next beat
+            if j - near > 1 or j >= len(beats):
+                out[k]["gridStart"] = None
+                continue
         out[k]["gridStart"] = float(beats[j])
+        out_index, last_beat = k, j
     return out

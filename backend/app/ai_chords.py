@@ -236,6 +236,7 @@ class Features:
     mfcc: np.ndarray = None  # type: ignore[assignment]  # (13, frames) timbre
     beats: np.ndarray = None  # type: ignore[assignment]  # real beat times in seconds (no artificial 0.0)
     audible_start: float = 0.0  # when sound begins (quiet playing counts); the opening before it is silence
+    texture: np.ndarray = None  # type: ignore[assignment]  # (8, frames) how loud, bright and dense the sound is
 
 
 @dataclass
@@ -313,6 +314,40 @@ def _refine_quality(f: "Features", root: int, lo: int, hi: int, weight: float) -
 TTA_SHIFTS = (-1, 0, 1)
 
 
+def _texture_features(y: np.ndarray, n_frames: int) -> np.ndarray:
+    """How loud, bright and dense the sound is, per frame (same 2048-sample frame grid as the chroma).
+
+    Rows: loudness (dB), spectral centroid (kHz), flatness, harmonic share (vs drums/percussion) and the share of
+    energy in four bands (<250 Hz, 250 Hz-1 kHz, 1-4 kHz, >4 kHz). Verses, choruses and intros differ mostly in this
+    texture, even when they play the same chords, which is why structure.py leans on it.
+    """
+    S = np.abs(librosa.stft(y, n_fft=2048, hop_length=HOP_LENGTH))
+    freqs = librosa.fft_frequencies(sr=SAMPLE_RATE, n_fft=2048)
+    harmonic, percussive = librosa.decompose.hpss(S)
+    power = S**2
+    total = power.sum(axis=0) + 1e-12
+
+    def share(low: float, high: float) -> np.ndarray:
+        band = (freqs >= low) & (freqs < high)
+        return power[band].sum(axis=0) / total
+
+    harmonic_power = (harmonic**2).sum(axis=0)
+    rows = [
+        10 * np.log10(total),
+        librosa.feature.spectral_centroid(S=S, sr=SAMPLE_RATE)[0] / 1000.0,
+        librosa.feature.spectral_flatness(S=S)[0],
+        harmonic_power / (harmonic_power + (percussive**2).sum(axis=0) + 1e-12),
+        share(20, 250),
+        share(250, 1000),
+        share(1000, 4000),
+        share(4000, 10000),
+    ]
+    texture = np.stack(rows)
+    if texture.shape[1] < n_frames:
+        texture = np.pad(texture, ((0, 0), (0, n_frames - texture.shape[1])), mode="edge")
+    return texture[:, :n_frames]
+
+
 def extract_features(y: np.ndarray, progress: Optional[ProgressFn] = None, tta: tuple[int, ...] = TTA_SHIFTS) -> Features:
     """Run beat tracking, the chord model and the chroma analyses on mono 22.05 kHz audio."""
     progress = progress or (lambda _p, _s: None)
@@ -357,7 +392,7 @@ def extract_features(y: np.ndarray, progress: Optional[ProgressFn] = None, tta: 
     n = chroma.shape[1]
     return Features(
         duration, bpm, boundaries, probs, bass_chroma, chroma, rms[:n], mfcc[:, :n],
-        np.asarray(beat_times, dtype=float), sound_starts,
+        np.asarray(beat_times, dtype=float), sound_starts, _texture_features(y, n),
     )
 
 
@@ -432,7 +467,7 @@ def detect_chords_ai(audio_path: str, on_progress: Optional[ProgressFn] = None) 
     detailed = place_chords_on_grid(detailed, features.beats, phase, features.duration)
     structure = analyze_structure(
         simple, features.beats, features.duration, features.chroma, features.mfcc, features.rms,
-        features.audible_start, phase,
+        features.audible_start, phase, features.texture,
     )
 
     beat_list = [float(t) for t in features.boundaries[:-1]]
