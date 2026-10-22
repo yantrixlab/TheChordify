@@ -152,6 +152,7 @@ import Nav from "../components/Nav.astro";
       item(info.playerScriptSolver, info.playerScriptSolver ? "Player-script solver installed" : "Player-script solver missing (yt-dlp-ejs): downloads will fail"),
       item(info.jsRuntime.node || info.jsRuntime.deno, info.jsRuntime.node || info.jsRuntime.deno ? `JavaScript runtime found (${info.jsRuntime.node ? "node" : "deno"})` : "No JavaScript runtime (node or deno) in this image"),
       item(info.accounts.length === 0 ? "warn" : ready > 0, info.accounts.length === 0 ? "No accounts: downloads are anonymous" : `${ready} of ${info.accounts.length} account${info.accounts.length === 1 ? "" : "s"} ready (cap ${info.hourlyCap} downloads per account per hour)`),
+      item(info.storage.kind === "postgres" ? true : "warn", `Saved songs: ${info.storage.songs} in the catalog, ${info.storage.results} analyses, kept in ${info.storage.where}${info.storage.kind === "postgres" ? "" : info.storage.databaseUrlSet ? " (DATABASE_URL is set but Postgres could not be reached: check the server log)" : " (set DATABASE_URL to keep them in Postgres, and mount a persistent volume on " + info.storage.dataDir + ")"}`),
       item(info.proxy ? true : "warn", info.proxy ? "Proxy configured" : "No proxy"),
       item(true, `Line: ${info.queue.running} running, ${info.queue.waiting} waiting (${info.queue.workers} at a time). Visitors may start ${info.newSongsPerHour || "unlimited"} new songs per hour.`),
     );

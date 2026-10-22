@@ -22,8 +22,11 @@ from .store import SongStore
 from . import youtube
 from .youtube import InvalidUrlError, VideoNotDownloadable, YouTubeBlocked, download_audio, extract_video_id, is_video_id, session_id_for_url, video_info
 
-# Saved results, uploads and the song catalog. Point DATA_DIR at a persistent volume in production, or every redeploy
-# starts with an empty catalog and re-analyses every song.
+log = logging.getLogger("thechordify.api")
+
+# Uploads, cookies and (without DATABASE_URL) the song catalog and saved results live under DATA_DIR. In production set
+# DATABASE_URL to a Postgres database for the catalog and results, and mount a persistent volume on DATA_DIR, or every
+# redeploy starts empty and re-analyses every song.
 CACHE_DIR = os.environ.get("DATA_DIR") or os.path.join(tempfile.gettempdir(), "thechordify-cache")
 UPLOAD_DIR = os.path.join(CACHE_DIR, "uploads")
 RESULT_DIR = os.path.join(CACHE_DIR, "results")
@@ -36,8 +39,12 @@ job_queue = JobQueue(
 )
 # New songs one visitor may start per hour (songs already in the catalog are free). 0 turns the limit off.
 NEW_SONGS_PER_HOUR = int(os.environ.get("NEW_SONGS_PER_HOUR", "8"))
-catalog = SongStore(os.path.join(CACHE_DIR, "songs.db"))
+catalog = SongStore(CACHE_DIR)
 youtube.configure(CACHE_DIR)  # where cookies pasted on the admin page are kept
+try:  # results and songs that older versions kept in files join the database, once
+    log.info("Imported from files: %s", catalog.import_files(CACHE_DIR))
+except Exception as exc:
+    log.warning("Could not import the old files: %s", exc)
 
 # Bump whenever the detector's output changes, so songs cached by an older version are analysed again.
 # 2: frame times no longer drift against the audio clock.
@@ -76,7 +83,6 @@ app.mount("/media", StaticFiles(directory=UPLOAD_DIR), name="media")
 _JOBS: dict[str, dict] = {}
 _JOBS_LOCK = threading.Lock()
 
-log = logging.getLogger("thechordify.api")
 # Songs whose chords are ready but whose sections are still being refined by the structure model (in this process).
 _PENDING: set[str] = set()
 
@@ -180,30 +186,22 @@ def _finish(session_id: str, result: dict, upgrade, cleanup: Optional[str] = Non
         _remove(cleanup)
 
 
-def _result_path(key: str) -> str:
-    return os.path.join(RESULT_DIR, f"{key}.json")
-
-
 def _load_cached_result(key: str) -> Optional[dict]:
-    path = _result_path(key)
-    if os.path.exists(path):
-        try:
-            with open(path, "r", encoding="utf-8") as f:
-                result = json.load(f)
-        except (OSError, ValueError):
-            return None  # unreadable/partial cache entry: treat as a miss and re-analyse
-        # Results from an older detector (e.g. before the timing-drift fix) are re-analysed.
-        return result if result.get("analysisVersion") == ANALYSIS_VERSION else None
-    return None
+    try:
+        result = catalog.load_result(key)
+    except Exception as exc:  # the database is unreachable: treat as a miss rather than failing the visitor's request
+        log.warning("Could not read the saved result %s: %s", key, exc)
+        return None
+    # Results from an older detector (e.g. before the timing-drift fix) are re-analysed.
+    return result if result and result.get("analysisVersion") == ANALYSIS_VERSION else None
 
 
 def _save_result(key: str, result: dict) -> None:
-    # Write-then-rename so a crash mid-write can't leave a truncated cache file behind.
-    path = _result_path(key)
-    tmp = f"{path}.tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump({**result, "analysisVersion": ANALYSIS_VERSION}, f)
-    os.replace(tmp, path)
+    try:
+        catalog.save_result(key, {**result, "analysisVersion": ANALYSIS_VERSION})
+    except Exception as exc:
+        # The analysis is still served from memory for now; it just will not be remembered.
+        log.error("Could not save the result %s: %s", key, exc)
 
 
 @app.get("/api/health")
@@ -356,7 +354,12 @@ class AccountBody(BaseModel):
 def admin_youtube_status(request: Request, test: bool = False) -> dict:
     """What the server has for YouTube (the accounts and their health); with ?test=1 also tries each one for real."""
     _require_admin(request)
-    return {**youtube.diagnose(test=test), "queue": job_queue.stats(), "newSongsPerHour": NEW_SONGS_PER_HOUR}
+    return {
+        **youtube.diagnose(test=test),
+        "queue": job_queue.stats(),
+        "newSongsPerHour": NEW_SONGS_PER_HOUR,
+        "storage": {**catalog.summary(), "dataDir": CACHE_DIR, "databaseUrlSet": bool(os.environ.get("DATABASE_URL"))},
+    }
 
 
 @app.post("/api/admin/youtube/accounts")
