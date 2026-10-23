@@ -119,6 +119,21 @@ async function sendCredential(credential: string): Promise<AuthUser> {
   return body.user;
 }
 
+/** The sign-in for payment reviewers (it only works while the server has it switched on). Throws with a message that is safe to show. */
+export async function signInAsReviewer(email: string, password: string): Promise<AuthUser> {
+  const res = await fetch(`${API_BASE}/api/auth/reviewer`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (res.status === 404) throw new Error("This sign-in is not switched on.");
+  if (!res.ok) throw new Error(body.detail || "Sign-in did not work. Please try again.");
+  remember(body.user);
+  return body.user;
+}
+
 /**
  * Draws Google's "Continue with Google" button in `target`. `onUser` runs once the server has accepted the sign-in.
  * Returns false when sign-in is not switched on, so the caller can say so instead of leaving a blank space.

@@ -1,0 +1,71 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Nav from "../components/Nav.astro";
+---
+
+<Layout title="Reviewer sign-in — Chord Suno" noindex>
+  <Nav />
+  <main id="main-content" class="rv">
+    <section class="rv-card" aria-labelledby="rv-title">
+      <div class="rv-mark" aria-hidden="true">🔑</div>
+      <h1 id="rv-title">Reviewer sign-in</h1>
+      <p class="rv-lead">For people reviewing Chord Suno for a payment service. Everyone else signs in with Google, using the Log in button.</p>
+      <form id="form" novalidate>
+        <label class="rv-field"><span>Email</span><input id="email" type="email" autocomplete="username" required /></label>
+        <label class="rv-field"><span>Password</span><input id="password" type="password" autocomplete="current-password" required /></label>
+        <button id="go" type="submit" class="rv-btn">Sign in</button>
+        <p id="msg" class="rv-msg" role="status"></p>
+      </form>
+      <p class="rv-fine">After signing in you can open the <a href="/pricing/">pricing page</a>, choose a plan and go through checkout.</p>
+    </section>
+  </main>
+</Layout>
+
+<style is:global>
+  .rv { min-height: calc(100vh - 64px); padding: 8vh 16px 60px; background: radial-gradient(ellipse 70% 38% at 50% -4%, #7c3aed26, transparent 70%), linear-gradient(180deg, #fbf7ff, #fff 60%); }
+  .rv-card { max-width: 420px; margin: 0 auto; padding: 36px 28px 28px; border-radius: 26px; background: #fff; border: 1px solid var(--color-hairline); box-shadow: 0 30px 60px -34px #5b21b690; text-align: center; }
+  .rv-mark { display: grid; place-items: center; width: 58px; height: 58px; margin: 0 auto 14px; border-radius: 18px; background: var(--color-violet-soft); font-size: 26px; }
+  .rv-card h1 { margin: 0 0 8px; font-size: 24px; font-weight: 800; letter-spacing: -0.03em; color: var(--color-ink); }
+  .rv-lead { margin: 0 auto 24px; max-width: 330px; font-size: 14.5px; line-height: 1.6; color: var(--color-body); }
+  .rv-field { display: grid; gap: 6px; margin-bottom: 14px; text-align: left; }
+  .rv-field span { font-size: 13px; font-weight: 600; color: var(--color-ink); }
+  .rv-field input { width: 100%; height: 46px; padding: 0 14px; border-radius: 12px; border: 1.5px solid var(--color-hairline); font: 500 15px var(--font-sans); color: var(--color-ink); outline: none; }
+  .rv-field input:focus { border-color: var(--color-violet); box-shadow: 0 0 0 3px #7c3aed1f; }
+  .rv-btn { width: 100%; height: 48px; margin-top: 4px; border: 0; border-radius: 14px; cursor: pointer; color: #fff; font: 800 15px var(--font-sans); background: linear-gradient(135deg, #7c3aed, #5b21b6); box-shadow: 0 10px 20px -10px #5b21b6cc; }
+  .rv-btn:disabled { opacity: 0.6; cursor: progress; }
+  .rv-btn:focus-visible { outline: 2px solid var(--color-violet); outline-offset: 3px; }
+  .rv-msg { min-height: 20px; margin: 12px 0 0; font-size: 14px; color: var(--color-mute); }
+  .rv-msg.bad { color: var(--color-error); }
+  .rv-msg.ok { color: var(--color-success); }
+  .rv-fine { margin: 18px 0 0; font-size: 13px; line-height: 1.5; color: var(--color-mute); }
+  .rv-fine a { color: var(--color-violet-deep); font-weight: 600; }
+</style>
+
+<script>
+  import { signInAsReviewer } from "../lib/auth";
+
+  const form = document.getElementById("form") as HTMLFormElement;
+  const msg = document.getElementById("msg")!;
+  const go = document.getElementById("go") as HTMLButtonElement;
+  const say = (text: string, kind: "bad" | "ok" | "" = "") => {
+    msg.textContent = text;
+    msg.className = `rv-msg ${kind}`.trim();
+  };
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const email = (document.getElementById("email") as HTMLInputElement).value.trim();
+    const password = (document.getElementById("password") as HTMLInputElement).value;
+    if (!email || !password) return say("Enter the email and password you were given.", "bad");
+    go.disabled = true;
+    say("Signing in…");
+    try {
+      await signInAsReviewer(email, password);
+      say("Signed in. Taking you to the plans…", "ok");
+      window.location.href = "/pricing/";
+    } catch (err) {
+      say(err instanceof Error ? err.message : "Sign-in did not work.", "bad");
+      go.disabled = false;
+    }
+  });
+</script>

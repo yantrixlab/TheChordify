@@ -465,10 +465,45 @@ def sign_in_with_google(body: GoogleBody, request: Request, response: Response) 
     user = accounts.sign_in(who["sub"], who["email"], who["name"], who["picture"])
     if user["disabled"]:
         raise HTTPException(status_code=403, detail="This account has been blocked.")
+    _start_session(user, request, response)
+    return {"user": _public_user(user)}
+
+
+def _start_session(user: dict, request: Request, response: Response) -> None:
     response.set_cookie(
         _SESSION_COOKIE, accounts.start_session(user["id"]), max_age=accounts_module.SESSION_DAYS * 86400,
         httponly=True, samesite="lax", secure=request.url.scheme == "https", path="/",
     )
+
+
+# A login for the people who review the site for a payment service, who cannot use Google sign-in. It exists only while
+# REVIEWER_EMAIL and REVIEWER_PASSWORD are both set (remove them when the review is over), signs in one ordinary Free account that
+# is never an admin, and is rate-limited.
+_REVIEWER_EMAIL = os.environ.get("REVIEWER_EMAIL", "").strip().lower()
+_REVIEWER_PASSWORD = os.environ.get("REVIEWER_PASSWORD", "")
+_reviewer_limiter = RateLimiter(limit=8, window=60.0)
+
+
+class ReviewerBody(BaseModel):
+    email: str
+    password: str
+
+
+@app.post("/api/auth/reviewer")
+def sign_in_as_reviewer(body: ReviewerBody, request: Request, response: Response) -> dict:
+    if not (_REVIEWER_EMAIL and _REVIEWER_PASSWORD) or _REVIEWER_EMAIL in _ADMIN_EMAILS:
+        raise HTTPException(status_code=404, detail="Not found")  # off (or set up to hand out an admin, which it never does)
+    caller = request.client.host if request.client else "unknown"
+    if not _reviewer_limiter.allow(caller):
+        raise HTTPException(status_code=429, detail="Too many attempts. Please wait a minute.")
+    same_email = hmac.compare_digest(body.email.strip().lower().encode(), _REVIEWER_EMAIL.encode())
+    same_password = hmac.compare_digest(body.password.encode(), _REVIEWER_PASSWORD.encode())
+    if not (same_email and same_password):  # both are always checked, so the answer does not say which was wrong
+        raise HTTPException(status_code=401, detail="That email or password is not right.")
+    user = accounts.sign_in("reviewer:" + _REVIEWER_EMAIL, _REVIEWER_EMAIL, "Razorpay reviewer", "")
+    if user["disabled"]:
+        raise HTTPException(status_code=403, detail="This account has been blocked.")
+    _start_session(user, request, response)
     return {"user": _public_user(user)}
 
 
@@ -717,7 +752,10 @@ def admin_overview(request: Request) -> dict:
         "plans": {"active": len(plans.list_plans(only_active=True)), "total": len(plans.list_plans())},
         "revenue": plans.revenue(),
         "payments": razorpay.status(),
-        "signIn": {"configured": bool(_GOOGLE_CLIENT_ID), "admins": len(_ADMIN_EMAILS)},
+        "signIn": {
+            "configured": bool(_GOOGLE_CLIENT_ID), "admins": len(_ADMIN_EMAILS),
+            "reviewer": bool(_REVIEWER_EMAIL and _REVIEWER_PASSWORD and _REVIEWER_EMAIL not in _ADMIN_EMAILS),
+        },
     }
 
 
