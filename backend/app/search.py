@@ -190,6 +190,54 @@ def search_songs(query: str, limit: int = 24) -> list[dict]:
     return songs[:limit]
 
 
+_suggest_cache: dict[str, tuple[float, dict]] = {}
+
+
+def suggest(query: str, songs_limit: int = 6, queries_limit: int = 4) -> dict:
+    """What to offer while somebody is still typing: a few songs that can be opened straight away, and a few likely searches
+    (YouTube Music's own autocomplete). Light on purpose, since it runs as people type: one request for each, in parallel."""
+    q = clean_query(query)
+    if len(q) < 2:
+        return {"songs": [], "queries": []}
+    key = q.lower()
+    now = time.monotonic()
+    with _cache_lock:
+        hit = _suggest_cache.get(key)
+        if hit and now - hit[0] < CACHE_SECONDS:
+            return hit[1]
+
+    def songs() -> list[dict]:
+        found = [_song(item, "song") for item in _ytmusic().search(q, filter="songs", limit=10, ignore_spelling=False)]
+        return [x for x in found if x][:songs_limit]
+
+    def texts() -> list[str]:
+        seen = {key}
+        out: list[str] = []
+        for text in _ytmusic().get_search_suggestions(q):
+            clean = clean_query(text)
+            if clean and clean.lower() not in seen:
+                seen.add(clean.lower())
+                out.append(clean)
+        return out[:queries_limit]
+
+    failures = 0
+    result: dict[str, list] = {"songs": [], "queries": []}
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        futures = {"songs": pool.submit(songs), "queries": pool.submit(texts)}
+        for name, future in futures.items():
+            try:
+                result[name] = future.result()
+            except Exception:
+                failures += 1
+    if failures == 2:
+        raise SearchUnavailable("YouTube Music did not answer")
+    with _cache_lock:
+        if len(_suggest_cache) > 500:
+            _suggest_cache.clear()
+        _suggest_cache[key] = (now, result)
+    return result
+
+
 class RateLimiter:
     """At most `limit` searches per `window` seconds for each caller, so the endpoint cannot be used to hammer YouTube."""
 

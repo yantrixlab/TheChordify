@@ -113,6 +113,22 @@ export async function searchSongs(query: string, signal?: AbortSignal): Promise<
   return data.results ?? [];
 }
 
+export interface Suggestions {
+  songs: SongHit[]; // to open straight away
+  queries: string[]; // likely searches
+}
+
+/** What to offer while somebody types in the toolbar search. Pass a signal to cancel the one a newer keystroke replaced. */
+export async function suggestSongs(query: string, signal?: AbortSignal): Promise<Suggestions> {
+  const res = await fetchApi(`${API_BASE}/api/suggest?q=${encodeURIComponent(query)}`, { signal });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new ApiError(body.detail || `Suggestions failed (${res.status})`, res.status);
+  }
+  const data = await res.json();
+  return { songs: data.songs ?? [], queries: data.queries ?? [] };
+}
+
 /** The most-jammed songs on the site (empty while nobody has played anything yet). */
 export async function getPopularSongs(): Promise<SongHit[]> {
   const res = await fetchApi(`${API_BASE}/api/popular`);

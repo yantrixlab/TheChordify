@@ -21,7 +21,7 @@ from . import accounts as accounts_module
 from .accounts import AccountStore, SignInError
 from .engagement import BADGE_RULES, DEFAULT_CONFIG, REWARD_KINDS, Engagement
 from .jobs import JobQueue
-from .search import RateLimiter, SearchUnavailable, clean_query, search_songs
+from .search import RateLimiter, SearchUnavailable, clean_query, search_songs, suggest
 from .store import SongStore
 from . import trending as trending_shelves
 from . import youtube
@@ -312,6 +312,7 @@ def _run_analysis_job(
 
 
 _search_limiter = RateLimiter(limit=30, window=60.0)
+_suggest_limiter = RateLimiter(limit=90, window=60.0)  # it runs as people type, so it gets more room than a full search
 
 
 @app.get("/api/search")
@@ -334,6 +335,27 @@ def search(request: Request, q: str = "") -> dict:
     except SearchUnavailable as exc:
         log.warning("Song search failed: %s", exc)
         raise HTTPException(status_code=502, detail="Song search is unavailable right now. Please try again in a moment.")
+
+
+@app.get("/api/suggest")
+def suggest_songs(request: Request, q: str = "") -> dict:
+    """The toolbar search's suggestions: songs to open straight away (the ones already chordified come first, with their chords
+    and jam count) and likely searches."""
+    query = clean_query(q)
+    if len(query) < 2:
+        return {"query": query, "songs": [], "queries": []}
+    caller = request.client.host if request.client else "unknown"
+    if not _suggest_limiter.allow(caller):
+        raise HTTPException(status_code=429, detail="Too many searches. Please wait a moment.")
+    try:
+        found = suggest(query)
+    except SearchUnavailable as exc:
+        log.warning("Suggestions failed: %s", exc)
+        raise HTTPException(status_code=502, detail="Suggestions are unavailable right now.")
+    known = catalog.lookup([song["videoId"] for song in found["songs"]])
+    songs = [{**song, **known.get(song["videoId"], {})} for song in found["songs"]]
+    songs.sort(key=lambda song: (0, -song["jams"]) if "jams" in song else (1, 0))  # chordified first, the rest as they came
+    return {"query": query, "songs": songs, "queries": found["queries"]}
 
 
 # ---- admin: keep YouTube downloads working (cookies expire; this avoids a redeploy each time) --------------------------

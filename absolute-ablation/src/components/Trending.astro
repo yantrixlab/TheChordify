@@ -105,6 +105,7 @@
   import type { SongHit, TrendingShelf } from "../lib/api";
   import { clock, jamLabel } from "../lib/format";
   import { heartButton, sessionIdOfVideo } from "../lib/library";
+  import { rememberSong } from "../lib/recent";
 
   const section = document.getElementById("trending") as HTMLElement;
   const shelves = document.getElementById("tr-shelves") as HTMLElement;
@@ -193,6 +194,7 @@
   }
 
   async function choose(song: SongHit, button: HTMLButtonElement) {
+    rememberSong(song);
     shelves.querySelectorAll<HTMLButtonElement>(".tc").forEach((b) => (b.disabled = true));
     button.setAttribute("aria-busy", "true");
     const label = button.querySelector(".tc-go span");

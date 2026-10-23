@@ -118,6 +118,7 @@ import Footer from "../components/Footer.astro";
 <script>
   import { searchSongs, getPopularSongs, startExtractFromYoutube, getApiErrorMessage } from "../lib/api";
   import { heartButton, sessionIdOfVideo } from "../lib/library";
+  import { rememberQuery, rememberSong } from "../lib/recent";
 
   // Searches people can try with one tap (shown before anything is typed, and when nothing matches).
   const examples = ["Perfect Ed Sheeran", "Tum Hi Ho", "Wonderwall", "Let It Be", "Kal Ho Naa Ho"];
@@ -197,6 +198,7 @@ import Footer from "../components/Footer.astro";
   const spinner = '<svg class="spin" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.6" stroke-opacity="0.35"/><path d="M14 8a6 6 0 0 0-6-6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
 
   async function choose(song, button) {
+    rememberSong(song);
     document.querySelectorAll(".pick").forEach((b) => (b.disabled = true));
     button.innerHTML = `${spinner}<span class="label">Starting…</span>`;
     try {
@@ -277,7 +279,10 @@ import Footer from "../components/Footer.astro";
       const songs = await searchSongs(query, controller.signal);
       panel.setAttribute("aria-busy", "false");
       if (songs.length === 0) showEmpty(query);
-      else showResults(query, songs);
+      else {
+        rememberQuery(query);
+        showResults(query, songs);
+      }
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return; // replaced by a newer search
       panel.setAttribute("aria-busy", "false");

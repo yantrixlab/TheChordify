@@ -53,6 +53,36 @@ const navLinks = [
 
     <!-- CTA cluster -->
     <div class="flex items-center gap-2">
+      <!-- Search: a bar on a computer, a button that opens a full-width bar on a phone or tablet -->
+      <div id="ns" class="ns">
+        <form id="ns-form" class="ns-form" role="search" autocomplete="off">
+          <span class="ns-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><circle cx="9" cy="9" r="5.8" stroke="currentColor" stroke-width="1.8" /><path d="m13.5 13.5 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
+          </span>
+          <input
+            id="ns-input"
+            type="text"
+            inputmode="search"
+            enterkeyhint="search"
+            maxlength="100"
+            placeholder="Search songs…"
+            aria-label="Search songs"
+            role="combobox"
+            aria-expanded="false"
+            aria-controls="ns-panel"
+            aria-autocomplete="list"
+            autocomplete="off"
+            autocapitalize="off"
+            spellcheck="false"
+          />
+          <kbd class="ns-key" aria-hidden="true">/</kbd>
+          <button id="ns-close" type="button" class="ns-close" aria-label="Close search">Cancel</button>
+        </form>
+        <div id="ns-panel" class="ns-panel" role="listbox" aria-label="Search suggestions" hidden></div>
+      </div>
+      <button id="ns-open" type="button" class="ns-open" aria-label="Search songs">
+        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="9" cy="9" r="5.8" stroke="currentColor" stroke-width="1.8" /><path d="m13.5 13.5 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
+      </button>
       <div data-auth-guest class="flex items-center gap-2">
       <button type="button" data-auth="open"
         class="hidden sm:inline-flex items-center"
@@ -166,7 +196,9 @@ const navLinks = [
 
 <script>
   import { initAuthUi } from "../lib/authUi";
+  import { initNavSearch } from "../lib/navSearch";
   initAuthUi();
+  initNavSearch();
 
   const btn = document.getElementById("hamburger-btn")!;
   const menu = document.getElementById("mobile-menu")!;
@@ -211,6 +243,8 @@ const navLinks = [
 
 <style is:global>
   [data-auth-guest][hidden] { display: none !important; }
+  nav button[data-auth] { white-space: nowrap; }
+  @media (max-width: 420px) { nav[aria-label="Main navigation"] > div { padding-left: 14px !important; padding-right: 14px !important; } }
   nav button[data-auth], #mobile-menu button[data-auth] { border: 1px solid transparent; font-family: inherit; cursor: pointer; }
 
   /* the account menu */
@@ -242,6 +276,69 @@ const navLinks = [
   .au-hud[hidden], .au-hud [hidden] { display: none; }
   .au-hud-mobile { margin: 8px 0 10px; padding: 16px; }
   @media (prefers-reduced-motion: reduce) { .au-xp i, .au-trigger { transition: none; } }
+
+  /* the search bar and its suggestions */
+  .ns { position: relative; }
+  .ns-form { position: relative; display: flex; align-items: center; width: 232px; height: 40px; border-radius: 999px; background: var(--color-canvas-soft-2); border: 1.5px solid transparent; transition: width 0.22s cubic-bezier(0.3, 0.7, 0.2, 1), background-color 0.15s, border-color 0.15s, box-shadow 0.15s; }
+  .ns-form:hover { background: #ebe3fb; }
+  .ns.is-focus .ns-form { width: 340px; background: #fff; border-color: var(--color-violet); box-shadow: 0 0 0 4px #7c3aed1f; }
+  .ns-icon { display: grid; place-items: center; flex: none; width: 40px; color: var(--color-mute); }
+  .ns.is-focus .ns-icon { color: var(--color-violet); }
+  .ns-form input { flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; outline: 0; background: transparent; font: 500 14.5px var(--font-sans); color: var(--color-ink); }
+  .ns-form input::placeholder { color: #9a8fb5; }
+  .ns-key { display: grid; place-items: center; flex: none; width: 22px; height: 22px; margin-right: 10px; border-radius: 6px; border: 1px solid var(--color-hairline-strong); background: #fff; font: 600 12px var(--font-mono); color: var(--color-mute); }
+  .ns.is-focus .ns-key { display: none; }
+  .ns-close, .ns-open { display: none; }
+  .ns-panel { position: absolute; right: 0; top: calc(100% + 10px); z-index: 70; width: 440px; max-width: calc(100vw - 24px); max-height: min(560px, calc(100vh - 100px)); overflow-y: auto; padding: 8px; border-radius: 20px; background: #fff; border: 1px solid var(--color-hairline); box-shadow: 0 30px 60px -24px #1a053388, 0 6px 16px #1a05331a; overscroll-behavior: contain; animation: ns-in 0.16s ease-out; }
+  .ns-panel[hidden] { display: none; }
+  .ns-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 10px 6px; font: 700 11px var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-mute); }
+  .ns-link { border: 0; background: none; cursor: pointer; font: 700 12px var(--font-sans); letter-spacing: 0; text-transform: none; color: var(--color-violet-deep); }
+  .ns-link:hover { text-decoration: underline; }
+  .ns-row { display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 14px; cursor: pointer; transition: background-color 0.1s; }
+  .ns-row.is-active, .ns-row:hover { background: var(--color-violet-soft); }
+  .ns-row.is-busy { opacity: 0.7; cursor: progress; }
+  .ns-art { flex: none; width: 46px; height: 46px; overflow: hidden; border-radius: 12px; background: linear-gradient(135deg, #ede9fe, #fde68a); }
+  .ns-art img { display: block; width: 100%; height: 100%; object-fit: cover; }
+  .ns-text { display: grid; flex: 1; min-width: 0; gap: 1px; }
+  .ns-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 14.5px var(--font-sans); color: var(--color-ink); }
+  .ns-title mark { background: none; color: var(--color-violet-deep); font-weight: 800; }
+  .ns-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; color: var(--color-mute); }
+  .ns-ready { display: flex; align-items: center; gap: 4px; margin-top: 3px; }
+  .ns-ready b { padding: 1px 6px; border-radius: 6px; background: #fff; border: 1px solid var(--color-hairline); font: 700 11px/1.4 var(--font-mono); color: var(--color-ink); }
+  .ns-ready em { margin-left: 4px; font: 700 11.5px var(--font-sans); font-style: normal; color: var(--color-violet-deep); }
+  .ns-go { display: inline-flex; align-items: center; gap: 6px; flex: none; font: 700 12.5px var(--font-sans); color: var(--color-violet-deep); opacity: 0; transition: opacity 0.1s; }
+  .ns-row.is-active .ns-go, .ns-row:hover .ns-go, .ns-row.is-busy .ns-go { opacity: 1; }
+  .ns-x { display: grid; place-items: center; flex: none; width: 30px; height: 30px; border: 0; border-radius: 50%; background: none; cursor: pointer; color: var(--color-mute); }
+  .ns-x:hover { background: #fff; color: var(--color-error); }
+  .ns-row-query { padding: 10px; }
+  .ns-row-query .ns-title, .ns-all .ns-title { flex: 1; min-width: 0; }
+  .ns-mark { display: grid; place-items: center; flex: none; width: 46px; color: var(--color-mute); }
+  .ns-row-query .ns-mark { width: 30px; }
+  .ns-all { margin-top: 4px; border-top: 1px solid var(--color-hairline); border-radius: 0 0 14px 14px; padding: 12px 10px; }
+  .ns-all .ns-mark { color: var(--color-violet); }
+  .ns-all .ns-go { opacity: 1; }
+  .ns-all .ns-title strong { color: var(--color-violet-deep); }
+  .ns-empty { margin: 0; padding: 18px 12px; text-align: center; font-size: 13.5px; line-height: 1.5; color: var(--color-mute); }
+  .ns-error { margin: 0 0 6px; padding: 8px 12px; border-radius: 10px; background: #fef2f2; color: var(--color-error); font-size: 13px; }
+  .ns-ghost { height: 62px; margin: 4px 0; border-radius: 14px; background: linear-gradient(100deg, #f3eeff 30%, #fbf9ff 50%, #f3eeff 70%); background-size: 200% 100%; animation: ns-shimmer 1.3s linear infinite; }
+  .ns-spin { animation: ns-turn 0.7s linear infinite; }
+  @keyframes ns-in { from { opacity: 0; transform: translateY(-6px); } }
+  @keyframes ns-shimmer { to { background-position: -200% 0; } }
+  @keyframes ns-turn { to { transform: rotate(360deg); } }
+
+  /* below a laptop there is no room for the bar: a button opens it as a sheet across the top of the screen */
+  @media (max-width: 1023px) {
+    .ns { display: none; }
+    .ns-open { display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 1px solid var(--color-hairline); border-radius: 50%; background: var(--color-canvas); color: var(--color-ink); cursor: pointer; }
+    .ns.is-sheet { position: fixed; z-index: 90; left: 0; right: 0; top: 0; display: block; padding: 10px 12px; background: #fff; box-shadow: 0 8px 24px -12px #1a053366; }
+    .ns.is-sheet .ns-form { width: 100%; height: 46px; background: var(--color-canvas-soft-2); }
+    .ns.is-sheet .ns-form input { font-size: 16px; } /* 16px keeps phones from zooming into the field */
+    .ns.is-sheet .ns-key { display: none; }
+    .ns.is-sheet .ns-close { display: block; flex: none; padding: 0 14px; border: 0; background: none; font: 700 14px var(--font-sans); color: var(--color-violet-deep); cursor: pointer; }
+    .ns-panel { position: fixed; left: 8px; right: 8px; top: 64px; width: auto; max-width: none; max-height: calc(100vh - 76px); max-height: calc(100dvh - 76px); }
+    .ns-go { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { .ns-form, .ns-panel, .ns-ghost, .ns-spin { animation: none; transition: none; } }
 
   /* the sign-in window */
   .au-backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 16px; background: #0d001f99; backdrop-filter: blur(4px); animation: au-fade 0.18s ease-out; }
