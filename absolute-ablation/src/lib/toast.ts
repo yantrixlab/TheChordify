@@ -68,6 +68,7 @@ export function toast(options: ToastOptions) {
   const icon = document.createElement("div");
   icon.className = "xt-icon";
   icon.textContent = options.icon;
+  if (/^\d+$/.test(options.icon)) icon.style.fontSize = options.icon.length > 3 ? "13px" : options.icon.length > 2 ? "16px" : ""; // a level of three or four digits has to fit its badge
   const body = document.createElement("div");
   body.className = "xt-body";
   const title = document.createElement("p");

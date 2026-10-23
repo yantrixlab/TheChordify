@@ -16,11 +16,11 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
 
     <section class="adm-card" aria-labelledby="h-levels">
       <h2 id="h-levels">Levels</h2>
-      <p class="adm-hint">There is no top level. Reaching level <em>n</em> takes <code>base × (n − 1) ^ growth</code> XP, so each level asks a little more than the last. A higher growth makes the climb steeper.</p>
+      <p class="adm-hint">There is no top level: levels 500 or 1000 work as well as 20. Reaching level <em>n</em> takes <code>base × (n − 1) ^ growth</code> XP, so each level asks a little more than the last. A higher growth makes the climb steeper, so for a long climb lower the base or the growth (a growth near 1 is almost the same XP for every level). The table shows what the numbers above mean in practice.</p>
       <div id="curve-fields" class="rw-grid"></div>
       <div class="adm-table-wrap" style="margin-top:14px">
         <table class="adm-table">
-          <thead><tr><th>Level</th><th class="num">Total XP</th><th class="num">From the level before</th><th class="num">About this many new songs</th></tr></thead>
+          <thead><tr><th>Level</th><th class="num">Total XP</th><th class="num">From the level before</th><th class="num">About this many new songs</th><th class="num">Days at the daily cap</th></tr></thead>
           <tbody id="curve-preview"></tbody>
         </table>
       </div>
@@ -93,6 +93,7 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
     cls?: string;
     placeholder?: string;
     max?: number;
+    step?: string;
   }
 
   function field(f: Field, value: any): HTMLElement {
@@ -110,7 +111,10 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
       input = el("input");
       input.type = f.type ?? "text";
       if (f.placeholder) input.placeholder = f.placeholder;
-      if (f.type === "number") input.min = "0";
+      if (f.type === "number") {
+        input.min = "0";
+        input.step = f.step ?? "1";
+      }
       if (f.max) input.maxLength = f.max;
     }
     input.value = String(value ?? "");
@@ -164,7 +168,7 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
   ];
   const CURVE_FIELDS: Field[] = [
     { key: "base", label: "Base XP", type: "number" },
-    { key: "growth", label: "Growth (1 to 4)", type: "number" },
+    { key: "growth", label: "Growth (1 to 4)", type: "number", step: "0.05" },
   ];
   const TITLE_FIELDS: Field[] = [
     { key: "level", label: "From level", type: "number", cls: "narrow" },
@@ -189,10 +193,11 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
 
   function drawPreview() {
     const { base, growth } = readCurve();
+    const cap = Number(($("xp-fields").querySelector('[data-key="dailyCap"]') as HTMLInputElement).value) || 0;
     const perSong = (Number(($("xp-fields").querySelector('[data-key="play"]') as HTMLInputElement).value) || 0) + (Number(($("xp-fields").querySelector('[data-key="newSong"]') as HTMLInputElement).value) || 0);
     const at = (n: number) => (n <= 1 ? 0 : Math.round(base * (n - 1) ** growth));
     $("curve-preview").replaceChildren(
-      ...[2, 3, 4, 5, 10, 20, 30, 50, 100].map((n) => {
+      ...[2, 3, 4, 5, 10, 20, 50, 100, 200, 500, 1000].map((n) => {
         const tr = el("tr");
         const td = (text: string, cls = "") => {
           const cell = el("td", cls, text);
@@ -202,6 +207,7 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
         td(number(at(n)), "num");
         td(`+${number(at(n) - at(n - 1))}`, "num");
         td(perSong > 0 ? `~${number(Math.ceil(at(n) / perSong))}` : "—", "num");
+        td(cap > 0 ? `~${number(Math.ceil(at(n) / cap))}` : "—", "num");
         return tr;
       }),
     );
