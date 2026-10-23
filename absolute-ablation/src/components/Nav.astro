@@ -355,9 +355,17 @@ const navLinks = [
   .au-status { min-height: 20px; margin: 12px 0 0; font-size: 13.5px; color: var(--color-mute); }
   .au-status.bad { color: var(--color-error); }
   .au-fine { margin: 14px 0 0; font-size: 12px; line-height: 1.5; color: var(--color-mute); }
-  .au-reviewer { margin: 12px 0 0; padding-top: 12px; border-top: 1px solid var(--color-hairline); font-size: 12.5px; }
-  .au-reviewer a { color: var(--color-mute); font-weight: 600; text-underline-offset: 2px; }
-  .au-reviewer a:hover { color: var(--color-violet-deep); }
+  .au-rv { margin: 0 0 6px; text-align: left; }
+  .au-rv-form { display: grid; gap: 10px; }
+  .au-rv-title { margin: 0; font: 700 11px var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-mute); text-align: center; }
+  .au-rv-form input { width: 100%; height: 44px; padding: 0 14px; border-radius: 12px; border: 1.5px solid var(--color-hairline); font: 500 15px var(--font-sans); color: var(--color-ink); outline: none; }
+  .au-rv-form input:focus { border-color: var(--color-violet); box-shadow: 0 0 0 3px #7c3aed1f; }
+  .au-rv-btn { height: 46px; border: 0; border-radius: 12px; cursor: pointer; color: #fff; font: 800 15px var(--font-sans); background: linear-gradient(135deg, #7c3aed, #5b21b6); box-shadow: 0 10px 20px -10px #5b21b6cc; }
+  .au-rv-btn:disabled { opacity: 0.6; cursor: progress; }
+  .au-rv-btn:focus-visible { outline: 2px solid var(--color-violet); outline-offset: 2px; }
+  .au-rv-msg { min-height: 18px; margin: 0; font-size: 13px; color: var(--color-error); text-align: center; }
+  .au-or { display: flex; align-items: center; gap: 12px; margin: 6px 0 14px; font-size: 12.5px; color: var(--color-mute); }
+  .au-or::before, .au-or::after { content: ""; flex: 1; height: 1px; background: var(--color-hairline); }
   .au-fine a { color: var(--color-violet-deep); font-weight: 600; text-underline-offset: 2px; }
   @keyframes au-fade { from { opacity: 0; } }
   @keyframes au-rise { from { opacity: 0; transform: translateY(12px) scale(0.98); } }

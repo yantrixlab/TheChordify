@@ -55,7 +55,7 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
       notes.replaceChildren(
         statusLine(o.signIn.configured ? true : false, o.signIn.configured ? "Google sign-in is switched on" : "Google sign-in is off: set GOOGLE_CLIENT_ID in the server's environment"),
         statusLine(o.signIn.admins > 0 ? true : "warn", o.signIn.admins > 0 ? `${o.signIn.admins} admin email${o.signIn.admins === 1 ? "" : "s"} set (ADMIN_EMAILS)` : "No admin email set: only the admin token gets in. Set ADMIN_EMAILS"),
-        ...(o.signIn.reviewer ? [statusLine("warn", "The reviewer login (/reviewer/) is switched on. Remove REVIEWER_EMAIL and REVIEWER_PASSWORD from the server when the payment review is over")] : []),
+        ...(o.signIn.reviewer ? [statusLine("warn", "The reviewer login is on (REVIEWER_LOGIN=true): its email and password boxes show in the sign-in window. Set REVIEWER_LOGIN to false when the payment review is over")] : []),
         statusLine(o.catalog.kind === "postgres" ? true : "warn", o.catalog.kind === "postgres" ? "Songs and people are kept in Postgres" : "Songs and people are kept in a file on this server: set DATABASE_URL to use Postgres"),
         statusLine(o.payments.configured ? (o.payments.webhookSecretSet ? true : "warn") : "warn", o.payments.configured ? `Razorpay is connected${o.payments.mode ? ` (${o.payments.mode} keys)` : ""}${o.payments.webhookSecretSet ? "" : ": add RAZORPAY_WEBHOOK_SECRET so renewals are recorded"}` : "Payments are off: set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to take subscriptions"),
         statusLine(o.youtube.ready > 0 ? true : false, o.youtube.ready > 0 ? "YouTube downloads have an account to use" : "No YouTube account is ready: downloads will probably be refused"),

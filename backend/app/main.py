@@ -449,8 +449,8 @@ def auth_config() -> dict:
     """What the sign-in button needs: the public Google client id (empty until it is set, which turns sign-in off)."""
     return {
         "googleClientId": _GOOGLE_CLIENT_ID, "enabled": bool(_GOOGLE_CLIENT_ID),
-        # a link to /reviewer/ shows in the sign-in window only while the reviewer login is switched on
-        "reviewerLogin": bool(_REVIEWER_EMAIL and _REVIEWER_PASSWORD and _REVIEWER_EMAIL not in _ADMIN_EMAILS),
+        # the reviewer's email and password boxes show in the sign-in window only while REVIEWER_LOGIN is true
+        "reviewerLogin": _reviewer_enabled(),
     }
 
 
@@ -480,11 +480,17 @@ def _start_session(user: dict, request: Request, response: Response) -> None:
     )
 
 
-# A login for the people who review the site for a payment service, who cannot use Google sign-in. It exists only while
-# REVIEWER_EMAIL and REVIEWER_PASSWORD are both set (remove them when the review is over), signs in one ordinary Free account that
-# is never an admin, and is rate-limited.
+# A login for the people who review the site for a payment service, who cannot use Google sign-in. It is on only while
+# REVIEWER_LOGIN is true and REVIEWER_EMAIL and REVIEWER_PASSWORD are set (switch it to false when the review is over). It signs in
+# one ordinary Free account that is never an admin, and is rate-limited.
 _REVIEWER_EMAIL = os.environ.get("REVIEWER_EMAIL", "").strip().lower()
 _REVIEWER_PASSWORD = os.environ.get("REVIEWER_PASSWORD", "")
+_REVIEWER_SWITCH = os.environ.get("REVIEWER_LOGIN", "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _reviewer_enabled() -> bool:
+    return _REVIEWER_SWITCH and bool(_REVIEWER_EMAIL and _REVIEWER_PASSWORD) and _REVIEWER_EMAIL not in _ADMIN_EMAILS  # never one that hands out an admin
+
 _reviewer_limiter = RateLimiter(limit=8, window=60.0)
 
 
@@ -495,8 +501,8 @@ class ReviewerBody(BaseModel):
 
 @app.post("/api/auth/reviewer")
 def sign_in_as_reviewer(body: ReviewerBody, request: Request, response: Response) -> dict:
-    if not (_REVIEWER_EMAIL and _REVIEWER_PASSWORD) or _REVIEWER_EMAIL in _ADMIN_EMAILS:
-        raise HTTPException(status_code=404, detail="Not found")  # off (or set up to hand out an admin, which it never does)
+    if not _reviewer_enabled():
+        raise HTTPException(status_code=404, detail="Not found")
     caller = request.client.host if request.client else "unknown"
     if not _reviewer_limiter.allow(caller):
         raise HTTPException(status_code=429, detail="Too many attempts. Please wait a minute.")
@@ -758,7 +764,7 @@ def admin_overview(request: Request) -> dict:
         "payments": razorpay.status(),
         "signIn": {
             "configured": bool(_GOOGLE_CLIENT_ID), "admins": len(_ADMIN_EMAILS),
-            "reviewer": bool(_REVIEWER_EMAIL and _REVIEWER_PASSWORD and _REVIEWER_EMAIL not in _ADMIN_EMAILS),
+            "reviewer": _reviewer_enabled(),
         },
     }
 

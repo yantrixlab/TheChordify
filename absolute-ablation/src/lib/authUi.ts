@@ -1,6 +1,6 @@
 // The sign-in window, and the account menu that replaces "Log in" / "Start free" once somebody is signed in.
 // Every page has the menu (Nav.astro), so this is started from there.
-import { cachedUser, getAuthConfig, getMe, renderGoogleButton, signOut } from "./auth";
+import { cachedUser, getAuthConfig, getMe, renderGoogleButton, signInAsReviewer, signOut } from "./auth";
 import type { AuthUser } from "./auth";
 import { levelFraction, levelRing } from "./levelRing";
 
@@ -21,6 +21,47 @@ export function closeSignIn() {
   dialog = null;
   document.body.style.overflow = "";
   returnFocus?.focus();
+}
+
+/** The reviewer's email and password boxes, with a divider before the Google button. */
+function reviewerForm(): HTMLElement {
+  const wrap = el("div", "au-rv");
+  const form = el("form", "au-rv-form");
+  form.noValidate = true;
+  const title = el("p", "au-rv-title", "Reviewer sign-in");
+  const email = el("input");
+  email.type = "email";
+  email.placeholder = "Reviewer email";
+  email.autocomplete = "username";
+  email.setAttribute("aria-label", "Reviewer email");
+  const password = el("input");
+  password.type = "password";
+  password.placeholder = "Password";
+  password.autocomplete = "current-password";
+  password.setAttribute("aria-label", "Reviewer password");
+  const button = el("button", "au-rv-btn", "Sign in");
+  button.type = "submit";
+  const message = el("p", "au-rv-msg");
+  message.setAttribute("role", "status");
+  form.append(title, email, password, button, message);
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!email.value.trim() || !password.value) {
+      message.textContent = "Enter the email and password you were given.";
+      return;
+    }
+    button.disabled = true;
+    message.textContent = "Signing in…";
+    try {
+      await signInAsReviewer(email.value.trim(), password.value);
+      closeSignIn();
+    } catch (err) {
+      message.textContent = err instanceof Error ? err.message : "Sign-in did not work.";
+      button.disabled = false;
+    }
+  });
+  wrap.append(form, el("p", "au-or", "or continue with Google"));
+  return wrap;
 }
 
 export async function openSignIn() {
@@ -71,14 +112,11 @@ export async function openSignIn() {
   dialog = backdrop;
   close.focus();
 
-  // While the reviewer login is switched on, people who review the site for a payment service can find it from here.
+  // While the reviewer login is switched on (REVIEWER_LOGIN=true on the server), people who review the site for a payment service
+  // get an email and password form above the Google button.
   void getAuthConfig().then((config) => {
     if (!config.reviewerLogin || dialog !== backdrop) return;
-    const reviewer = el("p", "au-reviewer");
-    const link = el("a", "", "Payment reviewer? Sign in here");
-    link.href = "/reviewer/";
-    reviewer.append(link);
-    box.append(reviewer);
+    slot.before(reviewerForm());
   });
 
   const on = await renderGoogleButton(
