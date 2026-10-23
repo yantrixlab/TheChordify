@@ -4,7 +4,7 @@ import Logo from "../components/Logo.astro";
 
 interface Props {
   title: string; // the page's name, also its heading
-  active: "overview" | "users" | "plans" | "youtube" | "test";
+  active: "overview" | "users" | "plans" | "rewards" | "youtube" | "test";
   lead?: string; // one line under the heading
 }
 
@@ -14,6 +14,7 @@ const links = [
   { key: "overview", label: "Overview", href: "/admin/", icon: "M3 11 12 3l9 8M5 10v10h5v-6h4v6h5V10" },
   { key: "users", label: "Users", href: "/admin/users/", icon: "M16 19v-1a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v1M9.5 10a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7M21 19v-1a4 4 0 0 0-3-3.9M15 3.2a3.5 3.5 0 0 1 0 6.6" },
   { key: "plans", label: "Subscription plans", href: "/admin/plans/", icon: "M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM3 10h18M7 15h3" },
+  { key: "rewards", label: "Rewards", href: "/admin/rewards/", icon: "M12 15a6 6 0 1 0 0-12 6 6 0 0 0 0 12zM8.5 14l-1.5 7 5-3 5 3-1.5-7" },
   { key: "youtube", label: "YouTube accounts", href: "/admin/youtube/", icon: "M2.5 8a3 3 0 0 1 3-3h13a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3h-13a3 3 0 0 1-3-3zM10 9.5v5l4.5-2.5z" },
   { key: "test", label: "Download test", href: "/admin/youtube-test/", icon: "M12 3v12m0 0-4-4m4 4 4-4M4 19h16" },
 ];

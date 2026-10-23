@@ -189,6 +189,14 @@ class SongStore:
             (video_id, session_id, title, artist, album, duration, thumbnail, json.dumps(list(chords)), key, tempo, now, now),
         )
 
+    def get_song(self, video_id: str) -> Optional[dict]:
+        """The catalog entry of one song (title, artist, cover...), or None."""
+        rows, _ = self._db.run("SELECT * FROM songs WHERE video_id = ?", (video_id,))
+        if not rows:
+            return None
+        r = rows[0]
+        return {"videoId": r["video_id"], "title": r["title"], "artist": r["artist"], "thumbnail": r["thumbnail"], "duration": r["duration"]}
+
     def lookup(self, video_ids: list[str]) -> dict[str, dict]:
         """{video_id: {"chords": [...], "jams": n}} for the ids that have been chordified."""
         if not video_ids:

@@ -9,6 +9,10 @@ export interface AuthUser {
   picture: string;
   plan: string;
   isAdmin: boolean;
+  level?: number; // from the library: where they stand, for the menu
+  title?: string;
+  ring?: string; // an avatar ring colour they have earned
+  stars?: number;
 }
 
 interface AuthConfig {

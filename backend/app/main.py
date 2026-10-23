@@ -19,6 +19,7 @@ from pydantic import BaseModel
 from .engine import analyze
 from . import accounts as accounts_module
 from .accounts import AccountStore, SignInError
+from .engagement import BADGE_RULES, DEFAULT_CONFIG, REWARD_KINDS, Engagement
 from .jobs import JobQueue
 from .search import RateLimiter, SearchUnavailable, clean_query, search_songs
 from .store import SongStore
@@ -49,6 +50,7 @@ youtube.keep_failures(lambda: catalog.load_result("meta:failures"), lambda data:
 _TRENDING_KEY = "meta:trending"  # not a valid song id, so it can never be asked for as a result
 trending_shelves.start(lambda: catalog.load_result(_TRENDING_KEY), lambda data: catalog.save_result(_TRENDING_KEY, data))
 accounts = AccountStore(catalog.db)
+engagement = Engagement(catalog.db)
 try:  # results and songs that older versions kept in files join the database, once
     log.info("Imported from files: %s", catalog.import_files(CACHE_DIR))
 except Exception as exc:
@@ -447,7 +449,10 @@ def sign_in_with_google(body: GoogleBody, request: Request, response: Response) 
 def whoami(request: Request, response: Response) -> dict:
     response.headers["Cache-Control"] = "no-store"
     user = _session_user(request)
-    return {"user": _public_user(user) if user else None}
+    if not user:
+        return {"user": None}
+    snap = engagement.snapshot(user["id"])
+    return {"user": {**_public_user(user), **{k: snap[k] for k in ("level", "title", "ring", "stars")}}}
 
 
 @app.post("/api/auth/logout")
@@ -531,8 +536,10 @@ def admin_users(request: Request, search: str = "", page: int = 1, pageSize: int
     size = min(max(pageSize, 1), 100)
     page = max(page, 1)
     users, total = accounts.list_users(search=search[:100], limit=size, offset=(page - 1) * size)
+    xps = engagement.xp_of([u["id"] for u in users])
+    levels = engagement.levels_of(xps)
     return {
-        "users": [{**u, "isAdmin": u["email"] in _ADMIN_EMAILS} for u in users],
+        "users": [{**u, "isAdmin": u["email"] in _ADMIN_EMAILS, "xp": xps.get(u["id"], 0), "level": levels.get(u["id"], 1)} for u in users],
         "total": total, "page": page, "pageSize": size,
     }
 
@@ -577,6 +584,142 @@ def admin_delete_plan(plan_id: str, request: Request) -> dict:
     if not accounts.delete_plan(plan_id):
         raise HTTPException(status_code=404, detail="No such plan")
     return {"ok": True}
+
+
+# ---- the signed-in person's library, favourites and progress --------------------------------------------------------------
+
+_SESSION_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+_THUMBNAIL = re.compile(r"^https://(i\.ytimg\.com|yt3\.googleusercontent\.com|lh3\.googleusercontent\.com)/[^\s]{1,260}$")
+_play_limiter = RateLimiter(limit=60, window=60.0)
+
+
+class FavoriteBody(BaseModel):
+    title: str = ""
+    artist: str = ""
+    thumbnail: str = ""
+    duration: float = 0
+
+
+class PlayedBody(BaseModel):
+    sessionId: str
+
+
+def _require_user(request: Request, changes: bool = False) -> dict:
+    user = _session_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Sign in to continue")
+    if changes and not _origin_ok(request):
+        raise HTTPException(status_code=403, detail="This request came from another site")
+    return user
+
+
+def _library_meta(session_id: str, supplied: Optional[dict] = None) -> tuple[Optional[dict], bool]:
+    """What the library should remember about a song, and whether we have really analysed it (so it is worth XP).
+    What we hold ourselves is trusted; what the browser supplies is only used for a YouTube song we have not analysed, and is clipped."""
+    video_id = session_id[3:] if session_id.startswith("yt_") and is_video_id(session_id[3:]) else ""
+    result = _load_cached_result(session_id)
+    if result:
+        song = catalog.get_song(video_id) if video_id else None
+        thumbnail = (song or {}).get("thumbnail") or (f"https://i.ytimg.com/vi/{video_id}/mqdefault.jpg" if video_id else "")
+        return {
+            "videoId": video_id, "title": (result.get("title") or (song or {}).get("title") or "Untitled song")[:140],
+            "artist": (result.get("artist") or (song or {}).get("artist") or "")[:140], "thumbnail": thumbnail,
+            "duration": float(result.get("duration") or 0), "chords": _chord_summary(result.get("chords", [])),
+        }, True
+    if video_id and supplied and supplied.get("title"):
+        thumbnail = supplied.get("thumbnail", "")
+        return {
+            "videoId": video_id, "title": str(supplied["title"])[:140], "artist": str(supplied.get("artist", ""))[:140],
+            "thumbnail": thumbnail if _THUMBNAIL.match(thumbnail) else f"https://i.ytimg.com/vi/{video_id}/mqdefault.jpg",
+            "duration": max(0.0, min(float(supplied.get("duration") or 0), 36000.0)), "chords": [],
+        }, False
+    return None, False
+
+
+@app.get("/api/me/profile")
+def my_profile(request: Request, response: Response) -> dict:
+    user = _require_user(request)
+    response.headers["Cache-Control"] = "no-store"
+    return {"user": _public_user(user), "profile": engagement.profile(user["id"])}
+
+
+@app.get("/api/me/library")
+def my_library(request: Request, response: Response, tab: str = "history", limit: int = 48, offset: int = 0) -> dict:
+    user = _require_user(request)
+    response.headers["Cache-Control"] = "no-store"
+    items, total = engagement.list_items(user["id"], "favorites" if tab == "favorites" else "history", min(max(limit, 1), 100), max(offset, 0))
+    return {"items": items, "total": total}
+
+
+@app.get("/api/me/favorites")
+def my_favorites(request: Request, response: Response) -> dict:
+    user = _require_user(request)
+    response.headers["Cache-Control"] = "no-store"
+    return {"keys": engagement.favorite_keys(user["id"])}
+
+
+@app.put("/api/me/favorites/{session_id}")
+def add_favorite(session_id: str, request: Request, body: Optional[FavoriteBody] = None) -> dict:
+    user = _require_user(request, changes=True)
+    if not _SESSION_ID.match(session_id):
+        raise HTTPException(status_code=400, detail="That is not a song")
+    meta, real = _library_meta(session_id, body.model_dump() if body else None)
+    if meta is None:
+        raise HTTPException(status_code=404, detail="We do not know that song")
+    return engagement.set_favorite(user["id"], session_id, meta, True, pays_xp=real)
+
+
+@app.delete("/api/me/favorites/{session_id}")
+def remove_favorite(session_id: str, request: Request) -> dict:
+    user = _require_user(request, changes=True)
+    if not _SESSION_ID.match(session_id):
+        raise HTTPException(status_code=400, detail="That is not a song")
+    return engagement.set_favorite(user["id"], session_id, {}, False, pays_xp=False)
+
+
+@app.post("/api/me/played")
+def i_played(body: PlayedBody, request: Request) -> dict:
+    """The player calls this once per visit to a song, when playback starts: it fills the history and pays out XP."""
+    user = _require_user(request, changes=True)
+    if not _play_limiter.allow(user["id"]):
+        raise HTTPException(status_code=429, detail="Slow down a little")
+    if not _SESSION_ID.match(body.sessionId):
+        raise HTTPException(status_code=400, detail="That is not a song")
+    meta, real = _library_meta(body.sessionId)
+    if not real or meta is None:
+        raise HTTPException(status_code=404, detail="We do not know that song")  # only songs we have analysed count
+    return engagement.record_play(user["id"], body.sessionId, meta)
+
+
+# ---- admin: the rules for XP, levels, badges and rewards -------------------------------------------------------------------
+
+
+class RewardsBody(BaseModel):
+    config: dict
+
+
+@app.get("/api/admin/rewards")
+def admin_rewards(request: Request) -> dict:
+    _require_admin(request)
+    return {
+        "config": engagement.config(), "defaults": DEFAULT_CONFIG, "badgeCounts": engagement.badge_counts(),
+        "badgeRules": BADGE_RULES, "rewardKinds": REWARD_KINDS,
+    }
+
+
+@app.put("/api/admin/rewards")
+def admin_save_rewards(body: RewardsBody, request: Request) -> dict:
+    _require_admin(request)
+    try:
+        return {"config": engagement.save_config(body.config)}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.post("/api/admin/rewards/reset")
+def admin_reset_rewards(request: Request) -> dict:
+    _require_admin(request)
+    return {"config": engagement.reset_config()}
 
 
 class AccountBody(BaseModel):

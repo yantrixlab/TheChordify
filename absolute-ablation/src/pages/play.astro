@@ -28,7 +28,7 @@ import Nav from "../components/Nav.astro";
                 </div>
                 <div id="song-sub" class="ph-sub"><span class="ph-sub-main">Transcription by Chord Suno</span><span id="song-note" class="ph-note" hidden>Refining the sections…</span></div>
               </div>
-              <button id="btn-share" type="button" class="ph-share">Share</button>
+              <div class="ph-actions" id="ph-actions"><button id="btn-share" type="button" class="ph-share">Share</button></div>
             </div>
             <div class="ph-controls">
               <button id="btn-restart" type="button" class="ph-btn" aria-label="Back to the start">
@@ -336,6 +336,9 @@ import Nav from "../components/Nav.astro";
   .ph-title h1 { margin: 0; font-size: 22px; font-weight: 700; line-height: 1.2; letter-spacing: -0.01em; }
   .ph-by { font-size: 14px; color: var(--color-mute); }
   .ph-sub { margin-top: 3px; font-size: 13px; color: var(--color-mute); }
+  .ph-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+  .hb.hb-head { width: 32px; height: 32px; background: var(--color-violet-soft); box-shadow: none; }
+  .hb.hb-head:hover { background: #fde7f3; }
   .ph-share { flex: 0 0 auto; height: 32px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--color-violet-soft);
     color: var(--color-violet-deep); font-size: 13px; font-weight: 600; cursor: pointer; }
   .ph-share:hover { background: #ddd2fb; }
@@ -451,6 +454,7 @@ import Nav from "../components/Nav.astro";
 <script>
   import { getGuitarShapes, chordNotes, chordKeyLabel, transposeChord, type GuitarShape } from "../lib/chordShapes";
   import { API_BASE, registerJam, type ExtractResult, type ChordSegment, type Bar, type Section } from "../lib/api";
+  import { heartButton, recordPlay } from "../lib/library";
 
   const params = new URLSearchParams(window.location.search);
   const sessionId = params.get("session");
@@ -636,9 +640,18 @@ import Nav from "../components/Nav.astro";
     void registerJam(id);
   }
 
+  // For a signed-in person, a visit to a song goes in their history and earns XP, once, when playback first starts.
+  let playRecorded = false;
+  function recordMyPlayOnce() {
+    if (playRecorded || !sessionId) return;
+    playRecorded = true;
+    void recordPlay(sessionId);
+  }
+
   function setPlayingUi(playing: boolean) {
     if (playing) {
       countJamOnce();
+      recordMyPlayOnce();
       lastFollowedRow = null; // re-centre the grid on the playing row as soon as playback starts
       gridActive = -1;
     }
@@ -1669,6 +1682,21 @@ import Nav from "../components/Nav.astro";
     songTitleEl.textContent = title;
     songArtistEl.textContent = result.artist ? `by ${result.artist}` : "";
     document.title = `${title} chords — Chord Suno`;
+    if (result.sessionId && !document.getElementById("ph-heart")) {
+      // the favourite heart, beside Share
+      const heart = heartButton(
+        {
+          sessionId: result.sessionId,
+          title,
+          artist: result.artist ?? "",
+          thumbnail: result.videoId ? `https://i.ytimg.com/vi/${result.videoId}/mqdefault.jpg` : "",
+          duration: result.duration,
+        },
+        "hb hb-head",
+      );
+      heart.id = "ph-heart";
+      document.getElementById("ph-actions")?.prepend(heart);
+    }
     detailToggle.hidden = chordsDetailed === chordsSimple;
 
     loadingState.classList.add("hidden");

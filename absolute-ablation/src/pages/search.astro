@@ -64,7 +64,7 @@ import Footer from "../components/Footer.astro";
 
   .list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
   .list + div { margin-top: 26px; }  /* the example searches under the popular list */
-  .song { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 14px; padding: 10px 12px 10px 10px;
+  .song { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto auto; align-items: center; gap: 14px; padding: 10px 12px 10px 10px;
     border-radius: 16px; background: #fff; border: 1px solid var(--color-hairline); box-shadow: 0 1px 2px #1a05330a;
     transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s; }
   .song:hover { border-color: #cdbbee; box-shadow: 0 14px 28px -18px #5b21b690; transform: translateY(-1px); }
@@ -105,7 +105,7 @@ import Footer from "../components/Footer.astro";
   @media (max-width: 560px) {
     .sp { padding: 36px 14px 64px; }
     .go { padding: 0 16px; }
-    .song { grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; }
+    .song { grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 10px; }
     .thumb { width: 52px; height: 52px; }
     .thumb.wide { width: 84px; height: 47px; }
     .time { display: none; }
@@ -117,6 +117,7 @@ import Footer from "../components/Footer.astro";
 
 <script>
   import { searchSongs, getPopularSongs, startExtractFromYoutube, getApiErrorMessage } from "../lib/api";
+  import { heartButton, sessionIdOfVideo } from "../lib/library";
 
   // Searches people can try with one tap (shown before anything is typed, and when nothing matches).
   const examples = ["Perfect Ed Sheeran", "Tum Hi Ho", "Wonderwall", "Let It Be", "Kal Ho Naa Ho"];
@@ -246,7 +247,8 @@ import Footer from "../components/Footer.astro";
       if (song.chords && song.chords.length > 0) button.dataset.open = "1";
       button.innerHTML = `<span class="label">${song.chords && song.chords.length > 0 ? "Open chords" : "Get chords"}</span>${play}`;
       button.addEventListener("click", () => choose(song, button));
-      row.append(img, meta, el("span", "time", clock(song.duration)), button);
+      const heart = heartButton({ sessionId: sessionIdOfVideo(song.videoId), title: song.title, artist: song.artist, thumbnail: song.thumbnail, duration: song.duration }, "hb hb-row");
+      row.append(img, meta, el("span", "time", clock(song.duration)), heart, button);
       list.append(row);
     });
     return list;

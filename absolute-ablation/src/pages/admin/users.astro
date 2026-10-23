@@ -12,6 +12,7 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
       <thead>
         <tr>
           <th>Person</th>
+          <th>Level</th>
           <th>Plan</th>
           <th>Joined</th>
           <th>Last sign-in</th>
@@ -98,11 +99,13 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
     });
     const actions = cell(toggle);
     actions.className = "acts";
+    const level = el("td");
+    level.append(el("span", "adm-pill violet", `Lv ${user.level}`), ` ${number(user.xp)} XP`);
     const plan = el("td");
     plan.append(el("span", "adm-pill", user.plan));
     const sign = cell(String(number(user.logins)));
     sign.className = "num";
-    tr.append(personCell, plan, cell(day(user.createdAt)), cell(when(user.lastLoginAt)), sign, cell(status), actions);
+    tr.append(personCell, level, plan, cell(day(user.createdAt)), cell(when(user.lastLoginAt)), sign, cell(status), actions);
     return tr;
   }
 

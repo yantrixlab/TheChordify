@@ -286,3 +286,17 @@ section[id], [id] {
   overflow-y: auto;
 }
 #mobile-menu.open { display: flex; }
+
+/* The favourite heart (lib/library.ts): on a card's picture, in a row, or in the player header */
+.hb { display: grid; place-items: center; flex: none; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 50%; background: #ffffffee; color: #8b7fa8;
+  box-shadow: 0 2px 10px -2px #1a053366; cursor: pointer; transition: color 0.15s, transform 0.15s, background-color 0.15s; }
+.hb svg path { fill: transparent; transition: fill 0.15s; }
+.hb:hover { color: #ec4899; transform: scale(1.08); }
+.hb:focus-visible { outline: 2px solid var(--color-violet); outline-offset: 2px; }
+.hb[aria-pressed="true"] { color: #ec4899; }
+.hb[aria-pressed="true"] svg path { fill: currentColor; }
+.hb[aria-pressed="true"] svg { animation: hb-pop 0.4s cubic-bezier(0.3, 1.8, 0.5, 1); }
+.hb.hb-card { position: absolute; top: 18px; right: 18px; z-index: 3; width: 32px; height: 32px; }
+.hb.hb-row { background: #fff; border: 1px solid var(--color-hairline); box-shadow: none; }
+@keyframes hb-pop { 0% { transform: scale(0.6); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .hb, .hb svg path { transition: none; } .hb[aria-pressed="true"] svg { animation: none; } .hb:hover { transform: none; } }

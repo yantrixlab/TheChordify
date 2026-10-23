@@ -22,6 +22,7 @@ function avatar(user: AuthUser, size: number): HTMLElement {
   const box = el("span", "au-avatar");
   box.style.width = box.style.height = `${size}px`;
   box.style.fontSize = `${Math.round(size * 0.4)}px`;
+  if (user.ring) box.style.boxShadow = `0 0 0 2px #fff, 0 0 0 4px ${user.ring}`; // a ring earned by levelling up
   if (user.picture) {
     const img = el("img");
     img.alt = "";
@@ -113,6 +114,7 @@ function userMenu(user: AuthUser): HTMLElement {
   trigger.setAttribute("aria-expanded", "false");
   trigger.setAttribute("aria-label", `Account menu for ${user.name || user.email}`);
   trigger.append(avatar(user, 34));
+  if (user.level) trigger.append(el("span", "au-lv", String(user.level)));
 
   const panel = el("div", "au-panel");
   panel.setAttribute("role", "menu");
@@ -121,8 +123,13 @@ function userMenu(user: AuthUser): HTMLElement {
   head.append(avatar(user, 40));
   const names = el("div", "au-names");
   names.append(el("strong", "", user.name || user.email), el("span", "", user.email));
+  if (user.level) names.append(el("span", "au-rank", `Level ${user.level} · ${user.title ?? ""}${user.stars ? " " + "★".repeat(Math.min(user.stars, 5)) : ""}`));
   head.append(names);
   panel.append(head);
+  const library = el("a", "au-item", "My library");
+  library.href = "/library/";
+  library.setAttribute("role", "menuitem");
+  panel.append(library);
   if (user.isAdmin) {
     const admin = el("a", "au-item", "Admin");
     admin.href = "/admin/";
@@ -172,6 +179,9 @@ function render(user: AuthUser | null) {
     names.append(el("strong", "", user.name || user.email), el("span", "", user.email));
     row.append(names);
     node.append(row);
+    const mine = el("a", "au-mobile-link", user.level ? `My library · Level ${user.level}` : "My library");
+    mine.href = "/library/";
+    node.append(mine);
     if (user.isAdmin) {
       const admin = el("a", "au-mobile-link", "Admin");
       admin.href = "/admin/";

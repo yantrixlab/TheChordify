@@ -1,0 +1,299 @@
+---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+---
+
+<AdminLayout
+  title="Rewards"
+  active="rewards"
+  lead="How people earn XP and levels, the titles and badges they win, and what unlocks along the way. Changes apply to everybody at once: levels are worked out from each person's XP, so nothing has to be migrated."
+>
+  <div id="app" aria-busy="true">
+    <section class="adm-card" aria-labelledby="h-xp">
+      <h2 id="h-xp">XP for playing</h2>
+      <p class="adm-hint">What each action is worth. Playing the same song again within the repeat window earns nothing, and a day's XP stops at the daily cap, so pressing play over and over does not pay.</p>
+      <div id="xp-fields" class="rw-grid"></div>
+    </section>
+
+    <section class="adm-card" aria-labelledby="h-levels">
+      <h2 id="h-levels">Levels</h2>
+      <p class="adm-hint">There is no top level. Reaching level <em>n</em> takes <code>base × (n − 1) ^ growth</code> XP, so each level asks a little more than the last. A higher growth makes the climb steeper.</p>
+      <div id="curve-fields" class="rw-grid"></div>
+      <div class="adm-table-wrap" style="margin-top:14px">
+        <table class="adm-table">
+          <thead><tr><th>Level</th><th class="num">Total XP</th><th class="num">From the level before</th><th class="num">About this many new songs</th></tr></thead>
+          <tbody id="curve-preview"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="adm-card" aria-labelledby="h-titles">
+      <h2 id="h-titles">Titles</h2>
+      <p class="adm-hint">A name for each stretch of levels. The last one stays for every level after it.</p>
+      <div id="titles" class="rw-rows"></div>
+      <button id="add-title" type="button" class="adm-btn ghost small">+ Add a title</button>
+    </section>
+
+    <section class="adm-card" aria-labelledby="h-badges">
+      <h2 id="h-badges">Badges</h2>
+      <p class="adm-hint">Won once, when a number reaches its target. A badge can also pay bonus XP. The code is its permanent name: changing it makes the badge new to everybody.</p>
+      <div id="badges" class="rw-rows"></div>
+      <button id="add-badge" type="button" class="adm-btn ghost small">+ Add a badge</button>
+    </section>
+
+    <section class="adm-card" aria-labelledby="h-rewards">
+      <h2 id="h-rewards">Rewards</h2>
+      <p class="adm-hint">Things that unlock at a level. Set “Repeats every” to make one keep coming (a star every 10 levels, for example), so there is always something ahead. A ring colours the picture around a person's avatar; a perk is something you hand out yourself, such as a month of Premium.</p>
+      <div id="rewards" class="rw-rows"></div>
+      <button id="add-reward" type="button" class="adm-btn ghost small">+ Add a reward</button>
+    </section>
+  </div>
+
+  <div class="rw-save">
+    <p id="msg" class="adm-msg" role="status"></p>
+    <button id="reset" type="button" class="adm-btn ghost">Back to the defaults</button>
+    <button id="discard" type="button" class="adm-btn ghost">Discard changes</button>
+    <button id="save" type="button" class="adm-btn">Save changes</button>
+  </div>
+</AdminLayout>
+
+<style is:global>
+  .rw-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px 16px; margin-top: 12px; }
+  .rw-rows { display: grid; gap: 0; margin: 10px 0 14px; }
+  .rw-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 12px; padding: 14px 0; border-bottom: 1px solid #f1eaf9; }
+  .rw-row:last-child { border-bottom: 0; }
+  .rw-f { display: grid; gap: 4px; flex: 1 1 130px; min-width: 0; }
+  .rw-f > span { font: 700 11px var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-mute); }
+  .rw-f.narrow { flex: 0 1 96px; }
+  .rw-f.wide { flex: 2 1 240px; }
+  .rw-f input[type="color"] { height: 42px; padding: 3px; }
+  .rw-note { align-self: center; font-size: 12.5px; color: var(--color-mute); white-space: nowrap; }
+  .rw-save { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px; margin: 8px -12px 0; padding: 14px 12px; background: linear-gradient(180deg, #f7f3fd00, #f7f3fd 30%); }
+  .rw-save .adm-msg { flex: 1 1 200px; margin: 0; }
+  @media (max-width: 640px) { .rw-save .adm-btn { flex: 1 1 auto; } }
+</style>
+
+<script>
+  import { adminReady, adminFetch, el, say, number } from "../../lib/admin";
+
+  const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
+
+  type Item = Record<string, any>;
+  let config: Item = {};
+  let badgeCounts: Record<string, number> = {};
+  let rules: Record<string, string> = {};
+  let kinds: Record<string, string> = {};
+
+  // ---- small form builders -------------------------------------------------------------------------------------------
+
+  interface Field {
+    key: string;
+    label: string;
+    type?: "text" | "number" | "select" | "color";
+    options?: [string, string][];
+    cls?: string;
+    placeholder?: string;
+    max?: number;
+  }
+
+  function field(f: Field, value: any): HTMLElement {
+    const wrap = el("label", `rw-f ${f.cls ?? ""}`.trim());
+    wrap.append(el("span", "", f.label));
+    let input: HTMLInputElement | HTMLSelectElement;
+    if (f.type === "select") {
+      input = el("select");
+      f.options!.forEach(([v, text]) => {
+        const option = el("option", "", text);
+        option.value = v;
+        input.append(option);
+      });
+    } else {
+      input = el("input");
+      input.type = f.type ?? "text";
+      if (f.placeholder) input.placeholder = f.placeholder;
+      if (f.type === "number") input.min = "0";
+      if (f.max) input.maxLength = f.max;
+    }
+    input.value = String(value ?? "");
+    input.dataset.key = f.key;
+    wrap.append(input);
+    return wrap;
+  }
+
+  const read = (root: HTMLElement, fields: Field[]): Item => {
+    const out: Item = {};
+    fields.forEach((f) => {
+      const input = root.querySelector<HTMLInputElement>(`[data-key="${f.key}"]`)!;
+      out[f.key] = f.type === "number" ? Number(input.value || 0) : input.value.trim();
+    });
+    return out;
+  };
+
+  /** A list the admin can add to and remove from. `collect()` gives back what is on screen. */
+  function listEditor(host: HTMLElement, items: Item[], fields: Field[], blank: () => Item, notes?: (item: Item) => string) {
+    const rows = host;
+    const add = (item: Item) => {
+      const row = el("div", "rw-row");
+      fields.forEach((f) => row.append(field(f, item[f.key])));
+      if (notes) row.append(el("span", "rw-note", notes(item)));
+      const remove = el("button", "adm-btn danger small", "Remove");
+      remove.type = "button";
+      remove.addEventListener("click", () => row.remove());
+      row.append(remove);
+      rows.append(row);
+      return row;
+    };
+    rows.replaceChildren();
+    items.forEach(add);
+    return {
+      add: () => add(blank()).querySelector("input")?.focus(),
+      collect: () => [...rows.querySelectorAll<HTMLElement>(".rw-row")].map((row) => read(row, fields)),
+    };
+  }
+
+  // ---- the page ------------------------------------------------------------------------------------------------------
+
+  const XP_FIELDS: Field[] = [
+    { key: "play", label: "Each play", type: "number" },
+    { key: "newSong", label: "A song for the first time", type: "number" },
+    { key: "favorite", label: "First favourite of a song", type: "number" },
+    { key: "dailyFirst", label: "First play of the day", type: "number" },
+    { key: "streakPerDay", label: "Per streak day after the first", type: "number" },
+    { key: "streakMaxDays", label: "Streak bonus counts up to (days)", type: "number" },
+    { key: "repeatCooldownMinutes", label: "Same song again, after (minutes)", type: "number" },
+    { key: "dailyCap", label: "Most XP from playing in a day (0 = no limit)", type: "number" },
+  ];
+  const CURVE_FIELDS: Field[] = [
+    { key: "base", label: "Base XP", type: "number" },
+    { key: "growth", label: "Growth (1 to 4)", type: "number" },
+  ];
+  const TITLE_FIELDS: Field[] = [
+    { key: "level", label: "From level", type: "number", cls: "narrow" },
+    { key: "name", label: "Title", max: 30 },
+  ];
+  let BADGE_FIELDS: Field[] = [];
+  const REWARD_FIELDS = (): Field[] => [
+    { key: "name", label: "Name", max: 40 },
+    { key: "level", label: "At level", type: "number", cls: "narrow" },
+    { key: "repeatEvery", label: "Repeats every (0 = once)", type: "number", cls: "narrow" },
+    { key: "kind", label: "Kind", type: "select", options: Object.entries(kinds).map(([v, l]) => [v, l.split(" (")[0]] as [string, string]), cls: "narrow" },
+    { key: "value", label: "Value (ring colour #rrggbb, or perk text)" },
+    { key: "description", label: "Description", cls: "wide", max: 140 },
+    { key: "id", label: "Id", cls: "narrow", max: 40 },
+  ];
+
+  let titles: ReturnType<typeof listEditor>;
+  let badges: ReturnType<typeof listEditor>;
+  let rewards: ReturnType<typeof listEditor>;
+
+  const readCurve = () => ({ base: Math.max(1, Number(($("curve-fields").querySelector('[data-key="base"]') as HTMLInputElement).value) || 100), growth: Math.max(1, Math.min(4, Number(($("curve-fields").querySelector('[data-key="growth"]') as HTMLInputElement).value) || 1.6)) });
+
+  function drawPreview() {
+    const { base, growth } = readCurve();
+    const perSong = (Number(($("xp-fields").querySelector('[data-key="play"]') as HTMLInputElement).value) || 0) + (Number(($("xp-fields").querySelector('[data-key="newSong"]') as HTMLInputElement).value) || 0);
+    const at = (n: number) => (n <= 1 ? 0 : Math.round(base * (n - 1) ** growth));
+    $("curve-preview").replaceChildren(
+      ...[2, 3, 4, 5, 10, 20, 30, 50, 100].map((n) => {
+        const tr = el("tr");
+        const td = (text: string, cls = "") => {
+          const cell = el("td", cls, text);
+          tr.append(cell);
+        };
+        td(`Level ${n}`);
+        td(number(at(n)), "num");
+        td(`+${number(at(n) - at(n - 1))}`, "num");
+        td(perSong > 0 ? `~${number(Math.ceil(at(n) / perSong))}` : "—", "num");
+        return tr;
+      }),
+    );
+  }
+
+  function draw() {
+    $("xp-fields").replaceChildren(...XP_FIELDS.map((f) => field(f, config.xp[f.key])));
+    $("curve-fields").replaceChildren(...CURVE_FIELDS.map((f) => field(f, config.curve[f.key])));
+    const tz = el("label", "rw-f");
+    tz.append(el("span", "", "Where a day starts (minutes from UTC)"));
+    const tzInput = el("input");
+    tzInput.type = "number";
+    tzInput.dataset.key = "tz";
+    tzInput.value = String(config.timezoneOffsetMinutes);
+    tzInput.title = "330 is India, 0 is UTC. It decides when a daily streak rolls over.";
+    tz.append(tzInput);
+    $("xp-fields").append(tz);
+    drawPreview();
+
+    titles = listEditor($("titles"), config.titles, TITLE_FIELDS, () => ({ level: (config.titles.at(-1)?.level ?? 1) + 5, name: "" }));
+    BADGE_FIELDS = [
+      { key: "icon", label: "Icon", cls: "narrow", max: 8 },
+      { key: "name", label: "Name", max: 40 },
+      { key: "rule", label: "Target", type: "select", options: Object.entries(rules) },
+      { key: "threshold", label: "Reach", type: "number", cls: "narrow" },
+      { key: "bonusXp", label: "Bonus XP", type: "number", cls: "narrow" },
+      { key: "description", label: "Description", cls: "wide", max: 120 },
+      { key: "code", label: "Code", cls: "narrow", max: 40 },
+    ];
+    badges = listEditor($("badges"), config.badges, BADGE_FIELDS, () => ({ icon: "🏅", name: "", rule: "plays", threshold: 10, bonusXp: 0, description: "", code: "" }), (b) => (b.code in badgeCounts ? `Won by ${number(badgeCounts[b.code])}` : "Not won yet"));
+    rewards = listEditor($("rewards"), config.rewards, REWARD_FIELDS(), () => ({ name: "", level: 5, repeatEvery: 0, kind: "ring", value: "#f59e0b", description: "", id: "" }));
+  }
+
+  function collect(): Item {
+    const xp = read($("xp-fields"), XP_FIELDS);
+    return {
+      xp,
+      curve: readCurve(),
+      timezoneOffsetMinutes: Number(($("xp-fields").querySelector('[data-key="tz"]') as HTMLInputElement).value || 330),
+      titles: titles.collect(),
+      badges: badges.collect().map((b) => ({ ...b, code: b.code || String(b.name).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") })),
+      rewards: rewards.collect(),
+    };
+  }
+
+  async function load() {
+    try {
+      const data = await adminFetch("/api/admin/rewards");
+      config = data.config;
+      badgeCounts = data.badgeCounts;
+      rules = data.badgeRules;
+      kinds = data.rewardKinds;
+      $("app").setAttribute("aria-busy", "false");
+      draw();
+    } catch (err) {
+      say("msg", err instanceof Error ? err.message : "Could not load the rules.", "bad");
+    }
+  }
+
+  $("add-title").addEventListener("click", () => titles.add());
+  $("add-badge").addEventListener("click", () => badges.add());
+  $("add-reward").addEventListener("click", () => rewards.add());
+  $("discard").addEventListener("click", () => {
+    load();
+    say("msg", "Changes discarded.", "");
+  });
+  $("reset").addEventListener("click", async () => {
+    if (!confirm("Put every rule back to the defaults? Your changes to XP, levels, titles, badges and rewards are lost. People keep the XP they have, but their level may change.")) return;
+    try {
+      await adminFetch("/api/admin/rewards/reset", { method: "POST" });
+      await load();
+      say("msg", "Back to the defaults.", "ok");
+    } catch (err) {
+      say("msg", err instanceof Error ? err.message : "Could not reset.", "bad");
+    }
+  });
+  $("save").addEventListener("click", async () => {
+    const button = $<HTMLButtonElement>("save");
+    button.disabled = true;
+    try {
+      const data = await adminFetch("/api/admin/rewards", { method: "PUT", body: JSON.stringify({ config: collect() }) });
+      config = data.config;
+      draw();
+      say("msg", "Saved. The new rules apply from now on.", "ok");
+    } catch (err) {
+      say("msg", err instanceof Error ? err.message : "Could not save.", "bad");
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  $("xp-fields").addEventListener("input", drawPreview);
+  $("curve-fields").addEventListener("input", drawPreview);
+  adminReady().then(load);
+</script>
