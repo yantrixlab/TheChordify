@@ -46,7 +46,14 @@ export async function openSignIn() {
   const slot = el("div", "au-button");
   const status = el("p", "au-status");
   status.setAttribute("role", "status");
-  const fine = el("p", "au-fine", "We only receive your name, email address and profile picture from Google.");
+  const fine = el("p", "au-fine", "We only receive your name, email address and profile picture from Google. By continuing you agree to the ");
+  for (const [text, href, after] of [["Terms of Service", "/terms/", " and "], ["Privacy Policy", "/privacy/", "."]] as const) {
+    const link = el("a", "", text);
+    link.href = href;
+    link.target = "_blank";
+    link.rel = "noopener";
+    fine.append(link, after);
+  }
   box.append(close, mark, title, sub, slot, status, fine);
   backdrop.append(box);
   backdrop.addEventListener("mousedown", (event) => {

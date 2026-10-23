@@ -1,0 +1,113 @@
+---
+import LegalLayout from "../layouts/LegalLayout.astro";
+import { business } from "../lib/business";
+---
+
+<LegalLayout title="Privacy Policy" description="What Chord Suno collects, why, who it is shared with, and the choices you have.">
+  <p>
+    This policy explains what {business.name} ("we") collects when you use {business.product} at <a href={business.site}>{business.site}</a>, what we do with it, and your choices. We
+    aim to collect only what the service needs.
+  </p>
+
+  <h2>1. What we collect</h2>
+  <h3>When you sign in with Google</h3>
+  <p>
+    Your name, email address, profile picture and Google's account identifier, which Google gives us when you choose "Continue with Google". We never receive your Google password.
+    We also record when you sign in.
+  </p>
+  <h3>What you do on the site</h3>
+  <ul>
+    <li>The songs you play and favourite (your library and history).</li>
+    <li>Your progress: XP, level, streak and badges.</li>
+    <li>The number of new songs you start each day, so that your plan's limits can be applied.</li>
+    <li>Songs you pick from YouTube, and audio files you upload, with the chords and other results we work out from them.</li>
+  </ul>
+  <h3>When you subscribe</h3>
+  <p>
+    Payments are handled by Razorpay. We receive the plan you chose, the status and dates of your subscription, and the identifiers Razorpay gives it. We <strong>do not</strong> receive
+    or store your card, UPI or bank details. Those go only to Razorpay.
+  </p>
+  <h3>Technical information</h3>
+  <p>
+    Like most websites, our servers see your IP address and browser details when you visit. We use your IP address to apply fair-use limits and to keep the service safe. We also keep
+    short-term logs to find and fix problems.
+  </p>
+
+  <h2>2. Why we use it</h2>
+  <ul>
+    <li>To sign you in and keep you signed in.</li>
+    <li>To analyse the songs you choose and show you the results.</li>
+    <li>To keep your library, favourites, XP and badges, and to apply your plan.</li>
+    <li>To take payments, manage subscriptions and answer questions about them.</li>
+    <li>To protect the service from abuse, and to keep it working and improve it.</li>
+    <li>To reply when you contact us.</li>
+  </ul>
+  <p>We do not sell your personal information, and we do not use it to show you advertising.</p>
+
+  <h2>3. Who we share it with</h2>
+  <p>We use a few services to run {business.product}. They receive only what they need:</p>
+  <table>
+    <thead><tr><th>Service</th><th>What for</th></tr></thead>
+    <tbody>
+      <tr><td>Google</td><td>Signing in with Google, and the fonts used on the site.</td></tr>
+      <tr><td>Razorpay</td><td>Taking payments and managing subscriptions.</td></tr>
+      <tr><td>YouTube</td><td>Fetching the audio of a song you choose, and the video player on the play page. YouTube has its own privacy policy and may set its own cookies.</td></tr>
+      <tr><td>Our hosting provider</td><td>Running the servers and database where your data is kept.</td></tr>
+    </tbody>
+  </table>
+  <p>
+    We may also share information if the law requires it, or to protect our rights, our users or the service. If the business were ever sold or merged, your information could move with
+    it, under this policy.
+  </p>
+
+  <h2>4. Cookies and storage in your browser</h2>
+  <table>
+    <thead><tr><th>Name</th><th>What it does</th></tr></thead>
+    <tbody>
+      <tr><td><code>cs_session</code> (cookie)</td><td>Keeps you signed in. It is set when you sign in, and cannot be read by scripts on the page.</td></tr>
+      <tr><td>Browser storage</td><td>Remembers things on your device only: recent searches, your chosen instrument and chord shapes, your sign-in details for the menu, and an admin token if you are an admin. It is never sent to us for tracking.</td></tr>
+    </tbody>
+  </table>
+  <p>You can clear cookies and site data in your browser at any time. You will be signed out, and these settings will reset.</p>
+
+  <h2>5. How long we keep it</h2>
+  <p>
+    We keep your account information, library and progress while your account exists. Subscription records are kept as long as we need them for accounting and legal reasons. The chords
+    worked out for a YouTube song are kept so that the next person who opens it does not have to wait. Uploaded audio is kept so that you can play along, and we may delete it from time
+    to time. You can ask us to delete your account and data at any time (see below).
+  </p>
+
+  <h2>6. Your choices and rights</h2>
+  <p>Under Indian law, including the Digital Personal Data Protection Act, 2023, you can ask us to:</p>
+  <ul>
+    <li>tell you what personal data we hold about you, and give you a copy;</li>
+    <li>correct data that is wrong or out of date;</li>
+    <li>delete your account and personal data; and</li>
+    <li>deal with a complaint about how we have handled your data.</li>
+  </ul>
+  <p>
+    Write to <a href={`mailto:${business.email}`}>{business.email}</a> from the email address on your account. We will reply and act within a reasonable time. You can also stop using the
+    service, and withdraw Chord Suno's access to your Google account in your <a href="https://myaccount.google.com/permissions" rel="noopener">Google account settings</a>.
+  </p>
+
+  <h2>7. Security</h2>
+  <p>
+    We use sensible measures to protect your data: sign-in is through Google, sessions are stored as a hash on our server, the connection to the site is encrypted, and payment details never
+    reach us. No system is perfectly secure, so we cannot promise absolute security.
+  </p>
+
+  <h2>8. Children</h2>
+  <p>
+    {business.product} is meant for people aged 18 and over, or younger people using it with a parent or guardian's permission. We do not knowingly collect personal data from children
+    without that permission. If you think we have, write to us and we will delete it.
+  </p>
+
+  <h2>9. Changes to this policy</h2>
+  <p>We may update this policy. The date at the top shows when it last changed, and we will tell you about important changes on the site or by email.</p>
+
+  <h2>10. Contact and complaints</h2>
+  <p>
+    {business.name}{business.address ? `, ${business.address}` : ""}. Email: <a href={`mailto:${business.email}`}>{business.email}</a>. For privacy requests and complaints, write to that address with
+    "Privacy" in the subject. More on our <a href="/contact/">contact page</a>.
+  </p>
+</LegalLayout>

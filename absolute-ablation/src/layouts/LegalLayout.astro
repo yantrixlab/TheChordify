@@ -1,0 +1,68 @@
+---
+import Layout from "./Layout.astro";
+import Nav from "../components/Nav.astro";
+import Footer from "../components/Footer.astro";
+import { business } from "../lib/business";
+
+interface Props {
+  title: string;
+  description: string;
+  eyebrow?: string;
+}
+
+const { title, description, eyebrow = "Legal" } = Astro.props;
+const pages = [
+  { href: "/terms/", label: "Terms of Service" },
+  { href: "/privacy/", label: "Privacy Policy" },
+  { href: "/refunds/", label: "Refund & Cancellation" },
+  { href: "/contact/", label: "Contact us" },
+];
+const here = Astro.url.pathname.replace(/\/?$/, "/");
+---
+
+<Layout title={`${title} — Chord Suno`} description={description}>
+  <Nav />
+  <main id="main-content" class="lg">
+    <article class="lg-wrap">
+      <p class="lg-eyebrow">{eyebrow}</p>
+      <h1>{title}</h1>
+      <p class="lg-meta">Last updated {business.updated}</p>
+      <div class="lg-body">
+        <slot />
+      </div>
+      <nav class="lg-others" aria-label="Other policies">
+        {pages.filter((p) => p.href !== here).map((p) => <a href={p.href}>{p.label}</a>)}
+      </nav>
+    </article>
+  </main>
+  <Footer />
+</Layout>
+
+<style is:global>
+  .lg { padding: 56px 20px 100px; background: radial-gradient(ellipse 70% 30% at 50% -4%, #7c3aed1f, transparent 70%), linear-gradient(180deg, #fbf7ff, #fff 40%); }
+  .lg-wrap { max-width: 780px; margin: 0 auto; }
+  .lg-eyebrow { margin: 0 0 10px; font: 700 12px var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-violet); }
+  .lg-wrap h1 { margin: 0 0 8px; font-size: clamp(30px, 5vw, 46px); font-weight: 800; letter-spacing: -0.04em; line-height: 1.08; color: var(--color-ink); }
+  .lg-meta { margin: 0 0 34px; font-size: 14px; color: var(--color-mute); }
+  .lg-body { font-size: 16px; line-height: 1.72; color: var(--color-body); }
+  .lg-body h2 { margin: 38px 0 10px; font-size: 22px; font-weight: 800; letter-spacing: -0.02em; line-height: 1.25; color: var(--color-ink); }
+  .lg-body h3 { margin: 24px 0 6px; font-size: 17px; font-weight: 700; color: var(--color-ink); }
+  .lg-body p { margin: 0 0 14px; }
+  .lg-body ul, .lg-body ol { margin: 0 0 16px; padding-left: 22px; }
+  .lg-body ul { list-style: disc; }
+  .lg-body ol { list-style: decimal; }
+  .lg-body li::marker { color: var(--color-violet); }
+  .lg-body li { margin: 6px 0; }
+  .lg-body a { color: var(--color-violet-deep); font-weight: 600; text-underline-offset: 3px; }
+  .lg-body strong { color: var(--color-ink); }
+  .lg-body table { width: 100%; margin: 6px 0 20px; border-collapse: collapse; font-size: 14.5px; }
+  .lg-body th, .lg-body td { padding: 10px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--color-hairline); }
+  .lg-body th { font: 700 11.5px var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-mute); }
+  .lg-body code { padding: 1px 6px; border-radius: 6px; background: #f3eeff; font: 600 13px var(--font-mono); }
+  .lg-card { margin: 8px 0 22px; padding: 20px 22px; border-radius: 18px; background: #fff; border: 1px solid var(--color-hairline); box-shadow: 0 1px 2px #1a05330a; }
+  .lg-card p:last-child { margin-bottom: 0; }
+  .lg-others { display: flex; flex-wrap: wrap; gap: 8px 10px; margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--color-hairline); }
+  .lg-others a { padding: 8px 14px; border-radius: 999px; background: var(--color-violet-soft); font-size: 14px; font-weight: 700; color: var(--color-violet-deep); text-decoration: none; }
+  .lg-others a:hover { background: #ddd2fb; }
+  @media (max-width: 640px) { .lg { padding: 36px 16px 72px; } .lg-body { font-size: 15.5px; } }
+</style>

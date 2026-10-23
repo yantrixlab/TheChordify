@@ -26,6 +26,10 @@ const faqs = [
         <div class="pg-ghosts" aria-hidden="true"><div></div><div></div><div></div></div>
       </div>
 
+      <p class="pg-legal">
+        Payments are processed securely by Razorpay. By subscribing you agree to our <a href="/terms/">Terms of Service</a> and the <a href="/refunds/">Refund &amp; Cancellation Policy</a>. Questions? <a href="/contact/">Contact us</a>.
+      </p>
+
       <section class="pr-faq" aria-labelledby="faq-title">
         <h2 id="faq-title">Questions, answered</h2>
         {faqs.map(([question, answer]) => (
@@ -46,6 +50,8 @@ const faqs = [
   .pg-head { max-width: 680px; margin: 0 auto 36px; text-align: center; }
   .pg-eyebrow { margin: 0 0 12px; font: 700 12px var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-violet); }
   .pg-head h1 { margin: 0 0 14px; font-size: clamp(32px, 5.4vw, 54px); font-weight: 800; letter-spacing: -0.045em; line-height: 1.05; color: var(--color-ink); }
+  .pg-legal { max-width: 640px; margin: 36px auto 0; text-align: center; font-size: 13.5px; line-height: 1.6; color: var(--color-mute); }
+  .pg-legal a { color: var(--color-violet-deep); font-weight: 600; }
   .pg-sub { margin: 0; font-size: 17px; line-height: 1.6; color: var(--color-body); }
   .pg-ghosts { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 20px; max-width: 1000px; margin: 0 auto; }
   .pg-ghosts div { height: 520px; border-radius: 26px; background: linear-gradient(100deg, #f3eeff 30%, #fbf9ff 50%, #f3eeff 70%); background-size: 200% 100%; animation: pg-shimmer 1.4s linear infinite; }

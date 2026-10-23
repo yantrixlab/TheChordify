@@ -1,0 +1,70 @@
+---
+import LegalLayout from "../layouts/LegalLayout.astro";
+import { business } from "../lib/business";
+---
+
+<LegalLayout title="Refund & Cancellation Policy" description="How to cancel a Chord Suno subscription, and when payments can be refunded.">
+  <p>
+    This policy explains how to cancel a paid {business.product} plan, what happens when you do, and when a payment can be refunded. It forms part of our
+    <a href="/terms/">Terms of Service</a>.
+  </p>
+
+  <h2>The Free plan</h2>
+  <p>The Free plan costs nothing, so there is nothing to cancel or refund. You can stop using it at any time.</p>
+
+  <h2>Cancelling a subscription</h2>
+  <ol>
+    <li>Sign in and open the <a href="/pricing/">pricing page</a>.</li>
+    <li>In the banner at the top, press <strong>Cancel subscription</strong>.</li>
+  </ol>
+  <ul>
+    <li>Cancelling stops all future renewals. You are not charged again.</li>
+    <li>You keep your paid plan until the end of the period you have already paid for. After that your account goes back to the Free plan.</li>
+    <li>Your library, favourites, XP and badges stay with your account.</li>
+    <li>If you cannot cancel from the site, write to <a href={`mailto:${business.email}`}>{business.email}</a> from your account email and we will cancel it for you.</li>
+  </ul>
+  <div class="lg-card">
+    <p><strong>Tip:</strong> cancel at least a day before your renewal date. A payment taken at renewal is for the period that follows it.</p>
+  </div>
+
+  <h2>Refunds</h2>
+  <p>
+    Subscriptions are billed in advance for each period, and you can cancel at any time. For this reason, <strong>payments already made are not refunded</strong>, and we do not give
+    partial refunds for the unused part of a period. The exceptions are below.
+  </p>
+  <p>We will refund a payment in full if:</p>
+  <ul>
+    <li>you were <strong>charged by mistake</strong>, for example the same payment was taken twice;</li>
+    <li>a payment was taken but your plan <strong>was not activated</strong>, and we cannot activate it within a reasonable time;</li>
+    <li>you were charged <strong>after you cancelled</strong>, before the end of the period you had paid for; or</li>
+    <li>the law requires it.</li>
+  </ul>
+
+  <h2>How to ask for a refund</h2>
+  <p>
+    Write to <a href={`mailto:${business.email}`}>{business.email}</a> with the subject "Refund" and include:
+  </p>
+  <ul>
+    <li>the email address of your Chord Suno account,</li>
+    <li>the Razorpay payment ID (it starts with <code>pay_</code> and is in the payment receipt email from Razorpay), and</li>
+    <li>a short description of what went wrong.</li>
+  </ul>
+  <p>We will look into it and reply, usually within 2 working days.</p>
+
+  <h2>How refunds are paid</h2>
+  <p>
+    An approved refund goes back to the payment method you used, through Razorpay. It usually reaches you within 5 to 7 working days after we approve it, though your bank or card issuer
+    can take longer to show it.
+  </p>
+
+  <h2>Failed renewals</h2>
+  <p>
+    If a renewal payment fails, Razorpay may try again over the following days. You keep your paid plan while it is trying. If it keeps failing, the plan ends and your account goes back to
+    Free. You can subscribe again at any time.
+  </p>
+
+  <h2>Questions</h2>
+  <p>
+    Write to <a href={`mailto:${business.email}`}>{business.email}</a>, or see our <a href="/contact/">contact page</a>.
+  </p>
+</LegalLayout>

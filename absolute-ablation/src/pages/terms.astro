@@ -1,0 +1,118 @@
+---
+import LegalLayout from "../layouts/LegalLayout.astro";
+import { business } from "../lib/business";
+---
+
+<LegalLayout title="Terms of Service" description="The rules for using Chord Suno: accounts, songs and uploads, subscriptions and payments, and your responsibilities.">
+  <p>
+    These terms are the agreement between you and {business.name} ("we", "us") for using {business.product} at <a href={business.site}>{business.site}</a>. By signing in or using the
+    service you agree to them. If you do not agree, please do not use {business.product}.
+  </p>
+
+  <h2>1. What Chord Suno is</h2>
+  <p>
+    {business.product} listens to a song you pick from YouTube, or an audio file you upload, and works out its chords, tempo and sections automatically. It then shows them
+    for you to play along with. The results are produced by software, so they can contain mistakes. They are there to help you practise, not as an official score.
+  </p>
+
+  <h2>2. Who can use it</h2>
+  <p>
+    You must be at least 18, or use {business.product} with the permission of a parent or guardian who accepts these terms for you. You need a Google account to sign in.
+    You can use some features without signing in, and everybody who signs in starts on the Free plan.
+  </p>
+
+  <h2>3. Your account</h2>
+  <ul>
+    <li>You sign in with Google. We never see your Google password.</li>
+    <li>You are responsible for what happens under your account, so keep your Google account secure.</li>
+    <li>Tell us at <a href={`mailto:${business.email}`}>{business.email}</a> if you think someone else has used your account.</li>
+  </ul>
+
+  <h2>4. Songs, uploads and copyright</h2>
+  <p>
+    Songs belong to their artists and rights holders. {business.product} does not sell or give out music. It analyses audio you choose, for your own practice.
+  </p>
+  <ul>
+    <li>Only upload audio you have the right to use.</li>
+    <li>Do not use {business.product} to copy, share, sell or publish copyrighted material, or to get around any protection on it.</li>
+    <li>You keep your rights in what you upload. You allow us to store and process it so that we can analyse it and play it back to you.</li>
+    <li>If you believe something on {business.product} infringes your rights, write to <a href={`mailto:${business.email}`}>{business.email}</a> and we will look at it promptly.</li>
+  </ul>
+
+  <h2>5. Plans, payments and renewals</h2>
+  <ul>
+    <li><strong>Free.</strong> Every account starts on the Free plan, which is never charged for.</li>
+    <li><strong>Paid plans.</strong> What each plan includes, and its price, is shown on the <a href="/pricing/">pricing page</a> at the time you subscribe. Prices are in Indian rupees unless the page says otherwise.</li>
+    <li><strong>Payment.</strong> Payments are taken by Razorpay, a payment service. You pay using the methods Razorpay offers, such as UPI, cards, net banking and wallets. We never see or store your card details.</li>
+    <li><strong>Renewal.</strong> A paid plan renews automatically at the end of each billing period (monthly, yearly or as shown) until you cancel. By subscribing you authorise Razorpay to charge your chosen payment method for each renewal.</li>
+    <li><strong>Failed payments.</strong> If a renewal fails, Razorpay may try again. If it keeps failing, the paid plan ends and your account goes back to Free.</li>
+    <li><strong>Changes.</strong> We may change plans, features or prices. A change in price does not affect the period you have already paid for, and we will not renew you at a new price without it being shown to you first. Features marked "Soon" are planned and not promised for a date.</li>
+    <li><strong>Taxes.</strong> Prices include any taxes that apply, unless the page says otherwise.</li>
+  </ul>
+
+  <h2>6. Cancelling and refunds</h2>
+  <p>
+    You can cancel a subscription at any time from the <a href="/pricing/">pricing page</a>. You keep the plan until the end of the period you have paid for. Refunds are covered in
+    our <a href="/refunds/">Refund &amp; Cancellation Policy</a>, which forms part of these terms.
+  </p>
+
+  <h2>7. Using the service properly</h2>
+  <p>You agree not to:</p>
+  <ul>
+    <li>break the law, or use {business.product} to infringe anyone's rights;</li>
+    <li>try to break, overload or get unauthorised access to the service, other people's accounts or our systems;</li>
+    <li>use bots, scrapers or other automated means to take large amounts of data or to get around limits on your plan;</li>
+    <li>resell, share or sublet your paid plan, or use it for a business without our permission;</li>
+    <li>upload anything unlawful or harmful.</li>
+  </ul>
+  <p>We may limit, suspend or end accounts that break these rules.</p>
+
+  <h2>8. Our rights</h2>
+  <p>
+    The {business.product} website, name, design, software and the way the analysis is presented belong to {business.name}. You may use them only as these terms allow. Nothing here
+    transfers any of our rights to you.
+  </p>
+
+  <h2>9. Availability and changes to the service</h2>
+  <p>
+    We work to keep {business.product} running, but we do not promise it will always be available or error-free. We may change, pause or stop features, and we may carry out
+    maintenance. Songs from YouTube depend on YouTube being reachable, and sometimes a song cannot be fetched.
+  </p>
+
+  <h2>10. Disclaimers</h2>
+  <p>
+    {business.product} is provided "as is" and "as available". To the extent the law allows, we do not promise that the chords, tempo or sections are correct, or that the service
+    will suit a particular purpose.
+  </p>
+
+  <h2>11. Limit of our responsibility</h2>
+  <p>
+    To the extent the law allows, we are not responsible for indirect or consequential loss, or for loss of data, profit or opportunity arising from your use of
+    {business.product}. Our total responsibility to you for any claim relating to the service is limited to the amount you paid us in the three months before the claim arose
+    (or to ₹1,000 if you have not paid us anything). Nothing in these terms limits anything that cannot be limited by law.
+  </p>
+
+  <h2>12. Ending your account</h2>
+  <p>
+    You can stop using {business.product} at any time, and you can ask us to delete your account by writing to <a href={`mailto:${business.email}`}>{business.email}</a>. Cancel any
+    paid plan first, so it does not renew. We may end or suspend your account if you break these terms. Sections that by their nature should continue (such as copyright, limits on
+    our responsibility, and how disputes are settled) continue after your account ends.
+  </p>
+
+  <h2>13. Governing law</h2>
+  <p>
+    These terms are governed by the laws of {business.country}. Courts in {business.country} have jurisdiction over any dispute about them. Please write to us first at
+    <a href={`mailto:${business.email}`}>{business.email}</a> and we will try to put things right.
+  </p>
+
+  <h2>14. Changes to these terms</h2>
+  <p>
+    We may update these terms from time to time. The date at the top shows when they last changed. If a change matters to you, we will tell you on the site or by email. Using
+    {business.product} after a change means you accept the new terms.
+  </p>
+
+  <h2>15. Contact</h2>
+  <p>
+    {business.name}{business.address ? `, ${business.address}` : ""}. Email: <a href={`mailto:${business.email}`}>{business.email}</a>. More on our <a href="/contact/">contact page</a>.
+  </p>
+</LegalLayout>

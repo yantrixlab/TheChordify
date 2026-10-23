@@ -1,0 +1,35 @@
+---
+import LegalLayout from "../layouts/LegalLayout.astro";
+import { business } from "../lib/business";
+---
+
+<LegalLayout title="Contact us" eyebrow="Help" description="How to reach the Chord Suno team for support, payment questions and privacy requests.">
+  <p>We are a small team and we read every message. Write to us and we will reply, usually within 2 working days.</p>
+
+  <div class="lg-card">
+    <p><strong>{business.name}</strong><br />Operators of {business.product}</p>
+    <p>
+      Email: <a href={`mailto:${business.email}`}>{business.email}</a>
+      {business.phone && <><br />Phone: <a href={`tel:${business.phone.replace(/\s+/g, "")}`}>{business.phone}</a></>}
+      {business.address && <><br />Address: {business.address}</>}
+      <br />Website: <a href={business.site}>{business.site}</a>
+    </p>
+  </div>
+
+  <h2>What to write about</h2>
+  <ul>
+    <li><strong>A song would not load, or the chords look wrong.</strong> Tell us the song name or link.</li>
+    <li><strong>Your plan or a payment.</strong> Include your account email and, for a payment, the Razorpay payment ID (it starts with <code>pay_</code>).</li>
+    <li><strong>Cancelling or a refund.</strong> See the <a href="/refunds/">Refund &amp; Cancellation Policy</a>. You can cancel any time from the <a href="/pricing/">pricing page</a>.</li>
+    <li><strong>Privacy or deleting your account.</strong> Put "Privacy" in the subject. See the <a href="/privacy/">Privacy Policy</a>.</li>
+    <li><strong>Copyright concerns.</strong> Tell us what you believe is affected and where it is on the site.</li>
+    <li><strong>Anything else</strong>, including ideas for what you would like Chord Suno to do next.</li>
+  </ul>
+
+  <h2>Helpful to include</h2>
+  <ul>
+    <li>The email address you sign in with.</li>
+    <li>What you expected, and what happened instead.</li>
+    <li>The device and browser you were using, if it is about how the site looks or works.</li>
+  </ul>
+</LegalLayout>
