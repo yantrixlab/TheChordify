@@ -500,7 +500,7 @@ def _today() -> int:
 def _public_price(price: dict) -> dict:
     return {
         "id": price["id"], "period": price["period"], "intervalCount": price["intervalCount"], "amountMinor": price["amountMinor"],
-        "currency": price["currency"], "ready": bool(price["razorpayPlanId"]),  # ready: it can be paid for
+        "compareAtMinor": price["compareAtMinor"], "currency": price["currency"], "ready": bool(price["razorpayPlanId"]),  # ready: it can be paid for
     }
 
 
@@ -654,13 +654,15 @@ class PriceBody(BaseModel):
     period: str = "monthly"
     intervalCount: int = 1
     amountMinor: int
+    compareAtMinor: int = 0
     currency: str = "INR"
     razorpayPlanId: str = ""
     active: bool = True
 
     def fields(self) -> dict:
         return {
-            "period": self.period, "interval_count": self.intervalCount, "amount_minor": self.amountMinor, "currency": self.currency,
+            "period": self.period, "interval_count": self.intervalCount, "amount_minor": self.amountMinor,
+            "compare_at_minor": self.compareAtMinor, "currency": self.currency,
             "razorpay_plan_id": self.razorpayPlanId, "active": self.active,
         }
 

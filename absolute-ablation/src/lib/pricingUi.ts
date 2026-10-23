@@ -13,6 +13,7 @@ export interface PricingPrice {
   period: string;
   intervalCount: number;
   amountMinor: number;
+  compareAtMinor: number; // the price before a discount, shown crossed out (0 for none)
   currency: string;
   ready: boolean;
 }
@@ -100,21 +101,25 @@ export function renderPricing(root: HTMLElement, initial: PricingData, options: 
   const priceFor = (plan: PricingPlan): PricingPrice | undefined =>
     plan.prices.find((p) => p.period === period && p.intervalCount === 1) ?? plan.prices.find((p) => p.intervalCount === 1) ?? plan.prices[0];
 
-  /** The biggest saving a yearly price gives over twelve monthly ones, for the label on the switch. */
-  const bestSaving = () => {
-    let best = 0;
-    for (const plan of data.plans) {
-      const monthly = plan.prices.find((p) => p.period === "monthly" && p.intervalCount === 1);
-      const yearly = plan.prices.find((p) => p.period === "yearly" && p.intervalCount === 1);
-      if (monthly && yearly && monthly.currency === yearly.currency) best = Math.max(best, Math.round((1 - yearly.amountMinor / (monthly.amountMinor * 12)) * 100));
+  /**
+   * The crossed-out price for a price, and what it saves. The admin's "original price" wins; without one, a yearly price is
+   * compared with the same plan paid monthly. Both are worked out per month so the figures can be set side by side.
+   */
+  const strike = (plan: PricingPlan, price: PricingPrice): { wasTotal: number; wasPerMonth: number; percent: number } | null => {
+    let wasTotal = price.compareAtMinor;
+    if (!wasTotal && price.period === "yearly" && price.intervalCount === 1) {
+      const monthly = plan.prices.find((p) => p.period === "monthly" && p.intervalCount === 1 && p.currency === price.currency);
+      if (monthly) wasTotal = monthly.amountMinor * 12;
     }
-    return best;
+    if (!wasTotal || wasTotal <= price.amountMinor) return null;
+    return { wasTotal, wasPerMonth: wasTotal / months(price), percent: Math.round((1 - price.amountMinor / wasTotal) * 100) };
   };
 
-  const saving = (plan: PricingPlan) => {
-    const monthly = plan.prices.find((p) => p.period === "monthly" && p.intervalCount === 1);
-    const yearly = plan.prices.find((p) => p.period === "yearly" && p.intervalCount === 1);
-    return monthly && yearly && monthly.currency === yearly.currency ? Math.round((1 - yearly.amountMinor / (monthly.amountMinor * 12)) * 100) : 0;
+  /** The biggest saving among the yearly prices, for the label on the switch. */
+  const bestSaving = () => {
+    let best = 0;
+    for (const plan of data.plans) for (const price of plan.prices) if (price.period === "yearly") best = Math.max(best, strike(plan, price)?.percent ?? 0);
+    return best;
   };
 
   // ---- the switch ---------------------------------------------------------------------------------------------------
@@ -158,15 +163,20 @@ export function renderPricing(root: HTMLElement, initial: PricingData, options: 
       box.append(el("p", "pr-bill", "No card needed"));
     } else {
       const perMonth = price.amountMinor / months(price);
-      amount.append(el("strong", "", money(Math.round(perMonth / 100) * 100, price.currency)), el("span", "pr-per", "/ month"));
+      const cut = strike(plan, price);
+      const whole = (minor: number) => money(Math.round(minor / 100) * 100, price.currency); // whole rupees; the line below has the exact amount
+      if (cut) amount.append(el("s", "pr-was", whole(cut.wasPerMonth)));
+      amount.append(el("strong", "", whole(perMonth)), el("span", "pr-per", "/ month"));
       box.append(amount);
       const bill = el("p", "pr-bill");
-      if (price.period === "monthly" && price.intervalCount === 1) bill.textContent = "Billed monthly";
+      if (price.period === "monthly" && price.intervalCount === 1) bill.append("Billed monthly");
       else {
         const every = price.intervalCount > 1 ? `every ${price.intervalCount} ${PERIOD_WORD[price.period]}s` : PERIOD_WORD[price.period] === "year" ? "yearly" : `per ${PERIOD_WORD[price.period]}`;
         bill.append(`Billed ${money(price.amountMinor, price.currency)} ${every}`);
-        const off = saving(plan);
-        if (price.period === "yearly" && off > 0) bill.append(el("em", "", ` · ${off}% off`));
+      }
+      if (cut) {
+        bill.append(el("s", "pr-was-total", ` ${money(cut.wasTotal, price.currency)}`));
+        bill.append(el("em", "", ` · Save ${cut.percent}%`));
       }
       box.append(bill);
     }

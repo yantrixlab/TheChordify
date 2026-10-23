@@ -102,6 +102,7 @@ _SCHEMA = [
         period           TEXT NOT NULL DEFAULT 'monthly',
         interval_count   INTEGER NOT NULL DEFAULT 1,
         amount_minor     INTEGER NOT NULL DEFAULT 0,
+        compare_at_minor INTEGER NOT NULL DEFAULT 0,
         currency         TEXT NOT NULL DEFAULT 'INR',
         razorpay_plan_id TEXT NOT NULL DEFAULT '',
         active           INTEGER NOT NULL DEFAULT 1,
@@ -187,6 +188,10 @@ class PlanStore:
         self._db = db
         for statement in _SCHEMA:
             db.run(statement)
+        try:  # a database made before prices could show a crossed-out price: add the column (it already exists in a new one)
+            db.run("ALTER TABLE plan_prices ADD COLUMN compare_at_minor INTEGER NOT NULL DEFAULT 0")
+        except Exception:
+            pass
         self._seed()
 
     # ----- first-run setup ---------------------------------------------------------------------------------------
@@ -255,11 +260,11 @@ class PlanStore:
         )
         return plan_id
 
-    def _insert_price(self, plan_id: str, period: str, interval: int, amount: int, currency: str, razorpay_id: str = "") -> str:
+    def _insert_price(self, plan_id: str, period: str, interval: int, amount: int, currency: str, razorpay_id: str = "", compare_at: int = 0) -> str:
         price_id = uuid.uuid4().hex
         self._db.run(
-            "INSERT INTO plan_prices (id, plan_id, period, interval_count, amount_minor, currency, razorpay_plan_id, active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)",
-            (price_id, plan_id, period, max(1, interval), int(amount), currency.upper(), razorpay_id, time.time()),
+            "INSERT INTO plan_prices (id, plan_id, period, interval_count, amount_minor, compare_at_minor, currency, razorpay_plan_id, active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)",
+            (price_id, plan_id, period, max(1, interval), int(amount), int(compare_at), currency.upper(), razorpay_id, time.time()),
         )
         return price_id
 
@@ -269,7 +274,8 @@ class PlanStore:
     def _price(row: dict) -> dict:
         return {
             "id": row["id"], "planId": row["plan_id"], "period": row["period"], "intervalCount": row["interval_count"],
-            "amountMinor": row["amount_minor"], "currency": row["currency"], "razorpayPlanId": row["razorpay_plan_id"], "active": bool(row["active"]),
+            "amountMinor": row["amount_minor"], "compareAtMinor": row["compare_at_minor"], "currency": row["currency"],
+            "razorpayPlanId": row["razorpay_plan_id"], "active": bool(row["active"]),
         }
 
     def list_features(self) -> list[dict]:
@@ -388,9 +394,12 @@ class PlanStore:
         currency = str(data.get("currency", "INR")).strip().upper()
         if len(currency) != 3 or not currency.isalpha():
             raise ValueError("The currency must be a three-letter code such as INR.")
+        compare_at = int(data.get("compare_at_minor", 0) or 0)
+        if compare_at < 0 or (compare_at and compare_at <= amount):
+            raise ValueError("The original price is shown crossed out next to the price, so it must be higher than the price (or empty).")
         razorpay_id = str(data.get("razorpay_plan_id", "")).strip()[:60]
         if price_id is None:
-            price_id = self._insert_price(plan_id, period, interval, amount, currency, razorpay_id)
+            price_id = self._insert_price(plan_id, period, interval, amount, currency, razorpay_id, compare_at)
         else:
             old = self.get_price(price_id)
             if old is None or old["planId"] != plan_id:
@@ -400,8 +409,8 @@ class PlanStore:
             if changed and razorpay_id == old["razorpayPlanId"]:
                 razorpay_id = ""
             self._db.run(
-                "UPDATE plan_prices SET period = ?, interval_count = ?, amount_minor = ?, currency = ?, razorpay_plan_id = ?, active = ? WHERE id = ?",
-                (period, interval, amount, currency, razorpay_id, 0 if data.get("active") is False else 1, price_id),
+                "UPDATE plan_prices SET period = ?, interval_count = ?, amount_minor = ?, compare_at_minor = ?, currency = ?, razorpay_plan_id = ?, active = ? WHERE id = ?",
+                (period, interval, amount, compare_at, currency, razorpay_id, 0 if data.get("active") is False else 1, price_id),
             )
         return self.get_price(price_id)  # type: ignore[return-value]
 

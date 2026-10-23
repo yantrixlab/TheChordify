@@ -82,6 +82,11 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
           <small>In the main unit (rupees). What the person pays each time.</small>
         </label>
         <label class="adm-field">
+          <span>Original price (optional)</span>
+          <input id="p-compare" type="number" min="0" step="0.01" inputmode="decimal" placeholder="500" />
+          <small>Shown crossed out beside the amount, so people see the saving. For the same period; leave empty for none. It is not what is charged.</small>
+        </label>
+        <label class="adm-field">
           <span>Currency</span>
           <input id="p-currency" type="text" maxlength="3" placeholder="INR" />
           <small>Razorpay subscriptions use INR.</small>
@@ -221,6 +226,7 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
   function priceRow(plan: Item, price: Item): HTMLElement {
     const row = el("li", "pl-price");
     const amount = el("span", "pl-amount", priceLabel(price));
+    if (price.compareAtMinor) amount.append(el("small", "", `was ${money(price.compareAtMinor, price.currency)}`));
     if (!price.active) amount.append(el("small", "", "off"));
     const rz = el("span", "pl-rz");
     if (price.razorpayPlanId) {
@@ -355,6 +361,7 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
     period.value = price?.period ?? "monthly";
     ($("p-interval") as HTMLInputElement).value = String(price?.intervalCount ?? 1);
     ($("p-amount") as HTMLInputElement).value = price ? String(price.amountMinor / 100) : "";
+    ($("p-compare") as HTMLInputElement).value = price && price.compareAtMinor ? String(price.compareAtMinor / 100) : "";
     ($("p-currency") as HTMLInputElement).value = price?.currency ?? "INR";
     ($("p-razorpay") as HTMLInputElement).value = price?.razorpayPlanId ?? "";
     ($("p-active") as HTMLInputElement).checked = price ? price.active : true;
@@ -373,6 +380,7 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
       period: value("p-period"),
       intervalCount: Math.max(1, Math.floor(Number(value("p-interval")) || 1)),
       amountMinor: Math.round(amount * 100),
+      compareAtMinor: Math.round((Number(value("p-compare")) || 0) * 100),
       currency: value("p-currency") || "INR",
       razorpayPlanId: value("p-razorpay"),
       active: ($("p-active") as HTMLInputElement).checked,

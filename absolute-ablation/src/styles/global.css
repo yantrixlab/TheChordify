@@ -399,3 +399,9 @@ section[id], [id] {
   .pr-table .pr-corner { width: 44%; }
 }
 @media (prefers-reduced-motion: reduce) { .pr-card, .pr-card:hover, .pr-cta, .pr-switch button, .pr-faq summary::after { transition: none; transform: none; } }
+
+/* the crossed-out price beside the price */
+.pr-was { align-self: flex-end; margin-right: 2px; padding-bottom: 6px; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; color: var(--color-mute); text-decoration-thickness: 2px; text-decoration-color: #e11d48; }
+.pr-card.is-featured .pr-was { color: #b9a6e0; text-decoration-color: #fb7185; }
+.pr-was-total { color: var(--color-mute); text-decoration-thickness: 1.5px; text-decoration-color: #e11d48; }
+.pr-card.is-featured .pr-was-total { color: #9d89c9; text-decoration-color: #fb7185; }
