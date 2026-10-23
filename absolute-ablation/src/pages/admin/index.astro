@@ -10,6 +10,8 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
     <div class="adm-row" style="margin-top:10px">
       <a class="adm-btn ghost" href="/admin/users/" style="display:inline-grid;place-items:center;text-decoration:none">Users</a>
       <a class="adm-btn ghost" href="/admin/plans/" style="display:inline-grid;place-items:center;text-decoration:none">Subscription plans</a>
+      <a class="adm-btn ghost" href="/admin/features/" style="display:inline-grid;place-items:center;text-decoration:none">Features &amp; limits</a>
+      <a class="adm-btn ghost" href="/admin/subscriptions/" style="display:inline-grid;place-items:center;text-decoration:none">Subscriptions</a>
       <a class="adm-btn ghost" href="/admin/youtube/" style="display:inline-grid;place-items:center;text-decoration:none">YouTube accounts</a>
       <a class="adm-btn ghost" href="/admin/youtube-test/" style="display:inline-grid;place-items:center;text-decoration:none">Download test</a>
     </div>
@@ -46,6 +48,7 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
         tile("Jam sessions", number(o.catalog.jams), "Times people pressed play"),
         tile("YouTube accounts", `${o.youtube.ready} / ${o.youtube.accounts}`, "ready to download", "/admin/youtube/"),
         tile("Plans on sale", String(o.plans.active), `${o.plans.total} in total`, "/admin/plans/"),
+        tile("Subscriptions", number(o.revenue.active), `${new Intl.NumberFormat(undefined, { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(o.revenue.monthlyMinor / 100)} a month`, "/admin/subscriptions/"),
         tile("Download line", `${o.queue.running} + ${o.queue.waiting}`, `running + waiting (${o.queue.workers} at a time)`),
       );
       tiles.setAttribute("aria-busy", "false");
@@ -53,6 +56,7 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
         statusLine(o.signIn.configured ? true : false, o.signIn.configured ? "Google sign-in is switched on" : "Google sign-in is off: set GOOGLE_CLIENT_ID in the server's environment"),
         statusLine(o.signIn.admins > 0 ? true : "warn", o.signIn.admins > 0 ? `${o.signIn.admins} admin email${o.signIn.admins === 1 ? "" : "s"} set (ADMIN_EMAILS)` : "No admin email set: only the admin token gets in. Set ADMIN_EMAILS"),
         statusLine(o.catalog.kind === "postgres" ? true : "warn", o.catalog.kind === "postgres" ? "Songs and people are kept in Postgres" : "Songs and people are kept in a file on this server: set DATABASE_URL to use Postgres"),
+        statusLine(o.payments.configured ? (o.payments.webhookSecretSet ? true : "warn") : "warn", o.payments.configured ? `Razorpay is connected${o.payments.mode ? ` (${o.payments.mode} keys)` : ""}${o.payments.webhookSecretSet ? "" : ": add RAZORPAY_WEBHOOK_SECRET so renewals are recorded"}` : "Payments are off: set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET to take subscriptions"),
         statusLine(o.youtube.ready > 0 ? true : false, o.youtube.ready > 0 ? "YouTube downloads have an account to use" : "No YouTube account is ready: downloads will probably be refused"),
       );
     } catch (err) {

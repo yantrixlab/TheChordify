@@ -8,6 +8,7 @@ import os
 import re
 import tempfile
 import threading
+import time
 from typing import Optional
 from urllib.parse import urlparse
 
@@ -19,6 +20,8 @@ from pydantic import BaseModel
 from .engine import analyze
 from . import accounts as accounts_module
 from .accounts import AccountStore, SignInError
+from .billing import Razorpay, RazorpayError, entity_summary
+from .plans import FREE_CODE, PERIODS, PlanStore
 from .engagement import BADGE_RULES, DEFAULT_CONFIG, REWARD_KINDS, Engagement
 from .jobs import JobQueue
 from .search import RateLimiter, SearchUnavailable, clean_query, search_songs, suggest
@@ -51,6 +54,8 @@ _TRENDING_KEY = "meta:trending"  # not a valid song id, so it can never be asked
 trending_shelves.start(lambda: catalog.load_result(_TRENDING_KEY), lambda data: catalog.save_result(_TRENDING_KEY, data))
 accounts = AccountStore(catalog.db)
 engagement = Engagement(catalog.db)
+plans = PlanStore(catalog.db)
+razorpay = Razorpay.from_env()  # payments: RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_SECRET
 try:  # results and songs that older versions kept in files join the database, once
     log.info("Imported from files: %s", catalog.import_files(CACHE_DIR))
 except Exception as exc:
@@ -474,7 +479,8 @@ def whoami(request: Request, response: Response) -> dict:
     if not user:
         return {"user": None}
     snap = engagement.snapshot(user["id"])
-    return {"user": {**_public_user(user), **{k: snap[k] for k in ("level", "title", "ring", "stars", "xp", "intoLevel", "levelSpan", "nextLevelXp", "streak")}}}
+    plan, _sub = plans.effective(user["id"])
+    return {"user": {**_public_user(user), "plan": plan["code"], "planName": plan["name"], **{k: snap[k] for k in ("level", "title", "ring", "stars", "xp", "intoLevel", "levelSpan", "nextLevelXp", "streak")}}}
 
 
 @app.post("/api/auth/logout")
@@ -486,11 +492,142 @@ def sign_out(request: Request, response: Response) -> dict:
     return {"ok": True}
 
 
-@app.get("/api/plans")
-def public_plans(response: Response) -> dict:
-    """The subscription plans that are switched on, in the order the admin set."""
-    response.headers["Cache-Control"] = "public, max-age=60"
-    return {"plans": accounts.list_plans(only_active=True)}
+def _today() -> int:
+    """The day number limits are counted in (the same day boundary as the daily streaks)."""
+    return int((time.time() + engagement.config()["timezoneOffsetMinutes"] * 60) // 86400)
+
+
+def _public_price(price: dict) -> dict:
+    return {
+        "id": price["id"], "period": price["period"], "intervalCount": price["intervalCount"], "amountMinor": price["amountMinor"],
+        "currency": price["currency"], "ready": bool(price["razorpayPlanId"]),  # ready: it can be paid for
+    }
+
+
+def _subscription_view(sub: Optional[dict]) -> Optional[dict]:
+    if not sub:
+        return None
+    price = plans.get_price(sub["priceId"])
+    return {
+        "status": sub["status"], "cancelAtPeriodEnd": sub["cancelAtPeriodEnd"], "currentEnd": sub["currentEnd"] or None,
+        "priceId": sub["priceId"], "period": price["period"] if price else "", "intervalCount": price["intervalCount"] if price else 1,
+        "amountMinor": price["amountMinor"] if price else 0, "currency": price["currency"] if price else "INR",
+    }
+
+
+@app.get("/api/pricing")
+def pricing(response: Response) -> dict:
+    """The pricing page: every plan on sale with its prices and what it includes. Read live, so the admin's changes show at once."""
+    response.headers["Cache-Control"] = "no-cache"
+    data = plans.pricing()
+    return {
+        "plans": [{**plan, "prices": [_public_price(p) for p in plan["prices"]]} for plan in data["plans"]],
+        "features": data["features"],
+        "checkout": {"enabled": razorpay.configured, "mode": razorpay.mode},
+    }
+
+
+@app.get("/api/me/plan")
+def my_plan(request: Request, response: Response) -> dict:
+    """The plan this visitor is on and what it includes. Signed-out visitors are on Free, like everybody who has not paid."""
+    response.headers["Cache-Control"] = "no-store"
+    user = _session_user(request)
+    plan, sub = plans.effective(user["id"] if user else None)
+    return {
+        "signedIn": bool(user),
+        "plan": {"id": plan["id"], "code": plan["code"], "name": plan["name"], "isFree": plan["isFree"]},
+        "entitlements": plan["entitlements"],
+        "subscription": _subscription_view(sub),
+    }
+
+
+class SubscribeBody(BaseModel):
+    priceId: str
+
+
+class VerifyBody(BaseModel):
+    paymentId: str
+    subscriptionId: str
+    signature: str
+
+
+@app.post("/api/billing/subscribe")
+def billing_subscribe(body: SubscribeBody, request: Request) -> dict:
+    """Starts paying for a plan: makes a Razorpay subscription for this person, and gives the browser what it needs to open checkout."""
+    user = _require_user(request, changes=True)
+    if not razorpay.configured:
+        raise HTTPException(status_code=503, detail="Payments are not switched on yet.")
+    price = plans.get_price(body.priceId)
+    plan = plans.get_plan(price["planId"]) if price else None
+    if not price or not plan or not plan["active"] or not price["active"] or plan["isFree"]:
+        raise HTTPException(status_code=404, detail="That plan is not on sale.")
+    if not price["razorpayPlanId"]:
+        raise HTTPException(status_code=503, detail="This plan is not ready to be paid for yet.")
+    current, _sub = plans.effective(user["id"])
+    if not current["isFree"]:
+        raise HTTPException(status_code=409, detail=f"You are already on {current['name']}. Cancel it first if you want to change plans.")
+    try:
+        made = razorpay.create_subscription(plan_id=price["razorpayPlanId"], period=price["period"], notes={"user_id": user["id"], "price_id": price["id"], "plan": plan["code"]})
+    except RazorpayError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    plans.create_subscription(user["id"], plan["id"], price["id"], made["id"], made.get("status", "created"))
+    return {
+        "subscriptionId": made["id"], "keyId": razorpay.key_id, "name": "Chord Suno", "description": f"{plan['name']} plan",
+        "prefill": {"name": user["name"], "email": user["email"]},
+    }
+
+
+@app.post("/api/billing/verify")
+def billing_verify(body: VerifyBody, request: Request) -> dict:
+    """After checkout: the browser sends what Razorpay gave it; the signature proves the payment is real."""
+    user = _require_user(request, changes=True)
+    if not razorpay.verify_payment(body.paymentId, body.subscriptionId, body.signature):
+        raise HTTPException(status_code=400, detail="We could not confirm that payment.")
+    mine = plans.subscription_by_razorpay(body.subscriptionId)
+    if not mine or mine["userId"] != user["id"]:
+        raise HTTPException(status_code=404, detail="We do not know that subscription.")
+    try:
+        entity = entity_summary(razorpay.fetch_subscription(body.subscriptionId))
+    except RazorpayError:  # Razorpay answered the signature check, so the payment is real: treat it as started, the webhook will correct us
+        entity = {"id": body.subscriptionId, "status": "active", "current_start": 0, "current_end": 0, "paid_count": 1, "notes": {}}
+    plans.apply_razorpay({**entity, "status": entity["status"] if entity["status"] in ("active", "authenticated", "pending") else "active"})
+    plan, sub = plans.effective(user["id"])
+    return {"plan": {"code": plan["code"], "name": plan["name"]}, "subscription": _subscription_view(sub)}
+
+
+@app.post("/api/billing/cancel")
+def billing_cancel(request: Request) -> dict:
+    """Stops renewals. A person keeps the plan until the end of the period they have paid for."""
+    user = _require_user(request, changes=True)
+    plan, sub = plans.effective(user["id"])
+    if not sub:
+        raise HTTPException(status_code=404, detail="You do not have a subscription to cancel.")
+    if sub["cancelAtPeriodEnd"]:
+        return {"subscription": _subscription_view(sub)}
+    try:
+        razorpay.cancel_subscription(sub["razorpaySubscriptionId"], at_cycle_end=True)
+    except RazorpayError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    plans.mark_cancelling(sub["razorpaySubscriptionId"])
+    return {"subscription": _subscription_view(plans.effective(user["id"])[1])}
+
+
+@app.post("/api/billing/webhook")
+async def billing_webhook(request: Request) -> dict:
+    """Razorpay's own messages (a renewal, a failed payment, a cancellation). Only calls signed with the webhook secret are believed."""
+    raw = await request.body()
+    if not razorpay.verify_webhook(raw, request.headers.get("x-razorpay-signature", "")):
+        raise HTTPException(status_code=401, detail="Bad signature")
+    try:
+        event = json.loads(raw)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Not JSON")
+    name = str(event.get("event", ""))
+    entity = (((event.get("payload") or {}).get("subscription") or {}).get("entity")) if name.startswith("subscription.") else None
+    if isinstance(entity, dict) and entity.get("id"):
+        plans.apply_razorpay({**entity, "status": entity.get("status", "")})
+        log.info("Razorpay %s for subscription %s", name, entity.get("id"))
+    return {"ok": True}
 
 
 # ---- admin: who is here, people, plans ------------------------------------------------------------------------------------
@@ -500,26 +637,54 @@ class PlanBody(BaseModel):
     code: str
     name: str
     description: str = ""
-    priceMinor: int = 0
-    currency: str = "INR"
-    period: str = "monthly"
-    intervalCount: int = 1
-    features: list[str] = []
-    missing: list[str] = []
     badge: str = ""
     cta: str = ""
     featured: bool = False
     active: bool = True
     sortOrder: int = 0
-    razorpayPlanId: str = ""
 
     def fields(self) -> dict:
         return {
-            "code": self.code, "name": self.name, "description": self.description, "price_minor": self.priceMinor,
-            "currency": self.currency, "period": self.period, "interval_count": self.intervalCount, "features": self.features,
-            "missing": self.missing, "badge": self.badge, "cta": self.cta, "featured": self.featured, "active": self.active,
-            "sort_order": self.sortOrder, "razorpay_plan_id": self.razorpayPlanId,
+            "code": self.code, "name": self.name, "description": self.description, "badge": self.badge, "cta": self.cta,
+            "featured": self.featured, "active": self.active, "sort_order": self.sortOrder,
         }
+
+
+class PriceBody(BaseModel):
+    period: str = "monthly"
+    intervalCount: int = 1
+    amountMinor: int
+    currency: str = "INR"
+    razorpayPlanId: str = ""
+    active: bool = True
+
+    def fields(self) -> dict:
+        return {
+            "period": self.period, "interval_count": self.intervalCount, "amount_minor": self.amountMinor, "currency": self.currency,
+            "razorpay_plan_id": self.razorpayPlanId, "active": self.active,
+        }
+
+
+class FeatureBody(BaseModel):
+    key: str = ""
+    label: str
+    description: str = ""
+    kind: str = "flag"
+    unit: str = ""
+    group: str = "General"
+    status: str = "live"
+    sortOrder: int = 0
+
+    def fields(self) -> dict:
+        return {
+            "key": self.key, "label": self.label, "description": self.description, "kind": self.kind, "unit": self.unit,
+            "group": self.group, "status": self.status, "sort_order": self.sortOrder,
+        }
+
+
+class CellBody(BaseModel):
+    enabled: bool
+    value: Optional[int] = None
 
 
 class DisabledBody(BaseModel):
@@ -547,7 +712,9 @@ def admin_overview(request: Request) -> dict:
             "ready": sum(1 for a in accounts_now if a["status"] == "ready"),
             "recentFailures": len(youtube.recent_failures),
         },
-        "plans": {"active": len(accounts.list_plans(only_active=True)), "total": len(accounts.list_plans())},
+        "plans": {"active": len(plans.list_plans(only_active=True)), "total": len(plans.list_plans())},
+        "revenue": plans.revenue(),
+        "payments": razorpay.status(),
         "signIn": {"configured": bool(_GOOGLE_CLIENT_ID), "admins": len(_ADMIN_EMAILS)},
     }
 
@@ -574,38 +741,145 @@ def admin_block_user(user_id: str, body: DisabledBody, request: Request) -> dict
     return {"ok": True}
 
 
-@app.get("/api/admin/plans")
-def admin_plans(request: Request) -> dict:
+def _fail(exc: Exception) -> HTTPException:
+    return HTTPException(status_code=404 if isinstance(exc, LookupError) else 400, detail=str(exc.args[0] if exc.args else exc))
+
+
+@app.get("/api/admin/billing")
+def admin_billing(request: Request) -> dict:
+    """Everything the plans pages need: Razorpay's state, the feature catalogue, and every plan with its prices and rules."""
     _require_admin(request)
-    return {"plans": accounts.list_plans()}
+    return {
+        "razorpay": {**razorpay.status(), "webhookUrl": str(request.base_url).rstrip("/") + "/api/billing/webhook"},
+        "features": plans.list_features(),
+        "plans": plans.list_plans(),
+        "periods": list(PERIODS),
+        "freeCode": FREE_CODE,
+    }
 
 
 @app.post("/api/admin/plans")
 def admin_create_plan(body: PlanBody, request: Request) -> dict:
     _require_admin(request)
     try:
-        return {"plan": accounts.save_plan(body.fields())}
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        return {"plan": plans.save_plan(body.fields())}
+    except (ValueError, LookupError) as exc:
+        raise _fail(exc)
 
 
 @app.put("/api/admin/plans/{plan_id}")
 def admin_update_plan(plan_id: str, body: PlanBody, request: Request) -> dict:
     _require_admin(request)
     try:
-        return {"plan": accounts.save_plan(body.fields(), plan_id)}
-    except LookupError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+        return {"plan": plans.save_plan(body.fields(), plan_id)}
+    except (ValueError, LookupError) as exc:
+        raise _fail(exc)
 
 
 @app.delete("/api/admin/plans/{plan_id}")
 def admin_delete_plan(plan_id: str, request: Request) -> dict:
     _require_admin(request)
-    if not accounts.delete_plan(plan_id):
-        raise HTTPException(status_code=404, detail="No such plan")
+    try:
+        plans.delete_plan(plan_id)
+    except (ValueError, LookupError) as exc:
+        raise _fail(exc)
     return {"ok": True}
+
+
+@app.post("/api/admin/plans/{plan_id}/prices")
+def admin_add_price(plan_id: str, body: PriceBody, request: Request) -> dict:
+    _require_admin(request)
+    try:
+        return {"price": plans.save_price(plan_id, body.fields())}
+    except (ValueError, LookupError) as exc:
+        raise _fail(exc)
+
+
+@app.put("/api/admin/plans/{plan_id}/prices/{price_id}")
+def admin_update_price(plan_id: str, price_id: str, body: PriceBody, request: Request) -> dict:
+    _require_admin(request)
+    try:
+        return {"price": plans.save_price(plan_id, body.fields(), price_id)}
+    except (ValueError, LookupError) as exc:
+        raise _fail(exc)
+
+
+@app.delete("/api/admin/prices/{price_id}")
+def admin_delete_price(price_id: str, request: Request) -> dict:
+    _require_admin(request)
+    try:
+        plans.delete_price(price_id)
+    except (ValueError, LookupError) as exc:
+        raise _fail(exc)
+    return {"ok": True}
+
+
+@app.post("/api/admin/prices/{price_id}/razorpay")
+def admin_create_razorpay_plan(price_id: str, request: Request) -> dict:
+    """Creates this price as a Razorpay plan, so it can be subscribed to, and remembers the id Razorpay gives it."""
+    _require_admin(request)
+    price = plans.get_price(price_id)
+    plan = plans.get_plan(price["planId"]) if price else None
+    if not price or not plan:
+        raise HTTPException(status_code=404, detail="That price does not exist.")
+    if price["razorpayPlanId"]:
+        raise HTTPException(status_code=409, detail="This price is already on Razorpay. Edit the price to make a new one.")
+    try:
+        made = razorpay.create_plan(
+            period=price["period"], interval=price["intervalCount"], name=plan["name"], amount_minor=price["amountMinor"],
+            currency=price["currency"], description=plan["description"],
+        )
+    except RazorpayError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    plans.set_price_razorpay(price_id, made["id"])
+    return {"price": plans.get_price(price_id)}
+
+
+@app.post("/api/admin/features")
+def admin_add_feature(body: FeatureBody, request: Request) -> dict:
+    _require_admin(request)
+    try:
+        return {"feature": plans.save_feature(body.fields())}
+    except (ValueError, LookupError) as exc:
+        raise _fail(exc)
+
+
+@app.put("/api/admin/features/{key}")
+def admin_update_feature(key: str, body: FeatureBody, request: Request) -> dict:
+    _require_admin(request)
+    try:
+        return {"feature": plans.save_feature({**body.fields(), "key": key}, key)}
+    except (ValueError, LookupError) as exc:
+        raise _fail(exc)
+
+
+@app.delete("/api/admin/features/{key}")
+def admin_delete_feature(key: str, request: Request) -> dict:
+    _require_admin(request)
+    try:
+        plans.delete_feature(key)
+    except (ValueError, LookupError) as exc:
+        raise _fail(exc)
+    return {"ok": True}
+
+
+@app.put("/api/admin/plans/{plan_id}/features/{key}")
+def admin_set_plan_feature(plan_id: str, key: str, body: CellBody, request: Request) -> dict:
+    """One cell of the grid: whether a plan includes a feature, and its limit."""
+    _require_admin(request)
+    try:
+        return {"rule": plans.set_plan_feature(plan_id, key, body.enabled, body.value)}
+    except (ValueError, LookupError) as exc:
+        raise _fail(exc)
+
+
+@app.get("/api/admin/subscriptions")
+def admin_subscriptions(request: Request, page: int = 1, pageSize: int = 25) -> dict:
+    _require_admin(request)
+    size = min(max(pageSize, 1), 100)
+    page = max(page, 1)
+    items, total = plans.list_subscriptions(limit=size, offset=(page - 1) * size)
+    return {"subscriptions": items, "total": total, "page": page, "pageSize": size, "revenue": plans.revenue()}
 
 
 # ---- the signed-in person's library, favourites and progress --------------------------------------------------------------
@@ -688,6 +962,15 @@ def add_favorite(session_id: str, request: Request, body: Optional[FavoriteBody]
     meta, real = _library_meta(session_id, body.model_dump() if body else None)
     if meta is None:
         raise HTTPException(status_code=404, detail="We do not know that song")
+    plan, _sub = plans.effective(user["id"])
+    cap = PlanStore.limit(plan, "favorites_max")
+    if cap is not None:
+        kept = engagement.favorite_keys(user["id"])
+        if session_id not in kept and len(kept) >= cap:
+            raise HTTPException(
+                status_code=402,
+                detail=f"The {plan['name']} plan keeps up to {cap} favourite{'s' if cap != 1 else ''}. Remove one, or see the plans for more room.",
+            )
     return engagement.set_favorite(user["id"], session_id, meta, True, pays_xp=real)
 
 
@@ -843,6 +1126,25 @@ def _enqueue(request: Request, session_id: str, task) -> dict:
                 f"chordified open instantly, and you can start another in about {minutes} minute{'s' if minutes != 1 else ''}."
             ),
         )
+    # The plan's daily allowance of new songs. A signed-in person is counted on their account, a visitor by address, and a
+    # visitor is on the Free plan like anybody who has not paid.
+    user = _session_user(request)
+    plan, _sub = plans.effective(user["id"] if user else None)
+    daily = PlanStore.limit(plan, "songs_per_day")
+    owner = user["id"] if user else f"ip:{caller}"
+    today = _today()
+    if daily is not None and not _is_admin(request) and plans.usage(owner, today, "songs") >= daily:
+        if limited:
+            _new_song_limiter.refund(caller)
+        raise HTTPException(
+            status_code=402,
+            detail=(
+                f"New songs are not included in the {plan['name']} plan. See the plans to start."
+                if daily == 0
+                else f"The {plan['name']} plan includes {daily} new song{'s' if daily != 1 else ''} a day, and today's are used. "
+                "Songs that others have already chordified still open instantly. See the plans for more."
+            ),
+        )
     _set_job(session_id, status="queued", progress=0, stage="Queued")
     outcome = job_queue.submit(session_id, task)
     if outcome == "full":
@@ -850,6 +1152,7 @@ def _enqueue(request: Request, session_id: str, task) -> dict:
             _new_song_limiter.refund(caller)
         _JOBS.pop(session_id, None)
         raise HTTPException(status_code=503, detail="We're very busy right now. Please try again in a few minutes.")
+    plans.add_usage(owner, today, "songs")
     return {"sessionId": session_id, "status": "queued"}
 
 

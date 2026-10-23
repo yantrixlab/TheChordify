@@ -1,0 +1,106 @@
+---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+---
+
+<AdminLayout title="Subscriptions" active="subscriptions" lead="Everyone who has subscribed to a paid plan, newest activity first. Razorpay keeps these in step by webhook.">
+  <div id="tiles" class="ov-tiles"></div>
+  <div class="adm-table-wrap">
+    <table class="adm-table">
+      <thead>
+        <tr>
+          <th>Person</th>
+          <th>Plan</th>
+          <th>Price</th>
+          <th>Status</th>
+          <th>Renews or ends</th>
+          <th class="num">Payments</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <p id="empty" class="adm-empty" hidden>Nobody has subscribed yet.</p>
+  </div>
+  <div class="adm-row" style="margin-top:14px;justify-content:space-between">
+    <button id="prev" type="button" class="adm-btn ghost small">← Newer</button>
+    <span id="page" class="adm-hint" style="margin:0"></span>
+    <button id="next" type="button" class="adm-btn ghost small">Older →</button>
+  </div>
+  <p id="msg" class="adm-msg" role="status"></p>
+</AdminLayout>
+
+<style is:global>
+  .ov-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; margin-bottom: 18px; }
+  .ov-tile { padding: 18px 20px; border-radius: 18px; background: #fff; border: 1px solid var(--color-hairline); box-shadow: 0 1px 2px #1a05330a; }
+  .ov-tile small { display: block; font: 700 11px var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-mute); }
+  .ov-tile strong { display: block; margin: 8px 0 4px; font-size: 32px; font-weight: 800; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; color: var(--color-ink); }
+  .ov-tile span { font-size: 13px; color: var(--color-body); }
+</style>
+
+<script>
+  import { adminReady, adminFetch, el, say, money, when, number } from "../../lib/admin";
+
+  const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
+  const SIZE = 25;
+  let page = 1;
+  const PERIOD_WORD: Record<string, string> = { daily: "day", weekly: "week", monthly: "month", quarterly: "quarter", yearly: "year" };
+
+  const STATUS: Record<string, [string, string]> = {
+    active: ["ok", "Active"], pending: ["warn", "Payment retrying"], authenticated: ["violet", "Waiting for first charge"], created: ["", "Not paid yet"],
+    halted: ["bad", "Payments failed"], cancelled: ["warn", "Cancelled"], completed: ["", "Completed"], expired: ["", "Expired"], paused: ["warn", "Paused"],
+  };
+
+  async function load() {
+    try {
+      const data = await adminFetch(`/api/admin/subscriptions?page=${page}&pageSize=${SIZE}`);
+      $("tiles").replaceChildren(
+        ...[
+          ["Active subscriptions", number(data.revenue.active), "paying or retrying"],
+          ["Monthly income", money(data.revenue.monthlyMinor, "INR"), "from active plans, in rupees"],
+          ["All subscriptions", number(data.total), "ever started"],
+        ].map(([label, value, note]) => {
+          const tile = el("div", "ov-tile");
+          tile.append(el("small", "", label), el("strong", "", value), el("span", "", note));
+          return tile;
+        }),
+      );
+      $("rows").replaceChildren(
+        ...data.subscriptions.map((s: Record<string, any>) => {
+          const tr = el("tr");
+          const cell = (...nodes: (Node | string)[]) => {
+            const td = el("td");
+            td.append(...nodes);
+            return td;
+          };
+          const who = el("div");
+          who.append(el("strong", "", s.name || s.email), el("small", "", s.email));
+          who.style.cssText = "display:grid;line-height:1.35";
+          (who.querySelector("small") as HTMLElement).style.cssText = "color:var(--color-mute);font-size:12.5px";
+          const [tone, text] = STATUS[s.status] ?? ["", s.status];
+          const price = s.amountMinor ? `${money(s.amountMinor, s.currency)} / ${s.intervalCount > 1 ? s.intervalCount + " " : ""}${PERIOD_WORD[s.period] ?? s.period}${s.intervalCount > 1 ? "s" : ""}` : "—";
+          const ends = s.currentEnd ? `${s.cancelAtPeriodEnd || ["cancelled", "completed", "expired"].includes(s.status) ? "Ends " : "Renews "}${when(s.currentEnd)}` : "—";
+          const payments = cell(String(s.paidCount));
+          payments.className = "num";
+          tr.append(cell(who), cell(s.planName), cell(price), cell(el("span", `adm-pill ${tone}`, text)), cell(ends), payments);
+          return tr;
+        }),
+      );
+      $("empty").hidden = data.subscriptions.length > 0;
+      const pages = Math.max(1, Math.ceil(data.total / SIZE));
+      $("page").textContent = `Page ${page} of ${pages}`;
+      ($("prev") as HTMLButtonElement).disabled = page <= 1;
+      ($("next") as HTMLButtonElement).disabled = page >= pages;
+    } catch (err) {
+      say("msg", err instanceof Error ? err.message : "Could not load the subscriptions.", "bad");
+    }
+  }
+
+  $("prev").addEventListener("click", () => {
+    page -= 1;
+    void load();
+  });
+  $("next").addEventListener("click", () => {
+    page += 1;
+    void load();
+  });
+  adminReady().then(load);
+</script>

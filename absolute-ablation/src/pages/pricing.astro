@@ -1,0 +1,70 @@
+---
+import Layout from "../layouts/Layout.astro";
+import Nav from "../components/Nav.astro";
+import Footer from "../components/Footer.astro";
+
+const faqs = [
+  ["Do I need to pay to start?", "No. Everybody starts on the Free plan the moment they sign in with Google, and you can use Chord Suno without an account too. Paid plans add more on top."],
+  ["Can I cancel anytime?", "Yes. Cancel from this page whenever you like. You keep your plan until the end of the period you already paid for, then you are back on Free. Your library, favourites and XP stay."],
+  ["How do I pay?", "Payments are handled by Razorpay, so you can use UPI, cards, net banking or wallets. Your card details go to Razorpay only; Chord Suno never sees or stores them."],
+  ["Can I change plans?", "Yes. Cancel your current plan, and subscribe to the new one when it ends, or any time after. Pick monthly or yearly on each plan."],
+  ["What does “Soon” mean next to a feature?", "It is on the way and included in the plan, but not built yet. You will get it as soon as it ships, with no extra charge."],
+];
+---
+
+<Layout title="Pricing — Chord Suno" description="Chord Suno plans: start free, and upgrade for more songs, more tools and more ways to play.">
+  <Nav />
+  <main id="main-content" class="pg">
+    <div class="pg-wrap">
+      <header class="pg-head">
+        <p class="pg-eyebrow">Pricing</p>
+        <h1>Pick the plan that plays like you do</h1>
+        <p class="pg-sub">Start free, and move up when you want more songs, more tools and more ways to practise. Cancel anytime.</p>
+      </header>
+
+      <div id="plans" aria-live="polite" aria-busy="true">
+        <div class="pg-ghosts" aria-hidden="true"><div></div><div></div><div></div></div>
+      </div>
+
+      <section class="pr-faq" aria-labelledby="faq-title">
+        <h2 id="faq-title">Questions, answered</h2>
+        {faqs.map(([question, answer]) => (
+          <details>
+            <summary>{question}</summary>
+            <p>{answer}</p>
+          </details>
+        ))}
+      </section>
+    </div>
+  </main>
+  <Footer />
+</Layout>
+
+<style is:global>
+  .pg { padding: 56px 20px 100px; background: radial-gradient(ellipse 70% 38% at 50% -4%, #7c3aed26, transparent 70%), radial-gradient(ellipse 50% 30% at 90% 20%, #f59e0b1c, transparent 70%), linear-gradient(180deg, #fbf7ff, #fff 60%); }
+  .pg-wrap { max-width: 1160px; margin: 0 auto; }
+  .pg-head { max-width: 680px; margin: 0 auto 36px; text-align: center; }
+  .pg-eyebrow { margin: 0 0 12px; font: 700 12px var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-violet); }
+  .pg-head h1 { margin: 0 0 14px; font-size: clamp(32px, 5.4vw, 54px); font-weight: 800; letter-spacing: -0.045em; line-height: 1.05; color: var(--color-ink); }
+  .pg-sub { margin: 0; font-size: 17px; line-height: 1.6; color: var(--color-body); }
+  .pg-ghosts { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 20px; max-width: 1000px; margin: 0 auto; }
+  .pg-ghosts div { height: 520px; border-radius: 26px; background: linear-gradient(100deg, #f3eeff 30%, #fbf9ff 50%, #f3eeff 70%); background-size: 200% 100%; animation: pg-shimmer 1.4s linear infinite; }
+  @keyframes pg-shimmer { to { background-position: -200% 0; } }
+  @media (prefers-reduced-motion: reduce) { .pg-ghosts div { animation: none; } }
+  @media (max-width: 640px) { .pg { padding: 36px 14px 72px; } }
+</style>
+
+<script>
+  import { fetchPricing, renderPricing } from "../lib/pricingUi";
+
+  const root = document.getElementById("plans")!;
+  fetchPricing().then((data) => {
+    root.setAttribute("aria-busy", "false");
+    if (!data) {
+      root.replaceChildren(Object.assign(document.createElement("p"), { className: "pr-empty", textContent: "We could not load the plans right now. Please refresh in a moment." }));
+      return;
+    }
+    renderPricing(root, data);
+    if (location.hash === "#compare") document.getElementById("compare")?.scrollIntoView();
+  });
+</script>

@@ -112,7 +112,12 @@ function hud(user: AuthUser) {
   nums.append(have, need);
 
   const streak = el("div", "au-streak");
-  root.append(top, rank, bar, nums, streak);
+  const plan = el("div", "au-plan");
+  const planName = el("span");
+  const upgrade = el("a", "au-upgrade", "Upgrade →");
+  upgrade.href = "/pricing/";
+  plan.append(planName, upgrade);
+  root.append(top, rank, bar, nums, streak, plan);
 
   const update = (next: AuthUser) => {
     ring.update(next);
@@ -126,6 +131,9 @@ function hud(user: AuthUser) {
     need.textContent = next.levelSpan ? `${numberText(Math.max(0, (next.nextLevelXp ?? 0) - (next.xp ?? 0)))} to level ${(next.level ?? 1) + 1}` : "";
     streak.textContent = next.streak ? `🔥 ${next.streak}-day streak` : "";
     streak.hidden = !next.streak;
+    planName.textContent = next.planName ? `${next.planName} plan` : "";
+    upgrade.hidden = next.plan !== "free";
+    plan.hidden = !next.planName;
     rank.hidden = bar.hidden = nums.hidden = !next.level;
   };
   update(user);
@@ -150,7 +158,10 @@ function userMenu(user: AuthUser) {
   const library = el("a", "au-item", "My library");
   library.href = "/library/";
   library.setAttribute("role", "menuitem");
-  panel.append(library);
+  const billing = el("a", "au-item", "Plans & billing");
+  billing.href = "/pricing/";
+  billing.setAttribute("role", "menuitem");
+  panel.append(library, billing);
   if (user.isAdmin) {
     const admin = el("a", "au-item", "Admin");
     admin.href = "/admin/";

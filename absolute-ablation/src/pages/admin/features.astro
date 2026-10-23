@@ -1,0 +1,322 @@
+---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+---
+
+<AdminLayout
+  title="Features & limits"
+  active="features"
+  lead="Every feature a plan can include, in one grid. Switch a feature on or off for each plan, or set how much of it a plan gets. Changes save as you click and show on the pricing page straight away."
+>
+  <div class="ft-bar" role="status">
+    <span id="saved" class="adm-hint" style="margin:0"></span>
+    <span class="ft-key"><span class="adm-pill ok">Live</span> the app checks it <span class="adm-pill">Pricing page only</span> shown, but nothing in the app changes <span class="adm-pill warn">Soon</span> not built yet</span>
+  </div>
+
+  <div class="adm-table-wrap">
+    <table class="adm-table ft-grid" id="grid" aria-busy="true"></table>
+  </div>
+  <p id="msg" class="adm-msg" role="status"></p>
+
+  <section class="adm-card" style="margin-top:26px" aria-labelledby="h-cat">
+    <h2 id="h-cat">Feature catalogue</h2>
+    <p class="adm-hint">The list the grid is built from. Add anything you want to offer, even before it exists: mark it “Soon” and it shows with a Soon tag on the pricing page. A switch is on or off; a limit is a number (or unlimited).</p>
+    <div id="catalogue" class="ft-rows"></div>
+    <button id="add" type="button" class="adm-btn ghost small">+ Add a feature</button>
+  </section>
+
+  <section id="editor" class="adm-card ft-editor" hidden aria-labelledby="editor-title">
+    <h2 id="editor-title">New feature</h2>
+    <form id="form" novalidate>
+      <div class="ft-form">
+        <label class="adm-field"><span>Name</span><input id="f-label" type="text" maxlength="80" required placeholder="Chord sheet PDF" /></label>
+        <label class="adm-field">
+          <span>Key</span>
+          <input id="f-key" type="text" maxlength="40" required placeholder="pdf_export" />
+          <small>Letters, numbers, - and _. It cannot change later.</small>
+        </label>
+        <label class="adm-field ft-wide"><span>Description</span><input id="f-description" type="text" maxlength="200" placeholder="Download a song's chords as a printable PDF." /><small>Shown when somebody points at the feature.</small></label>
+        <label class="adm-field"><span>Kind</span>
+          <select id="f-kind"><option value="flag">Switch (on or off)</option><option value="limit">Limit (a number)</option></select>
+        </label>
+        <label class="adm-field"><span>Unit (for a limit)</span><input id="f-unit" type="text" maxlength="20" placeholder="songs" /></label>
+        <label class="adm-field"><span>Group</span><input id="f-group" type="text" maxlength="40" list="groups" placeholder="Export & tools" /><datalist id="groups"></datalist></label>
+        <label class="adm-field"><span>Status</span>
+          <select id="f-status"><option value="live">Live: it works today</option><option value="soon">Soon: shown with a Soon tag</option></select>
+        </label>
+        <label class="adm-field"><span>Order</span><input id="f-order" type="number" step="1" inputmode="numeric" value="0" /></label>
+      </div>
+      <div class="adm-row" style="margin-top:18px">
+        <button id="save" type="submit" class="adm-btn">Save feature</button>
+        <button id="cancel" type="button" class="adm-btn ghost">Cancel</button>
+      </div>
+      <p id="form-msg" class="adm-msg" role="status"></p>
+    </form>
+  </section>
+</AdminLayout>
+
+<style is:global>
+  .ft-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 20px; margin-bottom: 12px; }
+  .ft-key { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 12.5px; color: var(--color-mute); }
+  .ft-grid th, .ft-grid td { white-space: normal; }
+  .ft-grid thead th { text-align: center; vertical-align: bottom; min-width: 120px; }
+  .ft-grid thead th:first-child { text-align: left; min-width: 260px; }
+  .ft-grid thead th small { display: block; margin-top: 3px; font: 600 11px var(--font-sans); letter-spacing: 0; text-transform: none; color: var(--color-mute); }
+  .ft-grid .ft-group th { padding: 18px 16px 8px; background: #fff; text-align: left; font: 700 11px var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-violet-deep); }
+  .ft-grid td.ft-label { min-width: 260px; }
+  .ft-grid td.ft-label strong { display: block; font-size: 14.5px; color: var(--color-ink); }
+  .ft-grid td.ft-label span { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
+  .ft-grid td.ft-cell { text-align: center; }
+  .ft-cellwrap { display: inline-flex; align-items: center; gap: 8px; }
+  .ft-cellwrap input[type="number"] { width: 74px; height: 34px; padding: 0 8px; text-align: center; font-size: 14px; }
+  .ft-cellwrap input[type="number"]:disabled { opacity: 0.45; }
+  .ft-inf { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; color: var(--color-body); cursor: pointer; }
+  .ft-inf input { width: 15px; height: 15px; accent-color: var(--color-violet); }
+  /* the on/off switch */
+  .ft-switch { position: relative; display: inline-block; width: 42px; height: 24px; flex: none; }
+  .ft-switch input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; z-index: 1; }
+  .ft-switch i { position: absolute; inset: 0; border-radius: 999px; background: #d9d0ea; transition: background-color 0.18s; }
+  .ft-switch i::after { content: ""; position: absolute; left: 3px; top: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px #0004; transition: transform 0.18s; }
+  .ft-switch input:checked + i { background: var(--color-violet); }
+  .ft-switch input:checked + i::after { transform: translateX(18px); }
+  .ft-switch input:focus-visible + i { outline: 2px solid var(--color-violet); outline-offset: 2px; }
+  .ft-rows { display: grid; gap: 0; margin: 10px 0 14px; }
+  .ft-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 12px 0; border-bottom: 1px solid #f1eaf9; }
+  .ft-row:last-child { border-bottom: 0; }
+  .ft-row .name { flex: 1 1 220px; min-width: 0; }
+  .ft-row .name strong { display: block; font-size: 14.5px; color: var(--color-ink); }
+  .ft-row .name small { font: 600 11.5px var(--font-mono); color: var(--color-mute); }
+  .ft-editor { margin-top: 18px; scroll-margin-top: 80px; }
+  .ft-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 18px; margin-top: 14px; }
+  .ft-wide { grid-column: 1 / -1; }
+  @media (max-width: 640px) { .ft-form { grid-template-columns: 1fr; } }
+  @media (prefers-reduced-motion: reduce) { .ft-switch i, .ft-switch i::after { transition: none; } }
+</style>
+
+<script>
+  import { adminReady, adminFetch, el, say, money } from "../../lib/admin";
+
+  const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
+  type Item = Record<string, any>;
+  let plans: Item[] = [];
+  let features: Item[] = [];
+  let editingKey: string | null = null;
+
+  const saved = (text: string) => {
+    $("saved").textContent = text;
+  };
+
+  // ---- the grid ------------------------------------------------------------------------------------------------------
+
+  function pills(feature: Item): HTMLElement {
+    const box = el("span");
+    box.append(
+      el("span", `adm-pill ${feature.enforced ? "ok" : ""}`, feature.enforced ? "Live" : "Pricing page only"),
+      el("span", "adm-pill", feature.kind === "flag" ? "Switch" : `Limit${feature.unit ? ` · ${feature.unit}` : ""}`),
+    );
+    if (feature.status === "soon") box.append(el("span", "adm-pill warn", "Soon"));
+    return box;
+  }
+
+  async function save(plan: Item, feature: Item, enabled: boolean, value: number | null) {
+    saved("Saving…");
+    try {
+      const { rule } = await adminFetch(`/api/admin/plans/${encodeURIComponent(plan.id)}/features/${encodeURIComponent(feature.key)}`, {
+        method: "PUT",
+        body: JSON.stringify({ enabled, value }),
+      });
+      plan.entitlements[feature.key] = rule;
+      saved(`Saved ${new Date().toLocaleTimeString()}: ${feature.label} for ${plan.name}`);
+      say("msg", "", "");
+    } catch (err) {
+      saved("");
+      say("msg", err instanceof Error ? err.message : "Could not save that.", "bad");
+      draw(); // put the cell back as it was
+    }
+  }
+
+  function cell(plan: Item, feature: Item): HTMLElement {
+    const td = el("td", "ft-cell");
+    const rule = plan.entitlements[feature.key] ?? { enabled: false, value: null };
+    const wrap = el("span", "ft-cellwrap");
+    const toggle = el("label", "ft-switch");
+    const input = el("input");
+    input.type = "checkbox";
+    input.checked = rule.enabled;
+    input.setAttribute("aria-label", `${feature.label} in ${plan.name}`);
+    toggle.append(input, el("i"));
+    wrap.append(toggle);
+
+    if (feature.kind === "limit") {
+      const number = el("input");
+      number.type = "number";
+      number.min = "0";
+      number.step = "1";
+      number.value = rule.value === null ? "" : String(rule.value);
+      number.placeholder = "∞";
+      number.setAttribute("aria-label", `${feature.label} limit in ${plan.name}`);
+      const unlimited = el("label", "ft-inf");
+      const box = el("input");
+      box.type = "checkbox";
+      box.checked = rule.value === null;
+      unlimited.append(box, "∞");
+      unlimited.title = "No limit";
+      const sync = () => {
+        number.disabled = !input.checked || box.checked;
+        unlimited.style.opacity = input.checked ? "1" : "0.45";
+        box.disabled = !input.checked;
+      };
+      sync();
+      const commit = () => save(plan, feature, input.checked, box.checked || number.value === "" ? null : Math.max(0, Math.floor(Number(number.value))));
+      input.addEventListener("change", () => {
+        sync();
+        void commit();
+      });
+      box.addEventListener("change", () => {
+        if (!box.checked && number.value === "") number.value = "10";
+        sync();
+        void commit();
+      });
+      let timer: number | undefined;
+      number.addEventListener("input", () => {
+        window.clearTimeout(timer);
+        timer = window.setTimeout(commit, 500);
+      });
+      wrap.append(number, unlimited);
+    } else {
+      input.addEventListener("change", () => void save(plan, feature, input.checked, null));
+    }
+    td.append(wrap);
+    return td;
+  }
+
+  function draw() {
+    const grid = $("grid");
+    const head = el("tr");
+    head.append(el("th", "", "Feature"));
+    plans.forEach((plan) => {
+      const th = el("th", "", plan.name);
+      const price = plan.prices.find((p: Item) => p.active);
+      th.append(el("small", "", plan.isFree ? "Free" : price ? `${money(price.amountMinor, price.currency)} / ${price.period.replace("ly", "")}`.replace("dai", "day").replace("year", "year") : "No price yet"));
+      if (!plan.active) th.append(el("small", "", "Hidden"));
+      head.append(th);
+    });
+    const thead = el("thead");
+    thead.append(head);
+    const body = el("tbody");
+    let group = "";
+    features.forEach((feature) => {
+      if (feature.group !== group) {
+        group = feature.group;
+        const row = el("tr", "ft-group");
+        const th = el("th", "", group);
+        th.colSpan = plans.length + 1;
+        row.append(th);
+        body.append(row);
+      }
+      const row = el("tr");
+      const label = el("td", "ft-label");
+      const strong = el("strong", "", feature.label);
+      strong.title = feature.description;
+      label.append(strong, pills(feature));
+      row.append(label);
+      plans.forEach((plan) => row.append(cell(plan, feature)));
+      body.append(row);
+    });
+    grid.replaceChildren(thead, body);
+    grid.setAttribute("aria-busy", "false");
+    drawCatalogue();
+  }
+
+  // ---- the catalogue -------------------------------------------------------------------------------------------------
+
+  function drawCatalogue() {
+    $("groups").replaceChildren(...[...new Set(features.map((f) => f.group))].map((g) => Object.assign(el("option"), { value: g })));
+    $("catalogue").replaceChildren(
+      ...features.map((feature) => {
+        const row = el("div", "ft-row");
+        const name = el("div", "name");
+        name.append(el("strong", "", feature.label), el("small", "", `${feature.key} · ${feature.group}`));
+        const edit = el("button", "adm-btn ghost small", "Edit");
+        edit.type = "button";
+        edit.addEventListener("click", () => openEditor(feature));
+        const remove = el("button", "adm-btn danger small", "Remove");
+        remove.type = "button";
+        remove.disabled = feature.enforced;
+        remove.title = feature.enforced ? "The app checks this feature itself" : "";
+        remove.addEventListener("click", async () => {
+          if (!confirm(`Remove “${feature.label}” from every plan and from the pricing page?`)) return;
+          try {
+            await adminFetch(`/api/admin/features/${encodeURIComponent(feature.key)}`, { method: "DELETE" });
+            say("msg", `${feature.label} removed.`, "ok");
+            await load();
+          } catch (err) {
+            say("msg", err instanceof Error ? err.message : "Could not remove it.", "bad");
+          }
+        });
+        row.append(name, pills(feature), edit, remove);
+        return row;
+      }),
+    );
+  }
+
+  function openEditor(feature?: Item) {
+    editingKey = feature ? feature.key : null;
+    $("editor-title").textContent = feature ? `Edit ${feature.label}` : "New feature";
+    const set = (id: string, v: string) => (($(id) as HTMLInputElement).value = v);
+    set("f-label", feature?.label ?? "");
+    set("f-key", feature?.key ?? "");
+    ($("f-key") as HTMLInputElement).readOnly = !!feature;
+    set("f-description", feature?.description ?? "");
+    set("f-kind", feature?.kind ?? "flag");
+    set("f-unit", feature?.unit ?? "");
+    set("f-group", feature?.group ?? "General");
+    set("f-status", feature?.status ?? "live");
+    set("f-order", String(feature?.sortOrder ?? (features.length ? Math.max(...features.map((f) => f.sortOrder)) + 1 : 1)));
+    say("form-msg", "", "");
+    $("editor").hidden = false;
+    $("editor").scrollIntoView({ behavior: "smooth", block: "start" });
+    ($("f-label") as HTMLInputElement).focus({ preventScroll: true });
+  }
+
+  $("add").addEventListener("click", () => openEditor());
+  $("cancel").addEventListener("click", () => ($("editor").hidden = true));
+  $("form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const value = (id: string) => ($(id) as HTMLInputElement).value.trim();
+    const body = {
+      key: value("f-key"),
+      label: value("f-label"),
+      description: value("f-description"),
+      kind: value("f-kind"),
+      unit: value("f-unit"),
+      group: value("f-group") || "General",
+      status: value("f-status"),
+      sortOrder: Math.floor(Number(value("f-order")) || 0),
+    };
+    const button = $("save") as HTMLButtonElement;
+    button.disabled = true;
+    try {
+      await adminFetch(editingKey ? `/api/admin/features/${encodeURIComponent(editingKey)}` : "/api/admin/features", { method: editingKey ? "PUT" : "POST", body: JSON.stringify(body) });
+      say("msg", `${body.label} saved.`, "ok");
+      $("editor").hidden = true;
+      await load();
+    } catch (err) {
+      say("form-msg", err instanceof Error ? err.message : "Could not save that.", "bad");
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  async function load() {
+    try {
+      const data = await adminFetch("/api/admin/billing");
+      plans = data.plans;
+      features = data.features;
+      draw();
+    } catch (err) {
+      say("msg", err instanceof Error ? err.message : "Could not load the features.", "bad");
+    }
+  }
+
+  adminReady().then(load);
+</script>

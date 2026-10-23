@@ -59,6 +59,7 @@ interface ToastOptions {
   tone?: "level" | "badge";
   progress?: number; // 0-1, draws a bar
   sparks?: boolean;
+  href?: string; // makes the whole pop-up a link
   ms?: number;
 }
 
@@ -112,7 +113,14 @@ export function toast(options: ToastOptions) {
     box.classList.add("out");
     window.setTimeout(() => box.remove(), 320);
   };
-  close.addEventListener("click", dismiss);
+  close.addEventListener("click", (event) => {
+    event.stopPropagation();
+    dismiss();
+  });
+  if (options.href) {
+    box.style.cursor = "pointer";
+    box.addEventListener("click", () => (window.location.href = options.href!));
+  }
   container().append(box);
   window.setTimeout(dismiss, options.ms ?? 5200);
 }

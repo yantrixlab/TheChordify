@@ -276,6 +276,7 @@ import Nav from "../components/Nav.astro";
   .cr-item.is-rest.is-current { padding: 0 18px; }
   .cr-card { transition: transform 0.32s cubic-bezier(0.3, 0.6, 0.2, 1); transform-origin: center; }
   .cr-item.is-current .cr-card { transform: scale(1.3); }
+  .is-locked { opacity: 0.4 !important; cursor: not-allowed !important; }
 
   /* Other ways of playing a chord: arrows either side of its name (on hover on a computer, always on a phone) and dots for which one is showing */
   .vc-label { display: flex; align-items: center; justify-content: center; gap: 2px; }
@@ -455,6 +456,7 @@ import Nav from "../components/Nav.astro";
   import { getGuitarShapes, chordNotes, chordKeyLabel, transposeChord, type GuitarShape } from "../lib/chordShapes";
   import { API_BASE, registerJam, type ExtractResult, type ChordSegment, type Bar, type Section } from "../lib/api";
   import { heartButton, recordPlay } from "../lib/library";
+  import { can, loadPlan, nudge } from "../lib/plan";
 
   const params = new URLSearchParams(window.location.search);
   const sessionId = params.get("session");
@@ -485,6 +487,40 @@ import Nav from "../components/Nav.astro";
   const countInToggle = document.getElementById("countin-toggle") as HTMLButtonElement;
   const sectionsToggle = document.getElementById("sections-toggle") as HTMLButtonElement;
   const detailToggle = document.getElementById("detail-toggle") as HTMLButtonElement;
+
+  // Features a plan can leave out. The buttons stay where they are; a locked one explains instead of acting.
+  const LOCKS: [selector: string, key: string, label: string][] = [
+    ["#capo-down, #capo-up, #transpose-down, #transpose-up", "transpose_capo", "Transpose and capo"],
+    ["#detail-toggle", "chord_detail", "Full chord detail"],
+  ];
+  document.addEventListener(
+    "click",
+    (event) => {
+      const target = event.target as Element | null;
+      for (const [selector, key, label] of LOCKS) {
+        if (target?.closest(selector) && !can(key)) {
+          event.stopPropagation(); // before the button's own handler sees it
+          event.preventDefault();
+          nudge(label);
+          return;
+        }
+      }
+    },
+    true,
+  );
+  function applyLocks() {
+    for (const [selector, key] of LOCKS) {
+      document.querySelectorAll<HTMLElement>(selector).forEach((button) => {
+        button.classList.toggle("is-locked", !can(key));
+        button.setAttribute("aria-disabled", String(!can(key)));
+      });
+    }
+  }
+  window.addEventListener("plan-change", () => {
+    applyLocks();
+    if (!can("chord_voicings")) refreshViews(); // draw the diagrams again, without the arrows
+  });
+  void loadPlan();
 
   const headerEl = document.getElementById("player-header")!;
   const songTitleEl = document.getElementById("song-title")!;
@@ -546,7 +582,7 @@ import Nav from "../components/Nav.astro";
   function chordDiagram(fChord: string, label: string, scale = 1, keyboardArrows = true): HTMLElement {
     const choice = shapeChoice(fChord);
     if (!choice) return buildNoteFallbackCard(label);
-    const pick = choice.count > 1 ? { index: choice.index, count: choice.count, step: (delta: number) => stepVoicing(fChord, delta), keyboardArrows } : undefined;
+    const pick = choice.count > 1 && can("chord_voicings") ? { index: choice.index, count: choice.count, step: (delta: number) => stepVoicing(fChord, delta), keyboardArrows } : undefined;
     const diagram = buildFretDiagram(label, choice.shape, scale, pick);
     diagram.dataset.fchord = fChord;
     return diagram;

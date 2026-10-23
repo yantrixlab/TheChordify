@@ -7,7 +7,8 @@ export interface AuthUser {
   email: string;
   name: string;
   picture: string;
-  plan: string;
+  plan: string; // the plan code ("free", "premium"...)
+  planName?: string;
   isAdmin: boolean;
   level?: number; // from the library: where they stand, for the menu
   title?: string;
