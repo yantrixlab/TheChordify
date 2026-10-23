@@ -1,7 +1,9 @@
 // Dev talks to the local backend. A production build uses same-origin paths (/api, /media),
 // which the reverse proxy in deploy/Caddyfile forwards to the backend. PUBLIC_API_BASE overrides both.
+// In dev it is the same host name as the page (localhost or 127.0.0.1), so the sign-in cookie counts as same-site.
 export const API_BASE: string =
-  import.meta.env.PUBLIC_API_BASE ?? (import.meta.env.DEV ? "http://127.0.0.1:8000" : "");
+  import.meta.env.PUBLIC_API_BASE ??
+  (import.meta.env.DEV ? `http://${typeof window !== "undefined" ? window.location.hostname : "127.0.0.1"}:8000` : "");
 
 export interface ChordSegment {
   start: number;
@@ -74,7 +76,7 @@ export function getApiErrorMessage(err: unknown, fallback: string): string {
   return fallback;
 }
 
-async function fetchApi(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+export async function fetchApi(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   try {
     return await fetch(input, init);
   } catch (err) {

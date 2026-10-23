@@ -126,6 +126,7 @@ def _open_backend(data_dir: str):
 class SongStore:
     def __init__(self, data_dir: str) -> None:
         self._db = _open_backend(data_dir)
+        self.db = self._db  # the same connection, for the tables of people and plans (accounts.py)
         for statement in _SCHEMA:
             self._db.run(statement)
         log.info("Song catalog and results stored in %s", self._db.describe())
@@ -225,7 +226,11 @@ class SongStore:
     def summary(self) -> dict:
         songs, _ = self._db.run("SELECT COUNT(*) AS n FROM songs")
         results, _ = self._db.run("SELECT COUNT(*) AS n FROM results")
-        return {"kind": self._db.kind, "where": self._db.describe(), "songs": songs[0]["n"], "results": results[0]["n"]}
+        jams, _ = self._db.run("SELECT COALESCE(SUM(jams), 0) AS n FROM songs")
+        return {
+            "kind": self._db.kind, "where": self._db.describe(), "songs": songs[0]["n"], "results": results[0]["n"],
+            "jams": int(jams[0]["n"]),
+        }
 
     def import_files(self, data_dir: str) -> dict:
         """Brings in what older versions kept in files, once: results/*.json, and (into Postgres) the old songs.db.

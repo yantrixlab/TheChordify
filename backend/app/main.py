@@ -9,6 +9,7 @@ import re
 import tempfile
 import threading
 from typing import Optional
+from urllib.parse import urlparse
 
 from fastapi import FastAPI, HTTPException, Request, Response, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,6 +17,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from .engine import analyze
+from . import accounts as accounts_module
+from .accounts import AccountStore, SignInError
 from .jobs import JobQueue
 from .search import RateLimiter, SearchUnavailable, clean_query, search_songs
 from .store import SongStore
@@ -45,6 +48,7 @@ youtube.configure(CACHE_DIR)  # where cookies pasted on the admin page are kept
 youtube.keep_failures(lambda: catalog.load_result("meta:failures"), lambda data: catalog.save_result("meta:failures", data))
 _TRENDING_KEY = "meta:trending"  # not a valid song id, so it can never be asked for as a result
 trending_shelves.start(lambda: catalog.load_result(_TRENDING_KEY), lambda data: catalog.save_result(_TRENDING_KEY, data))
+accounts = AccountStore(catalog.db)
 try:  # results and songs that older versions kept in files join the database, once
     log.info("Imported from files: %s", catalog.import_files(CACHE_DIR))
 except Exception as exc:
@@ -75,6 +79,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()],
     allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+    allow_credentials=True,  # the sign-in cookie, for the sites listed above (in production the site and API share one origin)
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -335,21 +340,243 @@ _ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "")
 _admin_limiter = RateLimiter(limit=20, window=60.0)
 
 
-def _require_admin(request: Request) -> None:
-    if not _ADMIN_TOKEN:
-        raise HTTPException(status_code=404, detail="Not found")
-    caller = request.client.host if request.client else "unknown"
-    if not _admin_limiter.allow(caller):
-        raise HTTPException(status_code=429, detail="Too many attempts. Wait a minute.")
+# Admins are people who sign in with a Google account listed in ADMIN_EMAILS (comma-separated). The ADMIN_TOKEN, if set, still
+# works as a way in that does not depend on Google (the admin pages have a box for it).
+_ADMIN_EMAILS = {e.strip().lower() for e in os.environ.get("ADMIN_EMAILS", "").split(",") if e.strip()}
+_GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "").strip()
+_SESSION_COOKIE = "cs_session"
+_login_limiter = RateLimiter(limit=20, window=60.0)
+
+
+def _session_user(request: Request) -> Optional[dict]:
+    """The signed-in person behind this request's cookie, if any."""
+    try:
+        return accounts.user_for_session(request.cookies.get(_SESSION_COOKIE, ""))
+    except Exception as exc:
+        log.warning("Could not look up the session: %s", exc)
+        return None
+
+
+def _public_user(user: dict) -> dict:
+    return {
+        "id": user["id"], "email": user["email"], "name": user["name"], "picture": user["picture"], "plan": user["plan"],
+        "isAdmin": user["email"] in _ADMIN_EMAILS,
+    }
+
+
+def _origin_ok(request: Request) -> bool:
+    """A request that changes something and comes from a page on another site is not ours (cookies would ride along)."""
+    origin = request.headers.get("origin")
+    if not origin:
+        return True  # not sent by a browser page
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host", "")
+    if urlparse(origin).netloc == host:
+        return True
+    allowed = [o.strip() for o in os.environ.get("CORS_ORIGINS", "").split(",") if o.strip()]
+    return origin in allowed or re.match(r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$", origin) is not None
+
+
+def _admin_via(request: Request) -> Optional[str]:
+    """"google" for a signed-in admin, "token" for the admin token, else None."""
+    user = _session_user(request)
+    if user and user["email"] in _ADMIN_EMAILS:
+        return "google"
     given = request.headers.get("x-admin-token", "")
-    if not hmac.compare_digest(given.encode("utf-8"), _ADMIN_TOKEN.encode("utf-8")):
-        raise HTTPException(status_code=401, detail="Wrong admin token")
+    if _ADMIN_TOKEN and hmac.compare_digest(given.encode("utf-8"), _ADMIN_TOKEN.encode("utf-8")):
+        return "token"
+    return None
+
+
+def _require_admin(request: Request) -> None:
+    if not _ADMIN_TOKEN and not _ADMIN_EMAILS:
+        raise HTTPException(status_code=404, detail="Not found")  # the admin is switched off
+    via = _admin_via(request)
+    if via is None:
+        # Only the ones that fail count towards the limit, so guessing the token gets nowhere but an admin at work is never held up.
+        caller = request.client.host if request.client else "unknown"
+        if not _admin_limiter.allow(caller):
+            raise HTTPException(status_code=429, detail="Too many attempts. Wait a minute.")
+        if request.headers.get("x-admin-token"):
+            raise HTTPException(status_code=401, detail="Wrong admin token")
+        raise HTTPException(status_code=401, detail="Sign in with an admin Google account")
+    if via == "google" and request.method not in ("GET", "HEAD", "OPTIONS") and not _origin_ok(request):
+        raise HTTPException(status_code=403, detail="This request came from another site")
 
 
 def _is_admin(request: Request) -> bool:
-    """True if the request carries the admin token (the owner trying things is not held to the visitor limits)."""
-    given = request.headers.get("x-admin-token", "")
-    return bool(_ADMIN_TOKEN) and hmac.compare_digest(given.encode("utf-8"), _ADMIN_TOKEN.encode("utf-8"))
+    """True for an admin (the owner trying things is not held to the visitor limits)."""
+    return _admin_via(request) is not None
+
+
+# ---- sign-in (Google only) ----------------------------------------------------------------------------------------------
+
+
+class GoogleBody(BaseModel):
+    credential: str
+
+
+@app.get("/api/auth/config")
+def auth_config() -> dict:
+    """What the sign-in button needs: the public Google client id (empty until it is set, which turns sign-in off)."""
+    return {"googleClientId": _GOOGLE_CLIENT_ID, "enabled": bool(_GOOGLE_CLIENT_ID)}
+
+
+@app.post("/api/auth/google")
+def sign_in_with_google(body: GoogleBody, request: Request, response: Response) -> dict:
+    """Signs a person in (or up: the first sign-in creates their account) from the ID token Google's button gave the browser."""
+    if not _GOOGLE_CLIENT_ID:
+        raise HTTPException(status_code=503, detail="Sign-in is not set up yet.")
+    caller = request.client.host if request.client else "unknown"
+    if not _login_limiter.allow(caller):
+        raise HTTPException(status_code=429, detail="Too many sign-in attempts. Please wait a minute.")
+    try:
+        who = accounts_module.verify_google(body.credential, _GOOGLE_CLIENT_ID)
+    except SignInError as exc:
+        raise HTTPException(status_code=401, detail=str(exc))
+    user = accounts.sign_in(who["sub"], who["email"], who["name"], who["picture"])
+    if user["disabled"]:
+        raise HTTPException(status_code=403, detail="This account has been blocked.")
+    response.set_cookie(
+        _SESSION_COOKIE, accounts.start_session(user["id"]), max_age=accounts_module.SESSION_DAYS * 86400,
+        httponly=True, samesite="lax", secure=request.url.scheme == "https", path="/",
+    )
+    return {"user": _public_user(user)}
+
+
+@app.get("/api/auth/me")
+def whoami(request: Request, response: Response) -> dict:
+    response.headers["Cache-Control"] = "no-store"
+    user = _session_user(request)
+    return {"user": _public_user(user) if user else None}
+
+
+@app.post("/api/auth/logout")
+def sign_out(request: Request, response: Response) -> dict:
+    if not _origin_ok(request):
+        raise HTTPException(status_code=403, detail="This request came from another site")
+    accounts.end_session(request.cookies.get(_SESSION_COOKIE, ""))
+    response.delete_cookie(_SESSION_COOKIE, path="/")
+    return {"ok": True}
+
+
+@app.get("/api/plans")
+def public_plans(response: Response) -> dict:
+    """The subscription plans that are switched on, in the order the admin set."""
+    response.headers["Cache-Control"] = "public, max-age=60"
+    return {"plans": accounts.list_plans(only_active=True)}
+
+
+# ---- admin: who is here, people, plans ------------------------------------------------------------------------------------
+
+
+class PlanBody(BaseModel):
+    code: str
+    name: str
+    description: str = ""
+    priceMinor: int = 0
+    currency: str = "INR"
+    period: str = "monthly"
+    intervalCount: int = 1
+    features: list[str] = []
+    missing: list[str] = []
+    badge: str = ""
+    cta: str = ""
+    featured: bool = False
+    active: bool = True
+    sortOrder: int = 0
+    razorpayPlanId: str = ""
+
+    def fields(self) -> dict:
+        return {
+            "code": self.code, "name": self.name, "description": self.description, "price_minor": self.priceMinor,
+            "currency": self.currency, "period": self.period, "interval_count": self.intervalCount, "features": self.features,
+            "missing": self.missing, "badge": self.badge, "cta": self.cta, "featured": self.featured, "active": self.active,
+            "sort_order": self.sortOrder, "razorpay_plan_id": self.razorpayPlanId,
+        }
+
+
+class DisabledBody(BaseModel):
+    disabled: bool
+
+
+@app.get("/api/admin/me")
+def admin_me(request: Request) -> dict:
+    _require_admin(request)
+    via = _admin_via(request)
+    user = _session_user(request)
+    return {"admin": True, "via": via, "user": _public_user(user) if user else None}
+
+
+@app.get("/api/admin/overview")
+def admin_overview(request: Request) -> dict:
+    _require_admin(request)
+    accounts_now = youtube.list_accounts()
+    return {
+        "users": accounts.count_users(),
+        "catalog": catalog.summary(),
+        "queue": job_queue.stats(),
+        "youtube": {
+            "accounts": len(accounts_now),
+            "ready": sum(1 for a in accounts_now if a["status"] == "ready"),
+            "recentFailures": len(youtube.recent_failures),
+        },
+        "plans": {"active": len(accounts.list_plans(only_active=True)), "total": len(accounts.list_plans())},
+        "signIn": {"configured": bool(_GOOGLE_CLIENT_ID), "admins": len(_ADMIN_EMAILS)},
+    }
+
+
+@app.get("/api/admin/users")
+def admin_users(request: Request, search: str = "", page: int = 1, pageSize: int = 25) -> dict:
+    _require_admin(request)
+    size = min(max(pageSize, 1), 100)
+    page = max(page, 1)
+    users, total = accounts.list_users(search=search[:100], limit=size, offset=(page - 1) * size)
+    return {
+        "users": [{**u, "isAdmin": u["email"] in _ADMIN_EMAILS} for u in users],
+        "total": total, "page": page, "pageSize": size,
+    }
+
+
+@app.post("/api/admin/users/{user_id}/disabled")
+def admin_block_user(user_id: str, body: DisabledBody, request: Request) -> dict:
+    _require_admin(request)
+    if not accounts.set_disabled(user_id, body.disabled):
+        raise HTTPException(status_code=404, detail="No such user")
+    return {"ok": True}
+
+
+@app.get("/api/admin/plans")
+def admin_plans(request: Request) -> dict:
+    _require_admin(request)
+    return {"plans": accounts.list_plans()}
+
+
+@app.post("/api/admin/plans")
+def admin_create_plan(body: PlanBody, request: Request) -> dict:
+    _require_admin(request)
+    try:
+        return {"plan": accounts.save_plan(body.fields())}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.put("/api/admin/plans/{plan_id}")
+def admin_update_plan(plan_id: str, body: PlanBody, request: Request) -> dict:
+    _require_admin(request)
+    try:
+        return {"plan": accounts.save_plan(body.fields(), plan_id)}
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@app.delete("/api/admin/plans/{plan_id}")
+def admin_delete_plan(plan_id: str, request: Request) -> dict:
+    _require_admin(request)
+    if not accounts.delete_plan(plan_id):
+        raise HTTPException(status_code=404, detail="No such plan")
+    return {"ok": True}
 
 
 class AccountBody(BaseModel):

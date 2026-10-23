@@ -1,0 +1,70 @@
+---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+---
+
+<AdminLayout
+  title="Download test"
+  active="test"
+  lead="Downloads a 19-second public video with each account, and once with none, to see what YouTube lets through right now. It also makes one proof-of-origin token. It can take a minute or two."
+>
+  <section class="adm-card" aria-labelledby="h-test">
+    <h2 id="h-test">Run the test</h2>
+    <div class="adm-row" style="margin-top:12px">
+      <button id="test" type="button" class="adm-btn">Test every account now</button>
+      <span id="test-note" class="adm-hint" style="margin:0" role="status"></span>
+    </div>
+    <ul id="test-result" class="adm-list" style="margin-top:16px"></ul>
+  </section>
+
+  <section class="adm-card" aria-labelledby="h-failures">
+    <h2 id="h-failures">Recent download failures</h2>
+    <p class="adm-hint">The last songs that could not be downloaded, with the real answer from YouTube. They are kept across restarts.</p>
+    <p id="failures-empty" class="adm-hint" hidden>None recorded.</p>
+    <ul id="failures" class="adm-list"></ul>
+  </section>
+</AdminLayout>
+
+<script>
+  import { adminReady, adminFetch, say, statusLine, when } from "../../lib/admin";
+
+  const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
+
+  function showFailures(failures: any[]) {
+    $("failures-empty").hidden = failures.length > 0;
+    $("failures").replaceChildren(
+      ...failures.map((f: any) => statusLine(f.verdict.startsWith("this video") ? "warn" : false, `${when(f.at)} · ${f.song} · ${f.account} · ${f.verdict}: ${f.error}`)),
+    );
+  }
+
+  async function run(test: boolean) {
+    const info = await adminFetch(`/api/admin/youtube${test ? "?test=1" : ""}`);
+    showFailures(info.recentFailures || []);
+    if (!test) return;
+    $("test-result").replaceChildren(
+      statusLine(info.test.ok, info.test.ok ? "At least one way in works (a real download succeeded)" : "YouTube is blocking every account and anonymous requests: add or replace cookies, or use a proxy"),
+      statusLine(
+        info.test.token.ok === null ? "warn" : info.test.token.ok,
+        info.test.token.ok === null ? `Proof-of-origin token: ${info.test.token.note}` : info.test.token.ok ? `Proof-of-origin token made in ${info.test.token.seconds}s` : `Proof-of-origin token failed after ${info.test.token.seconds}s: ${info.test.token.error}`,
+      ),
+      ...info.test.results.map((r: any) => statusLine(r.ok, `${r.label}: ${r.ok ? `downloaded in ${r.attempts[r.attempts.length - 1].seconds}s` : r.attempts[r.attempts.length - 1].result}`)),
+    );
+  }
+
+  $("test").addEventListener("click", async () => {
+    const button = $<HTMLButtonElement>("test");
+    button.disabled = true;
+    button.textContent = "Testing…";
+    say("test-note", "Downloading for real, please wait…", "");
+    try {
+      await run(true);
+      say("test-note", `Finished ${new Date().toLocaleTimeString()}.`, "");
+    } catch (err) {
+      say("test-note", err instanceof Error ? err.message : "The test failed.", "bad");
+    } finally {
+      button.disabled = false;
+      button.textContent = "Test every account now";
+    }
+  });
+
+  adminReady().then(() => run(false).catch(() => {}));
+</script>

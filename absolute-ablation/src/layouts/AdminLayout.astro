@@ -1,0 +1,209 @@
+---
+import Layout from "./Layout.astro";
+import Logo from "../components/Logo.astro";
+
+interface Props {
+  title: string; // the page's name, also its heading
+  active: "overview" | "users" | "plans" | "youtube" | "test";
+  lead?: string; // one line under the heading
+}
+
+const { title, active, lead } = Astro.props;
+
+const links = [
+  { key: "overview", label: "Overview", href: "/admin/", icon: "M3 11 12 3l9 8M5 10v10h5v-6h4v6h5V10" },
+  { key: "users", label: "Users", href: "/admin/users/", icon: "M16 19v-1a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v1M9.5 10a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7M21 19v-1a4 4 0 0 0-3-3.9M15 3.2a3.5 3.5 0 0 1 0 6.6" },
+  { key: "plans", label: "Subscription plans", href: "/admin/plans/", icon: "M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM3 10h18M7 15h3" },
+  { key: "youtube", label: "YouTube accounts", href: "/admin/youtube/", icon: "M2.5 8a3 3 0 0 1 3-3h13a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3h-13a3 3 0 0 1-3-3zM10 9.5v5l4.5-2.5z" },
+  { key: "test", label: "Download test", href: "/admin/youtube-test/", icon: "M12 3v12m0 0-4-4m4 4 4-4M4 19h16" },
+];
+---
+
+<Layout title={`${title} — Admin — Chord Suno`} noindex>
+  <div class="adm">
+    <header class="adm-top">
+      <button id="adm-burger" class="adm-burger" type="button" aria-label="Open menu" aria-expanded="false" aria-controls="adm-side">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><path d="M2 5h14M2 9h14M2 13h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
+      </button>
+      <a href="/admin/" class="adm-top-logo"><Logo size={28} /></a>
+    </header>
+
+    <aside id="adm-side" class="adm-side" aria-label="Admin menu">
+      <a href="/admin/" class="adm-logo" aria-label="Chord Suno admin"><Logo size={32} tone="dark" /><span class="adm-chip">Admin</span></a>
+      <nav class="adm-nav">
+        {
+          links.map((link) => (
+            <a href={link.href} class={link.key === active ? "is-active" : ""} aria-current={link.key === active ? "page" : undefined}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d={link.icon} />
+              </svg>
+              {link.label}
+            </a>
+          ))
+        }
+      </nav>
+      <div class="adm-foot">
+        <p id="adm-who" class="adm-who">&nbsp;</p>
+        <a href="/" class="adm-foot-link">← Back to the site</a>
+        <button id="adm-signout" type="button" class="adm-foot-link">Sign out</button>
+      </div>
+    </aside>
+    <div id="adm-scrim" class="adm-scrim" hidden></div>
+
+    <main id="main-content" class="adm-main">
+      <section id="adm-gate" class="adm-gate" hidden aria-labelledby="adm-gate-title">
+        <h1 id="adm-gate-title">Admin sign-in</h1>
+        <p class="adm-lead">Sign in with an admin Google account to continue.</p>
+        <div id="adm-google" class="adm-google" hidden></div>
+        <details class="adm-token">
+          <summary>Use the admin token instead</summary>
+          <form id="adm-token-form" class="adm-row">
+            <input id="adm-token" type="password" autocomplete="off" placeholder="Admin token" aria-label="Admin token" />
+            <button type="submit" class="adm-btn">Continue</button>
+          </form>
+        </details>
+        <p id="adm-gate-msg" class="adm-msg" role="status"></p>
+      </section>
+
+      <div id="adm-app" hidden>
+        <h1>{title}</h1>
+        {lead && <p class="adm-lead">{lead}</p>}
+        <slot />
+      </div>
+    </main>
+  </div>
+</Layout>
+
+<style is:global>
+  body { background: #f7f3fd; }
+  .adm { min-height: 100vh; display: grid; grid-template-columns: 264px minmax(0, 1fr); }
+
+  /* the menu on the left */
+  .adm-side { position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; padding: 20px 14px 16px; background: linear-gradient(180deg, #1a0533, #12032a); color: #e9defc; overflow-x: hidden; overflow-y: auto; }
+  .adm-logo { display: flex; align-items: center; gap: 8px; padding: 4px 6px 22px; text-decoration: none; }
+  .adm-chip { flex: none; padding: 2px 7px; border-radius: 6px; background: #ffffff1f; font: 700 10px/1.6 var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase; color: #fcd34d; }
+  .adm-nav { display: grid; gap: 4px; }
+  .adm-nav a { display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-radius: 12px; color: #cdbdf0; text-decoration: none; font: 600 14.5px var(--font-sans); transition: background-color 0.15s, color 0.15s; }
+  .adm-nav a:hover { background: #ffffff12; color: #fff; }
+  .adm-nav a.is-active { background: linear-gradient(135deg, #7c3aed, #5b21b6); color: #fff; box-shadow: 0 10px 20px -12px #7c3aedcc; }
+  .adm-nav a:focus-visible, .adm-foot-link:focus-visible { outline: 2px solid #fcd34d; outline-offset: 2px; }
+  .adm-foot { margin-top: auto; display: grid; gap: 2px; padding-top: 16px; border-top: 1px solid #ffffff1a; }
+  .adm-who { margin: 0 0 8px; padding: 0 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: #b9a6e0; }
+  .adm-foot-link { display: block; width: 100%; padding: 9px 12px; border: 0; border-radius: 10px; background: none; text-align: left; font: 600 13.5px var(--font-sans); color: #cdbdf0; text-decoration: none; cursor: pointer; }
+  .adm-foot-link:hover { background: #ffffff12; color: #fff; }
+
+  /* the page */
+  .adm-main { min-width: 0; padding: 40px 40px 80px; }
+  .adm-main > div, .adm-gate { max-width: 960px; margin: 0 auto; }
+  .adm-main h1 { margin: 0 0 6px; font-size: 28px; font-weight: 800; letter-spacing: -0.03em; color: var(--color-ink); }
+  .adm-lead { margin: 0 0 26px; max-width: 680px; font-size: 15px; line-height: 1.6; color: var(--color-body); }
+  .adm-main [hidden] { display: none !important; }
+  .adm-top, .adm-scrim { display: none; }
+
+  /* shared pieces */
+  .adm-card { margin-bottom: 16px; padding: 20px 22px; border-radius: 18px; background: #fff; border: 1px solid var(--color-hairline); box-shadow: 0 1px 2px #1a05330a; }
+  .adm-card h2 { margin: 0 0 4px; font-size: 16px; font-weight: 700; color: var(--color-ink); }
+  .adm-card h3 { margin: 18px 0 8px; font-size: 14px; font-weight: 700; color: var(--color-ink); }
+  .adm-hint { margin: 0 0 12px; font-size: 13.5px; line-height: 1.55; color: var(--color-mute); }
+  .adm-main code { padding: 1px 6px; border-radius: 6px; background: #f3eeff; font: 600 12.5px var(--font-mono); }
+  .adm-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .adm-main input[type="text"], .adm-main input[type="password"], .adm-main input[type="search"], .adm-main input[type="number"], .adm-main select, .adm-main textarea {
+    width: 100%; height: 42px; padding: 0 13px; border-radius: 12px; border: 1.5px solid var(--color-hairline); background: #fff; font: 500 14.5px var(--font-sans); color: var(--color-ink); outline: none; }
+  .adm-main textarea { height: auto; padding: 11px 13px; font-size: 13.5px; line-height: 1.55; resize: vertical; }
+  .adm-main input:focus, .adm-main select:focus, .adm-main textarea:focus { border-color: var(--color-violet); box-shadow: 0 0 0 3px #7c3aed1f; }
+  .adm-row input[type="password"] { width: auto; flex: 1; min-width: 200px; }
+  .adm-btn { height: 40px; padding: 0 18px; border: 0; border-radius: 12px; cursor: pointer; color: #fff; font: 700 14px var(--font-sans); background: linear-gradient(135deg, #7c3aed, #5b21b6); }
+  .adm-btn.small { height: 32px; padding: 0 12px; font-size: 13px; }
+  .adm-btn.ghost { color: var(--color-violet-deep); background: var(--color-violet-soft); }
+  .adm-btn.danger { color: var(--color-error); background: #fee2e2; }
+  .adm-btn:disabled { opacity: 0.55; cursor: progress; }
+  .adm-btn:focus-visible { outline: 2px solid var(--color-violet); outline-offset: 2px; }
+  .adm-msg { min-height: 20px; margin: 10px 0 0; font-size: 14px; color: var(--color-mute); }
+  .adm-msg.ok { color: var(--color-success); }
+  .adm-msg.bad { color: var(--color-error); }
+  .adm-list { margin: 0 0 14px; padding: 0; list-style: none; display: grid; gap: 7px; }
+  .adm-list li { display: flex; gap: 10px; align-items: baseline; font-size: 14px; line-height: 1.5; color: var(--color-body); }
+  .adm-dot { flex: none; width: 10px; height: 10px; margin-top: 4px; border-radius: 50%; background: var(--color-mute); }
+  .adm-dot.ok { background: var(--color-success); }
+  .adm-dot.bad { background: var(--color-error); }
+  .adm-dot.warn { background: var(--color-warning); }
+  .adm-pill { display: inline-block; padding: 1px 9px; border-radius: 999px; font: 700 11px/1.7 var(--font-mono); text-transform: uppercase; letter-spacing: 0.04em; vertical-align: 1px; background: #f1f5f9; color: #475569; }
+  .adm-pill.ok { background: #d1fae5; color: #065f46; }
+  .adm-pill.bad { background: #fee2e2; color: #991b1b; }
+  .adm-pill.warn { background: #fef3c7; color: #92400e; }
+  .adm-pill.violet { background: var(--color-violet-soft); color: var(--color-violet-deep); }
+  .adm-table-wrap { overflow-x: auto; border-radius: 18px; background: #fff; border: 1px solid var(--color-hairline); box-shadow: 0 1px 2px #1a05330a; }
+  .adm-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .adm-table th { padding: 12px 16px; text-align: left; white-space: nowrap; font: 700 11.5px var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-mute); background: #fcfaff; border-bottom: 1px solid var(--color-hairline); }
+  .adm-table td { padding: 12px 16px; vertical-align: middle; white-space: nowrap; color: var(--color-body); border-bottom: 1px solid #f1eaf9; }
+  .adm-table tr:last-child td { border-bottom: 0; }
+  .adm-table .who { display: flex; align-items: center; gap: 12px; min-width: 190px; }
+  .adm-table .who strong { display: block; color: var(--color-ink); font-size: 14.5px; }
+  .adm-table .who small { display: block; color: var(--color-mute); font-size: 12.5px; }
+  .adm-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .adm-table td.acts { text-align: right; white-space: nowrap; }
+  .adm-table td.acts .adm-btn { margin-left: 8px; }
+  .adm-empty { padding: 36px 20px; text-align: center; color: var(--color-mute); font-size: 14.5px; }
+  .adm-avatar { display: inline-grid; place-items: center; flex: none; width: 38px; height: 38px; overflow: hidden; border-radius: 50%; background: linear-gradient(135deg, #7c3aed, #ec4899); color: #fff; font: 700 14px var(--font-sans); }
+  .adm-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .adm-field { display: grid; gap: 6px; }
+  .adm-field > span { font-size: 13px; font-weight: 600; color: var(--color-ink); }
+  .adm-field > small { font-size: 12.5px; color: var(--color-mute); line-height: 1.45; }
+  .adm-check { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--color-ink); }
+  .adm-check input { width: 18px; height: 18px; accent-color: var(--color-violet); }
+  .adm-details summary { cursor: pointer; font-weight: 600; font-size: 14px; color: var(--color-violet-deep); }
+  .adm-steps { margin: 10px 0 0; padding-left: 20px; color: var(--color-body); font-size: 14px; line-height: 1.7; }
+
+  /* the sign-in gate */
+  .adm-gate { margin-top: 8vh; padding: 36px 30px; max-width: 460px !important; border-radius: 24px; background: #fff; border: 1px solid var(--color-hairline); box-shadow: 0 30px 60px -34px #5b21b690; text-align: center; }
+  .adm-gate .adm-lead { margin: 0 auto 22px; }
+  .adm-google { display: flex; justify-content: center; min-height: 44px; margin-bottom: 18px; }
+  .adm-token { margin-top: 6px; text-align: left; }
+  .adm-token summary { text-align: center; cursor: pointer; font-size: 13.5px; font-weight: 600; color: var(--color-mute); }
+  .adm-token form { margin-top: 12px; }
+
+  @media (max-width: 860px) {
+    .adm { display: block; }
+    .adm-top { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; gap: 12px; padding: 10px 14px; background: #fff; border-bottom: 1px solid var(--color-hairline); }
+    .adm-top-logo { text-decoration: none; }
+    .adm-burger { display: grid; place-items: center; width: 40px; height: 40px; border: 1px solid var(--color-hairline); border-radius: 12px; background: #fff; color: var(--color-ink); cursor: pointer; }
+    .adm-side { position: fixed; z-index: 50; left: 0; top: 0; bottom: 0; width: min(290px, 84vw); height: auto; transform: translateX(-102%); transition: transform 0.22s ease; }
+    .adm-side.is-open { transform: none; box-shadow: 0 0 60px #000a; }
+    .adm-scrim { position: fixed; z-index: 40; inset: 0; background: #0d001f88; }
+    .adm-scrim:not([hidden]) { display: block; }
+    .adm-main { padding: 24px 16px 64px; }
+    .adm-main h1 { font-size: 24px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .adm-side { transition: none; } }
+</style>
+
+<script>
+  import { startAdmin } from "../lib/admin";
+  import { signOut } from "../lib/auth";
+
+  const side = document.getElementById("adm-side")!;
+  const scrim = document.getElementById("adm-scrim")!;
+  const burger = document.getElementById("adm-burger")!;
+  const toggle = (open: boolean) => {
+    side.classList.toggle("is-open", open);
+    scrim.hidden = !open;
+    burger.setAttribute("aria-expanded", String(open));
+  };
+  burger.addEventListener("click", () => toggle(!side.classList.contains("is-open")));
+  scrim.addEventListener("click", () => toggle(false));
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") toggle(false);
+  });
+
+  document.getElementById("adm-signout")!.addEventListener("click", async () => {
+    try {
+      sessionStorage.removeItem("cs-admin");
+    } catch {
+      // fine
+    }
+    await signOut();
+    location.reload();
+  });
+
+  startAdmin();
+</script>

@@ -1,0 +1,145 @@
+---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+---
+
+<AdminLayout
+  title="YouTube accounts"
+  active="youtube"
+  lead="YouTube often refuses downloads from a server's address. Cookies from signed-in accounts get past it. Add several accounts: downloads take turns between them, each is capped per hour, and one that YouTube blocks rests while the others carry on. Cookies expire, so replace them here when an account stops working. No redeploy needed."
+>
+  <section class="adm-card" aria-labelledby="h-status">
+    <h2 id="h-status">What the server has</h2>
+    <ul id="status" class="adm-list" style="margin-top:12px"></ul>
+    <p class="adm-hint" style="margin:0">To check that downloads really work, use <a href="/admin/youtube-test/" style="color:var(--color-violet-deep);font-weight:600">Download test</a>.</p>
+  </section>
+
+  <section class="adm-card" aria-labelledby="h-accounts">
+    <h2 id="h-accounts">Accounts</h2>
+    <ul id="accounts" class="yt-accounts"></ul>
+    <p id="accounts-empty" class="adm-hint" hidden>No accounts yet. Downloads are made anonymously, which YouTube often blocks from a server.</p>
+
+    <h3>Add an account</h3>
+    <details class="adm-details">
+      <summary>How to export its cookies</summary>
+      <ol class="adm-steps">
+        <li>Make a separate Google account for this (YouTube may restrict an account used for downloads, so never use your own).</li>
+        <li>In a <strong>private / incognito window</strong>, sign in to that account on youtube.com.</li>
+        <li>With that tab on youtube.com, use a cookies.txt extension (for example "Get cookies.txt LOCALLY") and export. It must be the <strong>Netscape cookies.txt</strong> format.</li>
+        <li>Close the private window straight away, so the browser does not refresh those cookies and invalidate them.</li>
+        <li>Paste the whole file below with a name for the account, then press Add.</li>
+      </ol>
+    </details>
+    <div style="display:grid;gap:10px;margin-top:12px">
+      <input id="label" type="text" maxlength="60" placeholder="Name, for example Account 2" aria-label="Account name" />
+      <textarea id="cookies" rows="7" spellcheck="false" aria-label="Cookies" placeholder="# Netscape HTTP Cookie File&#10;.youtube.com&#9;TRUE&#9;/&#9;TRUE&#9;1800000000&#9;SAPISID&#9;..."></textarea>
+    </div>
+    <div class="adm-row" style="margin-top:6px">
+      <button id="add" type="button" class="adm-btn">Add account</button>
+    </div>
+    <p id="accounts-msg" class="adm-msg" role="status"></p>
+  </section>
+</AdminLayout>
+
+<style is:global>
+  .yt-accounts { margin: 12px 0 14px; padding: 0; list-style: none; display: grid; gap: 8px; }
+  .yt-account { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--color-hairline); background: #fdfbff; }
+  .yt-account .who { min-width: 0; }
+  .yt-account strong { display: block; font-size: 14.5px; color: var(--color-ink); }
+  .yt-account small { display: block; margin-top: 2px; font-size: 12.5px; color: var(--color-mute); line-height: 1.5; }
+  .yt-account .acts { display: flex; gap: 8px; }
+</style>
+
+<script>
+  import { adminReady, adminFetch, el, say, statusLine, when } from "../../lib/admin";
+
+  const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
+
+  function showStatus(info: any) {
+    const ready = info.accounts.filter((a: any) => a.status === "ready").length;
+    const tokens = info.potProvider && info.potProvider.plugin && info.potProvider.mode;
+    $("status").replaceChildren(
+      statusLine(true, `yt-dlp ${info.ytDlp}`),
+      statusLine(info.playerScriptSolver, info.playerScriptSolver ? "Player-script solver installed" : "Player-script solver missing (yt-dlp-ejs): downloads will fail"),
+      statusLine(info.jsRuntime.node || info.jsRuntime.deno, info.jsRuntime.node || info.jsRuntime.deno ? `JavaScript runtime found (${info.jsRuntime.node ? "node" : "deno"})` : "No JavaScript runtime (node or deno) in this image"),
+      statusLine(info.accounts.length === 0 ? "warn" : ready > 0, info.accounts.length === 0 ? "No accounts: downloads are anonymous" : `${ready} of ${info.accounts.length} account${info.accounts.length === 1 ? "" : "s"} ready (cap ${info.hourlyCap} downloads per account per hour)`),
+      statusLine(info.storage.kind === "postgres" ? true : "warn", `Saved songs: ${info.storage.songs} in the catalog, ${info.storage.results} analyses, kept in ${info.storage.where}${info.storage.kind === "postgres" ? "" : info.storage.databaseUrlSet ? " (DATABASE_URL is set but Postgres could not be reached: check the server log)" : " (set DATABASE_URL to keep them in Postgres, and mount a persistent volume on " + info.storage.dataDir + ")"}`),
+      statusLine(tokens ? true : "warn", tokens ? `Proof-of-origin tokens on (${info.potProvider.mode})` : "Proof-of-origin tokens off: YouTube is more likely to ask for a sign-in"),
+      statusLine(info.proxy ? true : "warn", info.proxy ? "Proxy configured" : "No proxy"),
+      statusLine(true, `Line: ${info.queue.running} running, ${info.queue.waiting} waiting (${info.queue.workers} at a time). Visitors may start ${info.newSongsPerHour || "unlimited"} new songs per hour.`),
+    );
+  }
+
+  function showAccounts(accounts: any[]) {
+    $("accounts-empty").hidden = accounts.length > 0;
+    $("accounts").replaceChildren(
+      ...accounts.map((a) => {
+        const li = el("li", "yt-account");
+        const who = el("div", "who");
+        const name = el("strong", "", a.label);
+        name.append(" ", el("span", `adm-pill ${a.status === "resting" ? "bad" : a.status === "full" ? "warn" : "ok"}`, a.status === "resting" ? "resting" : a.status === "full" ? "at hourly cap" : "ready"));
+        const parts = [
+          `${a.cookies} cookies${a.loggedIn ? ", signed in" : ", no sign-in cookies"}`,
+          a.expiresSoonest ? `first one expires ${new Date(a.expiresSoonest * 1000).toLocaleDateString()}` : "",
+          `${a.usedLastHour}/${a.hourlyCap} downloads this hour`,
+          a.status === "resting" && a.restingUntil ? `resting until ${when(a.restingUntil)} after YouTube refused it (${a.failures}×)` : "",
+          a.lastError && a.status === "resting" ? a.lastError : "",
+          `from ${a.source}`,
+        ].filter(Boolean);
+        who.append(name, el("small", "", parts.join(" · ")));
+        const acts = el("div", "acts");
+        if (a.status === "resting") {
+          const retry = el("button", "adm-btn ghost small", "Try again now");
+          retry.type = "button";
+          retry.addEventListener("click", async () => {
+            await adminFetch(`/api/admin/youtube/accounts/${encodeURIComponent(a.id)}/reset`, { method: "POST" });
+            await refresh();
+          });
+          acts.append(retry);
+        }
+        if (a.removable) {
+          const remove = el("button", "adm-btn danger small", "Remove");
+          remove.type = "button";
+          remove.addEventListener("click", async () => {
+            if (!confirm(`Remove ${a.label}?`)) return;
+            try {
+              await adminFetch(`/api/admin/youtube/accounts/${encodeURIComponent(a.id)}`, { method: "DELETE" });
+              say("accounts-msg", `${a.label} removed.`, "ok");
+              await refresh();
+            } catch (err) {
+              say("accounts-msg", err instanceof Error ? err.message : "Could not remove.", "bad");
+            }
+          });
+          acts.append(remove);
+        }
+        li.append(who, acts);
+        return li;
+      }),
+    );
+  }
+
+  async function refresh() {
+    try {
+      const info = await adminFetch("/api/admin/youtube");
+      showStatus(info);
+      showAccounts(info.accounts);
+    } catch (err) {
+      say("accounts-msg", err instanceof Error ? err.message : "Could not load the YouTube status.", "bad");
+    }
+  }
+
+  $("add").addEventListener("click", async () => {
+    const text = $<HTMLTextAreaElement>("cookies").value;
+    const label = $<HTMLInputElement>("label").value;
+    try {
+      const added = await adminFetch("/api/admin/youtube/accounts", { method: "POST", body: JSON.stringify({ cookies: text, label }) });
+      $<HTMLTextAreaElement>("cookies").value = "";
+      $<HTMLInputElement>("label").value = "";
+      say("accounts-msg", `${added.label} added. Open Download test to check it works.`, "ok");
+      await refresh();
+    } catch (err) {
+      say("accounts-msg", err instanceof Error ? err.message : "Could not add.", "bad");
+    }
+  });
+
+  adminReady().then(refresh);
+</script>

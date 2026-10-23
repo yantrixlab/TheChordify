@@ -1,0 +1,146 @@
+---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+---
+
+<AdminLayout title="Users" active="users" lead="Everyone who has signed in with Google, newest first.">
+  <div class="adm-row us-bar">
+    <input id="search" type="search" placeholder="Search by name or email" aria-label="Search users" autocomplete="off" />
+    <span id="count" class="adm-hint" role="status" style="margin:0"></span>
+  </div>
+  <div class="adm-table-wrap" style="margin-top:14px">
+    <table class="adm-table">
+      <thead>
+        <tr>
+          <th>Person</th>
+          <th>Plan</th>
+          <th>Joined</th>
+          <th>Last sign-in</th>
+          <th class="num">Sign-ins</th>
+          <th>Status</th>
+          <th><span class="sr-only">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <p id="empty" class="adm-empty" hidden></p>
+  </div>
+  <div class="adm-row" style="margin-top:14px;justify-content:space-between">
+    <button id="prev" type="button" class="adm-btn ghost small">← Newer</button>
+    <span id="page" class="adm-hint" style="margin:0"></span>
+    <button id="next" type="button" class="adm-btn ghost small">Older →</button>
+  </div>
+  <p id="msg" class="adm-msg" role="status"></p>
+</AdminLayout>
+
+<style is:global>
+  .us-bar #search { max-width: 360px; }
+</style>
+
+<script>
+  import { adminReady, adminFetch, el, say, when, day, number } from "../../lib/admin";
+
+  const rows = document.getElementById("rows")!;
+  const empty = document.getElementById("empty")!;
+  const countEl = document.getElementById("count")!;
+  const pageEl = document.getElementById("page")!;
+  const prev = document.getElementById("prev") as HTMLButtonElement;
+  const next = document.getElementById("next") as HTMLButtonElement;
+  const search = document.getElementById("search") as HTMLInputElement;
+
+  const SIZE = 25;
+  let page = 1;
+  let query = "";
+  let latest = 0; // so a slow answer to an old search cannot overwrite a newer one
+
+  function avatar(user: any): HTMLElement {
+    const box = el("span", "adm-avatar");
+    if (user.picture) {
+      const img = el("img");
+      img.alt = "";
+      img.referrerPolicy = "no-referrer";
+      img.src = user.picture;
+      img.addEventListener("error", () => img.replaceWith(document.createTextNode((user.name || user.email)[0].toUpperCase())));
+      box.append(img);
+    } else {
+      box.textContent = (user.name || user.email)[0].toUpperCase();
+    }
+    return box;
+  }
+
+  function row(user: any): HTMLElement {
+    const tr = el("tr");
+    const who = el("div", "who");
+    const names = el("div");
+    const strong = el("strong", "", user.name || user.email);
+    if (user.isAdmin) strong.append(" ", el("span", "adm-pill violet", "Admin"));
+    names.append(strong, el("small", "", user.email));
+    who.append(avatar(user), names);
+    const cell = (...nodes: (Node | string)[]) => {
+      const td = el("td");
+      td.append(...nodes);
+      return td;
+    };
+    const personCell = cell(who);
+    const status = el("span", `adm-pill ${user.disabled ? "bad" : "ok"}`, user.disabled ? "Blocked" : "Active");
+    const toggle = el("button", `adm-btn small ${user.disabled ? "ghost" : "danger"}`, user.disabled ? "Unblock" : "Block");
+    toggle.type = "button";
+    toggle.addEventListener("click", async () => {
+      if (!user.disabled && !confirm(`Block ${user.email}? They are signed out at once and cannot sign in again until you unblock them.`)) return;
+      toggle.disabled = true;
+      try {
+        await adminFetch(`/api/admin/users/${encodeURIComponent(user.id)}/disabled`, { method: "POST", body: JSON.stringify({ disabled: !user.disabled }) });
+        say("msg", `${user.email} is now ${user.disabled ? "unblocked" : "blocked"}.`, "ok");
+        await load();
+      } catch (err) {
+        say("msg", err instanceof Error ? err.message : "Could not change that.", "bad");
+        toggle.disabled = false;
+      }
+    });
+    const actions = cell(toggle);
+    actions.className = "acts";
+    const plan = el("td");
+    plan.append(el("span", "adm-pill", user.plan));
+    const sign = cell(String(number(user.logins)));
+    sign.className = "num";
+    tr.append(personCell, plan, cell(day(user.createdAt)), cell(when(user.lastLoginAt)), sign, cell(status), actions);
+    return tr;
+  }
+
+  async function load() {
+    const mine = ++latest;
+    try {
+      const data = await adminFetch(`/api/admin/users?search=${encodeURIComponent(query)}&page=${page}&pageSize=${SIZE}`);
+      if (mine !== latest) return;
+      rows.replaceChildren(...data.users.map(row));
+      const pages = Math.max(1, Math.ceil(data.total / SIZE));
+      countEl.textContent = `${number(data.total)} ${query ? "match" + (data.total === 1 ? "" : "es") : data.total === 1 ? "person" : "people"}`;
+      pageEl.textContent = `Page ${page} of ${pages}`;
+      prev.disabled = page <= 1;
+      next.disabled = page >= pages;
+      empty.hidden = data.users.length > 0;
+      empty.textContent = query ? `Nobody matches “${query}”.` : "Nobody has signed in yet.";
+    } catch (err) {
+      say("msg", err instanceof Error ? err.message : "Could not load the users.", "bad");
+    }
+  }
+
+  let timer: number | undefined;
+  search.addEventListener("input", () => {
+    window.clearTimeout(timer);
+    timer = window.setTimeout(() => {
+      query = search.value.trim();
+      page = 1;
+      load();
+    }, 250);
+  });
+  prev.addEventListener("click", () => {
+    page -= 1;
+    load();
+  });
+  next.addEventListener("click", () => {
+    page += 1;
+    load();
+  });
+
+  adminReady().then(load);
+</script>

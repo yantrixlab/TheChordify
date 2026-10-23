@@ -1,0 +1,267 @@
+---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+---
+
+<AdminLayout
+  title="Subscription plans"
+  active="plans"
+  lead="The plans people can subscribe to. They are set up here to match Razorpay, which will take the payments."
+>
+  <div class="adm-row" style="margin-bottom:14px;justify-content:space-between">
+    <span id="summary" class="adm-hint" style="margin:0" role="status"></span>
+    <button id="new" type="button" class="adm-btn">+ New plan</button>
+  </div>
+
+  <div class="adm-table-wrap">
+    <table class="adm-table">
+      <thead>
+        <tr>
+          <th class="num">Order</th>
+          <th>Plan</th>
+          <th>Price</th>
+          <th>Status</th>
+          <th>Razorpay plan</th>
+          <th><span class="sr-only">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <p id="empty" class="adm-empty" hidden>No plans yet. Add the first one.</p>
+  </div>
+  <p id="msg" class="adm-msg" role="status"></p>
+
+  <section id="editor" class="adm-card pl-editor" hidden aria-labelledby="editor-title">
+    <h2 id="editor-title">New plan</h2>
+    <form id="form" novalidate>
+      <div class="pl-grid">
+        <label class="adm-field"><span>Name</span><input id="f-name" type="text" maxlength="60" required placeholder="Premium" /></label>
+        <label class="adm-field">
+          <span>Code</span>
+          <input id="f-code" type="text" maxlength="40" required placeholder="premium" />
+          <small>Letters, numbers, - and _. Used to tell plans apart; keep it short.</small>
+        </label>
+        <label class="adm-field pl-wide"><span>Description</span><input id="f-description" type="text" maxlength="160" placeholder="For serious players who want the full experience." /></label>
+        <label class="adm-field">
+          <span>Price</span>
+          <input id="f-price" type="number" min="0" step="0.01" inputmode="decimal" placeholder="499" />
+          <small>In the main unit (rupees, dollars). 0 makes it a free plan.</small>
+        </label>
+        <label class="adm-field">
+          <span>Currency</span>
+          <input id="f-currency" type="text" maxlength="3" placeholder="INR" />
+          <small>Three letters: INR, USD...</small>
+        </label>
+        <label class="adm-field">
+          <span>Billed</span>
+          <select id="f-period">
+            <option value="monthly">Monthly</option>
+            <option value="yearly">Yearly</option>
+            <option value="quarterly">Quarterly</option>
+            <option value="weekly">Weekly</option>
+            <option value="daily">Daily</option>
+            <option value="forever">Never (a free plan)</option>
+          </select>
+        </label>
+        <label class="adm-field">
+          <span>Every</span>
+          <input id="f-interval" type="number" min="1" step="1" inputmode="numeric" value="1" />
+          <small>1 = every period, 3 with Monthly = every 3 months.</small>
+        </label>
+        <label class="adm-field"><span>Badge (optional)</span><input id="f-badge" type="text" maxlength="30" placeholder="Most popular" /></label>
+        <label class="adm-field"><span>Button text</span><input id="f-cta" type="text" maxlength="40" placeholder="Start free trial" /></label>
+        <label class="adm-field pl-wide">
+          <span>What it includes</span>
+          <textarea id="f-features" rows="6" placeholder="One feature per line"></textarea>
+        </label>
+        <label class="adm-field pl-wide">
+          <span>What it does not include (optional)</span>
+          <textarea id="f-missing" rows="3" placeholder="One per line, shown crossed out"></textarea>
+        </label>
+        <label class="adm-field">
+          <span>Order on the page</span>
+          <input id="f-order" type="number" step="1" inputmode="numeric" value="0" />
+          <small>Smallest first.</small>
+        </label>
+        <label class="adm-field">
+          <span>Razorpay plan id</span>
+          <input id="f-razorpay" type="text" maxlength="60" placeholder="plan_XXXXXXXXXXXXXX" />
+          <small>Filled in once the plan exists on Razorpay.</small>
+        </label>
+      </div>
+      <div class="pl-checks">
+        <label class="adm-check"><input id="f-featured" type="checkbox" /> Highlight this plan</label>
+        <label class="adm-check"><input id="f-active" type="checkbox" checked /> On sale (visible to visitors)</label>
+      </div>
+      <details class="adm-details" style="margin-top:14px">
+        <summary>How this connects to Razorpay</summary>
+        <ol class="adm-steps">
+          <li>On Razorpay, open <strong>Subscriptions → Plans</strong> and create a plan with the same amount, currency and billing period as here.</li>
+          <li>A Razorpay plan cannot be edited once it exists. To change a price, create a new plan there and paste its id here.</li>
+          <li>Copy the plan's id (it starts with <code>plan_</code>) into the box above. Payments are not switched on yet; this keeps everything ready for them.</li>
+        </ol>
+      </details>
+      <div class="adm-row" style="margin-top:18px">
+        <button id="save" type="submit" class="adm-btn">Save plan</button>
+        <button id="cancel" type="button" class="adm-btn ghost">Cancel</button>
+      </div>
+      <p id="form-msg" class="adm-msg" role="status"></p>
+    </form>
+  </section>
+</AdminLayout>
+
+<style is:global>
+  .pl-editor { margin-top: 22px; scroll-margin-top: 80px; }
+  .pl-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 18px; margin-top: 14px; }
+  .pl-wide { grid-column: 1 / -1; }
+  .pl-checks { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 16px; }
+  .pl-name strong { display: block; color: var(--color-ink); font-size: 14.5px; }
+  .pl-name small { color: var(--color-mute); font-size: 12.5px; }
+  .pl-id { font: 600 12px var(--font-mono); color: var(--color-body); }
+  @media (max-width: 640px) { .pl-grid { grid-template-columns: 1fr; } }
+</style>
+
+<script>
+  import { adminReady, adminFetch, el, say, money } from "../../lib/admin";
+
+  const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+  const rows = $("rows");
+  const editor = $("editor");
+
+  const PERIOD_LABEL: Record<string, string> = { daily: "day", weekly: "week", monthly: "month", quarterly: "quarter", yearly: "year", forever: "" };
+
+  let plans: any[] = [];
+  let editingId: string | null = null;
+
+  const priceText = (plan: any) => {
+    if (plan.priceMinor === 0) return "Free";
+    const unit = PERIOD_LABEL[plan.period];
+    const every = plan.intervalCount > 1 ? `${plan.intervalCount} ${unit}s` : unit;
+    return `${money(plan.priceMinor, plan.currency)}${unit ? ` / ${every}` : ""}`;
+  };
+
+  function draw() {
+    $("summary").textContent = `${plans.length} plan${plans.length === 1 ? "" : "s"}, ${plans.filter((p) => p.active).length} on sale`;
+    $("empty").hidden = plans.length > 0;
+    rows.replaceChildren(
+      ...plans.map((plan) => {
+        const tr = el("tr");
+        const cell = (...nodes: (Node | string)[]) => {
+          const td = el("td");
+          td.append(...nodes);
+          return td;
+        };
+        const order = cell(String(plan.sortOrder));
+        order.className = "num";
+        const name = el("div", "pl-name");
+        const title = el("strong", "", plan.name);
+        if (plan.featured) title.append(" ", el("span", "adm-pill violet", plan.badge || "Highlighted"));
+        name.append(title, el("small", "", plan.code));
+        const razorpay = plan.razorpayPlanId ? el("span", "pl-id", plan.razorpayPlanId) : el("span", "adm-pill", plan.priceMinor === 0 ? "Not needed" : "Not linked");
+        const edit = el("button", "adm-btn ghost small", "Edit");
+        edit.type = "button";
+        edit.addEventListener("click", () => openEditor(plan));
+        const remove = el("button", "adm-btn danger small", "Delete");
+        remove.type = "button";
+        remove.addEventListener("click", () => removePlan(plan));
+        const actions = cell(edit, remove);
+        actions.className = "acts";
+        tr.append(order, cell(name), cell(priceText(plan)), cell(el("span", `adm-pill ${plan.active ? "ok" : "warn"}`, plan.active ? "On sale" : "Hidden")), cell(razorpay), actions);
+        return tr;
+      }),
+    );
+  }
+
+  async function load() {
+    try {
+      plans = (await adminFetch("/api/admin/plans")).plans;
+      draw();
+    } catch (err) {
+      say("msg", err instanceof Error ? err.message : "Could not load the plans.", "bad");
+    }
+  }
+
+  const lines = (text: string) => text.split("\n").map((line) => line.trim()).filter(Boolean);
+
+  function openEditor(plan?: any) {
+    editingId = plan ? plan.id : null;
+    $("editor-title").textContent = plan ? `Edit ${plan.name}` : "New plan";
+    const set = (id: string, value: string) => (($(id) as HTMLInputElement).value = value);
+    set("f-name", plan?.name ?? "");
+    set("f-code", plan?.code ?? "");
+    set("f-description", plan?.description ?? "");
+    set("f-price", plan ? String(plan.priceMinor / 100) : "");
+    set("f-currency", plan?.currency ?? "INR");
+    set("f-period", plan?.period ?? "monthly");
+    set("f-interval", String(plan?.intervalCount ?? 1));
+    set("f-badge", plan?.badge ?? "");
+    set("f-cta", plan?.cta ?? "");
+    set("f-features", (plan?.features ?? []).join("\n"));
+    set("f-missing", (plan?.missing ?? []).join("\n"));
+    set("f-order", String(plan?.sortOrder ?? (plans.length ? Math.max(...plans.map((p) => p.sortOrder)) + 1 : 1)));
+    set("f-razorpay", plan?.razorpayPlanId ?? "");
+    ($("f-featured") as HTMLInputElement).checked = !!plan?.featured;
+    ($("f-active") as HTMLInputElement).checked = plan ? plan.active : true;
+    say("form-msg", "", "");
+    editor.hidden = false;
+    editor.scrollIntoView({ behavior: "smooth", block: "start" });
+    ($("f-name") as HTMLInputElement).focus({ preventScroll: true });
+  }
+
+  function closeEditor() {
+    editor.hidden = true;
+    editingId = null;
+  }
+
+  async function removePlan(plan: any) {
+    if (!confirm(`Delete “${plan.name}”? People already on it are not charged differently, but the plan disappears from this list. To only stop selling it, edit it and untick “On sale”.`)) return;
+    try {
+      await adminFetch(`/api/admin/plans/${encodeURIComponent(plan.id)}`, { method: "DELETE" });
+      say("msg", `${plan.name} deleted.`, "ok");
+      if (editingId === plan.id) closeEditor();
+      await load();
+    } catch (err) {
+      say("msg", err instanceof Error ? err.message : "Could not delete that.", "bad");
+    }
+  }
+
+  $("new").addEventListener("click", () => openEditor());
+  $("cancel").addEventListener("click", closeEditor);
+
+  $("form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const value = (id: string) => ($(id) as HTMLInputElement).value.trim();
+    const price = Number(value("f-price") || 0);
+    if (!Number.isFinite(price) || price < 0) return say("form-msg", "The price must be a number, 0 or more.", "bad");
+    const body = {
+      code: value("f-code"),
+      name: value("f-name"),
+      description: value("f-description"),
+      priceMinor: Math.round(price * 100),
+      currency: value("f-currency") || "INR",
+      period: value("f-period"),
+      intervalCount: Math.max(1, Math.floor(Number(value("f-interval")) || 1)),
+      features: lines(($("f-features") as HTMLTextAreaElement).value),
+      missing: lines(($("f-missing") as HTMLTextAreaElement).value),
+      badge: value("f-badge"),
+      cta: value("f-cta"),
+      featured: ($("f-featured") as HTMLInputElement).checked,
+      active: ($("f-active") as HTMLInputElement).checked,
+      sortOrder: Math.floor(Number(value("f-order")) || 0),
+      razorpayPlanId: value("f-razorpay"),
+    };
+    const button = $("save") as HTMLButtonElement;
+    button.disabled = true;
+    try {
+      await adminFetch(editingId ? `/api/admin/plans/${encodeURIComponent(editingId)}` : "/api/admin/plans", { method: editingId ? "PUT" : "POST", body: JSON.stringify(body) });
+      say("msg", `${body.name} saved.`, "ok");
+      closeEditor();
+      await load();
+    } catch (err) {
+      say("form-msg", err instanceof Error ? err.message : "Could not save that.", "bad");
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  adminReady().then(load);
+</script>

@@ -1,0 +1,62 @@
+---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+---
+
+<AdminLayout title="Overview" active="overview" lead="How the site is doing, and anything that needs your attention.">
+  <ul id="notes" class="adm-list" aria-label="Things to look at"></ul>
+  <div id="tiles" class="ov-tiles" aria-busy="true"></div>
+  <section class="adm-card">
+    <h2>Jump to</h2>
+    <div class="adm-row" style="margin-top:10px">
+      <a class="adm-btn ghost" href="/admin/users/" style="display:inline-grid;place-items:center;text-decoration:none">Users</a>
+      <a class="adm-btn ghost" href="/admin/plans/" style="display:inline-grid;place-items:center;text-decoration:none">Subscription plans</a>
+      <a class="adm-btn ghost" href="/admin/youtube/" style="display:inline-grid;place-items:center;text-decoration:none">YouTube accounts</a>
+      <a class="adm-btn ghost" href="/admin/youtube-test/" style="display:inline-grid;place-items:center;text-decoration:none">Download test</a>
+    </div>
+  </section>
+</AdminLayout>
+
+<style is:global>
+  .ov-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; margin-bottom: 18px; }
+  .ov-tile { padding: 18px 20px; border-radius: 18px; background: #fff; border: 1px solid var(--color-hairline); box-shadow: 0 1px 2px #1a05330a; text-decoration: none; transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s; }
+  a.ov-tile:hover { border-color: #cdbbee; box-shadow: 0 16px 28px -20px #5b21b690; transform: translateY(-1px); }
+  .ov-tile small { display: block; font: 700 11px var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-mute); }
+  .ov-tile strong { display: block; margin: 8px 0 4px; font-size: 32px; font-weight: 800; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; color: var(--color-ink); }
+  .ov-tile span { font-size: 13px; color: var(--color-body); }
+</style>
+
+<script>
+  import { adminReady, adminFetch, el, statusLine, number } from "../../lib/admin";
+
+  const tile = (label: string, value: string, note: string, href?: string) => {
+    const box = el(href ? "a" : "div", "ov-tile");
+    if (href) (box as HTMLAnchorElement).href = href;
+    box.append(el("small", "", label), el("strong", "", value), el("span", "", note));
+    return box;
+  };
+
+  adminReady().then(async () => {
+    const tiles = document.getElementById("tiles")!;
+    const notes = document.getElementById("notes")!;
+    try {
+      const o = await adminFetch("/api/admin/overview");
+      tiles.replaceChildren(
+        tile("People", number(o.users.total), `${number(o.users.lastWeek)} joined in the last 7 days`, "/admin/users/"),
+        tile("Songs chordified", number(o.catalog.songs), `${number(o.catalog.results)} full analyses saved`),
+        tile("Jam sessions", number(o.catalog.jams), "Times people pressed play"),
+        tile("YouTube accounts", `${o.youtube.ready} / ${o.youtube.accounts}`, "ready to download", "/admin/youtube/"),
+        tile("Plans on sale", String(o.plans.active), `${o.plans.total} in total`, "/admin/plans/"),
+        tile("Download line", `${o.queue.running} + ${o.queue.waiting}`, `running + waiting (${o.queue.workers} at a time)`),
+      );
+      tiles.setAttribute("aria-busy", "false");
+      notes.replaceChildren(
+        statusLine(o.signIn.configured ? true : false, o.signIn.configured ? "Google sign-in is switched on" : "Google sign-in is off: set GOOGLE_CLIENT_ID in the server's environment"),
+        statusLine(o.signIn.admins > 0 ? true : "warn", o.signIn.admins > 0 ? `${o.signIn.admins} admin email${o.signIn.admins === 1 ? "" : "s"} set (ADMIN_EMAILS)` : "No admin email set: only the admin token gets in. Set ADMIN_EMAILS"),
+        statusLine(o.catalog.kind === "postgres" ? true : "warn", o.catalog.kind === "postgres" ? "Songs and people are kept in Postgres" : "Songs and people are kept in a file on this server: set DATABASE_URL to use Postgres"),
+        statusLine(o.youtube.ready > 0 ? true : false, o.youtube.ready > 0 ? "YouTube downloads have an account to use" : "No YouTube account is ready: downloads will probably be refused"),
+      );
+    } catch (err) {
+      notes.replaceChildren(statusLine(false, err instanceof Error ? err.message : "Could not load the overview."));
+    }
+  });
+</script>
