@@ -275,6 +275,8 @@ const sparkles = [
     transition: background-color 0.18s, color 0.18s, box-shadow 0.18s;
   }
   .tab:hover { color: var(--color-ink); }
+  .tab.is-locked { opacity: 0.55; }
+  .tab.is-locked::after { content: "🔒"; font-size: 12px; }
   .tab[aria-selected="true"] { background: #fff; color: var(--color-ink); box-shadow: 0 1px 2px #1a053314, 0 6px 14px -6px #7c3aed55; }
 
   .row { display: flex; gap: 10px; }
@@ -377,6 +379,7 @@ const sparkles = [
 
 <script>
   import { startExtractFromUpload, getApiErrorMessage } from "../lib/api";
+  import { can, loadPlan, nudge } from "../lib/plan";
 
   // Tab switching (the look follows aria-selected)
   const tabSearch = document.getElementById("tab-search") as HTMLButtonElement;
@@ -402,7 +405,23 @@ const sparkles = [
   arriveAtSearch();
 
   tabSearch.addEventListener("click", () => setTab("search"));
-  tabUp.addEventListener("click", () => setTab("upload"));
+  // Uploading is a plan feature: where the plan leaves it out the tab says so instead of opening.
+  tabUp.addEventListener("click", () => {
+    if (!can("upload_song")) {
+      setTab("search");
+      nudge("Uploading your own songs");
+      return;
+    }
+    setTab("upload");
+  });
+  function applyUploadLock() {
+    const locked = !can("upload_song");
+    tabUp.classList.toggle("is-locked", locked);
+    tabUp.setAttribute("title", locked ? "Not included in your plan" : "");
+    if (locked) setTab("search");
+  }
+  window.addEventListener("plan-change", applyUploadLock);
+  void loadPlan();
 
   // Instrument selector
   document.querySelectorAll<HTMLButtonElement>(".instrument-btn").forEach((btn) => {
@@ -446,6 +465,10 @@ const sparkles = [
   }
 
   async function upload(file: File) {
+    if (!can("upload_song")) {
+      nudge("Uploading your own songs");
+      return;
+    }
     uploadIcon.classList.add("hidden");
     uploadSpinner.classList.remove("hidden");
     uploadLabel.textContent = "Analyzing your song…";

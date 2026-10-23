@@ -33,7 +33,7 @@ KINDS = ("flag", "limit")
 _MONTHS = {"daily": 1 / 30, "weekly": 12 / 52, "monthly": 1, "quarterly": 3, "yearly": 12}
 
 # Features the product itself checks today. The rest still show on the pricing page, but switching them changes nothing in the app.
-ENFORCED = {"songs_per_day", "favorites_max", "chord_detail", "chord_voicings", "transpose_capo"}
+ENFORCED = {"songs_per_day", "favorites_max", "chord_detail", "chord_voicings", "transpose_capo", "upload_song"}
 
 # (key, label, description, kind, unit, group, status)
 _DEFAULT_FEATURES = [
@@ -41,6 +41,7 @@ _DEFAULT_FEATURES = [
     ("chord_detail", "Full chord detail", "7ths, suspended and slash chords on top of the simple major and minor chords.", "flag", "", "Songs & chords", "live"),
     ("chord_voicings", "Alternative chord shapes", "Switch any chord to other ways of playing it on the guitar neck.", "flag", "", "Songs & chords", "live"),
     ("transpose_capo", "Transpose and capo", "Change the key of a song and see the shapes with a capo.", "flag", "", "Songs & chords", "live"),
+    ("upload_song", "Upload your own song", "Analyse an audio file from your device (MP3, WAV, FLAC and more), not only songs from YouTube.", "flag", "", "Songs & chords", "live"),
     ("instruments_more", "Piano, ukulele and mandolin diagrams", "Chord diagrams for more instruments than the guitar.", "flag", "", "Songs & chords", "soon"),
     ("tempo_loop", "Slow-down and loop", "Slow a song down and loop a section while you practise.", "flag", "", "Playing", "live"),
     ("no_ads", "No ads", "Chord Suno shows no advertising.", "flag", "", "Playing", "live"),
@@ -60,7 +61,7 @@ _DEFAULT_FEATURES = [
 ]
 
 # What each starting plan includes: key -> True (on), a number (limit), None (a limit that is unlimited). Anything missing is off.
-_FREE_ON = {"songs_per_day": None, "chord_detail": True, "chord_voicings": True, "transpose_capo": True, "tempo_loop": True, "no_ads": True, "favorites_max": 25, "library_history": True, "xp_levels": True}
+_FREE_ON = {"songs_per_day": None, "upload_song": True, "chord_detail": True, "chord_voicings": True, "transpose_capo": True, "tempo_loop": True, "no_ads": True, "favorites_max": 25, "library_history": True, "xp_levels": True}
 _PREMIUM_ON = {**_FREE_ON, "favorites_max": None, "instruments_more": True, "pdf_export": True, "midi_export": True, "lyrics": True, "tuner": True, "metronome": True, "offline_mode": True, "priority_processing": True}
 _PRO_ON = {**_PREMIUM_ON, "priority_support": True, "team_seats": 5, "api_access": True}
 _DEFAULT_MATRIX = {"free": _FREE_ON, "premium": _PREMIUM_ON, "pro": _PRO_ON}
@@ -229,6 +230,7 @@ class PlanStore:
                     "INSERT INTO features (key, label, description, kind, unit, grp, status, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                     (key, label, description, kind, unit, group, status, order),
                 )
+        self._add_new_features()
         # The starting grid, for a starting plan that has no rules at all yet.
         for code, ons in _DEFAULT_MATRIX.items():
             plan, _ = self._db.run("SELECT id FROM plans WHERE code = ?", (code,))
@@ -243,6 +245,25 @@ class PlanStore:
                     self._db.run("INSERT INTO plan_features (plan_id, feature_key, enabled, value) VALUES (?, ?, 1, ?)", (plan[0]["id"], key, value))
                 else:
                     self._db.run("INSERT INTO plan_features (plan_id, feature_key, enabled, value) VALUES (?, ?, 0, NULL)", (plan[0]["id"], key))
+
+    def _add_new_features(self) -> None:
+        """Features added to the product after a database was first filled. Each is created once, and switched on for the
+        plans that exist (what everybody had before it became a setting); from then on the admin decides."""
+        for key in ("upload_song",):
+            exists, _ = self._db.run("SELECT key FROM features WHERE key = ?", (key,))
+            if exists:
+                continue
+            _, label, description, kind, unit, group, status = next(f for f in _DEFAULT_FEATURES if f[0] == key)
+            order = self._db.run("SELECT COALESCE(MAX(sort_order), 0) + 1 AS n FROM features")[0][0]["n"]
+            self._db.run(
+                "INSERT INTO features (key, label, description, kind, unit, grp, status, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (key, label, description, kind, unit, group, status, order),
+            )
+            for plan in self._db.run("SELECT id FROM plans")[0]:
+                self._db.run(
+                    "INSERT INTO plan_features (plan_id, feature_key, enabled, value) VALUES (?, ?, 1, NULL) ON CONFLICT(plan_id, feature_key) DO NOTHING",
+                    (plan["id"], key),
+                )
 
     def _ensure_free_plan(self) -> None:
         rows, _ = self._db.run("SELECT id FROM plans WHERE code = ?", (FREE_CODE,))

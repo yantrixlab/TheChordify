@@ -155,6 +155,7 @@ export async function startExtractFromYoutube(
   track("select_content", { content_type: "song", item_id: url.split("v=")[1]?.slice(0, 11) ?? "", item_name: (meta.title ?? "").slice(0, 100) });
   const res = await fetchApi(`${API_BASE}/api/extract/youtube`, {
     method: "POST",
+    credentials: "include", // so the plan of the signed-in person applies
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       url,
@@ -178,6 +179,7 @@ export async function startExtractFromUpload(file: File): Promise<{ sessionId: s
   formData.append("file", file);
   const res = await fetchApi(`${API_BASE}/api/extract/upload`, {
     method: "POST",
+    credentials: "include", // so the plan of the signed-in person applies
     body: formData,
   });
   if (!res.ok) {

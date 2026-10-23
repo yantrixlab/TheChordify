@@ -1234,6 +1234,14 @@ def extract_from_youtube(payload: YoutubeRequest, request: Request) -> dict:
 
 @app.post("/api/extract/upload")
 async def extract_from_upload(request: Request, file: UploadFile = File(...)) -> dict:
+    # Uploading is a plan feature: a visitor who is signed out is on the Free plan, like anybody who has not paid.
+    user = _session_user(request)
+    plan, _sub = plans.effective(user["id"] if user else None)
+    if not PlanStore.allowed(plan, "upload_song") and not _is_admin(request):
+        raise HTTPException(
+            status_code=402,
+            detail=f"Uploading your own songs is not included in the {plan['name']} plan. See the plans to add it.",
+        )
     _, ext = os.path.splitext(file.filename or "")
     ext = ext.lower()
     if ext not in ALLOWED_UPLOAD_EXTENSIONS:
