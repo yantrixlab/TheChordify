@@ -1,6 +1,6 @@
 // The sign-in window, and the account menu that replaces "Log in" / "Start free" once somebody is signed in.
 // Every page has the menu (Nav.astro), so this is started from there.
-import { cachedUser, getMe, renderGoogleButton, signOut } from "./auth";
+import { cachedUser, getAuthConfig, getMe, renderGoogleButton, signOut } from "./auth";
 import type { AuthUser } from "./auth";
 import { levelFraction, levelRing } from "./levelRing";
 
@@ -70,6 +70,16 @@ export async function openSignIn() {
   document.body.style.overflow = "hidden";
   dialog = backdrop;
   close.focus();
+
+  // While the reviewer login is switched on, people who review the site for a payment service can find it from here.
+  void getAuthConfig().then((config) => {
+    if (!config.reviewerLogin || dialog !== backdrop) return;
+    const reviewer = el("p", "au-reviewer");
+    const link = el("a", "", "Payment reviewer? Sign in here");
+    link.href = "/reviewer/";
+    reviewer.append(link);
+    box.append(reviewer);
+  });
 
   const on = await renderGoogleButton(
     slot,

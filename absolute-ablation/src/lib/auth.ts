@@ -24,6 +24,7 @@ export interface AuthUser {
 interface AuthConfig {
   googleClientId: string;
   enabled: boolean;
+  reviewerLogin?: boolean;
 }
 
 const HINT_KEY = "cs-user"; // the last signed-in person, so the menu can draw them before the server has answered

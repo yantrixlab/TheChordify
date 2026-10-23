@@ -447,7 +447,11 @@ class GoogleBody(BaseModel):
 @app.get("/api/auth/config")
 def auth_config() -> dict:
     """What the sign-in button needs: the public Google client id (empty until it is set, which turns sign-in off)."""
-    return {"googleClientId": _GOOGLE_CLIENT_ID, "enabled": bool(_GOOGLE_CLIENT_ID)}
+    return {
+        "googleClientId": _GOOGLE_CLIENT_ID, "enabled": bool(_GOOGLE_CLIENT_ID),
+        # a link to /reviewer/ shows in the sign-in window only while the reviewer login is switched on
+        "reviewerLogin": bool(_REVIEWER_EMAIL and _REVIEWER_PASSWORD and _REVIEWER_EMAIL not in _ADMIN_EMAILS),
+    }
 
 
 @app.post("/api/auth/google")
