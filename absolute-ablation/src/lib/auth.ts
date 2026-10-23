@@ -13,6 +13,11 @@ export interface AuthUser {
   title?: string;
   ring?: string; // an avatar ring colour they have earned
   stars?: number;
+  xp?: number; // total XP, and how far through the current level they are (for the ring around the picture)
+  intoLevel?: number;
+  levelSpan?: number;
+  nextLevelXp?: number;
+  streak?: number;
 }
 
 interface AuthConfig {
@@ -49,6 +54,12 @@ function remember(user: AuthUser | null) {
     // no storage: the menu just waits for the server
   }
   window.dispatchEvent(new CustomEvent<AuthUser | null>("auth-change", { detail: user }));
+}
+
+/** Folds new numbers (after earning XP) into the remembered person, so the ring around their picture moves at once. */
+export function updateUser(patch: Partial<AuthUser>) {
+  const user = cachedUser();
+  if (user) remember({ ...user, ...patch });
 }
 
 /** The signed-in person, or null. Also refreshes the cached hint. */

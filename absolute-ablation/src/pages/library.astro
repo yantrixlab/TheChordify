@@ -64,17 +64,18 @@ import Footer from "../components/Footer.astro";
   .lb-hero { display: grid; grid-template-columns: auto minmax(220px, 1fr) auto; gap: 22px 32px; align-items: center; padding: 26px 28px; border-radius: 26px; color: #fff;
     background: radial-gradient(circle at 12% 0%, #7c3aed88, transparent 55%), radial-gradient(circle at 100% 100%, #f59e0b44, transparent 50%), linear-gradient(135deg, #2a0a52, #12032a); box-shadow: 0 30px 60px -30px #1a0533cc; }
   .lb-who { display: flex; align-items: center; gap: 16px; min-width: 0; }
-  .lb-avatar { position: relative; display: grid; place-items: center; flex: none; width: 76px; height: 76px; border-radius: 50%; background: linear-gradient(135deg, #7c3aed, #ec4899); font: 800 26px var(--font-sans); color: #fff; box-shadow: 0 0 0 3px #1a0533, 0 0 0 6px var(--ring, #ffffff33); }
-  .lb-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
+  .lb-avatar { flex: none; --lr-track: #ffffff26; filter: drop-shadow(0 8px 18px #0006); }
+  .lb-avatar .lr-lv { box-shadow: 0 0 0 3px #1a0533, 0 4px 10px -2px #0008; }
   .lb-names { min-width: 0; }
   .lb-names h1 { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 24px; font-weight: 800; letter-spacing: -0.03em; }
-  .lb-level { margin: 4px 0 0; font-size: 14.5px; color: #d8c8f5; }
-  .lb-level b { color: #fcd34d; }
+  .lb-level { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin: 6px 0 0; font-size: 15px; font-weight: 700; color: #e9defc; }
+  .lb-lv { font: 800 22px/1 var(--font-mono); letter-spacing: 0.05em; color: #fcd34d; text-shadow: 0 0 18px #f59e0b99; }
   .lb-xp { min-width: 0; }
   .lb-xp-top { display: flex; justify-content: space-between; gap: 12px; font: 600 13px var(--font-sans); color: #d8c8f5; }
   .lb-xp-top span:first-child { color: #fff; font-weight: 700; }
-  .lb-bar { height: 12px; margin: 8px 0 0; border-radius: 999px; background: #ffffff22; overflow: hidden; }
-  .lb-bar i { display: block; width: 0; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #a78bfa, #f59e0b); box-shadow: 0 0 14px #f59e0b88; transition: width 1s cubic-bezier(0.2, 0.8, 0.2, 1) 0.2s; }
+  .lb-bar { position: relative; height: 16px; margin: 8px 0 0; border-radius: 999px; background: #ffffff22; overflow: hidden; }
+  .lb-bar::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 3px), #1a0533 calc(10% - 3px) 10%); } /* ten steps, like a game */
+  .lb-bar i { display: block; width: 0; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #a78bfa, #ec4899, #f59e0b); box-shadow: 0 0 14px #f59e0b88; transition: width 1s cubic-bezier(0.2, 0.8, 0.2, 1) 0.2s; }
   .lb-next { margin: 10px 0 0; font-size: 13px; color: #b9a6e0; }
   .lb-stats { display: flex; gap: 10px; margin: 0; padding: 0; list-style: none; }
   .lb-stats li { min-width: 78px; padding: 10px 12px; border-radius: 16px; background: #ffffff14; text-align: center; }
@@ -163,6 +164,7 @@ import Footer from "../components/Footer.astro";
   import { startExtractFromYoutube, getApiErrorMessage } from "../lib/api";
   import { cachedUser, getMe } from "../lib/auth";
   import { openSignIn } from "../lib/authUi";
+  import { levelRing } from "../lib/levelRing";
   import { clock } from "../lib/format";
   import { getLibrary, getProfile, heartButton, LibraryError } from "../lib/library";
   import type { LibraryItem, Profile } from "../lib/library";
@@ -198,23 +200,14 @@ import Footer from "../components/Footer.astro";
 
   function drawProfile(p: Profile) {
     const user = cachedUser();
-    const avatar = $("avatar");
-    avatar.replaceChildren();
-    avatar.style.setProperty("--ring", p.ring || "#ffffff33");
-    if (user?.picture) {
-      const img = el("img");
-      img.alt = "";
-      img.referrerPolicy = "no-referrer";
-      img.src = user.picture;
-      avatar.append(img);
-    } else {
-      avatar.textContent = (user?.name || user?.email || "?")[0].toUpperCase();
-    }
+    const ring = levelRing(
+      { name: user?.name, email: user?.email, picture: user?.picture, level: p.level, ring: p.ring, intoLevel: p.intoLevel, levelSpan: p.levelSpan },
+      112,
+    );
+    $("avatar").replaceChildren(ring.el);
     $("name").textContent = user?.name || user?.email || "Your library";
     const stars = p.stars > 0 ? ` ${"★".repeat(Math.min(p.stars, 8))}${p.stars > 8 ? `+${p.stars - 8}` : ""}` : "";
-    $("level-line").innerHTML = "";
-    const lv = el("b", "", `Level ${p.level}`);
-    $("level-line").append(lv, ` · ${p.title}${stars}`);
+    $("level-line").replaceChildren(el("b", "lb-lv", `LEVEL ${p.level}`), el("span", "", `${p.title}${stars}`));
     $("xp-label").textContent = `${num(p.xp)} XP`;
     $("xp-next").textContent = `${num(p.nextLevelXp - p.xp)} XP to level ${p.level + 1}`;
     const percent = p.levelSpan > 0 ? Math.round((100 * p.intoLevel) / p.levelSpan) : 0;

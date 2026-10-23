@@ -2,6 +2,7 @@
 // Every page has the menu (Nav.astro), so this is started from there.
 import { cachedUser, getMe, renderGoogleButton, signOut } from "./auth";
 import type { AuthUser } from "./auth";
+import { levelFraction, levelRing } from "./levelRing";
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] => {
   const node = document.createElement(tag);
@@ -9,32 +10,6 @@ const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, t
   if (text !== undefined) node.textContent = text;
   return node;
 };
-
-const initials = (user: AuthUser) =>
-  (user.name || user.email)
-    .split(/\s+/)
-    .map((part) => part[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-
-function avatar(user: AuthUser, size: number): HTMLElement {
-  const box = el("span", "au-avatar");
-  box.style.width = box.style.height = `${size}px`;
-  box.style.fontSize = `${Math.round(size * 0.4)}px`;
-  if (user.ring) box.style.boxShadow = `0 0 0 2px #fff, 0 0 0 4px ${user.ring}`; // a ring earned by levelling up
-  if (user.picture) {
-    const img = el("img");
-    img.alt = "";
-    img.referrerPolicy = "no-referrer";
-    img.src = user.picture;
-    img.addEventListener("error", () => img.replaceWith(document.createTextNode(initials(user))));
-    box.append(img);
-  } else {
-    box.textContent = initials(user);
-  }
-  return box;
-}
 
 // ---- the sign-in window ----------------------------------------------------------------------------------------------
 
@@ -106,26 +81,72 @@ export async function openSignIn() {
 
 // ---- the menu ---------------------------------------------------------------------------------------------------------
 
-function userMenu(user: AuthUser): HTMLElement {
+const numberText = (n: number) => n.toLocaleString();
+
+/** A game-style card: the person's ring, level and title, an XP bar made of ten steps, and their streak. */
+function hud(user: AuthUser) {
+  const root = el("div", "au-hud");
+  const top = el("div", "au-hud-top");
+  const ring = levelRing(user, 64);
+  const who = el("div", "au-hud-who");
+  const name = el("strong", "", user.name || user.email);
+  const email = el("span", "", user.email);
+  who.append(name, email);
+  top.append(ring.el, who);
+
+  const rank = el("div", "au-hud-rank");
+  const level = el("span", "au-hud-level");
+  const title = el("span", "au-hud-title");
+  rank.append(level, title);
+
+  const bar = el("div", "au-xp");
+  bar.setAttribute("role", "progressbar");
+  bar.setAttribute("aria-label", "Progress to the next level");
+  bar.setAttribute("aria-valuemin", "0");
+  bar.setAttribute("aria-valuemax", "100");
+  const fill = el("i");
+  bar.append(fill);
+  const nums = el("div", "au-xp-nums");
+  const have = el("b");
+  const need = el("span");
+  nums.append(have, need);
+
+  const streak = el("div", "au-streak");
+  root.append(top, rank, bar, nums, streak);
+
+  const update = (next: AuthUser) => {
+    ring.update(next);
+    const stars = next.stars ? " " + "★".repeat(Math.min(next.stars, 5)) : "";
+    level.textContent = next.level ? `LEVEL ${next.level}` : "";
+    title.textContent = next.level ? `${next.title ?? ""}${stars}` : "";
+    const percent = Math.round(levelFraction(next) * 100);
+    fill.style.width = `${percent}%`;
+    bar.setAttribute("aria-valuenow", String(percent));
+    have.textContent = next.levelSpan ? `${numberText(next.intoLevel ?? 0)} / ${numberText(next.levelSpan)} XP` : "";
+    need.textContent = next.levelSpan ? `${numberText(Math.max(0, (next.nextLevelXp ?? 0) - (next.xp ?? 0)))} to level ${(next.level ?? 1) + 1}` : "";
+    streak.textContent = next.streak ? `🔥 ${next.streak}-day streak` : "";
+    streak.hidden = !next.streak;
+    rank.hidden = bar.hidden = nums.hidden = !next.level;
+  };
+  update(user);
+  return { el: root, update };
+}
+
+function userMenu(user: AuthUser) {
   const wrap = el("div", "au-menu");
   const trigger = el("button", "au-trigger");
   trigger.type = "button";
   trigger.setAttribute("aria-haspopup", "menu");
   trigger.setAttribute("aria-expanded", "false");
-  trigger.setAttribute("aria-label", `Account menu for ${user.name || user.email}`);
-  trigger.append(avatar(user, 34));
-  if (user.level) trigger.append(el("span", "au-lv", String(user.level)));
+  trigger.setAttribute("aria-label", `Account menu for ${user.name || user.email}${user.level ? `, level ${user.level}` : ""}`);
+  const ring = levelRing(user, 44);
+  trigger.append(ring.el);
 
   const panel = el("div", "au-panel");
   panel.setAttribute("role", "menu");
   panel.hidden = true;
-  const head = el("div", "au-who");
-  head.append(avatar(user, 40));
-  const names = el("div", "au-names");
-  names.append(el("strong", "", user.name || user.email), el("span", "", user.email));
-  if (user.level) names.append(el("span", "au-rank", `Level ${user.level} · ${user.title ?? ""}${user.stars ? " " + "★".repeat(Math.min(user.stars, 5)) : ""}`));
-  head.append(names);
-  panel.append(head);
+  const card = hud(user);
+  panel.append(card.el);
   const library = el("a", "au-item", "My library");
   library.href = "/library/";
   library.setAttribute("role", "menuitem");
@@ -161,27 +182,46 @@ function userMenu(user: AuthUser): HTMLElement {
     if (event.key === "Escape") setOpen(false);
   });
   wrap.append(trigger, panel);
-  return wrap;
+  return {
+    el: wrap,
+    update: (next: AuthUser) => {
+      ring.update(next);
+      card.update(next);
+      trigger.setAttribute("aria-label", `Account menu for ${next.name || next.email}${next.level ? `, level ${next.level}` : ""}`);
+    },
+  };
 }
+
+// What is drawn in each place, so a change in XP moves the ring that is there instead of building it again.
+const drawn = new WeakMap<HTMLElement, { id: string; update: (user: AuthUser) => void }>();
 
 function render(user: AuthUser | null) {
   document.querySelectorAll<HTMLElement>("[data-auth-guest]").forEach((node) => (node.hidden = !!user));
   document.querySelectorAll<HTMLElement>("[data-auth-slot]").forEach((slot) => {
-    slot.replaceChildren();
-    if (user) slot.append(userMenu(user));
+    if (!user) {
+      slot.replaceChildren();
+      drawn.delete(slot);
+      return;
+    }
+    const mine = drawn.get(slot);
+    if (mine && mine.id === user.id) return mine.update(user);
+    const menu = userMenu(user);
+    slot.replaceChildren(menu.el);
+    drawn.set(slot, { id: user.id, update: menu.update });
   });
   document.querySelectorAll<HTMLElement>("[data-auth-mobile]").forEach((node) => {
-    node.replaceChildren();
-    if (!user) return;
-    const row = el("div", "au-mobile");
-    row.append(avatar(user, 40));
-    const names = el("div", "au-names");
-    names.append(el("strong", "", user.name || user.email), el("span", "", user.email));
-    row.append(names);
-    node.append(row);
-    const mine = el("a", "au-mobile-link", user.level ? `My library · Level ${user.level}` : "My library");
-    mine.href = "/library/";
-    node.append(mine);
+    if (!user) {
+      node.replaceChildren();
+      drawn.delete(node);
+      return;
+    }
+    const mine = drawn.get(node);
+    if (mine && mine.id === user.id) return mine.update(user);
+    const card = hud(user);
+    card.el.classList.add("au-hud-mobile");
+    const library = el("a", "au-mobile-link", "My library");
+    library.href = "/library/";
+    node.replaceChildren(card.el, library);
     if (user.isAdmin) {
       const admin = el("a", "au-mobile-link", "Admin");
       admin.href = "/admin/";
@@ -191,6 +231,7 @@ function render(user: AuthUser | null) {
     out.type = "button";
     out.addEventListener("click", () => signOut());
     node.append(out);
+    drawn.set(node, { id: user.id, update: card.update });
   });
 }
 

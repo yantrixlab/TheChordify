@@ -452,7 +452,7 @@ def whoami(request: Request, response: Response) -> dict:
     if not user:
         return {"user": None}
     snap = engagement.snapshot(user["id"])
-    return {"user": {**_public_user(user), **{k: snap[k] for k in ("level", "title", "ring", "stars")}}}
+    return {"user": {**_public_user(user), **{k: snap[k] for k in ("level", "title", "ring", "stars", "xp", "intoLevel", "levelSpan", "nextLevelXp", "streak")}}}
 
 
 @app.post("/api/auth/logout")

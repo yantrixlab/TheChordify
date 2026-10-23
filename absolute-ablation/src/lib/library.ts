@@ -2,7 +2,7 @@
 // The server decides all of it; this file asks for it, keeps the favourites in step across the hearts on a page, and
 // shows the pop-ups when something is earned.
 import { API_BASE } from "./api";
-import { cachedUser } from "./auth";
+import { cachedUser, updateUser } from "./auth";
 import { openSignIn } from "./authUi";
 import { celebrate } from "./toast";
 import type { Earned } from "./toast";
@@ -75,6 +75,11 @@ export class LibraryError extends Error {
   }
 }
 
+/** The parts of an answer that describe where the person now stands. */
+const progressOf = (r: any) => ({
+  level: r.level, title: r.title, ring: r.ring, stars: r.stars, xp: r.xp, intoLevel: r.intoLevel, levelSpan: r.levelSpan, nextLevelXp: r.nextLevelXp, streak: r.streak,
+});
+
 async function call<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = {};
   if (init.body !== undefined) headers["Content-Type"] = "application/json";
@@ -98,6 +103,7 @@ export async function recordPlay(sessionId: string): Promise<void> {
   if (!cachedUser()) return;
   try {
     const result = await call<Earned & { counted: boolean }>("/api/me/played", { method: "POST", body: JSON.stringify({ sessionId }) });
+    updateUser(progressOf(result));
     celebrate(result);
   } catch {
     // the play is not worth interrupting anything for
@@ -143,6 +149,7 @@ async function toggle(song: FavouriteSong, on: boolean) {
       method: on ? "PUT" : "DELETE",
       ...(on ? { body: JSON.stringify({ title: song.title, artist: song.artist, thumbnail: song.thumbnail, duration: song.duration }) } : {}),
     });
+    updateUser(progressOf(result));
     celebrate({ ...result, counted: true });
   } catch (err) {
     // undo what the heart showed

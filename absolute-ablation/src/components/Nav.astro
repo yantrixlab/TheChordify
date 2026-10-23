@@ -214,24 +214,34 @@ const navLinks = [
   nav button[data-auth], #mobile-menu button[data-auth] { border: 1px solid transparent; font-family: inherit; cursor: pointer; }
 
   /* the account menu */
-  .au-avatar { display: inline-grid; place-items: center; flex: none; overflow: hidden; border-radius: 50%; background: linear-gradient(135deg, #7c3aed, #ec4899); color: #fff; font-weight: 700; line-height: 1; }
-  .au-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .au-menu { position: relative; }
-  .au-lv { position: absolute; right: -5px; bottom: -5px; display: grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 999px; background: linear-gradient(135deg, #fcd34d, #f59e0b); color: #1a0533; font: 800 10.5px/1 var(--font-sans); box-shadow: 0 0 0 2px #fff; }
-  .au-rank { color: var(--color-violet-deep) !important; font-weight: 700; }
-  .au-trigger { position: relative; display: grid; place-items: center; padding: 2px; border: 2px solid transparent; border-radius: 50%; background: none; cursor: pointer; transition: border-color 0.15s; }
-  .au-trigger:hover, .au-trigger[aria-expanded="true"] { border-color: #c4b5fd; }
+  .au-trigger { position: relative; display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer; transition: transform 0.15s; }
+  .au-trigger:hover, .au-trigger[aria-expanded="true"] { transform: scale(1.06); }
   .au-trigger:focus-visible { outline: 2px solid var(--color-violet); outline-offset: 2px; }
-  .au-panel { position: absolute; right: 0; top: calc(100% + 8px); z-index: 60; min-width: 232px; padding: 8px; border-radius: 16px; background: #fff; border: 1px solid var(--color-hairline); box-shadow: 0 24px 48px -20px #1a053380, 0 4px 12px #1a053314; }
+  .au-panel { position: absolute; right: 0; top: calc(100% + 8px); z-index: 60; width: 292px; max-width: calc(100vw - 24px); padding: 8px; border-radius: 18px; background: #fff; border: 1px solid var(--color-hairline); box-shadow: 0 24px 48px -20px #1a053380, 0 4px 12px #1a053314; }
   .au-panel[hidden] { display: none; }
-  .au-who { display: flex; align-items: center; gap: 10px; padding: 8px 8px 12px; margin-bottom: 6px; border-bottom: 1px solid var(--color-hairline); }
-  .au-names { display: grid; min-width: 0; }
-  .au-names strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; color: var(--color-ink); }
-  .au-names span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; color: var(--color-mute); }
   .au-item { display: block; width: 100%; padding: 9px 10px; border: 0; border-radius: 10px; background: none; text-align: left; font: 600 14px var(--font-sans); color: var(--color-body); text-decoration: none; cursor: pointer; }
   .au-item:hover, .au-item:focus-visible { background: var(--color-violet-soft); color: var(--color-violet-deep); outline: none; }
-  .au-mobile { display: flex; align-items: center; gap: 12px; padding: 12px 4px; }
   .au-mobile-link { display: block; width: 100%; padding: 14px 16px; border: 1px solid var(--color-hairline); border-radius: 12px; background: var(--color-canvas-soft); text-align: center; font: 600 16px var(--font-sans); color: var(--color-ink); text-decoration: none; cursor: pointer; }
+
+  /* the game-style card at the top of the account menu */
+  .au-hud { padding: 14px; margin-bottom: 6px; border-radius: 14px; color: #fff; background: radial-gradient(circle at 0% 0%, #7c3aed99, transparent 60%), radial-gradient(circle at 100% 100%, #f59e0b33, transparent 55%), linear-gradient(135deg, #2a0a52, #12032a); }
+  .au-hud-top { display: flex; align-items: center; gap: 12px; }
+  .au-hud-who { display: grid; min-width: 0; }
+  .au-hud-who strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; }
+  .au-hud-who span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: #c9b8ec; }
+  .au-hud-rank { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-top: 12px; }
+  .au-hud-level { font: 800 20px/1 var(--font-mono); letter-spacing: 0.04em; color: #fcd34d; text-shadow: 0 0 14px #f59e0b88; }
+  .au-hud-title { font-size: 13px; font-weight: 700; color: #e9defc; }
+  .au-xp { position: relative; height: 12px; margin-top: 8px; border-radius: 999px; background: #ffffff1f; overflow: hidden; }
+  .au-xp i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #a78bfa, #ec4899, #f59e0b); box-shadow: 0 0 12px #f59e0b88; transition: width 0.9s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .au-xp::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 2px), #1a0533 calc(10% - 2px) 10%); } /* ten steps, like a game's XP bar */
+  .au-xp-nums { display: flex; justify-content: space-between; gap: 8px; margin-top: 6px; font-size: 12px; color: #c9b8ec; }
+  .au-xp-nums b { color: #fff; font-variant-numeric: tabular-nums; }
+  .au-streak { display: inline-block; margin-top: 10px; padding: 3px 10px; border-radius: 999px; background: #ffffff1a; font-size: 12px; font-weight: 700; color: #ffd9a0; }
+  .au-hud[hidden], .au-hud [hidden] { display: none; }
+  .au-hud-mobile { margin: 8px 0 10px; padding: 16px; }
+  @media (prefers-reduced-motion: reduce) { .au-xp i, .au-trigger { transition: none; } }
 
   /* the sign-in window */
   .au-backdrop { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 16px; background: #0d001f99; backdrop-filter: blur(4px); animation: au-fade 0.18s ease-out; }

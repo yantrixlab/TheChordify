@@ -300,3 +300,16 @@ section[id], [id] {
 .hb.hb-row { background: #fff; border: 1px solid var(--color-hairline); box-shadow: none; }
 @keyframes hb-pop { 0% { transform: scale(0.6); } 100% { transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) { .hb, .hb svg path { transition: none; } .hb[aria-pressed="true"] svg { animation: none; } .hb:hover { transform: none; } }
+
+/* A picture inside a ring that fills with the person's progress to the next level (lib/levelRing.ts) */
+.lr { position: relative; display: inline-block; flex: none; }
+.lr-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.lr-track { stroke: var(--lr-track, #e4d9f5); }
+.lr-arc { transition: stroke-dashoffset 1s cubic-bezier(0.2, 0.8, 0.2, 1) 0.15s; filter: drop-shadow(0 0 3px #ec489966); }
+.lr-face { position: absolute; display: grid; place-items: center; overflow: hidden; border-radius: 50%; background: linear-gradient(135deg, #7c3aed, #ec4899); color: #fff; font-weight: 800; line-height: 1; }
+.lr-face img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.lr-lv { position: absolute; right: -4px; bottom: -4px; display: grid; place-items: center; min-width: 1.7em; height: 1.7em; padding: 0 0.3em; border-radius: 999px; background: linear-gradient(135deg, #fcd34d, #f59e0b); color: #1a0533; font-family: var(--font-sans); font-weight: 800; line-height: 1; box-shadow: 0 0 0 2px #fff, 0 3px 8px -2px #0006; }
+.lr-lv[hidden] { display: none; }
+.lr-lv.pop { animation: lr-pop 0.8s cubic-bezier(0.3, 1.7, 0.5, 1); }
+@keyframes lr-pop { 0% { transform: scale(0.4) rotate(-25deg); } 60% { transform: scale(1.35) rotate(8deg); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .lr-arc { transition: none; } .lr-lv.pop { animation: none; } }
