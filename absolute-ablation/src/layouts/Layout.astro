@@ -1,14 +1,17 @@
 ---
 import "../styles/global.css";
+import { business } from "../lib/business";
 
 interface Props {
   title?: string;
   description?: string;
   noindex?: boolean; // keep the page out of search engines (the admin page)
+  analytics?: boolean; // count visits to this page in Google Analytics (the admin pages turn it off)
 }
 
 const {
   noindex = false,
+  analytics = true,
   title = "Chord Suno — Hear Every Chord. Play Every Song.",
   description = "Chord Suno listens to any YouTube link or audio file and writes out every chord, synced to the beat, for guitar, piano, ukulele and mandolin. Suno means listen.",
 } = Astro.props;
@@ -24,6 +27,23 @@ const {
     <link rel="canonical" href={new URL(Astro.url.pathname, "https://chordsuno.com").href} />
     <meta name="application-name" content="Chord Suno" />
     {noindex && <meta name="robots" content="noindex, nofollow" />}
+    {
+      analytics && business.analyticsId && (
+        <>
+          {/* Google Analytics: page views for every visitor; the events (sign-ins, searches, checkout) come from lib/analytics.ts */}
+          <script is:inline async src={`https://www.googletagmanager.com/gtag/js?id=${business.analyticsId}`}></script>
+          <script is:inline define:vars={{ id: business.analyticsId }}>
+            window.dataLayer = window.dataLayer || [];
+            window.gtag = function gtag() {
+              window.dataLayer.push(arguments);
+            };
+            window.gtag("js", new Date());
+            // work on a developer's own computer is not counted as visits
+            if (!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) window.gtag("config", id);
+          </script>
+        </>
+      )
+    }
     <meta name="generator" content={Astro.generator} />
     <title>{title}</title>
 

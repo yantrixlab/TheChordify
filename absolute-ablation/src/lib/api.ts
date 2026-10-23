@@ -1,3 +1,5 @@
+import { track } from "./analytics";
+
 // Dev talks to the local backend. A production build uses same-origin paths (/api, /media),
 // which the reverse proxy in deploy/Caddyfile forwards to the backend. PUBLIC_API_BASE overrides both.
 // In dev it is the same host name as the page (localhost or 127.0.0.1), so the sign-in cookie counts as same-site.
@@ -150,6 +152,7 @@ export async function startExtractFromYoutube(
   url: string,
   meta: Partial<Pick<SongHit, "title" | "artist" | "album" | "thumbnail" | "duration">> = {},
 ): Promise<{ sessionId: string }> {
+  track("select_content", { content_type: "song", item_id: url.split("v=")[1]?.slice(0, 11) ?? "", item_name: (meta.title ?? "").slice(0, 100) });
   const res = await fetchApi(`${API_BASE}/api/extract/youtube`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

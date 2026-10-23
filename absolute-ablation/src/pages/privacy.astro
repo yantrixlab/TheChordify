@@ -27,6 +27,12 @@ import { business } from "../lib/business";
     Payments are handled by Razorpay. We receive the plan you chose, the status and dates of your subscription, and the identifiers Razorpay gives it. We <strong>do not</strong> receive
     or store your card, UPI or bank details. Those go only to Razorpay.
   </p>
+  <h3>Visit statistics</h3>
+  <p>
+    We use Google Analytics to count visits and see which pages and features are used: for example how many people search, open a song or reach the pricing page. It receives
+    your visit and device details (such as the pages you open, your browser and an approximate location from your IP address) and those events. We do not send it your name, email address
+    or any account details. The admin pages are not counted.
+  </p>
   <h3>Technical information</h3>
   <p>
     Like most websites, our servers see your IP address and browser details when you visit. We use your IP address to apply fair-use limits and to keep the service safe. We also keep
@@ -49,7 +55,7 @@ import { business } from "../lib/business";
   <table>
     <thead><tr><th>Service</th><th>What for</th></tr></thead>
     <tbody>
-      <tr><td>Google</td><td>Signing in with Google, and the fonts used on the site.</td></tr>
+      <tr><td>Google</td><td>Signing in with Google, the fonts used on the site, and Google Analytics (see below), which shows us how many people visit and which pages and features they use.</td></tr>
       <tr><td>Razorpay</td><td>Taking payments and managing subscriptions.</td></tr>
       <tr><td>YouTube</td><td>Fetching the audio of a song you choose, and the video player on the play page. YouTube has its own privacy policy and may set its own cookies.</td></tr>
       <tr><td>Our hosting provider</td><td>Running the servers and database where your data is kept.</td></tr>
@@ -65,6 +71,7 @@ import { business } from "../lib/business";
     <thead><tr><th>Name</th><th>What it does</th></tr></thead>
     <tbody>
       <tr><td><code>cs_session</code> (cookie)</td><td>Keeps you signed in. It is set when you sign in, and cannot be read by scripts on the page.</td></tr>
+      <tr><td><code>_ga</code>, <code>_ga_*</code> (cookies)</td><td>Set by Google Analytics to tell visits apart and count them. They hold a random identifier, not your name or email. You can stop them by blocking cookies, using Google's <a href="https://tools.google.com/dlpage/gaoptout" rel="noopener">opt-out add-on</a>, or a content blocker.</td></tr>
       <tr><td>Browser storage</td><td>Remembers things on your device only: recent searches, your chosen instrument and chord shapes, your sign-in details for the menu, and an admin token if you are an admin. It is never sent to us for tracking.</td></tr>
     </tbody>
   </table>

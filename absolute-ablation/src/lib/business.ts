@@ -11,6 +11,8 @@ export const business = {
   /** The registered address, on one line (for example "12 Park Street, Kolkata, West Bengal 700016, India"). */
   address: "",
   country: "India",
+  /** Google Analytics 4 measurement id (from Admin > Data streams in Google Analytics). Empty turns analytics off. */
+  analyticsId: "G-V9JWJZNYZ0",
   /** Shown as "Last updated" on each page. */
   updated: "24 October 2026",
 };

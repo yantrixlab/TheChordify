@@ -119,6 +119,7 @@ import Footer from "../components/Footer.astro";
   import { searchSongs, getPopularSongs, startExtractFromYoutube, getApiErrorMessage } from "../lib/api";
   import { heartButton, sessionIdOfVideo } from "../lib/library";
   import { rememberQuery, rememberSong } from "../lib/recent";
+  import { track } from "../lib/analytics";
 
   // Searches people can try with one tap (shown before anything is typed, and when nothing matches).
   const examples = ["Perfect Ed Sheeran", "Tum Hi Ho", "Wonderwall", "Let It Be", "Kal Ho Naa Ho"];
@@ -281,6 +282,7 @@ import Footer from "../components/Footer.astro";
       if (songs.length === 0) showEmpty(query);
       else {
         rememberQuery(query);
+        track("search", { search_term: query.slice(0, 100), results: songs.length });
         showResults(query, songs);
       }
     } catch (err) {

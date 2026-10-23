@@ -1,6 +1,7 @@
 // Sign-in with Google, and who is signed in. The browser gets a signed ID token from Google's button, the server checks
 // it and answers with a cookie (HttpOnly, so nothing here ever sees the session itself). There are no passwords.
 import { API_BASE } from "./api";
+import { track } from "./analytics";
 
 export interface AuthUser {
   id: string;
@@ -117,6 +118,7 @@ async function sendCredential(credential: string): Promise<AuthUser> {
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.detail || "Sign-in did not work. Please try again.");
   remember(body.user);
+  track("login", { method: "google" });
   return body.user;
 }
 
@@ -132,6 +134,7 @@ export async function signInAsReviewer(email: string, password: string): Promise
   if (res.status === 404) throw new Error("This sign-in is not switched on.");
   if (!res.ok) throw new Error(body.detail || "Sign-in did not work. Please try again.");
   remember(body.user);
+  track("login", { method: "reviewer" });
   return body.user;
 }
 

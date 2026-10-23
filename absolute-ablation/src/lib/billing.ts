@@ -5,6 +5,7 @@ import { cachedUser, getMe } from "./auth";
 import { openSignIn } from "./authUi";
 import { loadPlan } from "./plan";
 import { toast } from "./toast";
+import { track } from "./analytics";
 
 const CHECKOUT_SCRIPT = "https://checkout.razorpay.com/v1/checkout.js";
 let scriptReady: Promise<void> | null = null;
@@ -44,6 +45,7 @@ export async function startCheckout(priceId: string, planName: string): Promise<
     return;
   }
   try {
+    track("begin_checkout", { item_name: planName });
     const order = await post<{ subscriptionId: string; keyId: string; name: string; description: string; prefill: { name: string; email: string } }>("/api/billing/subscribe", { priceId });
     await loadCheckout();
     await new Promise<void>((resolve) => {
@@ -62,6 +64,7 @@ export async function startCheckout(priceId: string, planName: string): Promise<
               subscriptionId: response.razorpay_subscription_id,
               signature: response.razorpay_signature,
             });
+            track("subscribe", { item_name: planName });
             toast({ icon: "🎉", title: `You are on ${planName}`, text: "Thank you! Your plan is active.", tone: "level", sparks: true, ms: 7000 });
             await Promise.all([loadPlan(true), getMe()]);
           } catch (err) {
@@ -84,6 +87,7 @@ export async function startCheckout(priceId: string, planName: string): Promise<
 export async function cancelSubscription(): Promise<void> {
   try {
     await post("/api/billing/cancel");
+    track("cancel_subscription");
     toast({ icon: "✅", title: "Renewal cancelled", text: "Your plan stays until the end of the period you paid for.", ms: 6000 });
     await loadPlan(true);
   } catch (err) {
