@@ -1,7 +1,7 @@
 """Beats per bar, found from the audio instead of assumed to be four.
 
 The beat grid says where the beats are, not how they group into bars. Most songs count in fours, but plenty count in
-threes (waltzes, many folk and film songs) or sixes. Each candidate bar length is tested against two signals that the
+threes (waltzes, many folk and film songs), fives, sixes or sevens. Each candidate bar length is tested against two signals that the
 audio gives on every beat:
 
   * accent: how hard the beat hits (onset strength). The first beat of a bar is usually the strongest;
@@ -19,7 +19,7 @@ from __future__ import annotations
 
 import numpy as np
 
-CANDIDATES = (3, 4, 6)
+CANDIDATES = (3, 4, 5, 6, 7)
 DEFAULT = 4
 # The average of the largest of m standard normal values: what the best position scores by chance alone.
 _CHANCE_MAX = {2: 0.56, 3: 0.85, 4: 1.03, 5: 1.16, 6: 1.27, 7: 1.35}
@@ -76,14 +76,19 @@ def estimate_meter(beats: np.ndarray, accent: np.ndarray, change: np.ndarray, bp
         return DEFAULT, info
     scores = meter_scores(accent, change)
     info["scores"] = {m: round(s, 2) for m, s in scores.items()}
-    s3, s4, s6 = scores[3], scores[4], scores[6]
+    s3, s4, s5, s6, s7 = (max(scores[m], 0.0) for m in (3, 4, 5, 6, 7))
 
     # Three has to beat four clearly: it must score well in its own right, and well above four.
     best = DEFAULT
-    if s3 > 2.5 and s3 > 1.5 * max(s4, 0.0) + 1.5:
+    if s3 > 2.5 and s3 > 1.5 * s4 + 1.5:
         best = 3
     # Six beats a bar is two groups of three, felt at a quick tempo: it has to beat three and four on top.
     if bpm >= 110 and s6 > 3.0 and s6 > max(s3, s4) + 1.0:
         best = 6
+    # Five and seven are rare and easy to imagine in noise: they have to stand far clear of every other length.
+    by_length = {3: s3, 4: s4, 5: s5, 6: s6, 7: s7}
+    for m in (5, 7):
+        if by_length[m] > 6.0 and by_length[m] > max(s for k, s in by_length.items() if k != m) + 3.0:
+            best = m
     info["beatsPerBar"] = best
     return best, info

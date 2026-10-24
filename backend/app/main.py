@@ -73,8 +73,9 @@ except Exception as exc:
 # 10: a pickup bar gets real beat cells (the first cell is the first beat; no leading Silence section), and a section
 #     starts where its chords do.
 # 11: chords that recur on the same beat of nearby bars are favoured there (restores faint repeats); slivers under 0.3 s are absorbed.
-# 12: bars are as long as the song counts them (3, 4 or 6 beats) instead of always four; the result says `beatsPerBar`.
-ANALYSIS_VERSION = 12
+# 12: bars are as long as the song counts them instead of always four; the result says `beatsPerBar`.
+# 13: five and seven beats a bar are found too.
+ANALYSIS_VERSION = 13
 
 ALLOWED_UPLOAD_EXTENSIONS ={".mp3", ".wav", ".flac", ".m4a"}
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50MB

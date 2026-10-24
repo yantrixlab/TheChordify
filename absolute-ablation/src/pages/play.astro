@@ -56,6 +56,9 @@ import Nav from "../components/Nav.astro";
                 { id: "tempo", label: "Tempo" },
                 { id: "capo", label: "Capo" },
                 { id: "transpose", label: "Transpose" },
+                { id: "meter", label: "Beats / bar" },
+                { id: "pulse", label: "Pulse" },
+                { id: "barstart", label: "Bar start" },
                 { id: "sections", label: "Sections" },
                 { id: "detail", label: "Chords" },
               ].map((tool, i) => (
@@ -66,6 +69,9 @@ import Nav from "../components/Nav.astro";
                     {tool.id === "tempo" && "🐢"}
                     {tool.id === "capo" && "🪕"}
                     {tool.id === "transpose" && "♯"}
+                    {tool.id === "meter" && "𝄴"}
+                    {tool.id === "pulse" && "◉"}
+                    {tool.id === "barstart" && "⇥"}
                     {tool.id === "countin" && "③"}
                     {tool.id === "sections" && "☰"}
                     {tool.id === "detail" && "♬"}
@@ -110,6 +116,27 @@ import Nav from "../components/Nav.astro";
                       <button id="transpose-down" type="button" aria-label="Transpose down" style="background:none;border:none;cursor:pointer;color:var(--color-mute);font-size:12px;">◂</button>
                       <span id="transpose-value" style="font-family:var(--font-mono);font-size:11px;color:var(--color-ink);font-weight:600;min-width:24px;text-align:center;">0</span>
                       <button id="transpose-up" type="button" aria-label="Transpose up" style="background:none;border:none;cursor:pointer;color:var(--color-mute);font-size:12px;">▸</button>
+                    </div>
+                  )}
+                  {tool.id === "meter" && (
+                    <div class="flex items-center gap-1">
+                      <button id="meter-down" type="button" aria-label="Fewer beats in a bar" style="background:none;border:none;cursor:pointer;color:var(--color-mute);font-size:12px;">◂</button>
+                      <span id="meter-value" title="Beats in a bar. Click to go back to what the song was analysed as." style="font-family:var(--font-mono);font-size:11px;color:var(--color-ink);font-weight:600;min-width:20px;text-align:center;">4</span>
+                      <button id="meter-up" type="button" aria-label="More beats in a bar" style="background:none;border:none;cursor:pointer;color:var(--color-mute);font-size:12px;">▸</button>
+                    </div>
+                  )}
+                  {tool.id === "pulse" && (
+                    <div class="flex items-center gap-1">
+                      <button id="pulse-down" type="button" aria-label="Count every beat" style="background:none;border:none;cursor:pointer;color:var(--color-mute);font-size:12px;">◂</button>
+                      <span id="pulse-value" title="Count every beat the tracker found, or twice as many (a beat in between each)." style="font-family:var(--font-mono);font-size:11px;color:var(--color-ink);font-weight:600;min-width:24px;text-align:center;">×1</span>
+                      <button id="pulse-up" type="button" aria-label="Count twice as fast" style="background:none;border:none;cursor:pointer;color:var(--color-mute);font-size:12px;">▸</button>
+                    </div>
+                  )}
+                  {tool.id === "barstart" && (
+                    <div class="flex items-center gap-1">
+                      <button id="barstart-down" type="button" aria-label="Start bars one beat earlier" style="background:none;border:none;cursor:pointer;color:var(--color-mute);font-size:12px;">◂</button>
+                      <span id="barstart-value" title="Which beat a bar starts on. Auto follows where the chords change." style="font-family:var(--font-mono);font-size:11px;color:var(--color-ink);font-weight:600;min-width:34px;text-align:center;">auto</span>
+                      <button id="barstart-up" type="button" aria-label="Start bars one beat later" style="background:none;border:none;cursor:pointer;color:var(--color-mute);font-size:12px;">▸</button>
                     </div>
                   )}
                   {tool.id === "countin" && (
@@ -486,6 +513,15 @@ import Nav from "../components/Nav.astro";
   const transposeDown = document.getElementById("transpose-down") as HTMLButtonElement;
   const transposeUp = document.getElementById("transpose-up") as HTMLButtonElement;
   const transposeValueEl = document.getElementById("transpose-value")!;
+  const meterDown = document.getElementById("meter-down") as HTMLButtonElement;
+  const meterUp = document.getElementById("meter-up") as HTMLButtonElement;
+  const meterValueEl = document.getElementById("meter-value")!;
+  const pulseDown = document.getElementById("pulse-down") as HTMLButtonElement;
+  const pulseUp = document.getElementById("pulse-up") as HTMLButtonElement;
+  const pulseValueEl = document.getElementById("pulse-value")!;
+  const barStartDown = document.getElementById("barstart-down") as HTMLButtonElement;
+  const barStartUp = document.getElementById("barstart-up") as HTMLButtonElement;
+  const barStartValueEl = document.getElementById("barstart-value")!;
   const countInToggle = document.getElementById("countin-toggle") as HTMLButtonElement;
   const sectionsToggle = document.getElementById("sections-toggle") as HTMLButtonElement;
   const detailToggle = document.getElementById("detail-toggle") as HTMLButtonElement;
@@ -804,7 +840,7 @@ import Nav from "../components/Nav.astro";
     const firstSound = chords.findIndex((seg) => seg.chord !== "N");
     const placed = chords
       .filter((seg, i) => seg.gridStart !== null && !(seg.chord === "N" && i < firstSound)) // nothing sounds before the song starts
-      .map((seg) => ({ chord: seg.chord, start: seg.gridStart ?? seg.start }));
+      .map((seg) => ({ chord: seg.chord, start: meter.pulse === 1 ? (seg.gridStart ?? seg.start) : seg.start }));
     let next = 0; // next chord not yet written; cells and chords are both in time order
     return bars.map((bar) =>
       Array.from({ length: BEAT_CELLS }, (_, k) => {
@@ -837,9 +873,171 @@ import Nav from "../components/Nav.astro";
     BARS_PER_ROW = n >= 6 ? 2 : 4;
     chordGridEl.style.setProperty("--bpb", String(n));
     chordGridEl.style.setProperty("--rb", String(BARS_PER_ROW));
-    chordGridEl.style.setProperty("--rbm", String(n >= 6 ? 1 : 2)); // bars per row on a phone
+    chordGridEl.style.setProperty("--rbm", String(n >= 5 ? 1 : 2)); // bars per row on a phone
     chordGridEl.classList.toggle("wide-bars", n >= 6);
   }
+
+  // ---- Bar length: what the analysis found, or what the player sets for this song -----------------------------
+  // The analysis groups the beats into bars of 3, 4, 5, 6 or 7, but a loose live recording (or a tracker that locked on
+  // every other beat) can fool it. So the player can regroup the beats: beats per bar, a beat in between each beat
+  // ("pulse" x2), and the beat a bar starts on. The choice is kept per song.
+  interface MeterSetting {
+    perBar: number;
+    pulse: 1 | 2;
+    shift: number | null; // beats before the first bar line (a pickup); null = where the chords change
+  }
+  const METER_KEY = "chordsuno-meter:";
+  const METER_MIN = 2;
+  const METER_MAX = 9;
+  let baseBars: Bar[] = [];
+  let baseSections: Section[] = [];
+  let baseBeatsPerBar = 4;
+  let baseTempo = 120;
+  let meter: MeterSetting = { perBar: 4, pulse: 1, shift: null };
+  let meterShift = 0; // the shift in use (the worked-out one when `meter.shift` is null)
+
+  function isSongsOwnMeter(): boolean {
+    return meter.perBar === baseBeatsPerBar && meter.pulse === 1 && meter.shift === null;
+  }
+
+  /** Every beat the analysis found, in order (pickup beats included). */
+  function songBeats(pulse: 1 | 2): number[] {
+    const flat: number[] = [];
+    for (const bar of baseBars) {
+      for (let k = 0; k < baseBeatsPerBar; k++) {
+        const t = bar.beats[k];
+        if (t !== null && t !== undefined) flat.push(t);
+      }
+    }
+    if (pulse === 1) return flat;
+    const doubled: number[] = [];
+    flat.forEach((t, i) => {
+      doubled.push(t);
+      const gap = i + 1 < flat.length ? flat[i + 1] - t : i > 0 ? t - flat[i - 1] : 0.5;
+      if (t + gap < duration) doubled.push(t + gap / 2);
+    });
+    return doubled;
+  }
+
+  function nearestBeat(beats: number[], t: number): number {
+    let lo = 0;
+    let hi = beats.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (beats[mid] < t) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo > 0 && Math.abs(beats[lo - 1] - t) < Math.abs(beats[lo] - t) ? lo - 1 : lo;
+  }
+
+  /** The beat of the bar where chords change most often: that is where bars start. */
+  function chordShift(beats: number[], perBar: number): number {
+    if (beats.length === 0) return 0;
+    const votes = new Array(perBar).fill(0);
+    chordsSimple.forEach((seg, i) => {
+      if (seg.chord === "N" || i === 0) return;
+      votes[nearestBeat(beats, seg.start) % perBar]++;
+    });
+    return votes.indexOf(Math.max(...votes));
+  }
+
+  /** Bars of `perBar` beats; the `shift` beats before the first bar line make a pickup bar. Missing beats are null. */
+  function groupBeats(beats: number[], perBar: number, shift: number): Bar[] {
+    const out: Bar[] = [];
+    const add = (cells: (number | null)[], end: number) => {
+      out.push({ start: firstNumber(cells) as number, beats: [...cells, end] });
+    };
+    let i = 0;
+    if (shift > 0 && beats.length > shift) {
+      add([...new Array(perBar - shift).fill(null), ...beats.slice(0, shift)], beats[shift]);
+      i = shift;
+    }
+    while (i < beats.length) {
+      const cells: (number | null)[] = beats.slice(i, i + perBar);
+      while (cells.length < perBar) cells.push(null);
+      add(cells, beats[i + perBar] ?? duration);
+      i += perBar;
+    }
+    return out;
+  }
+
+  /** The sections again, on the new bars: each starts at the bar nearest its start time. */
+  function regroupSections(raw: Section[], to: Bar[]): Section[] {
+    const out = raw.map((sec) => ({ ...sec }));
+    let prev = -1;
+    out.forEach((sec) => {
+      if (sec.startBar === null) return;
+      let best = 0;
+      to.forEach((bar, b) => {
+        if (Math.abs(bar.start - sec.start) < Math.abs(to[best].start - sec.start)) best = b;
+      });
+      sec.startBar = Math.min(Math.max(best, prev + 1), to.length - 1);
+      prev = sec.startBar;
+    });
+    const real = out.filter((sec) => sec.startBar !== null);
+    real.forEach((sec, i) => {
+      sec.endBar = i + 1 < real.length ? Math.max((real[i + 1].startBar as number) - 1, sec.startBar as number) : to.length - 1;
+    });
+    return out;
+  }
+
+  /** Works out bars, sections and tempo from the song's beats and the current setting. */
+  function rebuildMeter() {
+    if (isSongsOwnMeter()) {
+      bars = baseBars;
+      sections = baseSections;
+      meterShift = 0;
+    } else {
+      const beats = songBeats(meter.pulse);
+      meterShift = Math.min(meter.shift ?? chordShift(beats, meter.perBar), meter.perBar - 1);
+      bars = groupBeats(beats, meter.perBar, meterShift);
+      sections = regroupSections(baseSections, bars);
+    }
+    tempo = baseTempo * meter.pulse;
+    applyMeter(meter.perBar);
+    meterValueEl.textContent = String(meter.perBar);
+    meterValueEl.style.color = meter.perBar === baseBeatsPerBar ? "var(--color-ink)" : "var(--color-violet)";
+    pulseValueEl.textContent = `×${meter.pulse}`;
+    pulseValueEl.style.color = meter.pulse === 1 ? "var(--color-ink)" : "var(--color-violet)";
+    barStartValueEl.textContent = meter.shift === null ? "auto" : meter.shift === 0 ? "0" : `+${meter.shift}`;
+    barStartValueEl.style.color = meter.shift === null ? "var(--color-ink)" : "var(--color-violet)";
+  }
+
+  function saveMeter() {
+    try {
+      if (isSongsOwnMeter()) localStorage.removeItem(METER_KEY + sessionId);
+      else localStorage.setItem(METER_KEY + sessionId, JSON.stringify(meter));
+    } catch {
+      // the choice just does not stay for next time
+    }
+  }
+
+  function loadMeter() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(METER_KEY + sessionId) || "null");
+      if (
+        saved &&
+        Number.isInteger(saved.perBar) && saved.perBar >= METER_MIN && saved.perBar <= METER_MAX &&
+        (saved.pulse === 1 || saved.pulse === 2) &&
+        (saved.shift === null || (Number.isInteger(saved.shift) && saved.shift >= 0 && saved.shift < saved.perBar))
+      ) {
+        meter = { perBar: saved.perBar, pulse: saved.pulse, shift: saved.shift };
+      }
+    } catch {
+      // nothing saved, or storage is off
+    }
+  }
+
+  function changeMeter(next: Partial<MeterSetting>) {
+    const before = { ...meter };
+    meter = { ...meter, ...next };
+    if (meter.perBar !== before.perBar || meter.pulse !== before.pulse) meter.shift = next.shift ?? null; // the old pickup no longer fits
+    rebuildMeter();
+    saveMeter();
+    refreshViews();
+    renderProgress();
+  }
+
   const stripEl = document.getElementById("beat-strip")!;
   const stripScrollEl = document.getElementById("bs-scroll")!;
   const stripTrackEl = document.getElementById("bs-track")!;
@@ -1519,7 +1717,8 @@ import Nav from "../components/Nav.astro";
 
   /** Swaps in new sections (the structure model's, once they arrive) without touching the chords. */
   function applySections(next: Section[]) {
-    sections = next;
+    baseSections = next;
+    sections = isSongsOwnMeter() ? next : regroupSections(next, bars);
     renderProgress();
     renderChordGrid();
     renderDetails();
@@ -1723,12 +1922,15 @@ import Nav from "../components/Nav.astro";
     chordsSimple = result.chords;
     chordsDetailed = result.chordsDetailed ?? result.chords;
     chords = chordsSimple;
-    bars = result.bars;
-    applyMeter(result.beatsPerBar ?? (bars[0]?.beats.length ? bars[0].beats.length - 1 : 4));
-    sections = result.sections ?? [];
     songKey = result.key ?? "";
     duration = result.duration;
-    tempo = result.tempo || 120;
+    baseBars = result.bars;
+    baseSections = result.sections ?? [];
+    baseBeatsPerBar = result.beatsPerBar ?? (baseBars[0]?.beats.length ? baseBars[0].beats.length - 1 : 4);
+    baseTempo = result.tempo || 120;
+    meter = { perBar: baseBeatsPerBar, pulse: 1, shift: null };
+    loadMeter();
+    rebuildMeter(); // bars, sections and tempo, as the song counts them (or as this player set them)
 
     const title = result.title || "Your song";
     songTitleEl.textContent = title;
@@ -1873,6 +2075,18 @@ import Nav from "../components/Nav.astro";
     updateTransposeLabel();
     refreshViews();
   });
+
+  // Toolbar: bar length (beats per bar, pulse, where bars start): for songs the analysis counts differently from a player
+  meterDown.addEventListener("click", () => meter.perBar > METER_MIN && changeMeter({ perBar: meter.perBar - 1 }));
+  meterUp.addEventListener("click", () => meter.perBar < METER_MAX && changeMeter({ perBar: meter.perBar + 1 }));
+  meterValueEl.style.cursor = "pointer";
+  meterValueEl.addEventListener("click", () => changeMeter({ perBar: baseBeatsPerBar, pulse: 1, shift: null }));
+  pulseDown.addEventListener("click", () => meter.pulse !== 1 && changeMeter({ pulse: 1 }));
+  pulseUp.addEventListener("click", () => meter.pulse !== 2 && changeMeter({ pulse: 2 }));
+  barStartDown.addEventListener("click", () => changeMeter({ shift: (meterShift + meter.perBar - 1) % meter.perBar }));
+  barStartUp.addEventListener("click", () => changeMeter({ shift: (meterShift + 1) % meter.perBar }));
+  barStartValueEl.style.cursor = "pointer";
+  barStartValueEl.addEventListener("click", () => meter.shift !== null && changeMeter({ shift: null }));
 
   // View switcher: Chords grid / Chord diagrams
   function setActiveView(view: "diagrams" | "grid") {
