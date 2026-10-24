@@ -120,17 +120,19 @@ import { INSTRUMENTS } from "../../lib/tools/pitch";
 
   /* the strings */
   .tn-board { --node: 58px; --k: 2.2px; position: relative; display: flex; justify-content: center; gap: clamp(6px, 2.6vw, 22px); height: 330px; margin: 14px auto 6px; max-width: 520px; padding: 0 6px; }
-  .tn-board::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 0; border-top: 1px dashed #ffffff30; pointer-events: none; }
+  .tn-board::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: repeating-linear-gradient(90deg, #ffffff33 0 6px, transparent 6px 12px); pointer-events: none; }
   .tn-board.all-ok { animation: tn-glow 1.6s ease-in-out 2; border-radius: 28px; }
   .tn-str { position: relative; flex: 1 1 0; max-width: 78px; min-width: 0; height: 100%; }
-  .tn-wire { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; color: #8f78d0; transition: color 0.25s; pointer-events: none; }
+  .tn-wire { position: absolute; inset: 0; width: 100%; height: 100%; color: #8f78d0; transition: color 0.35s ease; pointer-events: none; }
   .tn-wire path { fill: none; stroke: currentColor; stroke-linecap: round; vector-effect: non-scaling-stroke; }
-  .tn-str.near .tn-wire { color: #fbbf24; filter: drop-shadow(0 0 7px #f59e0b99); }
+  .tn-wire .tn-glow { stroke-opacity: 0; transition: stroke-opacity 0.4s ease; }
+  .tn-str.near .tn-wire { color: #fbbf24; }
+  .tn-str.near .tn-glow { stroke-opacity: 0.28; }
   .tn-str.ok .tn-wire, .tn-str.done .tn-wire { color: #6ee7b7; }
-  .tn-str.ok .tn-wire { filter: drop-shadow(0 0 8px #10b981aa); }
+  .tn-str.ok .tn-glow { stroke-opacity: 0.34; }
   .tn-zone { position: absolute; left: 50%; top: 50%; width: calc(var(--node) + 8px); transform: translate(-50%, -50%); border-radius: 99px; background: #34d3991f; border: 1px solid #34d39933; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
   .tn-str.near .tn-zone, .tn-str.ok .tn-zone, .tn-board.manual .tn-str.target .tn-zone { opacity: 1; }
-  .tn-node { --y: -50%; position: absolute; left: 50%; top: 50%; display: grid; place-content: center; width: var(--node); height: var(--node); padding: 0; font: inherit; color: #efe6ff; background: #1f0b45; border: 3px solid #ffffff2e; border-radius: 50%; cursor: pointer; transform: translate(-50%, var(--y)); transition: transform 0.16s cubic-bezier(.3,.8,.4,1), border-color 0.25s, background-color 0.25s, box-shadow 0.25s, color 0.25s; }
+  .tn-node { --y: -50%; position: absolute; left: 50%; top: 50%; display: grid; place-content: center; width: var(--node); height: var(--node); padding: 0; font: inherit; color: #efe6ff; background: #1f0b45; border: 3px solid #ffffff2e; border-radius: 50%; cursor: pointer; transform: translate(-50%, var(--y)); will-change: transform; transition: border-color 0.35s ease, background-color 0.35s ease, box-shadow 0.35s ease, color 0.35s ease; }
   .tn-node b { display: block; font: 800 20px/1 var(--font-sans); letter-spacing: -0.02em; }
   .tn-node small { display: block; margin-top: 2px; font: 600 10px/1 var(--font-mono); color: #a78bd0; }
   .tn-node:hover { border-color: #ffffff66; background: #2c1160; }
@@ -179,8 +181,9 @@ import { INSTRUMENTS } from "../../lib/tools/pitch";
 </style>
 
 <script>
-  import { INSTRUMENTS, detectPitch, freqFromMidi, midiFromName, noteFromFreq, noteLabel, type Instrument } from "../../lib/tools/pitch";
+  import { INSTRUMENTS, detectPitch, matchString, pickFundamental, freqFromMidi, midiFromName, noteFromFreq, noteLabel, type Instrument } from "../../lib/tools/pitch";
   import { MicError, NoiseGate, SILENT_MIC_TEXT, SilenceWatch, audioContext, fillMicPicker, levelPercent, openMic, resumeAudio, rms, type Mic } from "../../lib/tools/audio";
+  import { StringTracker } from "../../lib/tools/tracker";
   import { initGate } from "../../lib/tools/gate";
   import { toast } from "../../lib/toast";
 
@@ -205,7 +208,7 @@ import { INSTRUMENTS } from "../../lib/tools/pitch";
   let announced = false;
 
   // ---- the board: a string for each string of the instrument ----
-  interface Lane { root: HTMLElement; node: HTMLButtonElement; path: SVGPathElement; midi: number | null; amp: number; width: number; hz: number }
+  interface Lane { root: HTMLElement; node: HTMLButtonElement; path: SVGPathElement; glow: SVGPathElement; midi: number | null; amp: number; width: number; hz: number }
   let lanes: Lane[] = [];
   const SVGNS = "http://www.w3.org/2000/svg";
 
@@ -226,7 +229,11 @@ import { INSTRUMENTS } from "../../lib/tools/pitch";
       const width = midi === null ? 3 : Math.max(1.6, Math.min(5, 5.4 - (midi - 40) * 0.1));
       path.setAttribute("stroke-width", String(width));
       path.setAttribute("d", "M20 0 L20 330");
-      svg.appendChild(path);
+      const glow = document.createElementNS(SVGNS, "path");
+      glow.setAttribute("class", "tn-glow");
+      glow.setAttribute("stroke-width", String(width + 9));
+      glow.setAttribute("d", "M20 0 L20 330");
+      svg.append(glow, path);
       const zone = document.createElement("span");
       zone.className = "tn-zone";
       const node = document.createElement("button");
@@ -250,7 +257,7 @@ import { INSTRUMENTS } from "../../lib/tools/pitch";
       }
       root.append(svg, zone, node);
       board.appendChild(root);
-      return { root, node, path, midi, amp: 0, width, hz: 9 + (midi === null ? 12 : (midi - 40) * 0.32) };
+      return { root, node, path, glow, midi, amp: 0, width, hz: 9 + (midi === null ? 12 : (midi - 40) * 0.32) };
     });
     done = lanes.map(() => false);
     held = lanes.map(() => 0);
@@ -262,7 +269,9 @@ import { INSTRUMENTS } from "../../lib/tools/pitch";
   function rebuild() {
     $("board").replaceChildren();
     buildBoard();
-    idle();
+    disp.length = 0;
+    vel.length = 0;
+    syncTracker();
   }
   const pxPerCent = () => ($("board").clientHeight * 0.36) / 50;
   function sizeZones() {
@@ -302,29 +311,92 @@ import { INSTRUMENTS } from "../../lib/tools/pitch";
   }
 
   // ---- moving things ----
-  function place(index: number, cents: number) {
-    lanes[index].node.style.setProperty("--y", `calc(-50% + ${-Math.max(-50, Math.min(50, cents)) * pxPerCent()}px)`);
+  // Nothing here jumps. The string being tuned follows the pitch with a smooth glide, glides back to the middle when the sound
+  // stops, and only the string being played moves, vibrates or lights up.
+  const tracker = new StringTracker({ strings: [], target: null, tol: 5 });
+  const disp: number[] = []; // where each note is drawn, in cents
+  const vel: number[] = []; // and how fast it is moving
+  /** A critically damped spring: eases into the move, glides, and settles without overshooting or jittering. */
+  function glide(current: number, goal: number, v: number, seconds: number, dt: number): [number, number] {
+    const w = 2 / seconds;
+    const x = w * dt;
+    const e = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
+    const change = current - goal;
+    const temp = (v + w * change) * dt;
+    return [goal + (change + temp) * e, (v - w * temp) * e];
   }
-  function idle() {
-    lanes.forEach((l) => {
-      l.root.classList.remove("near", "ok");
-      l.node.style.setProperty("--y", "-50%");
+  let signal = 0; // how loud the string being played is, for the vibration
+  let anim = 0;
+  let lastFrame = 0;
+  let readoutAt = 0;
+  let ledAt = -2;
+
+  function syncTracker() {
+    tracker.opts = { strings: strings(), target, tol: prefs.tol };
+    tracker.release();
+    paintStates();
+  }
+  function paintStates() {
+    const lock = tracker.lock;
+    lanes.forEach((l, i) => {
+      l.root.classList.toggle("near", i === lock && !tracker.ok);
+      l.root.classList.toggle("ok", i === lock && tracker.ok);
     });
-    root.classList.remove("ok");
+    root.classList.toggle("ok", lock >= 0 && tracker.ok);
+  }
+  const cache = new WeakMap<Element, string>();
+  function put(el: Element, html: string) {
+    if (cache.get(el) === html) return;
+    cache.set(el, html);
+    el.innerHTML = html;
+  }
+  function placeholders() {
+    put($("note"), "<b>–</b><sup></sup>");
+    put($("cents"), "&nbsp;");
+    put($("hz"), "&nbsp;");
+    put($("hint"), announced ? "All strings in tune!" : "&nbsp;");
+    ledAt = -2;
     drawLed(null);
   }
-
-  let signal = 0; // how loud the string being played is, 0 to 1, for the vibration
-  let activeIndex = -1;
-  let anim = 0;
-  function animate(t: number) {
+  function drawReadout() {
+    const lock = tracker.lock;
+    if (lock < 0) return;
+    const goal = tracker.goal()!;
+    const c = tracker.cents;
+    const shown = noteFromFreq(freqFromMidi(goal, prefs.a4), prefs.a4);
+    put($("note"), `<b>${NAMES_PRETTY(shown.name)}</b><sup>${shown.octave}</sup>`);
+    put($("cents"), `${c > 0.5 ? "+" : c < -0.5 ? "−" : ""}${Math.abs(Math.round(c))} ¢`);
+    put($("hz"), `${freqFromMidi(goal + c / 100, prefs.a4).toFixed(1)} Hz`);
+    put($("hint"), tracker.ok ? "In tune ✓" : c < 0 ? "A little low: tune up ↑" : "A little high: tune down ↓");
+    if (lanes[lock].midi === null) put(lanes[lock].node, `<b>${NAMES_PRETTY(shown.name)}</b>`);
+  }
+  function frame(t: number) {
+    const dt = lastFrame ? Math.min(0.1, (t - lastFrame) / 1000) : 0.016;
+    lastFrame = t;
+    const lock = tracker.lock;
+    const k = pxPerCent();
     lanes.forEach((l, i) => {
-      const goal = i === activeIndex ? Math.min(1, signal * 14) : 0;
-      l.amp += (goal - l.amp) * 0.18;
+      const active = i === lock;
+      const [next, speed] = glide(disp[i] ?? 0, active ? tracker.cents : 0, vel[i] ?? 0, active ? 0.2 : 0.45, dt);
+      disp[i] = next;
+      vel[i] = speed;
+      l.node.style.setProperty("--y", `calc(-50% + ${(-Math.max(-50, Math.min(50, next)) * k).toFixed(2)}px)`);
+      l.amp += ((active ? Math.min(1, signal * 14) : 0) - l.amp) * (1 - Math.exp(-dt / 0.12));
       const wobble = l.amp * (l.width < 2.4 ? 11 : 8) * Math.sin((t / 1000) * l.hz * Math.PI * 2);
-      l.path.setAttribute("d", l.amp < 0.01 ? "M20 0 L20 330" : `M20 0 Q ${20 + wobble} 165 20 330`);
+      const d = l.amp < 0.01 ? "M20 0 L20 330" : `M20 0 Q ${(20 + wobble).toFixed(2)} 165 20 330`;
+      l.path.setAttribute("d", d);
+      l.glow.setAttribute("d", d);
     });
-    anim = requestAnimationFrame(animate);
+    const at = lock >= 0 ? Math.round(Math.max(-50, Math.min(50, disp[lock] ?? 0)) / 5) + 10 : -1;
+    if (at !== ledAt) {
+      ledAt = at;
+      drawLed(at < 0 ? null : (at - 10) * 5);
+    }
+    if (t - readoutAt > 90) {
+      readoutAt = t;
+      drawReadout();
+    }
+    anim = requestAnimationFrame(frame);
   }
 
   // ---- the settings ----
@@ -343,6 +415,7 @@ import { INSTRUMENTS } from "../../lib/tools/pitch";
     $("mode-manual").setAttribute("aria-pressed", String(target !== null));
     $("board").classList.toggle("manual", target !== null);
     lanes.forEach((l) => l.root.classList.toggle("target", l.midi !== null && l.midi === target));
+    syncTracker();
   }
   $("mode-auto").addEventListener("click", () => { target = null; setMode(); });
   $("mode-manual").addEventListener("click", () => {
@@ -371,7 +444,7 @@ import { INSTRUMENTS } from "../../lib/tools/pitch";
   drawA4();
 
   const drawTol = () => all<HTMLButtonElement>("[data-tol]").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.tol) === prefs.tol)));
-  all<HTMLButtonElement>("[data-tol]").forEach((b) => b.addEventListener("click", () => { prefs.tol = Number(b.dataset.tol); save(); drawTol(); sizeZones(); }));
+  all<HTMLButtonElement>("[data-tol]").forEach((b) => b.addEventListener("click", () => { prefs.tol = Number(b.dataset.tol); tracker.opts.tol = prefs.tol; save(); drawTol(); sizeZones(); }));
   drawTol();
 
   const sens = $<HTMLInputElement>("sens");
@@ -413,35 +486,22 @@ import { INSTRUMENTS } from "../../lib/tools/pitch";
   let mic: Mic | null = null;
   let timer = 0;
   let buf = new Float32Array(0);
-  let recent: number[] = []; // midi, a few readings, to smooth over
   let lastHeard = 0;
-  let wasOk = false;
   const root = document.querySelector<HTMLElement>(".tn")!;
   const CAPTURE = 12; // readings in tune in a row (about 0.6 s) before a string counts as tuned
 
-  function show(gi: number, goal: number, cents: number, freq: number) {
-    const ok = Math.abs(cents) <= prefs.tol;
-    const shown = noteFromFreq(freqFromMidi(goal, prefs.a4), prefs.a4);
-    $("note").innerHTML = `<b>${NAMES_PRETTY(shown.name)}</b><sup>${shown.octave}</sup>`;
-    $("cents").textContent = `${cents > 0 ? "+" : cents < 0 ? "−" : ""}${Math.abs(Math.round(cents))} ¢`;
-    $("hz").textContent = `${freq.toFixed(1)} Hz`;
-    $("hint").textContent = ok ? "In tune ✓" : cents < 0 ? "A little low: tune up ↑" : "A little high: tune down ↓";
-    root.classList.toggle("ok", ok);
-    drawLed(cents);
-    lanes.forEach((l, i) => {
-      l.root.classList.toggle("near", i === gi && !ok);
-      l.root.classList.toggle("ok", i === gi && ok);
-      if (i !== gi) l.node.style.setProperty("--y", "-50%");
-    });
-    place(gi, cents);
-    activeIndex = gi;
-    if (ok && !wasOk && "vibrate" in navigator) navigator.vibrate?.(20);
-    wasOk = ok;
+  function release() {
+    tracker.release();
+    paintStates();
+    placeholders();
+  }
 
-    // a string is captured once it holds in tune, and let go again if it is played badly out of tune afterwards
-    if (lanes[gi].midi === null) return;
-    held[gi] = ok ? held[gi] + 1 : 0;
-    off[gi] = Math.abs(cents) > Math.max(15, prefs.tol * 3) ? off[gi] + 1 : 0;
+  /** A string is captured once it holds in tune, and let go again if it is played badly out of tune afterwards. */
+  function capture() {
+    const gi = tracker.lock;
+    if (gi < 0 || lanes[gi].midi === null) return;
+    held[gi] = tracker.ok ? held[gi] + 1 : 0;
+    off[gi] = Math.abs(tracker.cents) > Math.max(15, prefs.tol * 3) ? off[gi] + 1 : 0;
     if (!done[gi] && held[gi] >= CAPTURE) {
       done[gi] = true;
       const node = lanes[gi].node;
@@ -453,7 +513,6 @@ import { INSTRUMENTS } from "../../lib/tools/pitch";
       if (done.every(Boolean) && !announced) {
         announced = true;
         $("board").classList.add("all-ok");
-        $("hint").textContent = "All strings in tune!";
         toast({ icon: "🎸", title: "All strings in tune", text: "Nicely done. Time to play.", ms: 4000 });
       }
     } else if (done[gi] && off[gi] >= 20) {
@@ -462,6 +521,17 @@ import { INSTRUMENTS } from "../../lib/tools/pitch";
       $("board").classList.remove("all-ok");
       drawProgress();
     }
+  }
+
+  function consider(m: number, clarity: number) {
+    const lock = tracker.lock;
+    const wasOk = tracker.ok;
+    tracker.push(m, clarity);
+    if (tracker.lock !== lock || tracker.ok !== wasOk) {
+      paintStates();
+      if (tracker.ok && !wasOk && "vibrate" in navigator) navigator.vibrate?.(20);
+    }
+    capture();
   }
 
   function tick() {
@@ -479,35 +549,18 @@ import { INSTRUMENTS } from "../../lib/tools/pitch";
     signal = open ? level : 0;
     let pitch = open ? detectPitch(buf, sr, inst.fmin, inst.fmax) : null;
     if (pitch && pitch.clarity < 0.75) pitch = null;
-    if (!pitch) {
-      if (now - lastHeard > 900) {
-        recent = [];
-        wasOk = false;
-        activeIndex = -1;
-        $("status").textContent = "Listening… play a string";
-        $("note").innerHTML = "<b>–</b><sup></sup>";
-        $("cents").innerHTML = "&nbsp;";
-        $("hz").innerHTML = "&nbsp;";
-        if (!announced) $("hint").innerHTML = "&nbsp;";
-        idle();
-      }
-      return;
+    if (pitch) {
+      lastHeard = now;
+      put($("status"), "Listening");
+      // which string is sounding comes from the spectrum, so a string ringing in sympathy cannot take over
+      const list = strings();
+      let m = list.length ? matchString(buf, sr, list, prefs.a4, pitch.freq, target) : null;
+      if (m === null) m = 69 + 12 * Math.log2(pickFundamental(buf, sr, pitch.freq, inst.fmin, inst.fmax) / prefs.a4);
+      consider(m, pitch.clarity);
+    } else if (tracker.lock >= 0 && now - lastHeard > 700) {
+      release();
+      put($("status"), "Listening… play a string");
     }
-    lastHeard = now;
-    const exact = 69 + 12 * Math.log2(pitch.freq / prefs.a4);
-    // a jump of more than a few semitones is usually the tuner catching an overtone: start again from it
-    if (recent.length && Math.abs(exact - recent[recent.length - 1]) > 3) recent = [];
-    recent = [...recent, exact].slice(-5);
-    const smooth = [...recent].sort((a, b) => a - b)[recent.length >> 1];
-    const list = strings();
-    let goal: number;
-    if (target !== null) goal = target;
-    else if (list.length) goal = list.reduce((best, m) => (Math.abs(m - smooth) < Math.abs(best - smooth) ? m : best), list[0]);
-    else goal = Math.round(smooth);
-    const gi = list.length ? list.indexOf(goal) : 0;
-    if (!list.length) lanes[0].node.innerHTML = `<b>${NAMES_PRETTY(noteFromFreq(freqFromMidi(goal, prefs.a4), prefs.a4).name)}</b>`;
-    $("status").textContent = "Listening";
-    show(gi, goal, (smooth - goal) * 100, freqFromMidi(smooth, prefs.a4));
   }
 
   async function start() {
@@ -525,34 +578,31 @@ import { INSTRUMENTS } from "../../lib/tools/pitch";
     $("mic-name").textContent = mic.label ? `Microphone: ${mic.label}` : "";
     void fillMicPicker($<HTMLSelectElement>("mic-select"), mic.deviceId, () => { stop(); void start(); });
     root.classList.add("live");
-    $("status").textContent = "Listening… play a string";
+    put($("status"), "Listening… play a string");
     $("listen-text").textContent = "Stop";
     $("listen").setAttribute("aria-pressed", "true");
+    syncTracker();
     timer = window.setInterval(tick, 50);
     cancelAnimationFrame(anim);
-    anim = requestAnimationFrame(animate);
+    lastFrame = 0;
+    anim = requestAnimationFrame(frame);
     drawProgress();
   }
   function stop() {
     window.clearInterval(timer);
     mic?.stop();
     mic = null;
-    recent = [];
-    activeIndex = -1;
     signal = 0;
-    root.classList.remove("live", "ok");
-    $("status").textContent = "Press Start, then play a string";
+    release();
+    root.classList.remove("live");
+    put($("status"), "Press Start, then play a string");
     $("listen-text").textContent = "Start";
     $("listen").setAttribute("aria-pressed", "false");
     $("level").style.width = "0";
     $("mic-warn").hidden = true;
-    $("note").innerHTML = "<b>–</b><sup></sup>";
-    $("cents").innerHTML = "&nbsp;";
-    $("hz").innerHTML = "&nbsp;";
-    $("hint").innerHTML = "&nbsp;";
-    idle();
     drawProgress();
-    window.setTimeout(() => { if (!mic) cancelAnimationFrame(anim); }, 600);
+    // keep animating for a moment so the note glides back to the middle and the string settles
+    window.setTimeout(() => { if (!mic) cancelAnimationFrame(anim); }, 1200);
   }
   $("listen").addEventListener("click", () => (mic ? stop() : void start()));
   window.addEventListener("pagehide", stop);
