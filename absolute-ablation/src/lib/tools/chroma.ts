@@ -160,6 +160,7 @@ const SHAPES: Shape[] = [
   { suffix: "aug", intervals: [0, 4, 8], prior: 0.88 },
   { suffix: "6", intervals: [0, 4, 7, 9], prior: 0.86 },
   { suffix: "m7b5", intervals: [0, 3, 6, 10], prior: 0.86 },
+  { suffix: "5", intervals: [0, 7], prior: 0.8 }, // only named when asked for: two notes fit almost anything
 ];
 
 const TEMPLATES = ROOTS.flatMap((root, r) =>
@@ -181,7 +182,7 @@ export interface ChordGuess {
 export function matchChords(bins: Float32Array, count = 3, suffixes?: string[]): ChordGuess[] {
   const norm = Math.hypot(...bins);
   if (norm === 0) return [];
-  const scored = TEMPLATES.filter((tpl) => !suffixes || suffixes.includes(tpl.suffix)).map((tpl) => {
+  const scored = TEMPLATES.filter((tpl) => (suffixes ? suffixes.includes(tpl.suffix) : tpl.suffix !== "5")).map((tpl) => {
     let dot = 0;
     for (let i = 0; i < 12; i++) dot += bins[i] * tpl.t[i];
     return { name: tpl.name, root: tpl.root, score: (dot / (norm * tpl.norm)) * tpl.prior };

@@ -35,6 +35,7 @@ const QUALITIES: Quality[] = [
   { suffix: "m6", intervals: [0, 3, 7, 9], name: "minor 6th" },
   { suffix: "dim7", intervals: [0, 3, 6, 9], name: "diminished 7th" },
   { suffix: "m7b5", intervals: [0, 3, 6, 10], name: "half-diminished" },
+  { suffix: "5", intervals: [0, 7], name: "power chord" },
 ];
 
 const QUALITY_BY_SUFFIX = new Map(QUALITIES.map((q) => [q.suffix, q]));
@@ -202,11 +203,11 @@ function neckZone(lowestFret: number): number {
 }
 
 /** The most comfortable voicing overall, and the most comfortable one in each stretch of the neck. */
-function searchVoicings(parsed: ParsedChord, allowOpen: boolean): { best?: Voicing; zones: Map<number, Voicing> } {
+function searchVoicings(parsed: ParsedChord, allowOpen: boolean): { best?: Voicing; zones: Map<number, Voicing>; all: Voicing[] } {
   const { root, quality, bass } = parsed;
   const zones = new Map<number, Voicing>();
   const tones = new Set(quality.intervals.map((i) => (root + i) % 12));
-  if (!tones.has(bass)) return { zones };
+  if (!tones.has(bass)) return { zones, all: [] };
 
   // The fifth may be left out of four-note chords; every other tone defines the chord.
   const required = new Set(
@@ -214,11 +215,12 @@ function searchVoicings(parsed: ParsedChord, allowOpen: boolean): { best?: Voici
   );
 
   let best: Voicing | undefined;
+  const everyOne: Voicing[] = [];
   const frets: number[] = [];
 
   const evaluate = () => {
     const sounding = frets.filter((f) => f >= 0).length;
-    if (sounding < 4) return;
+    if (sounding < (quality.intervals.length < 3 ? 3 : 4)) return;
     const firstString = frets.findIndex((f) => f >= 0);
     if ((OPEN_STRINGS[firstString] + frets[firstString]) % 12 !== bass) return;
 
@@ -255,6 +257,7 @@ function searchVoicings(parsed: ParsedChord, allowOpen: boolean): { best?: Voici
       (fifthMissing ? 0.8 : 0);
     const candidate: Voicing = { frets: [...frets], fingers, score, fullness: score + muted * 2.5 };
     if (!best || score < best.score) best = candidate;
+    if (lowest <= 12) everyOne.push(candidate);
     if (lowest > MAX_ALTERNATIVE_FRET) return; // an alternative that high up the neck is not one anybody would reach for
     const zone = neckZone(lowest);
     const inZone = zones.get(zone);
@@ -287,7 +290,7 @@ function searchVoicings(parsed: ParsedChord, allowOpen: boolean): { best?: Voici
   };
   search(0, 0, Infinity, 0);
 
-  return { best, zones };
+  return { best, zones, all: everyOne };
 }
 
 function toShape(found: Voicing): GuitarShape {
@@ -359,4 +362,36 @@ export function getGuitarShape(chord: string): GuitarShape | undefined {
   }
   voicingCache.set(chord, shape ?? null);
   return shape;
+}
+
+const allCache = new Map<string, GuitarShape[]>();
+
+/**
+ * Many ways of playing a chord, for a chord library: the usual fingering first, then comfortable ones all the way up the neck, each
+ * starting at least two frets from the last so they look and feel different. Up to `max`, in order up the neck after the first.
+ */
+export function getAllGuitarShapes(chord: string, max = 8): GuitarShape[] {
+  const key = `${chord}:${max}`;
+  const cached = allCache.get(key);
+  if (cached) return cached;
+  const usual = getGuitarShape(chord);
+  if (!usual) return [];
+  const parsed = parseChord(chord);
+  const chosen: { shape: GuitarShape; at: number }[] = [{ shape: usual, at: lowestFret(usual) }];
+  if (parsed) {
+    const options = [...searchVoicings(parsed, true).all, ...searchVoicings(parsed, false).all]
+      .map((voicing) => ({ voicing, shape: toShape(voicing) }))
+      .sort((a, b) => a.voicing.fullness - b.voicing.fullness);
+    for (const { voicing, shape } of options) {
+      if (chosen.length >= max) break;
+      const at = lowestFret(shape);
+      if (chosen.some((c) => sameShape(c.shape, shape) || Math.abs(c.at - at) < 2)) continue;
+      void voicing;
+      chosen.push({ shape, at });
+    }
+  }
+  const [first, ...others] = chosen;
+  const out = [first.shape, ...others.sort((a, b) => a.at - b.at).map((c) => c.shape)];
+  allCache.set(key, out);
+  return out;
 }

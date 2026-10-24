@@ -1,7 +1,16 @@
 ---
 import ToolShell from "../../components/ToolShell.astro";
 
-const keys = [["C", "C"], ["G", "G"], ["D", "D"], ["A", "A"], ["E", "E"], ["B", "B"], ["F", "F"], ["A#", "B♭"], ["D#", "E♭"], ["G#", "A♭"], ["C#", "D♭"], ["F#", "F♯"]];
+const modes = [
+  { id: "explore", label: "Explore", icon: '<rect x="4" y="4" width="7" height="7" rx="1.6"/><rect x="13" y="4" width="7" height="7" rx="1.6"/><rect x="4" y="13" width="7" height="7" rx="1.6"/><rect x="13" y="13" width="7" height="7" rx="1.6"/>' },
+  { id: "follow", label: "Follow along", icon: '<circle cx="12" cy="12" r="9"/><path d="M10 8.4v7.2l5.6-3.6z"/>' },
+  { id: "listen", label: "Listen & check", icon: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3"/>' },
+  { id: "minute", label: "1-minute changes", icon: '<circle cx="12" cy="13.5" r="7.5"/><path d="M12 9.5v4l2.6 1.8M9.6 3h4.8"/>' },
+  { id: "progression", label: "Progressions", icon: '<path d="M4 18.5h4.5v-4.2H13v-4.2h4.2V6H20"/>' },
+  { id: "quiz", label: "Chord quiz", icon: '<circle cx="12" cy="12" r="9"/><path d="M9.4 9.6a2.6 2.6 0 1 1 3.6 2.4c-.8.4-1 .9-1 1.8M12 17h.01"/>' },
+];
+const roots = ["C", "D", "E", "F", "G", "A", "B"];
+const qualities = [["", "maj"], ["m", "min"], ["5", "5"], ["7", "7"], ["m7", "m7"], ["maj7", "maj7"], ["sus2", "sus2"], ["sus4", "sus4"], ["6", "6"], ["m6", "m6"], ["dim", "dim"], ["aug", "aug"], ["m7b5", "m7♭5"], ["dim7", "dim7"], ["mMaj7", "mMaj7"]];
 const sets = [
   ["First four", "G C D Em"],
   ["Open chords", "Em Am C G D A E Dm"],
@@ -9,7 +18,9 @@ const sets = [
   ["Minor mood", "Am Dm Em Bm F#m Cm Gm"],
   ["Barre chords", "F Bm F#m B Cm Gm C#m Fm"],
   ["7th chords", "G7 C7 D7 A7 E7 Am7 Dm7 Em7 Cmaj7"],
+  ["Power chords", "E5 A5 D5 G5 C5"],
 ];
+const keys = [["C", "C"], ["G", "G"], ["D", "D"], ["A", "A"], ["E", "E"], ["B", "B"], ["F", "F"], ["A#", "B♭"], ["D#", "E♭"], ["G#", "A♭"], ["C#", "D♭"], ["F#", "F♯"]];
 const progressions = [
   ["I – IV – V", "I IV V IV"],
   ["I – V – vi – IV", "I V vi IV"],
@@ -22,227 +33,426 @@ const progressions = [
 
 <ToolShell
   title="Practice Your Chords — Chord Suno Toolkit"
-  description="Chord change drills for guitar: follow along with a beat, a one-minute changes challenge, and a listen mode that checks the chord you play."
+  description="Learn and drill guitar chords: a library of every chord and every way to play it, chord-change drills with a beat, listen mode, one-minute changes, progressions and a chord quiz."
   heading="Practice your chords"
-  sub="Pick the chords you want to master and drill them three ways: follow along with a beat, race the clock for one minute, or let Chord Suno listen and check each chord you play."
+  sub="Find any chord and every way to play it, hear it, then drill the changes: follow a beat, race the clock, play along with a progression, or let Chord Suno listen and check you."
   feature="practice_chords"
   tool="practice"
   crumb="Practice your chords"
 >
-  <div class="tk-layout">
-    <section class="tk-console pr" aria-label="Chord practice">
-      <div class="pr-modes tk-seg on-dark wide" id="modes" role="tablist" aria-label="Practice mode">
-        <button type="button" role="tab" data-mode="follow" aria-pressed="true">Follow along</button>
-        <button type="button" role="tab" data-mode="listen" aria-pressed="false">Listen &amp; check</button>
-        <button type="button" role="tab" data-mode="minute" aria-pressed="false">1-minute changes</button>
-      </div>
-      <p class="pr-blurb" id="blurb"></p>
+  <div class="pz">
+    <div class="pz-modes" id="modes" role="tablist" aria-label="Practice mode">
+      <span class="pz-thumb" id="thumb" aria-hidden="true"></span>
+      {modes.map((m) => (
+        <button type="button" role="tab" data-mode={m.id} aria-selected="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true" set:html={m.icon} />
+          <span>{m.label}</span>
+        </button>
+      ))}
+    </div>
+    <p class="pz-blurb" id="blurb"></p>
 
-      <div class="pr-stage">
-        <div class="pr-now" id="now-card">
-          <div class="pr-label">Play now</div>
-          <div class="pr-name" id="now-name">–</div>
-          <div class="pr-diagram" id="now-diagram"></div>
-          <div class="pr-badge" id="badge" hidden></div>
-        </div>
-        <div class="pr-next" id="next-card">
-          <div class="pr-label">Next</div>
-          <div class="pr-next-name" id="next-name">–</div>
-          <div class="pr-diagram" id="next-diagram"></div>
-        </div>
-      </div>
-
-      <!-- follow along -->
-      <div class="pr-panel" data-panel="follow">
-        <div class="pr-beats" id="beats" aria-hidden="true"></div>
-        <div class="pr-bpm">
-          <button class="tk-round" id="bpm-minus" type="button" aria-label="Slower">−</button>
-          <div><b id="bpm-out">80</b><span>BPM</span></div>
-          <button class="tk-round" id="bpm-plus" type="button" aria-label="Faster">+</button>
-        </div>
-      </div>
-
-      <!-- listen and check -->
-      <div class="pr-panel" data-panel="listen" hidden>
-        <div class="pr-timer" id="limit-bar" hidden aria-hidden="true"><i id="limit-fill"></i></div>
-      </div>
-
-      <!-- one minute -->
-      <div class="pr-panel" data-panel="minute" hidden>
-        <div class="pr-clock"><b id="clock">1:00</b><span>left</span></div>
-        <div class="pr-count"><b id="count">0</b><span>clean changes</span></div>
-        <p class="pr-auto" id="auto-note">Play the chord shown. Each time Chord Suno hears you switch to the other chord, it counts.</p>
-        <button class="tk-btn on-dark pr-tapper" id="changed" type="button" disabled>Count a change myself <span class="tk-kbd" style="margin-left:8px">Space</span></button>
-      </div>
-
-      <!-- what the microphone hears, for listen and 1-minute -->
-      <div class="pr-panel" data-panel="listen minute" hidden>
-        <div class="pr-heard">I hear: <b id="heard">–</b></div>
-        <div class="pr-meter" aria-hidden="true"><i id="level"></i></div>
-        <p class="mic-name" id="mic-name"></p>
-        <select id="mic-select" class="tk-select mic-select" aria-label="Microphone" hidden></select>
-        <p class="mic-warn" id="mic-warn" hidden role="alert"></p>
-      </div>
-
-      <div class="pr-stats" id="stats"></div>
-
-      <div class="pr-actions">
-        <button id="go" class="tk-btn amber pr-go" type="button" aria-pressed="false"><span id="go-text">Start</span></button>
-        <button id="skip" class="tk-btn on-dark" type="button" hidden>Skip chord</button>
-      </div>
-      <p class="tk-error" id="error" hidden role="alert"></p>
-    </section>
-
-    <div>
-      <section class="tk-card">
-        <h2>Your chords <small id="chord-count"></small></h2>
-        <div class="tk-seg" id="chord-list" aria-label="Chords in this drill"></div>
-        <form class="tk-inline" id="add-form" autocomplete="off" style="margin-top:12px">
-          <input class="tk-select" id="add-chord" type="text" maxlength="12" placeholder="Add a chord, e.g. Bm or F#m7" aria-label="Add a chord" style="flex:1 1 170px;width:auto" />
-          <button class="tk-btn soft" type="submit">Add</button>
-        </form>
-        <p class="tk-error" id="add-error" hidden></p>
-
-        <div class="tk-field" style="margin-top:18px">
-          <p class="tk-label">Start from a set</p>
-          <div class="tk-seg" id="sets">
-            {sets.map(([label, chords]) => (<button type="button" data-chords={chords}>{label}</button>))}
-          </div>
-        </div>
-
-        <details class="pr-prog">
-          <summary>Practise a chord progression in a key</summary>
-          <div class="tk-field" style="margin-top:12px">
-            <label class="tk-label" for="key">Key</label>
-            <select id="key" class="tk-select">
-              {keys.map(([v, l]) => (<option value={v}>{l} major</option>))}
-            </select>
-          </div>
-          <div class="tk-seg" id="progressions">
-            {progressions.map(([label, steps]) => (<button type="button" data-steps={steps}>{label}</button>))}
-          </div>
-          <p class="tk-hint">Fills the list with that progression, played in order.</p>
-        </details>
-      </section>
-
-      <section class="tk-card">
-        <h2>Settings</h2>
-        <div class="pr-set" data-for="follow">
-          <div class="tk-field">
-            <p class="tk-label">Beats on each chord</p>
-            <div class="tk-seg" id="per-chord" role="group" aria-label="Beats on each chord">
-              {[1, 2, 4, 8].map((n) => (<button type="button" data-per={n} aria-pressed="false">{n}</button>))}
+    <div class="tk-layout">
+      <section class="tk-console pz-stage" aria-label="Practice area">
+        <!-- Explore: every way to play the chosen chord -->
+        <div class="pz-view" data-view="explore">
+          <div class="pz-ex-head">
+            <div class="pz-ex-name" id="ex-name">C</div>
+            <div>
+              <div class="pz-ex-long" id="ex-long">C major</div>
+              <div class="pz-notes" id="ex-notes"></div>
             </div>
           </div>
-          <label class="tk-switch">
-            <span>Click<small>Hear the beat as you play</small></span>
-            <input type="checkbox" id="click-on" checked /><i></i>
-          </label>
+          <div class="pz-gallery" id="gallery"></div>
+          <p class="pz-hint">Tap a shape to hear it. The one marked <b>In use</b> is the one your drills will show.</p>
         </div>
-        <div class="pr-set" data-for="listen" hidden>
-          <div class="tk-field">
-            <p class="tk-label">Time for each chord</p>
-            <div class="tk-seg" id="limit" role="group" aria-label="Time for each chord">
-              <button type="button" data-limit="0" aria-pressed="false">No limit</button>
-              <button type="button" data-limit="10" aria-pressed="false">10 s</button>
-              <button type="button" data-limit="5" aria-pressed="false">5 s</button>
+
+        <!-- the drills -->
+        <div class="pz-view" data-view="drill" hidden>
+          <div class="pz-cards">
+            <div class="pz-now" id="now-card">
+              <div class="pz-label">Play now</div>
+              <div class="pz-name" id="now-name">–</div>
+              <div class="pz-diagram" id="now-diagram"></div>
+              <div class="pz-badge" id="badge" hidden></div>
+            </div>
+            <div class="pz-next" id="next-card">
+              <div class="pz-label">Next</div>
+              <div class="pz-next-name" id="next-name">–</div>
+              <div class="pz-diagram" id="next-diagram"></div>
             </div>
           </div>
-          <div class="tk-field">
-            <label class="tk-label" for="sens">Microphone sensitivity <output id="sens-out">Medium</output></label>
-            <input id="sens" class="tk-range" type="range" min="0" max="100" value="55" />
-          </div>
-        </div>
-        <div class="pr-set" data-for="minute" hidden>
-          <div class="tk-field">
-            <p class="tk-label">The two chords</p>
-            <div class="tk-inline">
-              <select id="pair-a" class="tk-select" style="flex:1" aria-label="First chord"></select>
-              <span aria-hidden="true">⇄</span>
-              <select id="pair-b" class="tk-select" style="flex:1" aria-label="Second chord"></select>
+
+          <div class="pz-strip" id="strip" data-extra="progression" hidden aria-label="The progression"></div>
+
+          <div class="pz-extra" data-extra="follow progression" hidden>
+            <div class="pz-beats" id="beats" aria-hidden="true"></div>
+            <div class="pz-bpm">
+              <button class="tk-round" id="bpm-minus" type="button" aria-label="Slower">−</button>
+              <div><b id="bpm-out">80</b><span>BPM</span></div>
+              <button class="tk-round" id="bpm-plus" type="button" aria-label="Faster">+</button>
             </div>
-            <p class="tk-hint" id="best-line"></p>
+          </div>
+
+          <div class="pz-extra" data-extra="listen" hidden>
+            <div class="pz-timer" id="limit-bar" hidden aria-hidden="true"><i id="limit-fill"></i></div>
+          </div>
+
+          <div class="pz-extra" data-extra="minute" hidden>
+            <div class="pz-slots" role="group" aria-label="The two chords">
+              <button type="button" class="pz-slot" id="slot-a" data-slot="0"><span>A</span><b id="slot-a-name">G</b></button>
+              <span class="pz-swap-icon" aria-hidden="true">⇄</span>
+              <button type="button" class="pz-slot" id="slot-b" data-slot="1"><span>B</span><b id="slot-b-name">C</b></button>
+            </div>
+            <div class="pz-clockrow">
+              <div class="pz-ring">
+                <svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="44" class="bg"/><circle cx="50" cy="50" r="44" class="fg" id="ring"/></svg>
+                <div><b id="clock">1:00</b><span>left</span></div>
+              </div>
+              <div class="pz-count"><b id="count">0</b><span>clean changes</span></div>
+            </div>
+            <p class="pz-auto" id="auto-note">Play the first chord to start. Each time Chord Suno hears you switch to the other chord, it counts.</p>
+            <button class="tk-btn on-dark pz-tapper" id="changed" type="button" disabled>Count a change myself <span class="tk-kbd" style="margin-left:8px">Space</span></button>
+          </div>
+
+          <div class="pz-extra" data-extra="listen minute" hidden>
+            <div class="pz-heard">I hear <b id="heard">–</b></div>
+            <div class="pz-meter" aria-hidden="true"><i id="level"></i></div>
+            <p class="mic-name" id="mic-name"></p>
+            <select id="mic-select" class="tk-select mic-select" aria-label="Microphone" hidden></select>
+            <p class="mic-warn" id="mic-warn" hidden role="alert"></p>
           </div>
         </div>
-        <div class="tk-field" data-for="follow listen">
-          <p class="tk-label">Order</p>
-          <div class="tk-seg" id="order" role="group" aria-label="Order">
-            <button type="button" data-order="random" aria-pressed="false">Shuffled</button>
-            <button type="button" data-order="list" aria-pressed="false">In order</button>
+
+        <!-- the quiz -->
+        <div class="pz-view" data-view="quiz" hidden>
+          <div class="pz-quiz-card" id="quiz-card">
+            <div class="pz-label">What chord is this?</div>
+            <div class="pz-diagram pz-quiz-diagram" id="quiz-diagram"></div>
+            <div class="pz-badge" id="quiz-badge" hidden></div>
           </div>
+          <div class="pz-options" id="options"></div>
+        </div>
+
+        <div class="pz-foot" id="foot">
+          <div class="pz-stats" id="stats"></div>
+          <div class="pz-actions">
+            <button id="go" class="tk-btn amber pz-go" type="button" aria-pressed="false"><span id="go-text">Start</span></button>
+            <button id="skip" class="tk-btn on-dark" type="button" hidden>Skip chord</button>
+          </div>
+          <p class="tk-error" id="error" hidden role="alert"></p>
         </div>
       </section>
 
-      <section class="tk-card">
-        <h2>How it works</h2>
-        <ul class="pr-tips">
-          <li><b>Follow along</b> keeps a beat and moves to the next chord every few beats. Start slow and push the tempo up when it feels easy.</li>
-          <li><b>Listen &amp; check</b> uses your microphone to hear the chord you play. Your sound is analysed on your device and never recorded.</li>
-          <li><b>1-minute changes</b> is the classic challenge: switch between two chords as many times as you can, cleanly, in 60 seconds.</li>
-        </ul>
-      </section>
+      <div class="pz-side">
+        <section class="tk-card pz-picker">
+          <h2>Find any chord</h2>
+          <div class="pz-seg pz-roots" id="roots" role="group" aria-label="Note">
+            {roots.map((r) => (<button type="button" data-root={r} aria-pressed="false">{r}</button>))}
+          </div>
+          <div class="pz-seg pz-acc" id="acc" role="group" aria-label="Flat, natural or sharp">
+            <button type="button" data-acc="b" aria-pressed="false" aria-label="Flat">♭</button>
+            <button type="button" data-acc="" aria-pressed="false" aria-label="Natural">♮</button>
+            <button type="button" data-acc="#" aria-pressed="false" aria-label="Sharp">♯</button>
+          </div>
+          <div class="pz-quals" id="quals" role="group" aria-label="Kind of chord">
+            {qualities.map(([v, l]) => (<button type="button" data-qual={v} aria-pressed="false">{l}</button>))}
+          </div>
+
+          <div class="pz-preview">
+            <div class="pz-prev-diagram" id="pick-diagram"></div>
+            <div class="pz-prev-info">
+              <div class="pz-prev-name" id="pick-name">C</div>
+              <div class="pz-prev-long" id="pick-long">C major</div>
+              <div class="pz-notes dark" id="pick-notes"></div>
+              <div class="pz-shapes">
+                <button type="button" id="shape-prev" aria-label="Previous way to play it">‹</button>
+                <span id="shape-count">1 of 1</span>
+                <button type="button" id="shape-next" aria-label="Next way to play it">›</button>
+              </div>
+            </div>
+          </div>
+          <div class="pz-pick-actions">
+            <button class="tk-btn soft" id="pick-hear" type="button">🔊 Hear it</button>
+            <button class="tk-btn soft" id="pick-add" type="button">＋ Add to my chords</button>
+            <button class="tk-btn soft" id="pick-use" type="button" hidden>Use as chord A</button>
+          </div>
+        </section>
+
+        <section class="tk-card">
+          <h2>My chords <small id="chord-count"></small></h2>
+          <div class="pz-chips" id="chord-list" aria-label="Chords in your drills"></div>
+          <form class="tk-inline" id="add-form" autocomplete="off" style="margin-top:12px">
+            <input class="tk-select" id="add-chord" type="text" maxlength="12" placeholder="Type a chord, e.g. Bm or F#m7" aria-label="Add a chord by name" style="flex:1 1 170px;width:auto" />
+            <button class="tk-btn soft" type="submit">Add</button>
+          </form>
+          <p class="tk-error" id="add-error" hidden></p>
+          <div class="tk-field" style="margin-top:16px">
+            <p class="tk-label">Start from a set</p>
+            <div class="tk-seg" id="sets">
+              {sets.map(([label, chords]) => (<button type="button" data-chords={chords}>{label}</button>))}
+            </div>
+          </div>
+        </section>
+
+        <section class="tk-card" id="settings-card">
+          <h2>Settings</h2>
+
+          <div class="pz-set" data-for="progression" hidden>
+            <div class="tk-field">
+              <label class="tk-label" for="key">Key</label>
+              <select id="key" class="tk-select">
+                {keys.map(([v, l]) => (<option value={v}>{l} major</option>))}
+              </select>
+            </div>
+            <div class="tk-field">
+              <p class="tk-label">Progression</p>
+              <div class="tk-seg" id="progressions" role="group" aria-label="Progression">
+                {progressions.map(([label, steps]) => (<button type="button" data-steps={steps} aria-pressed="false">{label}</button>))}
+              </div>
+            </div>
+          </div>
+
+          <div class="pz-set" data-for="follow progression" hidden>
+            <div class="tk-field">
+              <p class="tk-label">Beats on each chord</p>
+              <div class="tk-seg" id="per-chord" role="group" aria-label="Beats on each chord">
+                {[1, 2, 4, 8].map((n) => (<button type="button" data-per={n} aria-pressed="false">{n}</button>))}
+              </div>
+            </div>
+            <label class="tk-switch">
+              <span>Click<small>Hear the beat as you play</small></span>
+              <input type="checkbox" id="click-on" checked /><i></i>
+            </label>
+            <label class="tk-switch">
+              <span>Speed trainer<small>Gets faster as you go, up to a top tempo</small></span>
+              <input type="checkbox" id="trainer-on" /><i></i>
+            </label>
+            <div class="tk-inline pz-sub" id="trainer-fields">
+              Add <input class="tk-number" id="trainer-step" type="number" min="1" max="20" value="5" aria-label="BPM to add" /> BPM every
+              <input class="tk-number" id="trainer-every" type="number" min="1" max="32" value="8" aria-label="Chords between steps" /> chords, up to
+              <input class="tk-number" id="trainer-target" type="number" min="40" max="200" value="120" aria-label="Top tempo" /> BPM
+            </div>
+          </div>
+
+          <div class="pz-set" data-for="listen" hidden>
+            <div class="tk-field">
+              <p class="tk-label">Time for each chord</p>
+              <div class="tk-seg" id="limit" role="group" aria-label="Time for each chord">
+                <button type="button" data-limit="0" aria-pressed="false">No limit</button>
+                <button type="button" data-limit="10" aria-pressed="false">10 s</button>
+                <button type="button" data-limit="5" aria-pressed="false">5 s</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="pz-set" data-for="listen minute" hidden>
+            <div class="tk-field">
+              <label class="tk-label" for="sens">Microphone sensitivity <output id="sens-out">Medium</output></label>
+              <input id="sens" class="tk-range" type="range" min="0" max="100" value="55" />
+            </div>
+          </div>
+
+          <div class="pz-set" data-for="minute" hidden>
+            <div class="tk-field">
+              <p class="tk-label">The two chords</p>
+              <p class="tk-hint" style="margin:0">Press A or B above, then pick any chord: from <b>Find any chord</b> with <b>Use as chord</b>, or tap one of <b>My chords</b>.</p>
+              <p class="tk-hint" id="best-line"></p>
+            </div>
+          </div>
+
+          <div class="pz-set" data-for="follow listen" hidden>
+            <div class="tk-field">
+              <p class="tk-label">Order</p>
+              <div class="tk-seg" id="order" role="group" aria-label="Order">
+                <button type="button" data-order="random" aria-pressed="false">Shuffled</button>
+                <button type="button" data-order="list" aria-pressed="false">In order</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="pz-set" data-for="quiz" hidden>
+            <label class="tk-switch">
+              <span>Quiz me on any chord<small>Off: only the chords in My chords</small></span>
+              <input type="checkbox" id="quiz-any" /><i></i>
+            </label>
+          </div>
+
+          <p class="tk-hint pz-none" data-for="explore">Nothing to set here: pick a chord and tap its shapes.</p>
+        </section>
+      </div>
     </div>
   </div>
 </ToolShell>
 
 <style is:global>
-  .pr { padding: 20px 20px 22px; text-align: center; }
-  .pr-modes { position: relative; }
-  .pr-modes button { min-height: 40px; }
-  .pr-blurb { position: relative; margin: 12px 0 0; font-size: 13.5px; line-height: 1.5; color: #c4b0e0; min-height: 40px; }
-  .pr-stage { position: relative; display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 14px; align-items: stretch; margin: 14px 0 16px; text-align: center; }
-  .pr-now, .pr-next { position: relative; display: flex; flex-direction: column; align-items: center; padding: 14px 10px 12px; border-radius: 24px; }
-  .pr-now { background: #fff; color: var(--color-ink); box-shadow: 0 24px 50px -24px #000000aa; transition: box-shadow 0.2s, background-color 0.2s, transform 0.15s; }
-  .pr-now.good { background: #ecfdf5; box-shadow: 0 0 0 4px #34d399, 0 24px 50px -24px #10b981; transform: scale(1.015); }
-  .pr-now.miss { background: #fff7ed; box-shadow: 0 0 0 4px #fb923c, 0 24px 50px -24px #000000aa; }
-  .pr-next { background: #ffffff12; border: 1px solid #ffffff1f; color: #e9ddff; }
-  .pr-label { font: 700 11px var(--font-mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--color-violet); }
-  .pr-next .pr-label { color: #b9a3df; }
-  .pr-name { font: 800 clamp(48px, 8vw, 76px)/1.05 var(--font-sans); letter-spacing: -0.05em; color: var(--color-ink); }
-  .pr-next-name { font: 800 32px/1.2 var(--font-sans); letter-spacing: -0.04em; color: #fff; }
-  .pr-diagram { width: 100%; max-width: 190px; margin-top: 4px; }
-  .pr-next .pr-diagram { max-width: 100px; opacity: 0.9; }
-  .pr-diagram svg { display: block; width: 100%; height: auto; }
-  .pr-next .pr-diagram svg { filter: invert(1) hue-rotate(180deg) brightness(1.4); }
-  .pr-nodiagram { padding: 24px 0; font-size: 13px; color: var(--color-mute); }
-  .pr-badge { position: absolute; top: 10px; right: 10px; padding: 3px 10px; font: 700 12px var(--font-mono); color: #065f46; background: #a7f3d0; border-radius: 99px; }
-  .pr-badge.miss { color: #9a3412; background: #fed7aa; }
-  .pr-badge[hidden] { display: none; }
+  .pz-modes { position: relative; display: flex; gap: 4px; padding: 5px; margin-bottom: 14px; overflow-x: auto; scrollbar-width: none; background: #fff; border: 1px solid var(--color-hairline); border-radius: 20px; box-shadow: 0 1px 2px #1a053308, 0 14px 30px -20px #1a053333; }
+  .pz-modes::-webkit-scrollbar { display: none; }
+  .pz-modes button { position: relative; z-index: 1; flex: 1 0 auto; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 46px; padding: 0 16px; font: 700 14px var(--font-sans); white-space: nowrap; color: var(--color-body); background: transparent; border: 0; border-radius: 15px; cursor: pointer; transition: color 0.25s; }
+  .pz-modes button svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; transition: transform 0.3s cubic-bezier(.3,1.5,.5,1); }
+  .pz-modes button:hover { color: var(--color-ink); }
+  .pz-modes button[aria-selected="true"] { color: #fff; }
+  .pz-modes button[aria-selected="true"] svg { transform: scale(1.12) rotate(-6deg); }
+  .pz-thumb { position: absolute; z-index: 0; top: 5px; bottom: 5px; left: 0; width: 0; border-radius: 15px; background: linear-gradient(135deg, #7c3aed, #5b21b6); box-shadow: 0 10px 22px -10px #7c3aed; transition: transform 0.38s cubic-bezier(.3,.9,.3,1), width 0.38s cubic-bezier(.3,.9,.3,1); }
+  .pz-blurb { margin: 0 4px 18px; max-width: 760px; font-size: 15px; line-height: 1.55; color: var(--color-body); min-height: 24px; }
 
-  .pr-panel { position: relative; }
-  .pr-panel[hidden], .pr-set[hidden] { display: none; }
-  .pr-beats { display: flex; justify-content: center; gap: 8px; margin: 0 0 14px; min-height: 20px; }
-  .pr-beats i { width: 16px; height: 16px; border-radius: 50%; border: 2px solid #ffffff55; transition: transform 0.08s, background-color 0.08s; }
-  .pr-beats i.now { background: #f59e0b; border-color: #f59e0b; transform: scale(1.35); box-shadow: 0 0 16px #f59e0bcc; }
-  .pr-beats i.first.now { background: #fff; border-color: #fff; box-shadow: 0 0 18px #fff; }
-  .pr-bpm { display: flex; align-items: center; justify-content: center; gap: 18px; }
-  .pr-bpm b { display: block; font: 800 44px/1 var(--font-sans); letter-spacing: -0.04em; color: #fff; font-variant-numeric: tabular-nums; }
-  .pr-bpm span { font: 700 11px var(--font-mono); letter-spacing: 0.22em; color: #c4b0e0; }
-  .pr-heard { font-size: 15px; color: #d6c7f2; }
-  .pr-heard b { margin-left: 6px; font: 800 22px var(--font-sans); color: #fff; }
-  .pr-meter, .pr-timer { height: 6px; max-width: 260px; margin: 12px auto 0; overflow: hidden; border-radius: 6px; background: #ffffff1c; }
-  .pr-meter i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #34d399, #fbbf24); transition: width 0.1s linear; }
-  .pr-timer i { display: block; height: 100%; width: 100%; background: #f59e0b; }
-  .pr-timer[hidden] { display: none; }
-  .pr-auto { margin: 0 0 12px; font-size: 13px; line-height: 1.5; color: #c4b0e0; }
-  .pr-clock, .pr-count { display: inline-block; margin: 0 16px 12px; }
-  .pr-clock b, .pr-count b { display: block; font: 800 52px/1 var(--font-sans); letter-spacing: -0.04em; color: #fff; font-variant-numeric: tabular-nums; }
-  .pr-clock span, .pr-count span { font: 700 11px var(--font-mono); letter-spacing: 0.18em; text-transform: uppercase; color: #c4b0e0; }
-  .pr-tapper { width: 100%; max-width: 360px; min-height: 60px; font-size: 17px; border-radius: 18px; }
-  .pr-stats { position: relative; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 22px; min-height: 26px; margin: 16px 0 4px; font-size: 13px; color: #b9a3df; }
-  .pr-stats b { margin-left: 4px; font: 700 14px var(--font-mono); color: #fff; }
-  .pr-actions { position: relative; display: flex; justify-content: center; gap: 10px; margin-top: 14px; }
-  .pr-go { min-width: 170px; min-height: 54px; font-size: 17px; border-radius: 18px; }
-  .pr .tk-error { text-align: left; }
-  .pr-prog { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--color-hairline); }
-  .pr-prog summary { font: 700 14px var(--font-sans); color: var(--color-violet-deep); cursor: pointer; }
-  .pr-tips { margin: 0; padding-left: 18px; list-style: disc; font-size: 14px; line-height: 1.65; color: var(--color-body); }
-  .pr-tips li + li { margin-top: 8px; }
-  .tk-chip .x { margin-left: 2px; color: var(--color-mute); font-size: 15px; line-height: 1; }
-  .tk-error + .tk-field { margin-top: 18px; }
-  @media (max-width: 520px) {
-    .pr-stage { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 10px; }
-    .pr-now, .pr-next { padding: 12px 6px 10px; }
+  .pz-stage { padding: 22px; }
+  .pz-view { position: relative; animation: pz-in 0.4s cubic-bezier(.2,.8,.2,1); }
+  .pz-view[hidden], .pz-extra[hidden], .pz-set[hidden], .pz-none[hidden], .pz-foot[hidden] { display: none; }
+  @keyframes pz-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  @keyframes pz-slide { from { opacity: 0; transform: translateX(26px) scale(0.97); } to { opacity: 1; transform: none; } }
+  @keyframes pz-pop { 0% { transform: scale(1); } 40% { transform: scale(1.28); } 100% { transform: scale(1); } }
+  @keyframes pz-beat { 0% { box-shadow: 0 0 0 0 #f59e0bcc, 0 24px 50px -24px #000000aa; } 100% { box-shadow: 0 0 0 18px #f59e0b00, 0 24px 50px -24px #000000aa; } }
+  @keyframes pz-shake { 0%, 100% { transform: none; } 25% { transform: translateX(-7px); } 75% { transform: translateX(7px); } }
+  .pz-swap { animation: pz-slide 0.36s cubic-bezier(.2,.8,.2,1); }
+
+  /* explore */
+  .pz-ex-head { display: flex; align-items: center; gap: 18px; margin-bottom: 18px; }
+  .pz-ex-name { font: 800 clamp(54px, 9vw, 84px)/1 var(--font-sans); letter-spacing: -0.05em; color: #fff; text-shadow: 0 8px 36px #7c3aedaa; min-width: 1.1em; }
+  .pz-ex-long { font: 700 18px var(--font-sans); color: #e9ddff; }
+  .pz-notes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .pz-notes span { padding: 3px 11px; font: 700 13px var(--font-mono); color: #1a0533; background: #fbbf24; border-radius: 99px; }
+  .pz-notes span:first-child { background: #fff; }
+  .pz-notes.dark span { color: var(--color-violet-deep); background: var(--color-canvas-soft-2); }
+  .pz-notes.dark span:first-child { color: #fff; background: var(--color-violet); }
+  .pz-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 12px; }
+  .pz-shape { position: relative; display: flex; flex-direction: column; align-items: center; padding: 10px 8px 12px; font: inherit; text-align: center; color: var(--color-ink); background: #fff; border: 2px solid transparent; border-radius: 20px; cursor: pointer; animation: pz-in 0.45s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--i, 0) * 55ms); transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s; }
+  .pz-shape:hover { transform: translateY(-4px); box-shadow: 0 18px 30px -16px #000000aa; }
+  .pz-shape:active { transform: scale(0.97); }
+  .pz-shape svg { display: block; width: 100%; max-width: 112px; height: auto; }
+  .pz-shape small { margin-top: 4px; font: 600 12px var(--font-sans); color: var(--color-mute); }
+  .pz-shape.use { border-color: #f59e0b; box-shadow: 0 0 0 4px #f59e0b44, 0 18px 30px -16px #000000aa; }
+  .pz-shape.use::after { content: "In use"; position: absolute; top: 8px; right: 8px; padding: 2px 8px; font: 700 10.5px var(--font-mono); letter-spacing: 0.06em; color: #78350f; background: #fde68a; border-radius: 99px; }
+  .pz-shape.playing svg { animation: pz-pop 0.4s ease-out; }
+  .pz-hint { margin: 16px 0 0; font-size: 13px; color: #b9a3df; }
+  .pz-hint b { color: #fde68a; }
+
+  /* the drills */
+  .pz-cards { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 14px; margin-bottom: 16px; text-align: center; }
+  .pz-now, .pz-next { position: relative; display: flex; flex-direction: column; align-items: center; padding: 14px 10px 12px; border-radius: 26px; overflow: hidden; }
+  .pz-now { background: #fff; color: var(--color-ink); box-shadow: 0 24px 50px -24px #000000aa; transition: background-color 0.25s, box-shadow 0.25s, transform 0.2s; }
+  .pz-now.beat { animation: pz-beat 0.3s ease-out; }
+  .pz-now.good { background: #ecfdf5; box-shadow: 0 0 0 4px #34d399, 0 24px 50px -24px #10b981; transform: scale(1.02); }
+  .pz-now.miss { background: #fff7ed; box-shadow: 0 0 0 4px #fb923c, 0 24px 50px -24px #000000aa; animation: pz-shake 0.35s; }
+  .pz-next { background: #ffffff12; border: 1px solid #ffffff1f; color: #e9ddff; }
+  .pz-label { font: 700 11px var(--font-mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--color-violet); }
+  .pz-next .pz-label { color: #b9a3df; }
+  .pz-name { font: 800 clamp(48px, 8vw, 74px)/1.05 var(--font-sans); letter-spacing: -0.05em; }
+  .pz-next-name { font: 800 32px/1.2 var(--font-sans); letter-spacing: -0.04em; color: #fff; }
+  .pz-diagram { width: 100%; max-width: 190px; margin-top: 4px; }
+  .pz-next .pz-diagram { max-width: 100px; }
+  .pz-diagram svg { display: block; width: 100%; height: auto; }
+  .pz-next .pz-diagram svg { filter: invert(1) hue-rotate(180deg) brightness(1.4); opacity: 0.9; }
+  .pz-nodiagram { padding: 24px 0; font-size: 13px; color: var(--color-mute); }
+  .pz-badge { position: absolute; top: 12px; right: 12px; padding: 3px 11px; font: 700 12px var(--font-mono); color: #065f46; background: #a7f3d0; border-radius: 99px; animation: pz-pop 0.4s ease-out; }
+  .pz-badge.miss { color: #9a3412; background: #fed7aa; }
+  .pz-badge[hidden] { display: none; }
+  .pz-strip { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: 0 0 16px; }
+  .pz-strip[hidden] { display: none; }
+  .pz-strip span { min-width: 44px; padding: 5px 11px; text-align: center; font: 700 13.5px var(--font-mono); color: #d6c7f2; background: #ffffff12; border: 1px solid #ffffff1c; border-radius: 10px; transition: transform 0.2s, background-color 0.2s, color 0.2s; }
+  .pz-strip span.on { color: #1a0533; background: #fbbf24; border-color: #fbbf24; transform: translateY(-3px) scale(1.08); box-shadow: 0 10px 20px -10px #f59e0b; }
+  .pz-strip span.done { opacity: 0.55; }
+  .pz-extra { position: relative; text-align: center; }
+  .pz-beats { display: flex; justify-content: center; gap: 9px; margin: 0 0 14px; min-height: 18px; }
+  .pz-beats i { width: 15px; height: 15px; border-radius: 50%; border: 2px solid #ffffff55; transition: transform 0.1s, background-color 0.1s, box-shadow 0.1s; }
+  .pz-beats i.now { background: #f59e0b; border-color: #f59e0b; transform: scale(1.4); box-shadow: 0 0 16px #f59e0bcc; }
+  .pz-beats i.first.now { background: #fff; border-color: #fff; box-shadow: 0 0 18px #fff; }
+  .pz-bpm { display: flex; align-items: center; justify-content: center; gap: 18px; }
+  .pz-bpm b { display: block; font: 800 44px/1 var(--font-sans); letter-spacing: -0.04em; color: #fff; font-variant-numeric: tabular-nums; }
+  .pz-bpm span { font: 700 11px var(--font-mono); letter-spacing: 0.22em; color: #c4b0e0; }
+  .pz-slots { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 14px; }
+  .pz-swap-icon { font-size: 20px; color: #a78bd0; }
+  .pz-slot { display: inline-flex; align-items: center; gap: 10px; min-width: 110px; padding: 8px 16px; font: inherit; color: #e9ddff; background: #ffffff12; border: 2px solid #ffffff22; border-radius: 16px; cursor: pointer; transition: transform 0.2s, border-color 0.2s, background-color 0.2s; }
+  .pz-slot span { font: 700 11px var(--font-mono); letter-spacing: 0.14em; color: #a78bd0; }
+  .pz-slot b { font: 800 22px var(--font-sans); letter-spacing: -0.03em; color: #fff; }
+  .pz-slot:hover { background: #ffffff1e; }
+  .pz-slot.armed { border-color: #fbbf24; background: #fbbf2422; transform: translateY(-2px); box-shadow: 0 10px 22px -12px #f59e0b; }
+  .pz-clockrow { display: flex; align-items: center; justify-content: center; gap: 26px; margin-bottom: 8px; }
+  .pz-ring { position: relative; width: 124px; height: 124px; }
+  .pz-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+  .pz-ring circle { fill: none; stroke-width: 7; }
+  .pz-ring .bg { stroke: #ffffff1c; }
+  .pz-ring .fg { stroke: #fbbf24; stroke-linecap: round; stroke-dasharray: 276.46; stroke-dashoffset: 0; transition: stroke-dashoffset 0.12s linear, stroke 0.3s; }
+  .pz-ring .fg.low { stroke: #fb7185; }
+  .pz-ring div { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
+  .pz-ring b { font: 800 30px/1 var(--font-sans); letter-spacing: -0.04em; color: #fff; font-variant-numeric: tabular-nums; }
+  .pz-ring span, .pz-count span { font: 700 10.5px var(--font-mono); letter-spacing: 0.16em; text-transform: uppercase; color: #c4b0e0; }
+  .pz-count b { display: block; font: 800 62px/1 var(--font-sans); letter-spacing: -0.05em; color: #fff; font-variant-numeric: tabular-nums; }
+  .pz-count b.bump { animation: pz-pop 0.35s ease-out; color: #fde68a; }
+  .pz-auto { margin: 0 0 12px; font-size: 13px; line-height: 1.5; color: #c4b0e0; }
+  .pz-tapper { width: 100%; max-width: 340px; min-height: 52px; border-radius: 16px; }
+  .pz-heard { margin-top: 14px; font-size: 14px; color: #d6c7f2; }
+  .pz-heard b { margin-left: 6px; font: 800 22px var(--font-sans); color: #fff; }
+  .pz-meter, .pz-timer { height: 6px; max-width: 260px; margin: 10px auto 0; overflow: hidden; border-radius: 6px; background: #ffffff1c; }
+  .pz-meter i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #34d399, #fbbf24); transition: width 0.1s linear; }
+  .pz-meter i:not(.open) { opacity: 0.45; }
+  .pz-timer i { display: block; height: 100%; width: 100%; background: #f59e0b; }
+  .pz-timer[hidden] { display: none; }
+
+  /* the quiz */
+  .pz-quiz-card { position: relative; display: flex; flex-direction: column; align-items: center; max-width: 280px; margin: 0 auto 16px; padding: 14px 14px 10px; color: var(--color-ink); background: #fff; border-radius: 26px; box-shadow: 0 24px 50px -24px #000000aa; transition: background-color 0.25s, box-shadow 0.25s; }
+  .pz-quiz-card.good { background: #ecfdf5; box-shadow: 0 0 0 4px #34d399, 0 24px 50px -24px #10b981; }
+  .pz-quiz-card.miss { background: #fff7ed; box-shadow: 0 0 0 4px #fb923c; animation: pz-shake 0.35s; }
+  .pz-quiz-diagram { max-width: 200px; }
+  .pz-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; max-width: 420px; margin: 0 auto; }
+  .pz-option { min-height: 58px; font: 800 24px var(--font-sans); letter-spacing: -0.03em; color: #fff; background: #ffffff14; border: 2px solid #ffffff26; border-radius: 18px; cursor: pointer; animation: pz-in 0.35s cubic-bezier(.2,.8,.2,1) both; animation-delay: calc(var(--i, 0) * 60ms); transition: transform 0.15s, background-color 0.2s, border-color 0.2s; }
+  .pz-option:hover { background: #ffffff26; transform: translateY(-2px); }
+  .pz-option:active { transform: scale(0.97); }
+  .pz-option.right { background: #10b98133; border-color: #34d399; }
+  .pz-option.wrong { background: #fb718533; border-color: #fb7185; animation: pz-shake 0.35s; }
+  .pz-option[disabled] { cursor: default; }
+
+  .pz-foot { position: relative; text-align: center; }
+  .pz-stats { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 22px; min-height: 24px; margin: 16px 0 4px; font-size: 13px; color: #b9a3df; }
+  .pz-stats b { margin-left: 4px; font: 700 14px var(--font-mono); color: #fff; }
+  .pz-actions { display: flex; justify-content: center; gap: 10px; margin-top: 14px; }
+  .pz-go { min-width: 170px; min-height: 54px; font-size: 17px; border-radius: 18px; }
+  .pz-foot .tk-error { text-align: left; }
+
+  /* the side */
+  .pz-seg { display: flex; gap: 4px; padding: 4px; background: var(--color-canvas-soft-2); border-radius: 16px; }
+  .pz-seg button { flex: 1; min-height: 44px; padding: 0; font: 700 16px var(--font-sans); color: var(--color-body); background: transparent; border: 0; border-radius: 12px; cursor: pointer; transition: background-color 0.2s, color 0.2s, transform 0.15s, box-shadow 0.2s; }
+  .pz-seg button:hover { color: var(--color-ink); background: #ffffff88; }
+  .pz-seg button:active { transform: scale(0.94); }
+  .pz-seg button[aria-pressed="true"] { color: #fff; background: var(--color-violet); box-shadow: 0 8px 16px -8px #7c3aed; }
+  .pz-acc { margin-top: 8px; }
+  .pz-acc button { font-size: 20px; }
+  .pz-quals { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 16px; }
+  .pz-quals button { min-height: 36px; padding: 0 13px; font: 700 13.5px var(--font-sans); color: var(--color-body); background: #fff; border: 1px solid var(--color-hairline); border-radius: 11px; cursor: pointer; transition: background-color 0.2s, color 0.2s, border-color 0.2s, transform 0.15s; }
+  .pz-quals button:hover { border-color: var(--color-hairline-strong); color: var(--color-ink); }
+  .pz-quals button:active { transform: scale(0.95); }
+  .pz-quals button[aria-pressed="true"] { color: #fff; background: var(--color-violet); border-color: var(--color-violet); }
+  .pz-preview { display: flex; align-items: center; gap: 16px; padding: 14px; background: var(--color-canvas-soft); border: 1px solid var(--color-hairline); border-radius: 20px; }
+  .pz-prev-diagram { flex: none; width: 110px; cursor: pointer; }
+  .pz-prev-diagram svg { display: block; width: 100%; height: auto; }
+  .pz-prev-info { min-width: 0; flex: 1; }
+  .pz-prev-name { font: 800 40px/1 var(--font-sans); letter-spacing: -0.05em; color: var(--color-ink); }
+  .pz-prev-long { margin: 2px 0 0; font: 600 14px var(--font-sans); color: var(--color-body); }
+  .pz-shapes { display: flex; align-items: center; gap: 8px; margin-top: 12px; font: 600 12px var(--font-mono); color: var(--color-mute); }
+  .pz-shapes button { width: 32px; height: 32px; font-size: 20px; line-height: 1; color: var(--color-violet-deep); background: #fff; border: 1px solid var(--color-hairline-strong); border-radius: 50%; cursor: pointer; transition: transform 0.15s, background-color 0.2s; }
+  .pz-shapes button:hover:not(:disabled) { background: var(--color-canvas-soft-2); }
+  .pz-shapes button:active:not(:disabled) { transform: scale(0.9); }
+  .pz-shapes button:disabled { opacity: 0.35; cursor: default; }
+  .pz-pick-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .pz-pick-actions .tk-btn { min-height: 42px; padding: 0 14px; font-size: 14px; }
+  .pz-pick-actions .tk-btn[hidden] { display: none; }
+  .pz-pick-actions .tk-btn.on { color: #fff; background: var(--color-violet); }
+  .pz-chips { display: flex; flex-wrap: wrap; gap: 7px; min-height: 40px; }
+  .pz-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 0 8px 0 14px; font: 800 15px var(--font-sans); color: var(--color-ink); background: #fff; border: 1px solid var(--color-hairline-strong); border-radius: 12px; cursor: pointer; animation: pz-in 0.3s cubic-bezier(.2,.8,.2,1) both; transition: background-color 0.2s, border-color 0.2s, transform 0.15s; }
+  .pz-chip:hover { background: var(--color-canvas-soft); transform: translateY(-1px); }
+  .pz-chip.on { border-color: var(--color-violet); background: var(--color-violet-soft); }
+  .pz-chip .x { display: grid; place-items: center; width: 22px; height: 22px; font-size: 15px; line-height: 1; color: var(--color-mute); border-radius: 50%; transition: background-color 0.2s, color 0.2s; }
+  .pz-chip .x:hover { color: #fff; background: var(--color-error); }
+  .pz-sub { transition: opacity 0.2s; }
+  .pz-sub.off { opacity: 0.45; }
+
+  @media (max-width: 560px) {
+    .pz-stage { padding: 16px; }
+    .pz-cards { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 10px; }
+    .pz-now, .pz-next { padding: 12px 6px 10px; }
+    .pz-modes button { padding: 0 13px; }
+    .pz-preview { flex-direction: column; text-align: center; }
+    .pz-shapes, .pz-notes.dark { justify-content: center; }
   }
 </style>
 
@@ -250,8 +460,10 @@ const progressions = [
   import { Metronome, clampBpm, defaultAccents } from "../../lib/tools/metronome";
   import { MicError, NoiseGate, SILENT_MIC_TEXT, SilenceWatch, fillMicPicker, levelPercent, openMic, type Mic } from "../../lib/tools/audio";
   import { ChordListener, type Heard } from "../../lib/tools/listener";
-  import { ROOTS, scoreChord } from "../../lib/tools/chroma";
-  import { diagramSvg, getGuitarShape } from "../../lib/tools/diagram";
+  import { scoreChord } from "../../lib/tools/chroma";
+  import { diagramSvg } from "../../lib/tools/diagram";
+  import { strumShape } from "../../lib/tools/strum";
+  import { getAllGuitarShapes, chordKeyLabel, chordNotes, type GuitarShape } from "../../lib/chordShapes";
   import { initGate } from "../../lib/tools/gate";
   import { toast } from "../../lib/toast";
   import { track } from "../../lib/analytics";
@@ -262,18 +474,47 @@ const progressions = [
   const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
   const all = <T extends HTMLElement>(selector: string) => [...document.querySelectorAll<T>(selector)];
 
-  type Mode = "follow" | "listen" | "minute";
-  interface Prefs { chords: string[]; mode: Mode; order: "random" | "list"; bpm: number; per: number; click: boolean; limit: number; sens: number; pair: [string, string] }
+  // ---- what is remembered on this device ----
+  type Mode = "explore" | "follow" | "listen" | "minute" | "progression" | "quiz";
+  interface Prefs {
+    mode: Mode; chords: string[]; shapes: Record<string, number>; order: "random" | "list"; bpm: number; per: number; click: boolean;
+    limit: number; sens: number; pair: [string, string]; prog: { key: string; steps: string }; pick: { root: string; acc: string; q: string };
+    trainer: { on: boolean; every: number; step: number; target: number }; quizAny: boolean;
+  }
   const KEY = "cs-practice";
   const BEST = "cs-practice-best";
-  let prefs: Prefs = { chords: ["G", "C", "D", "Em"], mode: "follow", order: "random", bpm: 70, per: 4, click: true, limit: 0, sens: 55, pair: ["G", "C"] };
-  try { prefs = { ...prefs, ...JSON.parse(localStorage.getItem(KEY) || "{}") }; } catch { /* first visit */ }
-  prefs.chords = prefs.chords.filter((c) => getGuitarShape(c));
-  if (prefs.chords.length < 2) prefs.chords = ["G", "C", "D", "Em"];
+  let prefs: Prefs = {
+    mode: "explore", chords: ["G", "C", "D", "Em"], shapes: {}, order: "random", bpm: 70, per: 4, click: true, limit: 0, sens: 55, pair: ["G", "C"],
+    prog: { key: "C", steps: "I V vi IV" }, pick: { root: "C", acc: "", q: "" }, trainer: { on: false, every: 8, step: 5, target: 120 }, quizAny: false,
+  };
+  try {
+    const old = JSON.parse(localStorage.getItem(KEY) || "{}");
+    prefs = { ...prefs, ...old, trainer: { ...prefs.trainer, ...old.trainer }, prog: { ...prefs.prog, ...old.prog }, pick: { ...prefs.pick, ...old.pick }, shapes: { ...old.shapes } };
+  } catch { /* first visit */ }
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(prefs)); } catch { /* storage is off */ } };
 
-  // ---- chord names ----
+  // ---- chord names and shapes ----
+  const NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+  const FLAT: Record<string, string> = { "C#": "D♭", "D#": "E♭", "F#": "G♭", "G#": "A♭", "A#": "B♭" };
   const FLATS: Record<string, string> = { Db: "C#", Eb: "D#", Gb: "F#", Ab: "G#", Bb: "A#", Cb: "B", Fb: "E", "E#": "F", "B#": "C" };
+  const pretty = (chord: string) => chord.replace("#", "♯");
+  const prettyWithFlat = (chord: string) => {
+    const m = /^([A-G]#?)(.*)$/.exec(chord);
+    return m && FLAT[m[1]] ? `${pretty(m[1])}${m[2]} / ${FLAT[m[1]]}${m[2]}` : pretty(chord);
+  };
+  const shapesOf = (chord: string): GuitarShape[] => getAllGuitarShapes(chord, 8);
+  const shapeIndex = (chord: string) => Math.min(Math.max(0, prefs.shapes[chord] ?? 0), Math.max(0, shapesOf(chord).length - 1));
+  const shapeFor = (chord: string): GuitarShape | undefined => shapesOf(chord)[shapeIndex(chord)];
+  const valid = (chord: string) => shapesOf(chord).length > 0;
+  const kindName = (chord: string) => chordKeyLabel(chord).replace(/^[A-G]#? /, "");
+  /** "C♯ / D♭ minor": the note under both of its names, then the kind of chord. */
+  const longName = (chord: string) => {
+    const root = /^[A-G]#?/.exec(chord)![0];
+    return `${FLAT[root] ? `${pretty(root)} / ${FLAT[root]}` : root} ${kindName(chord)}`;
+  };
+  prefs.chords = prefs.chords.filter(valid);
+  if (prefs.chords.length < 2) prefs.chords = ["G", "C", "D", "Em"];
+  if (!valid(prefs.pair[0]) || !valid(prefs.pair[1]) || prefs.pair[0] === prefs.pair[1]) prefs.pair = ["G", "C"];
   function normalise(raw: string): string | null {
     const m = /^\s*([A-Ga-g])([#b♯♭]?)\s*(.*?)\s*$/.exec(raw);
     if (!m) return null;
@@ -281,74 +522,178 @@ const progressions = [
     root = FLATS[root] ?? root;
     const suffix = ({ min: "m", "-": "m", maj: "", major: "", M: "", minor: "m", M7: "maj7", "∆7": "maj7", dom7: "7" } as Record<string, string>)[m[3]] ?? m[3];
     const name = root + suffix;
-    return getGuitarShape(name) ? name : null;
+    return valid(name) ? name : null;
+  }
+  const kindsFor = (...chords: string[]) => ["", "m", ...chords.map((c) => c.replace(/^[A-G]#?/, ""))];
+  const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+
+  function shapeLabel(shape: GuitarShape): string {
+    const pressed = shape.frets.map(Number).filter((f) => f > 0);
+    const lowest = pressed.length ? Math.min(...pressed) : 0;
+    const open = shape.frets.includes("0");
+    if (lowest <= 2 && (open || lowest <= 1)) return open ? "Open position" : "Near the nut";
+    return `From fret ${lowest}`;
   }
 
-  // ---- picking the next chord ----
-  let seq = 0;
-  function pick(after?: string): string {
-    const list = prefs.chords;
-    if (prefs.order === "list") return list[seq++ % list.length];
-    let next = list[Math.floor(Math.random() * list.length)];
-    for (let i = 0; i < 6 && next === after && list.length > 1; i++) next = list[Math.floor(Math.random() * list.length)];
-    return next;
+  // ---- the stage cards ----
+  function restart(el: HTMLElement) {
+    el.classList.remove("pz-swap");
+    void el.offsetWidth;
+    el.classList.add("pz-swap");
   }
-
-  // ---- the stage ----
-  function drawChord(prefix: "now" | "next", chord: string | null) {
-    $(`${prefix}-name`).textContent = chord ?? "–";
-    const shape = chord ? getGuitarShape(chord) : undefined;
-    $(`${prefix}-diagram`).innerHTML = shape ? diagramSvg(shape) : chord ? '<p class="pr-nodiagram">No diagram</p>' : "";
+  function drawCard(prefix: "now" | "next", chord: string | null, animate = true) {
+    const nameEl = $(`${prefix}-name`);
+    const diagram = $(`${prefix}-diagram`);
+    nameEl.textContent = chord ? pretty(chord) : "–";
+    const shape = chord ? shapeFor(chord) : undefined;
+    diagram.innerHTML = shape ? diagramSvg(shape) : chord ? '<p class="pz-nodiagram">No diagram</p>' : "";
+    if (animate && chord) {
+      restart(nameEl);
+      restart(diagram);
+    }
   }
-  const stage = (now: string | null, next: string | null) => {
-    drawChord("now", now);
-    drawChord("next", next);
+  const stage = (now: string | null, next: string | null, animate = true) => {
+    drawCard("now", now, animate);
+    drawCard("next", next, animate);
   };
-  const flash = (kind: "good" | "miss", text: string) => {
-    const card = $("now-card");
-    const badge = $("badge");
+  const flash = (kind: "good" | "miss", text: string, cardId = "now-card", badgeId = "badge") => {
+    const card = $(cardId);
+    const badge = $(badgeId);
     card.classList.remove("good", "miss");
     void card.offsetWidth;
     card.classList.add(kind);
     badge.textContent = text;
-    badge.className = `pr-badge ${kind}`;
+    badge.className = `pz-badge ${kind}`;
     badge.hidden = false;
-    window.setTimeout(() => { card.classList.remove("good", "miss"); badge.hidden = true; }, 750);
+    window.setTimeout(() => { card.classList.remove("good", "miss"); badge.hidden = true; }, 800);
   };
+  const error = (text: string | null) => { const el = $("error"); el.hidden = !text; el.textContent = text ?? ""; };
 
-  // ---- the chord list ----
+  // ---- the chord picker ----
+  function pickedChord(): string {
+    const { root, acc, q } = prefs.pick;
+    const base = NAMES.indexOf(root);
+    const pc = acc === "#" ? (base + 1) % 12 : acc === "b" ? (base + 11) % 12 : base;
+    return NAMES[pc] + q;
+  }
+  function drawPicker() {
+    all<HTMLButtonElement>("[data-root]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.root === prefs.pick.root)));
+    all<HTMLButtonElement>("[data-acc]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.acc === prefs.pick.acc)));
+    all<HTMLButtonElement>("[data-qual]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.qual === prefs.pick.q)));
+    const chord = pickedChord();
+    const shapes = shapesOf(chord);
+    const idx = shapeIndex(chord);
+    $("pick-name").textContent = pretty(chord);
+    $("pick-long").textContent = shapes.length ? longName(chord) : "No shape for this one";
+    $("pick-notes").innerHTML = chordNotes(chord).map((n) => `<span>${pretty(n)}</span>`).join("");
+    $("pick-diagram").innerHTML = shapes[idx] ? diagramSvg(shapes[idx]) : "";
+    $("shape-count").textContent = shapes.length ? `${idx + 1} of ${shapes.length}` : "–";
+    $<HTMLButtonElement>("shape-prev").disabled = idx <= 0;
+    $<HTMLButtonElement>("shape-next").disabled = idx >= shapes.length - 1;
+    const inList = prefs.chords.includes(chord);
+    const add = $<HTMLButtonElement>("pick-add");
+    add.textContent = inList ? "✓ In my chords" : "＋ Add to my chords";
+    add.classList.toggle("on", inList);
+    add.disabled = !shapes.length;
+    const use = $<HTMLButtonElement>("pick-use");
+    use.hidden = prefs.mode !== "minute";
+    use.textContent = `Use as chord ${armed ? "B" : "A"}`;
+    drawGallery();
+    all(".pz-chip").forEach((c) => c.classList.toggle("on", c.dataset.chord === chord));
+  }
+  let galleryFor = "";
+  function drawGallery() {
+    const chord = pickedChord();
+    const shapes = shapesOf(chord);
+    $("ex-name").textContent = pretty(chord);
+    $("ex-long").textContent = shapes.length ? longName(chord) : "No shape for this one";
+    $("ex-notes").innerHTML = chordNotes(chord).map((n) => `<span>${pretty(n)}</span>`).join("");
+    const box = $("gallery");
+    if (galleryFor === chord && box.childElementCount === shapes.length) {
+      [...box.children].forEach((card, i) => card.classList.toggle("use", i === shapeIndex(chord)));
+      return;
+    }
+    galleryFor = chord;
+    box.replaceChildren(
+      ...shapes.map((shape, i) => {
+        const card = document.createElement("button");
+        card.type = "button";
+        card.className = "pz-shape" + (i === shapeIndex(chord) ? " use" : "");
+        card.style.setProperty("--i", String(i));
+        card.innerHTML = `${diagramSvg(shape)}<small>${shapeLabel(shape)}</small>`;
+        card.setAttribute("aria-label", `${pretty(chord)}, ${shapeLabel(shape)}. Press to hear it and use it.`);
+        card.addEventListener("click", () => {
+          prefs.shapes[chord] = i;
+          save();
+          void strumShape(shape);
+          drawPicker();
+          card.classList.remove("playing");
+          void card.offsetWidth;
+          card.classList.add("playing");
+        });
+        return card;
+      }),
+    );
+  }
+  const hear = () => { const s = shapeFor(pickedChord()); if (s) void strumShape(s); };
+  all<HTMLButtonElement>("[data-root]").forEach((b) => b.addEventListener("click", () => { prefs.pick.root = b.dataset.root ?? "C"; save(); drawPicker(); hear(); }));
+  all<HTMLButtonElement>("[data-acc]").forEach((b) => b.addEventListener("click", () => { prefs.pick.acc = b.dataset.acc ?? ""; save(); drawPicker(); hear(); }));
+  all<HTMLButtonElement>("[data-qual]").forEach((b) => b.addEventListener("click", () => { prefs.pick.q = b.dataset.qual ?? ""; save(); drawPicker(); hear(); }));
+  $("shape-prev").addEventListener("click", () => { const c = pickedChord(); prefs.shapes[c] = shapeIndex(c) - 1; save(); drawPicker(); hear(); });
+  $("shape-next").addEventListener("click", () => { const c = pickedChord(); prefs.shapes[c] = shapeIndex(c) + 1; save(); drawPicker(); hear(); });
+  $("pick-hear").addEventListener("click", hear);
+  $("pick-diagram").addEventListener("click", hear);
+  $("pick-add").addEventListener("click", () => {
+    const chord = pickedChord();
+    if (prefs.chords.includes(chord)) {
+      if (prefs.chords.length <= 2) return showAddError("Keep at least two chords to practise.");
+      prefs.chords = prefs.chords.filter((c) => c !== chord);
+    } else {
+      if (prefs.chords.length >= 16) return showAddError("That is plenty to practise: take one out before adding another.");
+      prefs.chords = [...prefs.chords, chord];
+    }
+    changed();
+  });
+  $("pick-use").addEventListener("click", () => assignSlot(pickedChord()));
+
+  // ---- my chords ----
   function drawChords() {
     const box = $("chord-list");
     box.replaceChildren(
-      ...prefs.chords.map((c) => {
-        const b = document.createElement("button");
-        b.type = "button";
-        b.className = "tk-chip";
-        b.innerHTML = `${c}<span class="x" aria-hidden="true">×</span>`;
-        b.setAttribute("aria-label", `Remove ${c}`);
-        b.addEventListener("click", () => {
-          if (prefs.chords.length <= 2) return showAddError("Keep at least two chords to practise.");
-          prefs.chords = prefs.chords.filter((x) => x !== c);
-          changed();
+      ...prefs.chords.map((c, i) => {
+        const chip = document.createElement("div");
+        chip.className = "pz-chip" + (c === pickedChord() ? " on" : "");
+        chip.dataset.chord = c;
+        chip.style.animationDelay = `${i * 30}ms`;
+        chip.setAttribute("role", "button");
+        chip.tabIndex = 0;
+        chip.innerHTML = `${pretty(c)}<span class="x" role="button" aria-label="Remove ${pretty(c)}">×</span>`;
+        chip.addEventListener("click", (e) => {
+          if ((e.target as HTMLElement).classList.contains("x")) {
+            if (prefs.chords.length <= 2) return showAddError("Keep at least two chords to practise.");
+            prefs.chords = prefs.chords.filter((x) => x !== c);
+            return changed();
+          }
+          // pressing a chord shows it in the picker, and in the 1-minute mode puts it in the chosen slot
+          const m = /^([A-G])(#?)(.*)$/.exec(c)!;
+          prefs.pick = { root: m[1], acc: m[2], q: m[3] };
+          save();
+          if (prefs.mode === "minute") assignSlot(c);
+          else drawPicker();
+          hear();
         });
-        return b;
+        chip.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); chip.click(); } });
+        return chip;
       }),
     );
     $("chord-count").textContent = `${prefs.chords.length} chords`;
-    for (const id of ["pair-a", "pair-b"]) {
-      const select = $<HTMLSelectElement>(id);
-      select.replaceChildren(...[...new Set(prefs.chords)].map((c) => Object.assign(document.createElement("option"), { value: c, textContent: c })));
-    }
-    if (!prefs.chords.includes(prefs.pair[0])) prefs.pair[0] = prefs.chords[0];
-    if (!prefs.chords.includes(prefs.pair[1]) || prefs.pair[1] === prefs.pair[0]) prefs.pair[1] = prefs.chords.find((c) => c !== prefs.pair[0]) ?? prefs.chords[1];
-    $<HTMLSelectElement>("pair-a").value = prefs.pair[0];
-    $<HTMLSelectElement>("pair-b").value = prefs.pair[1];
     drawBest();
   }
   function changed() {
     seq = 0;
     save();
     drawChords();
+    drawPicker();
     if (!running) idleStage();
   }
   const showAddError = (message: string) => {
@@ -360,87 +705,168 @@ const progressions = [
   $("add-form").addEventListener("submit", (e) => {
     e.preventDefault();
     const input = $<HTMLInputElement>("add-chord");
-    const name = normalise(input.value);
     if (!input.value.trim()) return;
-    if (!name) return showAddError(`“${input.value.trim()}” is not a chord we know. Try names like Am, F#m, G7, Cmaj7 or Dsus4.`);
-    if (prefs.chords.includes(name)) return showAddError(`${name} is already in the list.`);
+    const name = normalise(input.value);
+    if (!name) return showAddError(`“${input.value.trim()}” is not a chord we know. Try names like Am, F#m, G7, Cmaj7, Dsus4 or E5.`);
+    if (prefs.chords.includes(name)) return showAddError(`${pretty(name)} is already in the list.`);
     if (prefs.chords.length >= 16) return showAddError("That is plenty to practise: take one out before adding another.");
     prefs.chords = [...prefs.chords, name];
     input.value = "";
     changed();
   });
-  all<HTMLButtonElement>("[data-chords]").forEach((b) => b.addEventListener("click", () => { prefs.chords = (b.dataset.chords ?? "").split(" "); prefs.order = "random"; changed(); drawSettings(); }));
+  all<HTMLButtonElement>("[data-chords]").forEach((b) => b.addEventListener("click", () => { prefs.chords = (b.dataset.chords ?? "").split(" ").filter(valid); prefs.order = "random"; changed(); drawSettings(); }));
 
-  // a progression in a key
+  // ---- progressions ----
   const MAJOR: Record<string, [number, string]> = { I: [0, ""], ii: [2, "m"], iii: [4, "m"], IV: [5, ""], V: [7, ""], vi: [9, "m"], I7: [0, "7"], IV7: [5, "7"], V7: [7, "7"] };
-  all<HTMLButtonElement>("[data-steps]").forEach((b) =>
-    b.addEventListener("click", () => {
-      const key = ROOTS.indexOf($<HTMLSelectElement>("key").value);
-      const chords = (b.dataset.steps ?? "").split(" ").map((step) => {
-        const [offset, quality] = MAJOR[step];
-        return ROOTS[(key + offset) % 12] + quality;
-      });
-      // played in order, repeats included, so the progression keeps its shape
-      prefs.chords = chords;
-      prefs.order = "list";
-      changed();
-      drawSettings();
-    }),
-  );
+  const progChords = (): string[] => prefs.prog.steps.split(" ").map((step) => NAMES[(NAMES.indexOf(prefs.prog.key) + MAJOR[step][0]) % 12] + MAJOR[step][1]);
+  function drawStrip(active = -1) {
+    const list = progChords();
+    const strip = $("strip");
+    const id = `${prefs.prog.key}|${prefs.prog.steps}`;
+    if (strip.dataset.id !== id) {
+      strip.dataset.id = id;
+      strip.replaceChildren(...list.map((c) => Object.assign(document.createElement("span"), { textContent: pretty(c) })));
+    }
+    [...strip.children].forEach((el, i) => {
+      el.classList.toggle("on", i === active);
+      el.classList.toggle("done", active >= 0 && i < active);
+    });
+  }
+  all<HTMLButtonElement>("[data-steps]").forEach((b) => b.addEventListener("click", () => { prefs.prog.steps = b.dataset.steps ?? "I V vi IV"; seq = 0; save(); drawSettings(); drawStrip(); if (!running) idleStage(); }));
+  $<HTMLSelectElement>("key").addEventListener("change", (e) => { prefs.prog.key = (e.target as HTMLSelectElement).value; seq = 0; save(); drawStrip(); if (!running) idleStage(); });
 
-  // ---- settings ----
+  // ---- modes and settings ----
   const MODES: Record<Mode, string> = {
+    explore: "Pick any note, flat or sharp, and a kind of chord. See every way to play it up the neck, hear each one, and choose the shape you want to practise.",
     follow: "A beat keeps time and the chord changes every few beats. The next chord is shown ahead so you can get your fingers ready.",
     listen: "Play the chord shown. Chord Suno listens through your microphone and moves on when it hears you play it right.",
-    minute: "Switch between two chords as many times as you can in one minute. Chord Suno listens through your microphone and counts each change it hears. No microphone? Press the button or Space yourself.",
+    minute: "Switch between two chords, any two you like, as many times as you can in one minute. Chord Suno listens through your microphone and counts each change it hears.",
+    progression: "Play along with a real progression in the key you choose. The chords come round in order, with a beat to keep you steady.",
+    quiz: "A chord shape appears. Name it. A quick way to learn what each shape is called.",
   };
+  function moveThumb(scroll = false) {
+    const on = document.querySelector<HTMLElement>('#modes [aria-selected="true"]');
+    if (!on) return;
+    const thumb = $("thumb");
+    thumb.style.width = `${on.offsetWidth}px`;
+    thumb.style.transform = `translateX(${on.offsetLeft}px)`;
+    if (scroll) on.scrollIntoView({ block: "nearest", inline: "center", behavior: "smooth" });
+  }
   function drawSettings() {
-    all<HTMLButtonElement>("[data-mode]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === prefs.mode)));
+    all<HTMLButtonElement>("[data-mode]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.mode === prefs.mode)));
+    moveThumb(true);
     $("blurb").textContent = MODES[prefs.mode];
-    all("[data-panel]").forEach((p) => (p.hidden = !(p.dataset.panel ?? "").split(" ").includes(prefs.mode)));
+    const view = prefs.mode === "explore" ? "explore" : prefs.mode === "quiz" ? "quiz" : "drill";
+    all("[data-view]").forEach((v) => {
+      const show = v.dataset.view === view;
+      if (show && v.hidden) {
+        v.hidden = false;
+        v.style.animation = "none";
+        void v.offsetWidth;
+        v.style.animation = "";
+      } else v.hidden = !show;
+    });
+    all("[data-extra]").forEach((p) => (p.hidden = !(p.dataset.extra ?? "").split(" ").includes(prefs.mode)));
     all("[data-for]").forEach((p) => (p.hidden = !(p.dataset.for ?? "").split(" ").includes(prefs.mode)));
-    $("skip").hidden = prefs.mode !== "listen" || !running;
+    $("foot").hidden = prefs.mode === "explore";
+    $("skip").hidden = !(running && prefs.mode === "listen");
     all<HTMLButtonElement>("[data-per]").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.per) === prefs.per)));
     all<HTMLButtonElement>("[data-limit]").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.limit) === prefs.limit)));
     all<HTMLButtonElement>("[data-order]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.order === prefs.order)));
+    all<HTMLButtonElement>("[data-steps]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.steps === prefs.prog.steps)));
+    $<HTMLSelectElement>("key").value = prefs.prog.key;
     $<HTMLInputElement>("click-on").checked = prefs.click;
-    $("bpm-out").textContent = String(prefs.bpm);
+    $<HTMLInputElement>("quiz-any").checked = prefs.quizAny;
+    $("bpm-out").textContent = String(metro?.settings.bpm ?? prefs.bpm);
+    $<HTMLInputElement>("trainer-on").checked = prefs.trainer.on;
+    $<HTMLInputElement>("trainer-step").value = String(prefs.trainer.step);
+    $<HTMLInputElement>("trainer-every").value = String(prefs.trainer.every);
+    $<HTMLInputElement>("trainer-target").value = String(prefs.trainer.target);
+    $("trainer-fields").classList.toggle("off", !prefs.trainer.on);
     const sens = $<HTMLInputElement>("sens");
     sens.value = String(prefs.sens);
     sens.style.setProperty("--fill", `${prefs.sens}%`);
     $("sens-out").textContent = prefs.sens < 35 ? "Low" : prefs.sens < 70 ? "Medium" : "High";
     noiseGate.sensitivity = prefs.sens;
+    $("slot-a-name").textContent = pretty(prefs.pair[0]);
+    $("slot-b-name").textContent = pretty(prefs.pair[1]);
+    $("slot-a").classList.toggle("armed", armed === 0);
+    $("slot-b").classList.toggle("armed", armed === 1);
   }
-  all<HTMLButtonElement>("[data-mode]").forEach((b) => b.addEventListener("click", () => { if (running) stopAll(); prefs.mode = b.dataset.mode as Mode; save(); drawSettings(); idleStage(); drawStats(); }));
-  all<HTMLButtonElement>("[data-per]").forEach((b) => b.addEventListener("click", () => { prefs.per = Number(b.dataset.per); save(); drawSettings(); if (running) restartFollow(); }));
+  function setMode(mode: Mode) {
+    if (mode === prefs.mode) return;
+    if (running) stopAll();
+    prefs.mode = mode;
+    save();
+    drawSettings();
+    drawPicker();
+    idleStage();
+    drawStats();
+    if (mode === "quiz") drawQuizIdle();
+    error(null);
+  }
+  all<HTMLButtonElement>("[data-mode]").forEach((b) => b.addEventListener("click", () => setMode(b.dataset.mode as Mode)));
+  window.addEventListener("resize", () => moveThumb());
+  all<HTMLButtonElement>("[data-per]").forEach((b) => b.addEventListener("click", () => { prefs.per = Number(b.dataset.per); save(); drawSettings(); if (running && metro) restartFollow(); }));
   all<HTMLButtonElement>("[data-limit]").forEach((b) => b.addEventListener("click", () => { prefs.limit = Number(b.dataset.limit); save(); drawSettings(); }));
   all<HTMLButtonElement>("[data-order]").forEach((b) => b.addEventListener("click", () => { prefs.order = b.dataset.order as Prefs["order"]; seq = 0; save(); drawSettings(); }));
   $<HTMLInputElement>("click-on").addEventListener("change", (e) => { prefs.click = (e.target as HTMLInputElement).checked; if (metro) metro.settings.volume = prefs.click ? 0.7 : 0; save(); });
+  $<HTMLInputElement>("quiz-any").addEventListener("change", (e) => { prefs.quizAny = (e.target as HTMLInputElement).checked; save(); });
   $<HTMLInputElement>("sens").addEventListener("input", (e) => { prefs.sens = Number((e.target as HTMLInputElement).value); save(); drawSettings(); });
+  $<HTMLInputElement>("trainer-on").addEventListener("change", (e) => { prefs.trainer.on = (e.target as HTMLInputElement).checked; if (metro) metro.settings.trainer.on = prefs.trainer.on; save(); drawSettings(); });
+  for (const [id, key, min, max] of [["trainer-step", "step", 1, 20], ["trainer-every", "every", 1, 32], ["trainer-target", "target", 40, 200]] as const)
+    $<HTMLInputElement>(id).addEventListener("change", () => {
+      prefs.trainer[key] = Math.min(max, Math.max(min, Math.round(Number($<HTMLInputElement>(id).value) || prefs.trainer[key])));
+      if (metro) Object.assign(metro.settings.trainer, prefs.trainer);
+      save();
+      drawSettings();
+    });
   const setBpm = (bpm: number) => { prefs.bpm = Math.min(200, Math.max(30, clampBpm(bpm))); if (metro) metro.settings.bpm = prefs.bpm; save(); drawSettings(); };
-  $("bpm-minus").addEventListener("click", () => setBpm(prefs.bpm - 5));
-  $("bpm-plus").addEventListener("click", () => setBpm(prefs.bpm + 5));
-  $<HTMLSelectElement>("pair-a").addEventListener("change", (e) => { prefs.pair[0] = (e.target as HTMLSelectElement).value; if (prefs.pair[1] === prefs.pair[0]) prefs.pair[1] = prefs.chords.find((c) => c !== prefs.pair[0]) ?? prefs.pair[1]; save(); drawChords(); idleStage(); });
-  $<HTMLSelectElement>("pair-b").addEventListener("change", (e) => { prefs.pair[1] = (e.target as HTMLSelectElement).value; if (prefs.pair[1] === prefs.pair[0]) prefs.pair[0] = prefs.chords.find((c) => c !== prefs.pair[1]) ?? prefs.pair[0]; save(); drawChords(); idleStage(); });
+  $("bpm-minus").addEventListener("click", () => setBpm((metro?.settings.bpm ?? prefs.bpm) - 5));
+  $("bpm-plus").addEventListener("click", () => setBpm((metro?.settings.bpm ?? prefs.bpm) + 5));
 
+  // ---- the two chords of the 1-minute mode ----
+  let armed: 0 | 1 = 0;
+  function assignSlot(chord: string) {
+    if (!valid(chord) || running) return;
+    prefs.pair[armed] = chord;
+    if (prefs.pair[0] === prefs.pair[1]) prefs.pair[1 - armed] = (prefs.chords.find((c) => c !== chord) ?? (chord === "G" ? "C" : "G"));
+    armed = armed === 0 ? 1 : 0;
+    save();
+    drawSettings();
+    drawPicker();
+    drawBest();
+    idleStage();
+  }
+  all<HTMLButtonElement>("[data-slot]").forEach((b) => b.addEventListener("click", () => { armed = Number(b.dataset.slot) as 0 | 1; drawSettings(); drawPicker(); }));
   const best = (): Record<string, number> => { try { return JSON.parse(localStorage.getItem(BEST) || "{}"); } catch { return {}; } };
   const pairKey = () => [...prefs.pair].sort().join("|");
   function drawBest() {
     const score = best()[pairKey()];
-    $("best-line").textContent = score ? `Your best for ${prefs.pair[0]} ⇄ ${prefs.pair[1]}: ${score} changes in a minute.` : "No score yet for this pair. Give it a go.";
+    $("best-line").textContent = score ? `Your best for ${pretty(prefs.pair[0])} ⇄ ${pretty(prefs.pair[1])}: ${score} changes in a minute.` : "No score yet for this pair. Give it a go.";
   }
 
-  // ---- state shared by the modes ----
+  // ---- state shared by the drills ----
   let running = false;
   let metro: Metronome | null = null;
   let raf = 0;
   let mic: Mic | null = null;
   let listener: ChordListener | null = null;
-  const error = (text: string | null) => { const el = $("error"); el.hidden = !text; el.textContent = text ?? ""; };
+  let seq = 0;
 
+  const source = () => (prefs.mode === "progression" ? progChords() : prefs.chords);
+  const ordered = () => prefs.mode === "progression" || prefs.order === "list";
+  function pick(after?: string): string {
+    const list = source();
+    if (ordered()) return list[seq++ % list.length];
+    let next = list[Math.floor(Math.random() * list.length)];
+    for (let i = 0; i < 6 && next === after && list.length > 1; i++) next = list[Math.floor(Math.random() * list.length)];
+    return next;
+  }
   function idleStage() {
-    if (prefs.mode === "minute") stage(prefs.pair[0], prefs.pair[1]);
-    else stage(prefs.chords[0], prefs.chords[1]);
+    if (prefs.mode === "minute") stage(prefs.pair[0], prefs.pair[1], false);
+    else if (prefs.mode === "progression") { const l = progChords(); stage(l[0], l[1], false); drawStrip(); }
+    else if (prefs.mode !== "explore" && prefs.mode !== "quiz") stage(prefs.chords[0], prefs.chords[1], false);
     $("beats").replaceChildren();
   }
   function drawStats(lines: [string, string | number][] = []) {
@@ -453,95 +879,7 @@ const progressions = [
     $("skip").hidden = !(on && prefs.mode === "listen");
   }
 
-  // ---- 1. follow along ----
-  let now = "";
-  let next = "";
-  let played = 0;
-  let startedAt = 0;
-  function startFollow() {
-    seq = 0;
-    played = 0;
-    now = "";
-    metro = new Metronome({
-      bpm: prefs.bpm, beats: prefs.per, accents: defaultAccents(prefs.per, 4), sub: 1, sound: "wood", volume: prefs.click ? 0.7 : 0,
-      trainer: { on: false, every: 4, step: 2, target: 140 }, gap: { on: false, play: 3, mute: 1 },
-    });
-    const beats = $("beats");
-    beats.replaceChildren(...Array.from({ length: prefs.per }, (_, i) => Object.assign(document.createElement("i"), { className: i === 0 ? "first" : "" })));
-    startedAt = performance.now();
-    void metro.start().then(() => { raf = requestAnimationFrame(followFrame); });
-  }
-  function followFrame() {
-    if (!metro?.running) return;
-    for (const tick of metro.due()) {
-      if (tick.sub !== 0) continue;
-      all("#beats i").forEach((dot, i) => dot.classList.toggle("now", i === tick.beat));
-      if (tick.beat === 0) {
-        if (!now) {
-          now = pick();
-          next = pick(now);
-        } else {
-          now = next;
-          next = pick(now);
-        }
-        played++;
-        stage(now, next);
-        drawStats([["Chords", played], ["Time", clock((performance.now() - startedAt) / 1000)], ["Tempo", `${prefs.bpm} BPM`]]);
-      }
-    }
-    raf = requestAnimationFrame(followFrame);
-  }
-  function restartFollow() {
-    cancelAnimationFrame(raf);
-    metro?.stop();
-    startFollow();
-  }
-  const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
-
-  // ---- 2. listen and check ----
-  const stats = { right: 0, streak: 0, bestStreak: 0, times: [] as number[], missed: 0 };
-  let target = "";
-  let shownAt = 0;
-  let okFrames = 0;
-  let locked = false;
-  let limitTimer = 0;
-  function listenStats() {
-    const avg = stats.times.length ? (stats.times.reduce((a, b) => a + b, 0) / stats.times.length / 1000).toFixed(1) : "–";
-    const fastest = stats.times.length ? (Math.min(...stats.times) / 1000).toFixed(1) : "–";
-    drawStats([["Right", stats.right], ["Streak", stats.streak], ["Best streak", stats.bestStreak], ["Average", avg === "–" ? avg : `${avg} s`], ["Fastest", fastest === "–" ? fastest : `${fastest} s`], ["Missed", stats.missed]]);
-  }
-  function nextTarget() {
-    locked = false;
-    okFrames = 0;
-    target = target ? next : pick();
-    next = pick(target);
-    shownAt = performance.now();
-    stage(target, next);
-    $("limit-fill").style.width = "100%";
-    if (listener) listener.options.suffixes = kindsFor(target);
-  }
-  function onHeard(h: Heard) {
-    meterAndName(h);
-    if (locked || !h.chroma || performance.now() - shownAt < 450) { if (!h.chroma) okFrames = 0; return; }
-    const score = scoreChord(h.chroma, target);
-    const top = h.guesses[0];
-    const right = score >= 0.62 && (top?.name === target || score >= (top?.score ?? 0) - 0.04);
-    okFrames = right ? okFrames + 1 : 0;
-    if (okFrames >= 2) {
-      locked = true;
-      const ms = performance.now() - shownAt;
-      stats.right++;
-      stats.streak++;
-      stats.bestStreak = Math.max(stats.bestStreak, stats.streak);
-      stats.times.push(ms);
-      flash("good", `${(ms / 1000).toFixed(1)} s`);
-      listenStats();
-      window.setTimeout(() => running && prefs.mode === "listen" && nextTarget(), 850);
-    }
-  }
-  /** The kinds of chord that may be named while practising: plain ones, and the kinds of the chords being practised. */
-  const kindsFor = (...chords: string[]) => ["", "m", ...chords.map((c) => c.replace(/^[A-G]#?/, ""))];
-
+  // ---- the microphone ----
   async function startMic(handler: (h: Heard) => void): Promise<boolean> {
     error(null);
     try {
@@ -577,9 +915,97 @@ const progressions = [
     $("level").style.width = `${levelPercent(h.level)}%`;
     $("level").classList.toggle("open", !!h.chroma);
     $("mic-warn").hidden = !silence.feed(h.level);
-    $("heard").textContent = h.chord ?? "–";
+    $("heard").textContent = h.chord ? pretty(h.chord) : "–";
   }
 
+  // ---- follow along, and progressions ----
+  let now = "";
+  let next = "";
+  let played = 0;
+  let startedAt = 0;
+  function startFollow() {
+    seq = 0;
+    played = 0;
+    now = "";
+    metro = new Metronome({
+      bpm: prefs.bpm, beats: prefs.per, accents: defaultAccents(prefs.per, 4), sub: 1, sound: "wood", volume: prefs.click ? 0.7 : 0,
+      trainer: { ...prefs.trainer }, gap: { on: false, play: 3, mute: 1 },
+    });
+    metro.onBpm = (bpm) => {
+      $("bpm-out").textContent = String(bpm);
+      if (bpm >= prefs.trainer.target) toast({ icon: "🏁", title: `Reached ${bpm} BPM`, text: "The speed trainer is at the top tempo you set.", ms: 3500 });
+    };
+    $("beats").replaceChildren(...Array.from({ length: prefs.per }, (_, i) => Object.assign(document.createElement("i"), { className: i === 0 ? "first" : "" })));
+    startedAt = performance.now();
+    void metro.start().then(() => { raf = requestAnimationFrame(followFrame); });
+  }
+  function followFrame() {
+    if (!metro?.running) return;
+    for (const tick of metro.due()) {
+      if (tick.sub !== 0) continue;
+      all("#beats i").forEach((dot, i) => dot.classList.toggle("now", i === tick.beat));
+      const card = $("now-card");
+      card.classList.remove("beat");
+      void card.offsetWidth;
+      card.classList.add("beat");
+      if (tick.beat === 0) {
+        if (!now) { now = pick(); next = pick(now); }
+        else { now = next; next = pick(now); }
+        played++;
+        stage(now, next);
+        if (prefs.mode === "progression") drawStrip((played - 1) % progChords().length);
+        drawStats([["Chords", played], ["Time", clock((performance.now() - startedAt) / 1000)], ["Tempo", `${metro.settings.bpm} BPM`]]);
+      }
+    }
+    raf = requestAnimationFrame(followFrame);
+  }
+  function restartFollow() {
+    cancelAnimationFrame(raf);
+    metro?.stop();
+    startFollow();
+  }
+
+  // ---- listen and check ----
+  const stats = { right: 0, streak: 0, bestStreak: 0, times: [] as number[], missed: 0 };
+  let target = "";
+  let shownAt = 0;
+  let okFrames = 0;
+  let locked = false;
+  let limitTimer = 0;
+  function listenStats() {
+    const avg = stats.times.length ? `${(stats.times.reduce((a, b) => a + b, 0) / stats.times.length / 1000).toFixed(1)} s` : "–";
+    const fastest = stats.times.length ? `${(Math.min(...stats.times) / 1000).toFixed(1)} s` : "–";
+    drawStats([["Right", stats.right], ["Streak", stats.streak], ["Best streak", stats.bestStreak], ["Average", avg], ["Fastest", fastest], ["Missed", stats.missed]]);
+  }
+  function nextTarget() {
+    locked = false;
+    okFrames = 0;
+    target = target ? next : pick();
+    next = pick(target);
+    shownAt = performance.now();
+    stage(target, next);
+    $("limit-fill").style.width = "100%";
+    if (listener) listener.options.suffixes = kindsFor(target);
+  }
+  function onHeard(h: Heard) {
+    meterAndName(h);
+    if (locked || !h.chroma || performance.now() - shownAt < 450) { if (!h.chroma) okFrames = 0; return; }
+    const score = scoreChord(h.chroma, target);
+    const top = h.guesses[0];
+    const right = score >= 0.62 && (top?.name === target || score >= (top?.score ?? 0) - 0.04);
+    okFrames = right ? okFrames + 1 : 0;
+    if (okFrames >= 2) {
+      locked = true;
+      const ms = performance.now() - shownAt;
+      stats.right++;
+      stats.streak++;
+      stats.bestStreak = Math.max(stats.bestStreak, stats.streak);
+      stats.times.push(ms);
+      flash("good", `${(ms / 1000).toFixed(1)} s`);
+      listenStats();
+      window.setTimeout(() => running && prefs.mode === "listen" && nextTarget(), 850);
+    }
+  }
   async function startListen() {
     if (!(await startMic(onHeard))) return false;
     Object.assign(stats, { right: 0, streak: 0, bestStreak: 0, times: [], missed: 0 });
@@ -587,8 +1013,7 @@ const progressions = [
     target = "";
     nextTarget();
     listenStats();
-    const bar = $("limit-bar");
-    bar.hidden = prefs.limit === 0;
+    $("limit-bar").hidden = prefs.limit === 0;
     limitTimer = window.setInterval(() => {
       if (!prefs.limit || locked) return;
       const left = 1 - (performance.now() - shownAt) / (prefs.limit * 1000);
@@ -606,7 +1031,7 @@ const progressions = [
   }
   $("skip").addEventListener("click", () => { if (running && prefs.mode === "listen") { stats.streak = 0; stats.missed++; listenStats(); nextTarget(); } });
 
-  // ---- 3. one minute ----
+  // ---- one minute, counted by the microphone ----
   let count = 0;
   let minuteTimer = 0;
   let expecting = "";
@@ -614,6 +1039,18 @@ const progressions = [
   let mShownAt = 0;
   let mOk = 0;
   let mStarted = false; // the first chord only starts the changes: playing it is not a change itself
+  const RING = 276.46;
+  const ring = (fraction: number) => {
+    $("ring").style.strokeDashoffset = String(RING * (1 - fraction));
+    $("ring").classList.toggle("low", fraction < 0.17);
+  };
+  function bump() {
+    const el = $("count");
+    el.textContent = String(count);
+    el.classList.remove("bump");
+    void el.offsetWidth;
+    el.classList.add("bump");
+  }
   function flip() {
     expecting = expecting === prefs.pair[0] ? prefs.pair[1] : prefs.pair[0];
     stage(expecting, expecting === prefs.pair[0] ? prefs.pair[1] : prefs.pair[0]);
@@ -633,7 +1070,7 @@ const progressions = [
     if (mOk < 2) return;
     if (mStarted) {
       count++;
-      $("count").textContent = String(count);
+      bump();
       flash("good", "+1");
     } else {
       mStarted = true;
@@ -645,7 +1082,6 @@ const progressions = [
     mStarted = false;
     const listening = await startMic(minuteHeard);
     if (!listening) {
-      // no microphone: the button and Space still count
       error(`${$("error").textContent ?? ""} You can still count your changes yourself with the button or Space.`.trim());
       mStarted = true;
     }
@@ -655,13 +1091,13 @@ const progressions = [
     if (!running) return stopMic();
     count = 0;
     $("count").textContent = "0";
-    $("clock").textContent = "1:00";
     expecting = prefs.pair[0];
     stage(expecting, prefs.pair[1]);
     mShownAt = performance.now();
     mOk = 0;
     if (listener) listener.options.suffixes = kindsFor(prefs.pair[0], prefs.pair[1]);
     phase = "ready";
+    ring(1);
     let left = 3;
     $("clock").textContent = String(left);
     $("go-text").textContent = "Get ready…";
@@ -676,16 +1112,16 @@ const progressions = [
       minuteTimer = window.setInterval(() => {
         const remaining = 60 - (performance.now() - t0) / 1000;
         $("clock").textContent = clock(Math.max(0, Math.ceil(remaining)));
+        ring(Math.max(0, remaining / 60));
         if (remaining <= 0) finishMinute();
       }, 100);
     }, 1000);
-    $("clock").textContent = "3";
   }
   function tapChange() {
     if (phase !== "run") return;
     mStarted = true;
     count++;
-    $("count").textContent = String(count);
+    bump();
     flip();
   }
   function finishMinute() {
@@ -702,27 +1138,101 @@ const progressions = [
     }
     drawBest();
     drawStats([["Result", `${count} changes`], ["Best", Math.max(count, old)]]);
-    toast({ icon: record && count > 0 ? "🏆" : "⏱️", title: record && count > 0 ? "New best!" : "Time!", text: `${count} clean changes between ${prefs.pair[0]} and ${prefs.pair[1]}.`, ms: 5000 });
+    toast({ icon: record && count > 0 ? "🏆" : "⏱️", title: record && count > 0 ? "New best!" : "Time!", text: `${count} clean changes between ${pretty(prefs.pair[0])} and ${pretty(prefs.pair[1])}.`, ms: 5000 });
     setGo(false);
     $("clock").textContent = "1:00";
+    ring(1);
   }
   $("changed").addEventListener("click", tapChange);
+
+  // ---- the quiz ----
+  const quiz = { right: 0, wrong: 0, streak: 0, bestStreak: 0, current: "", last: "", busy: false };
+  let anyCache: string[] | null = null;
+  const anyChords = () => (anyCache ??= NAMES.flatMap((n) => ["", "m", "7"].map((s) => n + s)).filter(valid));
+  const shuffle = <T,>(a: T[]): T[] => a.map((v) => [Math.random(), v] as const).sort((x, y) => x[0] - y[0]).map((x) => x[1]);
+  function drawQuizIdle() {
+    $("quiz-diagram").innerHTML = '<p class="pz-nodiagram" style="color:var(--color-body)">Press Start</p>';
+    $("options").replaceChildren();
+  }
+  function quizStats() {
+    const total = quiz.right + quiz.wrong;
+    drawStats([["Right", quiz.right], ["Streak", quiz.streak], ["Best streak", quiz.bestStreak], ["Accuracy", total ? `${Math.round((quiz.right / total) * 100)}%` : "–"]]);
+  }
+  function nextQuestion() {
+    quiz.busy = false;
+    const ANY = anyChords();
+    const pool = prefs.quizAny || prefs.chords.length < 3 ? ANY : prefs.chords;
+    let chord = pool[Math.floor(Math.random() * pool.length)];
+    for (let i = 0; i < 6 && chord === quiz.last; i++) chord = pool[Math.floor(Math.random() * pool.length)];
+    quiz.current = quiz.last = chord;
+    const root = chord.match(/^[A-G]#?/)![0];
+    const suffix = chord.slice(root.length);
+    // wrong answers that look alike: the same note in other kinds, or other notes of the same kind
+    const alike = shuffle(ANY.filter((c) => c !== chord && (c.startsWith(root) || c.endsWith(suffix)))).slice(0, 3);
+    const options = shuffle([chord, ...alike, ...shuffle(ANY.filter((c) => c !== chord && !alike.includes(c)))].slice(0, 4));
+    if (!options.includes(chord)) options[0] = chord;
+    const shape = shapeFor(chord);
+    const card = $("quiz-diagram");
+    card.innerHTML = shape ? diagramSvg(shape) : "";
+    restart(card);
+    $("options").replaceChildren(
+      ...options.map((c, i) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "pz-option";
+        b.style.setProperty("--i", String(i));
+        b.textContent = pretty(c);
+        b.addEventListener("click", () => answer(c, b));
+        return b;
+      }),
+    );
+  }
+  function answer(choice: string, button: HTMLButtonElement) {
+    if (quiz.busy || !running) return;
+    quiz.busy = true;
+    const right = choice === quiz.current;
+    all<HTMLButtonElement>(".pz-option").forEach((b) => {
+      b.disabled = true;
+      if (b.textContent === pretty(quiz.current)) b.classList.add("right");
+    });
+    if (right) {
+      quiz.right++;
+      quiz.streak++;
+      quiz.bestStreak = Math.max(quiz.bestStreak, quiz.streak);
+      flash("good", "Yes!", "quiz-card", "quiz-badge");
+      const s = shapeFor(quiz.current);
+      if (s) void strumShape(s);
+    } else {
+      quiz.wrong++;
+      quiz.streak = 0;
+      button.classList.add("wrong");
+      flash("miss", pretty(quiz.current), "quiz-card", "quiz-badge");
+    }
+    quizStats();
+    window.setTimeout(() => running && prefs.mode === "quiz" && nextQuestion(), right ? 1000 : 1700);
+  }
 
   // ---- start and stop ----
   async function startAll() {
     if (!gate.allowed()) return;
-    if (prefs.chords.length < 2) return error("Add at least two chords to practise.");
+    if (source().length < 2) return error("Add at least two chords to practise.");
     error(null);
     track("practice_start", { mode: prefs.mode, chords: prefs.chords.length });
     if (prefs.mode === "listen") {
       if (!(await startListen())) return;
       setGo(true);
-    } else if (prefs.mode === "follow") {
+    } else if (prefs.mode === "follow" || prefs.mode === "progression") {
       setGo(true);
+      if (prefs.mode === "progression") drawStrip(-1);
       startFollow();
-    } else {
+    } else if (prefs.mode === "minute") {
       setGo(true);
       void startMinute();
+    } else if (prefs.mode === "quiz") {
+      Object.assign(quiz, { right: 0, wrong: 0, streak: 0, bestStreak: 0, last: "" });
+      setGo(true);
+      quizStats();
+      nextQuestion();
     }
   }
   function stopAll() {
@@ -736,8 +1246,11 @@ const progressions = [
     $<HTMLButtonElement>("changed").disabled = true;
     $("limit-bar").hidden = true;
     $("clock").textContent = "1:00";
+    ring(1);
     setGo(false);
-    idleStage();
+    $("bpm-out").textContent = String(prefs.bpm);
+    if (prefs.mode === "quiz") drawQuizIdle();
+    else idleStage();
   }
   $("go").addEventListener("click", () => (running ? stopAll() : void startAll()));
   document.addEventListener("keydown", (e) => {
@@ -749,6 +1262,10 @@ const progressions = [
 
   drawChords();
   drawSettings();
+  drawPicker();
   idleStage();
   drawStats();
+  if (prefs.mode === "quiz") drawQuizIdle();
+  window.addEventListener("load", () => moveThumb());
+  window.setTimeout(() => moveThumb(), 150);
 </script>
