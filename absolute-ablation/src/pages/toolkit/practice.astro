@@ -99,11 +99,6 @@ const progressions = [
           </div>
 
           <div class="pz-extra" data-extra="minute" hidden>
-            <div class="pz-slots" role="group" aria-label="The two chords">
-              <button type="button" class="pz-slot" id="slot-a" data-slot="0"><span>A</span><b id="slot-a-name">G</b></button>
-              <span class="pz-swap-icon" aria-hidden="true">⇄</span>
-              <button type="button" class="pz-slot" id="slot-b" data-slot="1"><span>B</span><b id="slot-b-name">C</b></button>
-            </div>
             <div class="pz-clockrow">
               <div class="pz-ring">
                 <svg viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="44" class="bg"/><circle cx="50" cy="50" r="44" class="fg" id="ring"/></svg>
@@ -175,7 +170,6 @@ const progressions = [
           <div class="pz-pick-actions">
             <button class="tk-btn soft" id="pick-hear" type="button">🔊 Hear it</button>
             <button class="tk-btn soft" id="pick-add" type="button">＋ Add to my chords</button>
-            <button class="tk-btn soft" id="pick-use" type="button" hidden>Use as chord A</button>
           </div>
         </section>
 
@@ -255,13 +249,13 @@ const progressions = [
 
           <div class="pz-set" data-for="minute" hidden>
             <div class="tk-field">
-              <p class="tk-label">The two chords</p>
-              <p class="tk-hint" style="margin:0">Press A or B above, then pick any chord: from <b>Find any chord</b> with <b>Use as chord</b>, or tap one of <b>My chords</b>.</p>
+              <p class="tk-label">The chords</p>
+              <p class="tk-hint" style="margin:0">Every chord in <b>My chords</b> comes up, one after another. Add or remove chords there to make it easier or harder.</p>
               <p class="tk-hint" id="best-line"></p>
             </div>
           </div>
 
-          <div class="pz-set" data-for="follow listen" hidden>
+          <div class="pz-set" data-for="follow listen minute" hidden>
             <div class="tk-field">
               <p class="tk-label">Order</p>
               <div class="tk-seg" id="order" role="group" aria-label="Order">
@@ -478,13 +472,13 @@ const progressions = [
   type Mode = "explore" | "follow" | "listen" | "minute" | "progression" | "quiz";
   interface Prefs {
     mode: Mode; chords: string[]; shapes: Record<string, number>; order: "random" | "list"; bpm: number; per: number; click: boolean;
-    limit: number; sens: number; pair: [string, string]; prog: { key: string; steps: string }; pick: { root: string; acc: string; q: string };
+    limit: number; sens: number; prog: { key: string; steps: string }; pick: { root: string; acc: string; q: string };
     trainer: { on: boolean; every: number; step: number; target: number }; quizAny: boolean;
   }
   const KEY = "cs-practice";
   const BEST = "cs-practice-best";
   let prefs: Prefs = {
-    mode: "explore", chords: ["G", "C", "D", "Em"], shapes: {}, order: "random", bpm: 70, per: 4, click: true, limit: 0, sens: 55, pair: ["G", "C"],
+    mode: "explore", chords: ["G", "C", "D", "Em"], shapes: {}, order: "random", bpm: 70, per: 4, click: true, limit: 0, sens: 55,
     prog: { key: "C", steps: "I V vi IV" }, pick: { root: "C", acc: "", q: "" }, trainer: { on: false, every: 8, step: 5, target: 120 }, quizAny: false,
   };
   try {
@@ -514,7 +508,6 @@ const progressions = [
   };
   prefs.chords = prefs.chords.filter(valid);
   if (prefs.chords.length < 2) prefs.chords = ["G", "C", "D", "Em"];
-  if (!valid(prefs.pair[0]) || !valid(prefs.pair[1]) || prefs.pair[0] === prefs.pair[1]) prefs.pair = ["G", "C"];
   function normalise(raw: string): string | null {
     const m = /^\s*([A-Ga-g])([#b♯♭]?)\s*(.*?)\s*$/.exec(raw);
     if (!m) return null;
@@ -595,9 +588,6 @@ const progressions = [
     add.textContent = inList ? "✓ In my chords" : "＋ Add to my chords";
     add.classList.toggle("on", inList);
     add.disabled = !shapes.length;
-    const use = $<HTMLButtonElement>("pick-use");
-    use.hidden = prefs.mode !== "minute";
-    use.textContent = `Use as chord ${armed ? "B" : "A"}`;
     drawGallery();
     all(".pz-chip").forEach((c) => c.classList.toggle("on", c.dataset.chord === chord));
   }
@@ -654,7 +644,6 @@ const progressions = [
     }
     changed();
   });
-  $("pick-use").addEventListener("click", () => assignSlot(pickedChord()));
 
   // ---- my chords ----
   function drawChords() {
@@ -674,12 +663,11 @@ const progressions = [
             prefs.chords = prefs.chords.filter((x) => x !== c);
             return changed();
           }
-          // pressing a chord shows it in the picker, and in the 1-minute mode puts it in the chosen slot
+          // pressing a chord shows it in the picker
           const m = /^([A-G])(#?)(.*)$/.exec(c)!;
           prefs.pick = { root: m[1], acc: m[2], q: m[3] };
           save();
-          if (prefs.mode === "minute") assignSlot(c);
-          else drawPicker();
+          drawPicker();
           hear();
         });
         chip.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); chip.click(); } });
@@ -740,7 +728,7 @@ const progressions = [
     explore: "Pick any note, flat or sharp, and a kind of chord. See every way to play it up the neck, hear each one, and choose the shape you want to practise.",
     follow: "A beat keeps time and the chord changes every few beats. The next chord is shown ahead so you can get your fingers ready.",
     listen: "Play the chord shown. Chord Suno listens through your microphone and moves on when it hears you play it right.",
-    minute: "Switch between two chords, any two you like, as many times as you can in one minute. Chord Suno listens through your microphone and counts each change it hears.",
+    minute: "Change between all your chords as many times as you can in one minute, shuffled or in order. Chord Suno listens through your microphone and counts each chord you play.",
     progression: "Play along with a real progression in the key you choose. The chords come round in order, with a beat to keep you steady.",
     quiz: "A chord shape appears. Name it. A quick way to learn what each shape is called.",
   };
@@ -788,10 +776,6 @@ const progressions = [
     sens.style.setProperty("--fill", `${prefs.sens}%`);
     $("sens-out").textContent = prefs.sens < 35 ? "Low" : prefs.sens < 70 ? "Medium" : "High";
     noiseGate.sensitivity = prefs.sens;
-    $("slot-a-name").textContent = pretty(prefs.pair[0]);
-    $("slot-b-name").textContent = pretty(prefs.pair[1]);
-    $("slot-a").classList.toggle("armed", armed === 0);
-    $("slot-b").classList.toggle("armed", armed === 1);
   }
   function setMode(mode: Mode) {
     if (mode === prefs.mode) return;
@@ -825,25 +809,12 @@ const progressions = [
   $("bpm-minus").addEventListener("click", () => setBpm((metro?.settings.bpm ?? prefs.bpm) - 5));
   $("bpm-plus").addEventListener("click", () => setBpm((metro?.settings.bpm ?? prefs.bpm) + 5));
 
-  // ---- the two chords of the 1-minute mode ----
-  let armed: 0 | 1 = 0;
-  function assignSlot(chord: string) {
-    if (!valid(chord) || running) return;
-    prefs.pair[armed] = chord;
-    if (prefs.pair[0] === prefs.pair[1]) prefs.pair[1 - armed] = (prefs.chords.find((c) => c !== chord) ?? (chord === "G" ? "C" : "G"));
-    armed = armed === 0 ? 1 : 0;
-    save();
-    drawSettings();
-    drawPicker();
-    drawBest();
-    idleStage();
-  }
-  all<HTMLButtonElement>("[data-slot]").forEach((b) => b.addEventListener("click", () => { armed = Number(b.dataset.slot) as 0 | 1; drawSettings(); drawPicker(); }));
+  // ---- the best score, kept for each set of chords ----
   const best = (): Record<string, number> => { try { return JSON.parse(localStorage.getItem(BEST) || "{}"); } catch { return {}; } };
-  const pairKey = () => [...prefs.pair].sort().join("|");
+  const setKey = () => [...prefs.chords].sort().join("|");
   function drawBest() {
-    const score = best()[pairKey()];
-    $("best-line").textContent = score ? `Your best for ${pretty(prefs.pair[0])} ⇄ ${pretty(prefs.pair[1])}: ${score} changes in a minute.` : "No score yet for this pair. Give it a go.";
+    const score = best()[setKey()];
+    $("best-line").textContent = score ? `Your best with ${prefs.chords.map(pretty).join(" ")}: ${score} changes in a minute.` : "No score yet for this set of chords. Give it a go.";
   }
 
   // ---- state shared by the drills ----
@@ -864,8 +835,7 @@ const progressions = [
     return next;
   }
   function idleStage() {
-    if (prefs.mode === "minute") stage(prefs.pair[0], prefs.pair[1], false);
-    else if (prefs.mode === "progression") { const l = progChords(); stage(l[0], l[1], false); drawStrip(); }
+    if (prefs.mode === "progression") { const l = progChords(); stage(l[0], l[1], false); drawStrip(); }
     else if (prefs.mode !== "explore" && prefs.mode !== "quiz") stage(prefs.chords[0], prefs.chords[1], false);
     $("beats").replaceChildren();
   }
@@ -1052,11 +1022,12 @@ const progressions = [
     el.classList.add("bump");
   }
   function flip() {
-    expecting = expecting === prefs.pair[0] ? prefs.pair[1] : prefs.pair[0];
-    stage(expecting, expecting === prefs.pair[0] ? prefs.pair[1] : prefs.pair[0]);
+    expecting = next;
+    next = pick(expecting);
+    stage(expecting, next);
     mShownAt = performance.now();
     mOk = 0;
-    if (listener) listener.options.suffixes = kindsFor(prefs.pair[0], prefs.pair[1]);
+    if (listener) listener.options.suffixes = kindsFor(...prefs.chords);
   }
   function minuteHeard(h: Heard) {
     meterAndName(h);
@@ -1086,16 +1057,18 @@ const progressions = [
       mStarted = true;
     }
     $("auto-note").textContent = listening
-      ? "Play the first chord to start. Each time Chord Suno hears you switch to the other chord, it counts."
+      ? "Play the first chord to start. Each time Chord Suno hears you play the chord shown, it counts and shows the next one."
       : "Press the button, or Space, each time you switch chords cleanly.";
     if (!running) return stopMic();
     count = 0;
     $("count").textContent = "0";
-    expecting = prefs.pair[0];
-    stage(expecting, prefs.pair[1]);
+    seq = 0;
+    expecting = pick();
+    next = pick(expecting);
+    stage(expecting, next);
     mShownAt = performance.now();
     mOk = 0;
-    if (listener) listener.options.suffixes = kindsFor(prefs.pair[0], prefs.pair[1]);
+    if (listener) listener.options.suffixes = kindsFor(...prefs.chords);
     phase = "ready";
     ring(1);
     let left = 3;
@@ -1130,15 +1103,15 @@ const progressions = [
     $<HTMLButtonElement>("changed").disabled = true;
     stopMic();
     const scores = best();
-    const old = scores[pairKey()] ?? 0;
+    const old = scores[setKey()] ?? 0;
     const record = count > old;
     if (record) {
-      scores[pairKey()] = count;
+      scores[setKey()] = count;
       try { localStorage.setItem(BEST, JSON.stringify(scores)); } catch { /* storage is off */ }
     }
     drawBest();
     drawStats([["Result", `${count} changes`], ["Best", Math.max(count, old)]]);
-    toast({ icon: record && count > 0 ? "🏆" : "⏱️", title: record && count > 0 ? "New best!" : "Time!", text: `${count} clean changes between ${pretty(prefs.pair[0])} and ${pretty(prefs.pair[1])}.`, ms: 5000 });
+    toast({ icon: record && count > 0 ? "🏆" : "⏱️", title: record && count > 0 ? "New best!" : "Time!", text: `${count} clean changes across ${prefs.chords.length} chords.`, ms: 5000 });
     setGo(false);
     $("clock").textContent = "1:00";
     ring(1);
