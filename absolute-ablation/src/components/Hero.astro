@@ -70,7 +70,7 @@ const sparkles = [
     <!-- Eyebrow -->
     <div class="eyebrow">
       <span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
-      <span><strong>Suno</strong> <span class="deva" lang="hi">सुनो</span> means listen</span>
+      <a href="/toolkit/"><strong>New</strong> Tuner, metronome and chord practice</a>
     </div>
 
     <h1 class="title">
@@ -242,6 +242,8 @@ const sparkles = [
     backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
   }
   .eyebrow strong { font-weight: 700; }
+  .eyebrow a { color: inherit; text-decoration: none; }
+  .eyebrow a:hover { text-decoration: underline; text-underline-offset: 3px; }
   .deva { font-weight: 600; margin: 0 2px; }
   .eq { display: inline-flex; align-items: flex-end; gap: 2px; height: 16px; padding: 3px 6px; border-radius: 999px; background: var(--color-primary); }
   .eq i { width: 2.5px; height: 100%; border-radius: 2px; background: #fbbf24; transform-origin: bottom; animation: eq 1.1s ease-in-out infinite; }
