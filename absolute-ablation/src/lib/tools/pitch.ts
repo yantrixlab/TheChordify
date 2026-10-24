@@ -112,66 +112,84 @@ export function pickFundamental(buf: Float32Array, sampleRate: number, freq: num
 /**
  * Which of an instrument's strings is being played, and how far off it is.
  *
- * A pitch detector alone can be fooled when a string rings in sympathy with another (the open A shakes when the high E is played),
- * so this asks the spectrum instead: how much sound is there at each string's own pitch, or its 2nd or 3rd overtone (a low string
- * on a small microphone is mostly overtones)? The string with the most is the one being played. Its pitch is then taken from the
- * detector's reading when that agrees (it is the most exact), or from the spectrum peak itself.
+ * A pitch detector alone is fooled in two ways: a string ringing in sympathy with another (the open A shakes when the high E is
+ * played), and a low string on a small microphone, whose lowest overtones are faint so that the detector hears a higher note.
+ * So this asks the spectrum, and tests every string as an explanation of it. A string being played makes a whole series of
+ * sounds, at 1, 2, 3, 4... times its pitch. The string whose series accounts for the most of what is heard, with its own low
+ * overtones present, and its fundamental counting for extra if it is there, is the one being played.
  *
- * Returns the midi pitch (with a fraction) measured against that string, or null when no string stands out. `only` limits it to one
- * string, for when the player has chosen one.
+ * Its pitch is then the average of how far each of its overtones is from where it should be. Returns the midi pitch (with a
+ * fraction) measured against that string, or null when no string explains the sound well. `only` limits it to one string, for
+ * when the player has chosen one.
  */
 export function matchString(buf: Float32Array, sampleRate: number, strings: number[], a4: number, yin: number | null, only: number | null = null): number | null {
   const n = 16384;
   const mag = spectrum(buf, n);
   const binHz = sampleRate / n;
-  const WINDOW = 150; // cents either side of a string, for finding its sound
+  const lo = Math.max(2, Math.floor(50 / binHz));
+  const hi = Math.min(mag.length - 2, Math.floor(2400 / binHz));
 
   let top = 0;
-  for (let j = Math.floor(50 / binHz); j < Math.min(mag.length - 1, Math.floor(2400 / binHz)); j++) if (mag[j] > top) top = mag[j];
+  for (let j = lo; j <= hi; j++) if (mag[j] > top) top = mag[j];
   if (top === 0) return null;
 
-  const near = (hz: number, cents: number) => {
-    const lo = Math.max(2, Math.floor((hz * Math.pow(2, -cents / 1200)) / binHz));
-    const hi = Math.min(mag.length - 2, Math.ceil((hz * Math.pow(2, cents / 1200)) / binHz));
-    let at = lo;
-    for (let j = lo; j <= hi; j++) if (mag[j] > mag[at]) at = j;
-    if (at <= lo || at >= hi) return { mag: mag[at], freq: at * binHz }; // a peak at the edge belongs to a neighbour
-    const a = Math.log(mag[at - 1] + 1e-12);
-    const b = Math.log(mag[at] + 1e-12);
-    const c = Math.log(mag[at + 1] + 1e-12);
+  // the strong peaks of the sound, each placed exactly between bins
+  const peaks: { hz: number; mag: number }[] = [];
+  for (let j = lo; j <= hi; j++) {
+    if (mag[j] < 0.12 * top || mag[j] < mag[j - 1] || mag[j] <= mag[j + 1]) continue;
+    const a = Math.log(mag[j - 1] + 1e-12);
+    const b = Math.log(mag[j] + 1e-12);
+    const c = Math.log(mag[j + 1] + 1e-12);
     const d = a - 2 * b + c;
-    return { mag: mag[at], freq: (at + (d === 0 ? 0 : (0.5 * (a - c)) / d)) * binHz };
-  };
+    peaks.push({ hz: (j + (d === 0 ? 0 : (0.5 * (a - c)) / d)) * binHz, mag: mag[j] });
+  }
+  if (!peaks.length) return null;
+  const total = peaks.reduce((sum, p) => sum + p.mag, 0);
 
-  let best: { midi: number; strength: number; hz: number } | null = null;
+  const REACH = 60; // cents: how far from its place an overtone may be, for a string that is out of tune
+  let best: { midi: number; score: number; error: number } | null = null;
   for (const midi of only !== null ? [only] : strings) {
     const f = freqFromMidi(midi, a4);
-    let strength = 0;
-    let hz = f;
-    for (const [h, weight] of [[1, 1], [2, 0.9], [3, 0.7]] as const) {
-      if (f * h > 2400) break;
-      const p = near(f * h, WINDOW);
-      if (p.mag * weight > strength) {
-        strength = p.mag * weight;
-        hz = p.freq / h;
+    let covered = 0;
+    let fundamental = 0;
+    const present = new Set<number>();
+    let errSum = 0;
+    let errWeight = 0;
+    let lowSum = 0;
+    let lowWeight = 0;
+    for (const p of peaks) {
+      const h = Math.round(p.hz / f);
+      if (h < 1 || h > 6) continue;
+      const c = 1200 * Math.log2(p.hz / (h * f));
+      if (Math.abs(c) > REACH) continue;
+      covered += p.mag;
+      present.add(h);
+      if (h === 1) fundamental = Math.max(fundamental, p.mag);
+      errSum += c * p.mag;
+      errWeight += p.mag;
+      if (h <= 4) {
+        lowSum += c * p.mag;
+        lowWeight += p.mag;
       }
     }
-    if (!best || strength > best.strength) best = { midi, strength, hz };
+    if (!errWeight) continue;
+    const presence = [1, 2, 3, 4].filter((h) => present.has(h)).length / 4;
+    const score = (covered / total) * (0.5 + 0.5 * presence) + 0.3 * Math.min(1, fundamental / top);
+    const error = lowWeight ? lowSum / lowWeight : errSum / errWeight;
+    if (!best || score > best.score) best = { midi, score, error };
   }
-  if (!best || best.strength < 0.15 * top) return null;
+  if (best && best.score >= 0.4) return best.midi + best.error / 100;
 
-  const f = freqFromMidi(best.midi, a4);
-  const cents = (hz: number) => 1200 * Math.log2(hz / f);
-  const measured = cents(best.hz);
-  if (Math.abs(measured) < WINDOW - 10) return best.midi + measured / 100; // the spectrum peak: exact, and not thrown by a string ringing alongside
+  // the string is a good way off its note: fall back on the detector's reading, in whichever octave makes it fit
   if (yin) {
-    // the string is a good way off its note: the detector's reading, in whichever octave (or octave and fifth) makes it fit
-    let pick: number | null = null;
-    for (const k of [1, 2, 0.5, 3, 1 / 3]) {
-      const c = cents(yin * k);
-      if (Math.abs(c) < 350 && (pick === null || Math.abs(c) < Math.abs(pick))) pick = c;
+    let near: { midi: number; cents: number } | null = null;
+    for (const midi of only !== null ? [only] : strings) {
+      for (const k of [1]) {
+        const c = 1200 * Math.log2((yin * k) / freqFromMidi(midi, a4));
+        if (Math.abs(c) < 350 && (!near || Math.abs(c) < Math.abs(near.cents))) near = { midi, cents: c };
+      }
     }
-    if (pick !== null) return best.midi + pick / 100;
+    if (near) return near.midi + near.cents / 100;
   }
   return null;
 }
