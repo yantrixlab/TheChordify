@@ -5,9 +5,9 @@ import { INSTRUMENTS } from "../../lib/tools/pitch";
 
 <ToolShell
   title="Tuner — Chord Suno Toolkit"
-  description="A free online tuner for guitar, bass, ukulele, violin, mandolin and banjo, with alternate tunings, a reference tone and an adjustable A4."
+  description="A free online guitar tuner with a string-by-string display for guitar, bass, ukulele, violin, mandolin and banjo, with alternate tunings, a reference tone and an adjustable A4."
   heading="Tuner"
-  sub="Pick your instrument, pluck a string, and watch the needle. Works with guitars, basses, ukuleles, violins and your voice, and with alternate tunings like Drop D and DADGAD."
+  sub="Pluck a string and watch it on the board. The string you play lights up and vibrates, its note slides up when you are sharp and down when you are flat, and each string is captured once it holds in tune."
   feature="tuner"
   tool="tuner"
   crumb="Tuner"
@@ -16,22 +16,29 @@ import { INSTRUMENTS } from "../../lib/tools/pitch";
     <section class="tk-console tn" aria-label="Tuner">
       <div class="tn-top">
         <span class="tn-status" id="status" role="status">Press Start, then play a string</span>
-        <span class="tn-hz" id="hz" aria-hidden="true"></span>
+        <div class="tn-progress" id="progress" hidden>
+          <span id="progress-text">0 of 6 tuned</span>
+          <i><b id="progress-fill"></b></i>
+          <button type="button" id="reset" aria-label="Clear the tuned strings">Reset</button>
+        </div>
       </div>
 
-      <div class="tn-gauge" id="gauge-wrap">
-        <svg id="gauge" viewBox="0 0 320 190" role="img" aria-label="Tuning needle"></svg>
-        <span class="tn-flat" aria-hidden="true">♭</span>
-        <span class="tn-sharp" aria-hidden="true">♯</span>
-      </div>
+      <div class="tn-board" id="board" role="group" aria-label="Strings"></div>
 
-      <div class="tn-read" aria-live="polite">
+      <div class="tn-readout" aria-live="polite">
         <div class="tn-note" id="note"><b>–</b><sup></sup></div>
-        <div class="tn-cents" id="cents">&nbsp;</div>
-        <div class="tn-hint" id="hint">&nbsp;</div>
+        <div class="tn-side">
+          <div class="tn-cents" id="cents">&nbsp;</div>
+          <div class="tn-hz" id="hz">&nbsp;</div>
+        </div>
       </div>
+      <div class="tn-hint" id="hint">&nbsp;</div>
+      <div class="tn-led" id="led" aria-hidden="true"></div>
 
-      <div class="tn-strings" id="strings" role="group" aria-label="Strings"></div>
+      <div class="tn-pick" role="group" aria-label="Which string to tune">
+        <button type="button" id="mode-auto" aria-pressed="true">Auto-detect the string</button>
+        <button type="button" id="mode-manual" aria-pressed="false">I choose the string</button>
+      </div>
 
       <div class="tn-meter" aria-hidden="true"><i id="level"></i></div>
       <p class="mic-name" id="mic-name"></p>
@@ -56,7 +63,7 @@ import { INSTRUMENTS } from "../../lib/tools/pitch";
           <label class="tk-label" for="tuning">Tuning</label>
           <select id="tuning" class="tk-select"></select>
         </div>
-        <p class="tk-hint" id="mode-hint">Auto: the tuner finds which string you are playing. Tap a string to tune that one and hear it.</p>
+        <p class="tk-hint" id="mode-hint">Tap a string to hear its note.</p>
       </section>
 
       <section class="tk-card">
@@ -87,6 +94,7 @@ import { INSTRUMENTS } from "../../lib/tools/pitch";
         <ul class="tn-tips">
           <li>Pluck one string at a time and let it ring.</li>
           <li>Tune up to the note: if you are sharp, loosen below it, then tighten up to it.</li>
+          <li>A string turns green and is ticked once it has held in tune. Reset clears the ticks.</li>
           <li>Your sound is analysed on your device and never recorded.</li>
         </ul>
       </section>
@@ -95,49 +103,90 @@ import { INSTRUMENTS } from "../../lib/tools/pitch";
 </ToolShell>
 
 <style is:global>
-  .tn { padding: 22px 22px 22px; text-align: center; }
-  .tn-top { position: relative; display: flex; justify-content: space-between; align-items: center; gap: 10px; min-height: 30px; }
-  .tn-status { padding: 5px 12px; font: 600 12.5px var(--font-sans); color: #e9ddff; background: #ffffff14; border: 1px solid #ffffff22; border-radius: 99px; }
+  .tn { padding: 20px 20px 22px; text-align: center; }
+  .tn-top { position: relative; display: flex; justify-content: space-between; align-items: center; gap: 10px; min-height: 34px; flex-wrap: wrap; }
+  .tn-status { padding: 5px 12px; font: 600 12.5px var(--font-sans); color: #e9ddff; background: #ffffff14; border: 1px solid #ffffff22; border-radius: 99px; transition: color 0.3s, border-color 0.3s; }
   .tn.live .tn-status { color: #6ee7b7; border-color: #34d39966; }
-  .tn-hz { font: 600 13px var(--font-mono); color: #b9a3df; }
-  .tn-gauge { position: relative; max-width: 440px; margin: 6px auto 0; }
-  .tn-gauge svg { display: block; width: 100%; height: auto; overflow: visible; }
-  .tn-flat, .tn-sharp { position: absolute; top: 56%; font-size: 24px; color: #8f78bd; }
-  .tn-flat { left: 4%; }
-  .tn-sharp { right: 4%; }
-  #needle { transform-origin: 160px 172px; transition: transform 0.14s cubic-bezier(.3,.7,.4,1); }
-  .tn.idle #needle { transition: transform 0.6s ease; }
-  .tn-read { position: relative; margin-top: -4px; }
-  .tn-note { font: 800 84px/1 var(--font-sans); letter-spacing: -0.05em; color: #fff; text-shadow: 0 6px 30px #7c3aed99; transition: color 0.2s; }
-  .tn-note sup { margin-left: 4px; font: 700 26px var(--font-sans); color: #b9a3df; letter-spacing: 0; vertical-align: top; position: relative; top: 8px; }
+  .tn-progress { display: inline-flex; align-items: center; gap: 10px; font: 600 12.5px var(--font-sans); color: #d6c7f2; animation: tn-in 0.4s ease-out; }
+  .tn-progress[hidden] { display: none; }
+  .tn-progress i { display: block; width: 74px; height: 6px; overflow: hidden; border-radius: 6px; background: #ffffff1f; }
+  .tn-progress b { display: block; width: 0; height: 100%; border-radius: 6px; background: linear-gradient(90deg, #34d399, #6ee7b7); transition: width 0.5s cubic-bezier(.3,.9,.3,1); }
+  .tn-progress button { padding: 3px 10px; font: 600 12px var(--font-sans); color: #d6c7f2; background: transparent; border: 1px solid #ffffff2e; border-radius: 99px; cursor: pointer; transition: background-color 0.2s; }
+  .tn-progress button:hover { background: #ffffff1c; }
+  @keyframes tn-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @keyframes tn-pop { 0% { transform: translate(-50%, var(--y, -50%)) scale(1); } 45% { transform: translate(-50%, var(--y, -50%)) scale(1.28); } 100% { transform: translate(-50%, var(--y, -50%)) scale(1); } }
+  @keyframes tn-ripple { from { opacity: 0.8; transform: translate(-50%, -50%) scale(0.6); } to { opacity: 0; transform: translate(-50%, -50%) scale(2.4); } }
+  @keyframes tn-glow { 0%, 100% { box-shadow: 0 0 0 0 #34d39900; } 50% { box-shadow: 0 0 40px 4px #34d39966; } }
+
+  /* the strings */
+  .tn-board { --node: 58px; --k: 2.2px; position: relative; display: flex; justify-content: center; gap: clamp(6px, 2.6vw, 22px); height: 330px; margin: 14px auto 6px; max-width: 520px; padding: 0 6px; }
+  .tn-board::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 0; border-top: 1px dashed #ffffff30; pointer-events: none; }
+  .tn-board.all-ok { animation: tn-glow 1.6s ease-in-out 2; border-radius: 28px; }
+  .tn-str { position: relative; flex: 1 1 0; max-width: 78px; min-width: 0; height: 100%; }
+  .tn-wire { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; color: #8f78d0; transition: color 0.25s; pointer-events: none; }
+  .tn-wire path { fill: none; stroke: currentColor; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+  .tn-str.near .tn-wire { color: #fbbf24; filter: drop-shadow(0 0 7px #f59e0b99); }
+  .tn-str.ok .tn-wire, .tn-str.done .tn-wire { color: #6ee7b7; }
+  .tn-str.ok .tn-wire { filter: drop-shadow(0 0 8px #10b981aa); }
+  .tn-zone { position: absolute; left: 50%; top: 50%; width: calc(var(--node) + 8px); transform: translate(-50%, -50%); border-radius: 99px; background: #34d3991f; border: 1px solid #34d39933; opacity: 0; transition: opacity 0.3s; pointer-events: none; }
+  .tn-str.near .tn-zone, .tn-str.ok .tn-zone, .tn-board.manual .tn-str.target .tn-zone { opacity: 1; }
+  .tn-node { --y: -50%; position: absolute; left: 50%; top: 50%; display: grid; place-content: center; width: var(--node); height: var(--node); padding: 0; font: inherit; color: #efe6ff; background: #1f0b45; border: 3px solid #ffffff2e; border-radius: 50%; cursor: pointer; transform: translate(-50%, var(--y)); transition: transform 0.16s cubic-bezier(.3,.8,.4,1), border-color 0.25s, background-color 0.25s, box-shadow 0.25s, color 0.25s; }
+  .tn-node b { display: block; font: 800 20px/1 var(--font-sans); letter-spacing: -0.02em; }
+  .tn-node small { display: block; margin-top: 2px; font: 600 10px/1 var(--font-mono); color: #a78bd0; }
+  .tn-node:hover { border-color: #ffffff66; background: #2c1160; }
+  .tn-node:focus-visible { outline: 2px solid #fbbf24; outline-offset: 3px; }
+  .tn-str.near .tn-node { border-color: #fbbf24; background: #3a1b05; box-shadow: 0 0 26px #f59e0b66; }
+  .tn-str.ok .tn-node { border-color: #34d399; background: #053d2c; color: #d1fae5; box-shadow: 0 0 30px #10b98199; }
+  .tn-str.done .tn-node { border-color: #34d399; background: #064e3b; color: #d1fae5; }
+  .tn-str.done .tn-node::after { content: "✓"; position: absolute; top: -8px; right: -8px; display: grid; place-items: center; width: 22px; height: 22px; font: 800 12px var(--font-sans); color: #064e3b; background: #6ee7b7; border-radius: 50%; box-shadow: 0 4px 10px #00000055; animation: tn-pop-badge 0.4s cubic-bezier(.3,1.6,.5,1); }
+  @keyframes tn-pop-badge { from { transform: scale(0); } to { transform: scale(1); } }
+  .tn-board.manual .tn-str.target .tn-node { border-color: #fff; box-shadow: 0 0 0 4px #7c3aedcc; }
+  .tn-node.pop { animation: tn-pop 0.45s ease-out; }
+  .tn-node.ripple::before { content: ""; position: absolute; left: 50%; top: 50%; width: 100%; height: 100%; border: 2px solid #6ee7b7; border-radius: 50%; animation: tn-ripple 0.8s ease-out forwards; pointer-events: none; }
+
+  /* the readout */
+  .tn-readout { display: flex; align-items: center; justify-content: center; gap: 22px; margin-top: 6px; }
+  .tn-note { font: 800 72px/1 var(--font-sans); letter-spacing: -0.05em; color: #fff; text-shadow: 0 6px 30px #7c3aed99; transition: color 0.25s; min-width: 1.1em; }
+  .tn-note sup { margin-left: 4px; font: 700 24px var(--font-sans); color: #b9a3df; letter-spacing: 0; vertical-align: top; position: relative; top: 6px; }
   .tn.ok .tn-note { color: #6ee7b7; text-shadow: 0 6px 34px #10b981aa; }
-  .tn-cents { margin-top: 4px; font: 700 20px var(--font-mono); color: #fbbf24; font-variant-numeric: tabular-nums; }
+  .tn-side { text-align: left; min-width: 110px; }
+  .tn-cents { font: 800 26px/1.1 var(--font-mono); color: #fbbf24; font-variant-numeric: tabular-nums; transition: color 0.25s; }
   .tn.ok .tn-cents { color: #6ee7b7; }
-  .tn-hint { min-height: 24px; font: 600 14px var(--font-sans); color: #c4b0e0; }
-  .tn-strings { position: relative; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 16px 0 14px; }
-  .tn-string { display: grid; place-items: center; gap: 0; width: 56px; height: 56px; padding: 0; font: 800 17px/1 var(--font-sans); color: #e9ddff; background: #ffffff10; border: 2px solid #ffffff2a; border-radius: 50%; cursor: pointer; transition: transform 0.12s, background-color 0.15s, border-color 0.15s, box-shadow 0.15s; }
-  .tn-string small { display: block; margin-top: -10px; font: 600 10px var(--font-mono); color: #a78bd0; }
-  .tn-string:hover { background: #ffffff22; }
-  .tn-string.near { border-color: #fbbf24; background: #fbbf2426; transform: scale(1.1); }
-  .tn-string.target { border-color: #fff; box-shadow: 0 0 0 3px #7c3aedaa; }
-  .tn-string.ok { border-color: #34d399; background: #34d39930; box-shadow: 0 0 22px #34d39988; }
-  .tn-auto { width: auto; padding: 0 16px; border-radius: 99px; font-size: 13px; }
-  .tn-meter { position: relative; height: 6px; max-width: 280px; margin: 0 auto 16px; overflow: hidden; border-radius: 6px; background: #ffffff1c; }
+  .tn-hz { margin-top: 4px; font: 600 13px var(--font-mono); color: #b9a3df; }
+  .tn-hint { min-height: 24px; margin-top: 4px; font: 600 14px var(--font-sans); color: #c4b0e0; }
+  .tn-led { display: flex; justify-content: center; gap: 4px; max-width: 360px; height: 18px; margin: 8px auto 14px; }
+  .tn-led i { flex: 1; border-radius: 3px; background: #ffffff18; transition: background-color 0.12s, transform 0.12s, box-shadow 0.12s; }
+  .tn-led i.mid { background: #34d3992b; }
+  .tn-led i.on { background: #fbbf24; transform: scaleY(1.35); box-shadow: 0 0 12px #f59e0baa; }
+  .tn-led i.trail { background: #fbbf2455; }
+  .tn.ok .tn-led i.on { background: #6ee7b7; box-shadow: 0 0 14px #10b981cc; }
+  .tn-pick { display: inline-flex; gap: 4px; padding: 4px; margin-bottom: 14px; background: #ffffff10; border: 1px solid #ffffff1c; border-radius: 99px; }
+  .tn-pick button { padding: 7px 14px; font: 600 12.5px var(--font-sans); color: #c4b0e0; background: transparent; border: 0; border-radius: 99px; cursor: pointer; transition: background-color 0.2s, color 0.2s; }
+  .tn-pick button[aria-pressed="true"] { color: #1a0533; background: #fbbf24; }
+  .tn-meter { position: relative; height: 6px; max-width: 280px; margin: 0 auto 14px; overflow: hidden; border-radius: 6px; background: #ffffff1c; }
   .tn-meter i { display: block; height: 100%; width: 0; border-radius: 6px; background: linear-gradient(90deg, #34d399, #fbbf24); transition: width 0.08s linear; }
+  .tn-meter i:not(.open) { opacity: 0.45; }
   .tn-actions { position: relative; }
   .tn-listen { min-width: 170px; min-height: 54px; font-size: 17px; border-radius: 18px; }
   .tn .tk-error { text-align: left; }
   .tn-tips { margin: 0; padding-left: 18px; list-style: disc; font-size: 14px; line-height: 1.7; color: var(--color-body); }
-  @media (max-width: 480px) { .tn-note { font-size: 68px; } .tn-string { width: 50px; height: 50px; } }
+  @media (max-width: 520px) {
+    .tn { padding: 16px 12px 18px; }
+    .tn-board { --node: 48px; height: 290px; }
+    .tn-node b { font-size: 17px; }
+    .tn-note { font-size: 60px; }
+  }
 </style>
 
 <script>
   import { INSTRUMENTS, detectPitch, freqFromMidi, midiFromName, noteFromFreq, noteLabel, type Instrument } from "../../lib/tools/pitch";
   import { MicError, NoiseGate, SILENT_MIC_TEXT, SilenceWatch, audioContext, fillMicPicker, levelPercent, openMic, resumeAudio, rms, type Mic } from "../../lib/tools/audio";
   import { initGate } from "../../lib/tools/gate";
+  import { toast } from "../../lib/toast";
 
   const gate = initGate("tuner", "tuner");
   const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+  const all = <T extends HTMLElement>(selector: string) => [...document.querySelectorAll<T>(selector)];
 
   interface Prefs { instrument: string; tuning: number; a4: number; tol: number; sens: number }
   const KEY = "cs-tuner";
@@ -147,86 +196,172 @@ import { INSTRUMENTS } from "../../lib/tools/pitch";
 
   const instrument = (): Instrument => INSTRUMENTS.find((i) => i.id === prefs.instrument) ?? INSTRUMENTS[0];
   const strings = (): number[] => (instrument().tunings[prefs.tuning] ?? instrument().tunings[0]).notes.map(midiFromName);
+  const NAMES_PRETTY = (name: string) => name.replace("#", "♯");
+
   let target: number | null = null; // a string chosen by hand; null is automatic
+  let done: boolean[] = []; // strings that have held in tune
+  let held: number[] = []; // readings in a row in tune, per string
+  let off: number[] = []; // readings in a row out of tune, per string
+  let announced = false;
 
-  // ---- the gauge ----
-  const CX = 160, CY = 172, R = 132, SPAN = 62; // degrees for 50 cents each way
-  const polar = (deg: number, r: number) => [CX + r * Math.sin((deg * Math.PI) / 180), CY - r * Math.cos((deg * Math.PI) / 180)];
-  const centsToDeg = (c: number) => (Math.max(-50, Math.min(50, c)) / 50) * SPAN;
-  function drawGauge() {
-    const parts: string[] = [];
-    const tol = centsToDeg(prefs.tol);
-    const [x1, y1] = polar(-tol, R - 12);
-    const [x2, y2] = polar(tol, R - 12);
-    parts.push(`<path d="M${polar(-SPAN, R - 12).join(" ")} A${R - 12} ${R - 12} 0 0 1 ${polar(SPAN, R - 12).join(" ")}" fill="none" stroke="#ffffff14" stroke-width="22" stroke-linecap="round"/>`);
-    parts.push(`<path d="M${x1} ${y1} A${R - 12} ${R - 12} 0 0 1 ${x2} ${y2}" fill="none" stroke="#34d399" stroke-opacity=".55" stroke-width="22" stroke-linecap="butt"/>`);
-    for (let c = -50; c <= 50; c += 5) {
-      const major = c % 10 === 0;
-      const [a, b] = polar(centsToDeg(c), R + 4);
-      const [d, e] = polar(centsToDeg(c), R - (major ? 14 : 8) + 4);
-      parts.push(`<line x1="${a}" y1="${b}" x2="${d}" y2="${e}" stroke="${c === 0 ? "#fff" : "#9b84c8"}" stroke-width="${c === 0 ? 3 : major ? 2 : 1.2}" stroke-linecap="round"/>`);
-      if (c % 25 === 0 && c !== 0) {
-        const [tx, ty] = polar(centsToDeg(c), R + 22);
-        parts.push(`<text x="${tx}" y="${ty + 4}" fill="#8f78bd" font-size="11" font-family="monospace" text-anchor="middle">${c > 0 ? "+" : "−"}${Math.abs(c)}</text>`);
+  // ---- the board: a string for each string of the instrument ----
+  interface Lane { root: HTMLElement; node: HTMLButtonElement; path: SVGPathElement; midi: number | null; amp: number; width: number; hz: number }
+  let lanes: Lane[] = [];
+  const SVGNS = "http://www.w3.org/2000/svg";
+
+  function buildBoard() {
+    const board = $("board");
+    const list = strings();
+    const items = list.length ? list : [null];
+    board.classList.toggle("manual", target !== null);
+    board.classList.remove("all-ok");
+    lanes = items.map((midi, i) => {
+      const root = document.createElement("div");
+      root.className = "tn-str";
+      const svg = document.createElementNS(SVGNS, "svg");
+      svg.setAttribute("class", "tn-wire");
+      svg.setAttribute("viewBox", "0 0 40 330");
+      svg.setAttribute("preserveAspectRatio", "none");
+      const path = document.createElementNS(SVGNS, "path");
+      const width = midi === null ? 3 : Math.max(1.6, Math.min(5, 5.4 - (midi - 40) * 0.1));
+      path.setAttribute("stroke-width", String(width));
+      path.setAttribute("d", "M20 0 L20 330");
+      svg.appendChild(path);
+      const zone = document.createElement("span");
+      zone.className = "tn-zone";
+      const node = document.createElement("button");
+      node.type = "button";
+      node.className = "tn-node";
+      if (midi !== null) {
+        node.innerHTML = `<b>${NAMES_PRETTY(noteLabel(midi).replace(/\d/, ""))}</b><small>${noteLabel(midi).match(/\d/)?.[0] ?? ""}</small>`;
+        node.setAttribute("aria-label", `String ${i + 1}, ${noteLabel(midi)}. Press to hear it and tune this string.`);
+        node.addEventListener("click", () => {
+          target = midi;
+          setMode();
+          void playTone(freqFromMidi(midi, prefs.a4));
+          node.classList.remove("pop");
+          void node.offsetWidth;
+          node.classList.add("pop");
+        });
+      } else {
+        node.innerHTML = "<b>–</b>";
+        node.setAttribute("aria-label", "The note you play");
+        node.tabIndex = -1;
       }
-    }
-    parts.push(`<g id="needle"><line x1="${CX}" y1="${CY}" x2="${CX}" y2="${CY - R + 6}" stroke="#fbbf24" stroke-width="4" stroke-linecap="round" id="needle-line"/><circle cx="${CX}" cy="${CY}" r="11" fill="#fff"/><circle cx="${CX}" cy="${CY}" r="4" fill="#2a0f5c"/></g>`);
-    $("gauge").innerHTML = parts.join("");
-    point(0);
+      root.append(svg, zone, node);
+      board.appendChild(root);
+      return { root, node, path, midi, amp: 0, width, hz: 9 + (midi === null ? 12 : (midi - 40) * 0.32) };
+    });
+    done = lanes.map(() => false);
+    held = lanes.map(() => 0);
+    off = lanes.map(() => 0);
+    announced = false;
+    sizeZones();
+    drawProgress();
   }
-  function point(cents: number) {
-    $("needle").style.transform = `rotate(${centsToDeg(cents)}deg)`;
+  function rebuild() {
+    $("board").replaceChildren();
+    buildBoard();
+    idle();
+  }
+  const pxPerCent = () => ($("board").clientHeight * 0.36) / 50;
+  function sizeZones() {
+    const h = prefs.tol * 2 * pxPerCent();
+    lanes.forEach((l) => ((l.root.querySelector(".tn-zone") as HTMLElement).style.height = `${Math.max(14, h)}px`));
   }
 
-  // ---- the controls ----
+  function drawProgress() {
+    const n = lanes.filter((l) => l.midi !== null).length;
+    const d = done.filter(Boolean).length;
+    $("progress").hidden = n === 0 || (d === 0 && !mic);
+    $("progress-text").textContent = `${d} of ${n} tuned`;
+    $("progress-fill").style.width = n ? `${(d / n) * 100}%` : "0";
+    lanes.forEach((l, i) => l.root.classList.toggle("done", done[i]));
+  }
+  $("reset").addEventListener("click", () => {
+    done = lanes.map(() => false);
+    held = lanes.map(() => 0);
+    off = lanes.map(() => 0);
+    announced = false;
+    $("board").classList.remove("all-ok");
+    drawProgress();
+  });
+
+  // ---- the digital bar under the board ----
+  const SEGMENTS = 21;
+  function buildLed() {
+    $("led").replaceChildren(...Array.from({ length: SEGMENTS }, (_, i) => Object.assign(document.createElement("i"), { className: i === 10 ? "mid" : "" })));
+  }
+  function drawLed(cents: number | null) {
+    const segs = [...$("led").children];
+    const at = cents === null ? -1 : Math.round(Math.max(-50, Math.min(50, cents)) / 5) + 10;
+    segs.forEach((s, i) => {
+      s.classList.toggle("on", i === at);
+      s.classList.toggle("trail", at >= 0 && i !== at && ((i > 10 && i < at) || (i < 10 && i > at)));
+    });
+  }
+
+  // ---- moving things ----
+  function place(index: number, cents: number) {
+    lanes[index].node.style.setProperty("--y", `calc(-50% + ${-Math.max(-50, Math.min(50, cents)) * pxPerCent()}px)`);
+  }
+  function idle() {
+    lanes.forEach((l) => {
+      l.root.classList.remove("near", "ok");
+      l.node.style.setProperty("--y", "-50%");
+    });
+    root.classList.remove("ok");
+    drawLed(null);
+  }
+
+  let signal = 0; // how loud the string being played is, 0 to 1, for the vibration
+  let activeIndex = -1;
+  let anim = 0;
+  function animate(t: number) {
+    lanes.forEach((l, i) => {
+      const goal = i === activeIndex ? Math.min(1, signal * 14) : 0;
+      l.amp += (goal - l.amp) * 0.18;
+      const wobble = l.amp * (l.width < 2.4 ? 11 : 8) * Math.sin((t / 1000) * l.hz * Math.PI * 2);
+      l.path.setAttribute("d", l.amp < 0.01 ? "M20 0 L20 330" : `M20 0 Q ${20 + wobble} 165 20 330`);
+    });
+    anim = requestAnimationFrame(animate);
+  }
+
+  // ---- the settings ----
   function drawInstrument() {
-    document.querySelectorAll<HTMLButtonElement>("[data-instrument]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.instrument === prefs.instrument)));
+    all<HTMLButtonElement>("[data-instrument]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.instrument === prefs.instrument)));
     const inst = instrument();
     const select = $<HTMLSelectElement>("tuning");
     select.replaceChildren(...inst.tunings.map((t, i) => Object.assign(document.createElement("option"), { value: String(i), textContent: t.name, selected: i === prefs.tuning })));
     $("tuning-field").style.display = inst.tunings.length < 2 ? "none" : "";
-    drawStrings();
+    $("mode-hint").textContent = strings().length ? "Tap a string to hear its note and tune that one." : "Play any note and the tuner names it and shows how far off it is.";
+    $("mode-auto").parentElement!.style.display = strings().length ? "" : "none";
+    rebuild();
   }
-
-  function drawStrings(near: number | null = null, ok = false) {
-    const box = $("strings");
-    const list = strings();
-    if (!list.length) {
-      box.replaceChildren();
-      $("mode-hint").textContent = "Play any note and the tuner names it and shows how far off it is.";
-      return;
-    }
-    $("mode-hint").textContent = "Auto: the tuner finds which string you are playing. Tap a string to tune that one and hear it.";
-    const auto = document.createElement("button");
-    auto.type = "button";
-    auto.className = "tn-string tn-auto" + (target === null ? " target" : "");
-    auto.textContent = "Auto";
-    auto.setAttribute("aria-pressed", String(target === null));
-    auto.addEventListener("click", () => { target = null; drawStrings(); });
-    const buttons = list.map((midi, i) => {
-      const b = document.createElement("button");
-      b.type = "button";
-      b.className = "tn-string" + (midi === near ? (ok ? " ok" : " near") : "") + (midi === target ? " target" : "");
-      b.innerHTML = `${noteLabel(midi).replace(/\d/, "")}<small>${noteLabel(midi).match(/\d/)?.[0] ?? ""}</small>`;
-      b.setAttribute("aria-label", `String ${i + 1}, ${noteLabel(midi)}. Press to tune this string and hear it.`);
-      b.setAttribute("aria-pressed", String(midi === target));
-      b.addEventListener("click", () => { target = midi; drawStrings(); void playTone(freqFromMidi(midi, prefs.a4)); });
-      return b;
-    });
-    box.replaceChildren(auto, ...buttons);
+  function setMode() {
+    $("mode-auto").setAttribute("aria-pressed", String(target === null));
+    $("mode-manual").setAttribute("aria-pressed", String(target !== null));
+    $("board").classList.toggle("manual", target !== null);
+    lanes.forEach((l) => l.root.classList.toggle("target", l.midi !== null && l.midi === target));
   }
+  $("mode-auto").addEventListener("click", () => { target = null; setMode(); });
+  $("mode-manual").addEventListener("click", () => {
+    if (target === null) target = strings()[0] ?? null;
+    setMode();
+  });
 
-  document.querySelectorAll<HTMLButtonElement>("[data-instrument]").forEach((b) =>
+  all<HTMLButtonElement>("[data-instrument]").forEach((b) =>
     b.addEventListener("click", () => {
       prefs.instrument = b.dataset.instrument ?? "guitar";
       prefs.tuning = 0;
       target = null;
       save();
       drawInstrument();
+      setMode();
       if (mic) mic.analyser.fftSize = instrument().fmin < 50 ? 8192 : 4096;
     }),
   );
-  $<HTMLSelectElement>("tuning").addEventListener("change", (e) => { prefs.tuning = Number((e.target as HTMLSelectElement).value); target = null; save(); drawStrings(); });
+  $<HTMLSelectElement>("tuning").addEventListener("change", (e) => { prefs.tuning = Number((e.target as HTMLSelectElement).value); target = null; save(); rebuild(); setMode(); });
 
   const a4 = $<HTMLInputElement>("a4");
   const fill = (el: HTMLInputElement) => el.style.setProperty("--fill", `${((+el.value - +el.min) / (+el.max - +el.min)) * 100}%`);
@@ -235,8 +370,8 @@ import { INSTRUMENTS } from "../../lib/tools/pitch";
   a4.addEventListener("input", () => { prefs.a4 = Number(a4.value); drawA4(); save(); });
   drawA4();
 
-  const drawTol = () => document.querySelectorAll<HTMLButtonElement>("[data-tol]").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.tol) === prefs.tol)));
-  document.querySelectorAll<HTMLButtonElement>("[data-tol]").forEach((b) => b.addEventListener("click", () => { prefs.tol = Number(b.dataset.tol); save(); drawTol(); drawGauge(); }));
+  const drawTol = () => all<HTMLButtonElement>("[data-tol]").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.tol) === prefs.tol)));
+  all<HTMLButtonElement>("[data-tol]").forEach((b) => b.addEventListener("click", () => { prefs.tol = Number(b.dataset.tol); save(); drawTol(); sizeZones(); }));
   drawTol();
 
   const sens = $<HTMLInputElement>("sens");
@@ -279,48 +414,54 @@ import { INSTRUMENTS } from "../../lib/tools/pitch";
   let timer = 0;
   let buf = new Float32Array(0);
   let recent: number[] = []; // midi, a few readings, to smooth over
-  let steady = 0; // readings in a row that were in tune
   let lastHeard = 0;
   let wasOk = false;
   const root = document.querySelector<HTMLElement>(".tn")!;
+  const CAPTURE = 12; // readings in tune in a row (about 0.6 s) before a string counts as tuned
 
-  function show(reading: { midi: number; cents: number; freq: number } | null, strong: boolean) {
-    if (!reading) {
-      root.classList.remove("ok");
-      root.classList.add("idle");
-      $("hint").innerHTML = "&nbsp;";
-      return;
-    }
-    root.classList.remove("idle");
-    const shown = noteFromFreq(freqFromMidi(reading.midi, prefs.a4), prefs.a4);
-    const cents = reading.cents;
+  function show(gi: number, goal: number, cents: number, freq: number) {
     const ok = Math.abs(cents) <= prefs.tol;
-    steady = ok ? steady + 1 : 0;
-    const locked = steady >= 4;
-    $("note").innerHTML = `<b>${shown.name.replace("#", "♯")}</b><sup>${shown.octave}</sup>`;
-    $("cents").textContent = `${cents > 0 ? "+" : cents < 0 ? "−" : ""}${Math.abs(Math.round(cents))} cents`;
-    $("hz").textContent = `${reading.freq.toFixed(1)} Hz`;
-    $("hint").textContent = locked ? "In tune ✓" : cents < -prefs.tol ? "A little low: tune up ↑" : cents > prefs.tol ? "A little high: tune down ↓" : "Almost there…";
-    point(cents);
-    root.classList.toggle("ok", locked);
-    $("needle-line").setAttribute("stroke", locked ? "#6ee7b7" : "#fbbf24");
-    if (locked && !wasOk && "vibrate" in navigator) navigator.vibrate?.(25);
-    wasOk = locked;
-    if (strings().length) drawStringsHighlight(reading.midi, locked);
-    void strong;
-  }
-
-  let lastNear: number | null = null;
-  let lastOk = false;
-  function drawStringsHighlight(midi: number, ok: boolean) {
-    if (midi === lastNear && ok === lastOk) return;
-    lastNear = midi;
-    lastOk = ok;
-    document.querySelectorAll<HTMLButtonElement>(".tn-string:not(.tn-auto)").forEach((b, i) => {
-      const m = strings()[i];
-      b.classList.toggle("near", m === midi && !ok);
-      b.classList.toggle("ok", m === midi && ok);
+    const shown = noteFromFreq(freqFromMidi(goal, prefs.a4), prefs.a4);
+    $("note").innerHTML = `<b>${NAMES_PRETTY(shown.name)}</b><sup>${shown.octave}</sup>`;
+    $("cents").textContent = `${cents > 0 ? "+" : cents < 0 ? "−" : ""}${Math.abs(Math.round(cents))} ¢`;
+    $("hz").textContent = `${freq.toFixed(1)} Hz`;
+    $("hint").textContent = ok ? "In tune ✓" : cents < 0 ? "A little low: tune up ↑" : "A little high: tune down ↓";
+    root.classList.toggle("ok", ok);
+    drawLed(cents);
+    lanes.forEach((l, i) => {
+      l.root.classList.toggle("near", i === gi && !ok);
+      l.root.classList.toggle("ok", i === gi && ok);
+      if (i !== gi) l.node.style.setProperty("--y", "-50%");
     });
+    place(gi, cents);
+    activeIndex = gi;
+    if (ok && !wasOk && "vibrate" in navigator) navigator.vibrate?.(20);
+    wasOk = ok;
+
+    // a string is captured once it holds in tune, and let go again if it is played badly out of tune afterwards
+    if (lanes[gi].midi === null) return;
+    held[gi] = ok ? held[gi] + 1 : 0;
+    off[gi] = Math.abs(cents) > Math.max(15, prefs.tol * 3) ? off[gi] + 1 : 0;
+    if (!done[gi] && held[gi] >= CAPTURE) {
+      done[gi] = true;
+      const node = lanes[gi].node;
+      node.classList.remove("ripple", "pop");
+      void node.offsetWidth;
+      node.classList.add("ripple", "pop");
+      window.setTimeout(() => node.classList.remove("ripple", "pop"), 900);
+      drawProgress();
+      if (done.every(Boolean) && !announced) {
+        announced = true;
+        $("board").classList.add("all-ok");
+        $("hint").textContent = "All strings in tune!";
+        toast({ icon: "🎸", title: "All strings in tune", text: "Nicely done. Time to play.", ms: 4000 });
+      }
+    } else if (done[gi] && off[gi] >= 20) {
+      done[gi] = false;
+      announced = false;
+      $("board").classList.remove("all-ok");
+      drawProgress();
+    }
   }
 
   function tick() {
@@ -335,17 +476,20 @@ import { INSTRUMENTS } from "../../lib/tools/pitch";
     $("level").style.width = `${levelPercent(level)}%`;
     $("level").classList.toggle("open", open);
     $("mic-warn").hidden = !silence.feed(level, now);
+    signal = open ? level : 0;
     let pitch = open ? detectPitch(buf, sr, inst.fmin, inst.fmax) : null;
     if (pitch && pitch.clarity < 0.75) pitch = null;
     if (!pitch) {
       if (now - lastHeard > 900) {
         recent = [];
-        steady = 0;
         wasOk = false;
+        activeIndex = -1;
         $("status").textContent = "Listening… play a string";
-        show(null, false);
-        lastNear = null;
-        drawStringsHighlight(-1, false);
+        $("note").innerHTML = "<b>–</b><sup></sup>";
+        $("cents").innerHTML = "&nbsp;";
+        $("hz").innerHTML = "&nbsp;";
+        if (!announced) $("hint").innerHTML = "&nbsp;";
+        idle();
       }
       return;
     }
@@ -360,9 +504,10 @@ import { INSTRUMENTS } from "../../lib/tools/pitch";
     if (target !== null) goal = target;
     else if (list.length) goal = list.reduce((best, m) => (Math.abs(m - smooth) < Math.abs(best - smooth) ? m : best), list[0]);
     else goal = Math.round(smooth);
-    const cents = (smooth - goal) * 100;
+    const gi = list.length ? list.indexOf(goal) : 0;
+    if (!list.length) lanes[0].node.innerHTML = `<b>${NAMES_PRETTY(noteFromFreq(freqFromMidi(goal, prefs.a4), prefs.a4).name)}</b>`;
     $("status").textContent = "Listening";
-    show({ midi: goal, cents, freq: freqFromMidi(smooth, prefs.a4) }, true);
+    show(gi, goal, (smooth - goal) * 100, freqFromMidi(smooth, prefs.a4));
   }
 
   async function start() {
@@ -379,19 +524,23 @@ import { INSTRUMENTS } from "../../lib/tools/pitch";
     $("mic-warn").hidden = true;
     $("mic-name").textContent = mic.label ? `Microphone: ${mic.label}` : "";
     void fillMicPicker($<HTMLSelectElement>("mic-select"), mic.deviceId, () => { stop(); void start(); });
-    root.classList.add("live", "idle");
+    root.classList.add("live");
     $("status").textContent = "Listening… play a string";
     $("listen-text").textContent = "Stop";
     $("listen").setAttribute("aria-pressed", "true");
     timer = window.setInterval(tick, 50);
+    cancelAnimationFrame(anim);
+    anim = requestAnimationFrame(animate);
+    drawProgress();
   }
   function stop() {
     window.clearInterval(timer);
     mic?.stop();
     mic = null;
     recent = [];
+    activeIndex = -1;
+    signal = 0;
     root.classList.remove("live", "ok");
-    root.classList.add("idle");
     $("status").textContent = "Press Start, then play a string";
     $("listen-text").textContent = "Start";
     $("listen").setAttribute("aria-pressed", "false");
@@ -399,15 +548,17 @@ import { INSTRUMENTS } from "../../lib/tools/pitch";
     $("mic-warn").hidden = true;
     $("note").innerHTML = "<b>–</b><sup></sup>";
     $("cents").innerHTML = "&nbsp;";
+    $("hz").innerHTML = "&nbsp;";
     $("hint").innerHTML = "&nbsp;";
-    $("hz").textContent = "";
-    point(0);
-    drawStrings();
+    idle();
+    drawProgress();
+    window.setTimeout(() => { if (!mic) cancelAnimationFrame(anim); }, 600);
   }
   $("listen").addEventListener("click", () => (mic ? stop() : void start()));
   window.addEventListener("pagehide", stop);
+  window.addEventListener("resize", sizeZones);
 
-  drawGauge();
+  buildLed();
   drawInstrument();
-  root.classList.add("idle");
+  setMode();
 </script>
