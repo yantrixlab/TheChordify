@@ -39,6 +39,9 @@ import ToolShell from "../../components/ToolShell.astro";
       <div class="cd-bars" id="bars" aria-label="Notes heard" role="img"></div>
 
       <div class="cd-meter" aria-hidden="true"><i id="level"></i></div>
+      <p class="mic-name" id="mic-name"></p>
+      <select id="mic-select" class="tk-select mic-select" aria-label="Microphone" hidden></select>
+      <p class="mic-warn" id="mic-warn" hidden role="alert"></p>
       <div class="cd-actions">
         <button id="listen" class="tk-btn amber cd-listen" type="button" aria-pressed="false">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"></rect><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3"></path></svg>
@@ -140,7 +143,7 @@ import ToolShell from "../../components/ToolShell.astro";
 </style>
 
 <script>
-  import { MicError, gateLevel, openMic, type Mic } from "../../lib/tools/audio";
+  import { MicError, NoiseGate, SILENT_MIC_TEXT, SilenceWatch, fillMicPicker, levelPercent, openMic, type Mic } from "../../lib/tools/audio";
   import { ChordListener, type Heard } from "../../lib/tools/listener";
   import { NOTE_NAMES } from "../../lib/tools/pitch";
   import { pitchClassesOf } from "../../lib/tools/chroma";
@@ -160,6 +163,10 @@ import ToolShell from "../../components/ToolShell.astro";
   try { prefs = { ...prefs, ...JSON.parse(localStorage.getItem(KEY) || "{}") }; } catch { /* first visit */ }
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(prefs)); } catch { /* storage is off */ } };
 
+  const noiseGate = new NoiseGate(55);
+  const silence = new SilenceWatch();
+  $("mic-warn").textContent = SILENT_MIC_TEXT;
+
   // the twelve note bars
   const bars = $("bars");
   bars.innerHTML = NOTE_NAMES.map((n) => `<div class="cd-bar"><i></i><b>${n.replace("#", "♯")}</b></div>`).join("");
@@ -171,7 +178,7 @@ import ToolShell from "../../components/ToolShell.astro";
   const drawSens = () => {
     sens.style.setProperty("--fill", `${prefs.sens}%`);
     $("sens-out").textContent = prefs.sens < 35 ? "Low" : prefs.sens < 70 ? "Medium" : "High";
-    if (listener) listener.options.gate = gateLevel(prefs.sens);
+    noiseGate.sensitivity = prefs.sens;
   };
   sens.addEventListener("input", () => { prefs.sens = Number(sens.value); drawSens(); save(); });
   $<HTMLInputElement>("simple").checked = prefs.simple;
@@ -233,7 +240,9 @@ import ToolShell from "../../components/ToolShell.astro";
   let listener: ChordListener | null = null;
 
   function onHeard(h: Heard) {
-    $("level").style.width = `${Math.min(100, Math.sqrt(h.level / 0.25) * 100)}%`;
+    $("level").style.width = `${levelPercent(h.level)}%`;
+    $("level").classList.toggle("open", !!h.chroma);
+    $("mic-warn").hidden = !silence.feed(h.level);
     const hold = $<HTMLInputElement>("hold").checked;
     const tones = h.chord ? pitchClassesOf(h.chord) : [];
     barEls.forEach((bar, i) => {
@@ -263,8 +272,11 @@ import ToolShell from "../../components/ToolShell.astro";
       return;
     }
     startedAt = performance.now();
-    listener = new ChordListener(mic, { gate: gateLevel(prefs.sens), suffixes: prefs.simple ? SIMPLE : undefined }, onHeard);
+    listener = new ChordListener(mic, { gate: noiseGate, suffixes: prefs.simple ? SIMPLE : undefined }, onHeard);
     listener.start();
+    $("mic-warn").hidden = true;
+    $("mic-name").textContent = mic.label ? `Microphone: ${mic.label}` : "";
+    void fillMicPicker($<HTMLSelectElement>("mic-select"), mic.deviceId, () => { stop(); void start(); });
     root.classList.add("live");
     $("status").textContent = "Listening… play a chord";
     $("kind").textContent = "Listening… play a chord";
@@ -281,6 +293,7 @@ import ToolShell from "../../components/ToolShell.astro";
     $("listen-text").textContent = "Start";
     $("listen").setAttribute("aria-pressed", "false");
     $("level").style.width = "0";
+    $("mic-warn").hidden = true;
     $("conf").style.width = "0";
     $("conf-label").textContent = "";
     barEls.forEach((bar) => { (bar.firstElementChild as HTMLElement).style.height = "3px"; bar.classList.remove("in"); });

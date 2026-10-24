@@ -101,3 +101,13 @@
 .tk-more a.is-locked small::before { content: "🔒 "; }
 .tk-tile { flex: none; display: grid; place-items: center; width: 44px; height: 44px; color: #fff; border-radius: 14px; background: linear-gradient(135deg, var(--h1, #7c3aed), var(--h2, #c026d3)); box-shadow: 0 10px 20px -10px var(--h1, #7c3aed); }
 .tk-tile svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+
+/* the microphone: its name, a chooser when there are several, and the warning when it is silent */
+.mic-name { margin: 0 0 8px; text-align: center; font: 500 12px var(--font-sans); color: #a78bd0; }
+.mic-name:empty { display: none; }
+.mic-select { display: block; max-width: 320px; margin: 0 auto 12px; color: #fff; background: #ffffff14; border-color: #ffffff30; }
+.mic-select[hidden] { display: none; }
+.mic-select option { color: #0d001f; }
+.mic-warn { max-width: 400px; margin: 0 auto 12px; padding: 10px 14px; text-align: left; font-size: 13px; line-height: 1.5; color: #fde68a; background: #f59e0b22; border: 1px solid #f59e0b66; border-radius: 14px; }
+.mic-warn[hidden] { display: none; }
+.tn-meter i:not(.open), .cd-meter i:not(.open), .pr-meter i:not(.open) { opacity: 0.45; }

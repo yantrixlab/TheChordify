@@ -34,6 +34,9 @@ import { INSTRUMENTS } from "../../lib/tools/pitch";
       <div class="tn-strings" id="strings" role="group" aria-label="Strings"></div>
 
       <div class="tn-meter" aria-hidden="true"><i id="level"></i></div>
+      <p class="mic-name" id="mic-name"></p>
+      <select id="mic-select" class="tk-select mic-select" aria-label="Microphone" hidden></select>
+      <p class="mic-warn" id="mic-warn" hidden role="alert"></p>
       <div class="tn-actions">
         <button id="listen" class="tk-btn amber tn-listen" type="button" aria-pressed="false">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"></rect><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3"></path></svg>
@@ -130,7 +133,7 @@ import { INSTRUMENTS } from "../../lib/tools/pitch";
 
 <script>
   import { INSTRUMENTS, detectPitch, freqFromMidi, midiFromName, noteFromFreq, noteLabel, type Instrument } from "../../lib/tools/pitch";
-  import { MicError, audioContext, openMic, resumeAudio, rms, type Mic } from "../../lib/tools/audio";
+  import { MicError, NoiseGate, SILENT_MIC_TEXT, SilenceWatch, audioContext, fillMicPicker, levelPercent, openMic, resumeAudio, rms, type Mic } from "../../lib/tools/audio";
   import { initGate } from "../../lib/tools/gate";
 
   const gate = initGate("tuner", "tuner");
@@ -238,9 +241,11 @@ import { INSTRUMENTS } from "../../lib/tools/pitch";
 
   const sens = $<HTMLInputElement>("sens");
   sens.value = String(prefs.sens);
-  const gateLevel = () => 0.03 * Math.pow(0.07, prefs.sens / 100); // 0.03 (least sensitive) down to about 0.002
+  $("mic-warn").textContent = SILENT_MIC_TEXT;
+  const noiseGate = new NoiseGate(prefs.sens);
+  const silence = new SilenceWatch();
   const drawSens = () => { fill(sens); $("sens-out").textContent = prefs.sens < 35 ? "Low" : prefs.sens < 70 ? "Medium" : "High"; };
-  sens.addEventListener("input", () => { prefs.sens = Number(sens.value); drawSens(); save(); });
+  sens.addEventListener("input", () => { prefs.sens = Number(sens.value); noiseGate.sensitivity = prefs.sens; drawSens(); save(); });
   drawSens();
 
   // ---- a reference tone ----
@@ -325,10 +330,13 @@ import { INSTRUMENTS } from "../../lib/tools/pitch";
     if (buf.length !== mic.analyser.fftSize) buf = new Float32Array(mic.analyser.fftSize);
     mic.analyser.getFloatTimeDomainData(buf);
     const level = rms(buf);
-    $("level").style.width = `${Math.min(100, Math.sqrt(level / 0.25) * 100)}%`;
     const now = performance.now();
-    let pitch = level > gateLevel() ? detectPitch(buf, sr, inst.fmin, inst.fmax) : null;
-    if (pitch && pitch.clarity < 0.82) pitch = null;
+    const open = noiseGate.update(level, now);
+    $("level").style.width = `${levelPercent(level)}%`;
+    $("level").classList.toggle("open", open);
+    $("mic-warn").hidden = !silence.feed(level, now);
+    let pitch = open ? detectPitch(buf, sr, inst.fmin, inst.fmax) : null;
+    if (pitch && pitch.clarity < 0.75) pitch = null;
     if (!pitch) {
       if (now - lastHeard > 900) {
         recent = [];
@@ -368,6 +376,9 @@ import { INSTRUMENTS } from "../../lib/tools/pitch";
       error.hidden = false;
       return;
     }
+    $("mic-warn").hidden = true;
+    $("mic-name").textContent = mic.label ? `Microphone: ${mic.label}` : "";
+    void fillMicPicker($<HTMLSelectElement>("mic-select"), mic.deviceId, () => { stop(); void start(); });
     root.classList.add("live", "idle");
     $("status").textContent = "Listening… play a string";
     $("listen-text").textContent = "Stop";
@@ -385,6 +396,7 @@ import { INSTRUMENTS } from "../../lib/tools/pitch";
     $("listen-text").textContent = "Start";
     $("listen").setAttribute("aria-pressed", "false");
     $("level").style.width = "0";
+    $("mic-warn").hidden = true;
     $("note").innerHTML = "<b>–</b><sup></sup>";
     $("cents").innerHTML = "&nbsp;";
     $("hint").innerHTML = "&nbsp;";

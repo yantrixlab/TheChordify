@@ -66,6 +66,9 @@ const progressions = [
       <div class="pr-panel" data-panel="listen" hidden>
         <div class="pr-heard">I hear: <b id="heard">–</b></div>
         <div class="pr-meter" aria-hidden="true"><i id="level"></i></div>
+      <p class="mic-name" id="mic-name"></p>
+      <select id="mic-select" class="tk-select mic-select" aria-label="Microphone" hidden></select>
+      <p class="mic-warn" id="mic-warn" hidden role="alert"></p>
         <div class="pr-timer" id="limit-bar" hidden aria-hidden="true"><i id="limit-fill"></i></div>
       </div>
 
@@ -239,7 +242,7 @@ const progressions = [
 
 <script>
   import { Metronome, clampBpm, defaultAccents } from "../../lib/tools/metronome";
-  import { MicError, gateLevel, openMic, type Mic } from "../../lib/tools/audio";
+  import { MicError, NoiseGate, SILENT_MIC_TEXT, SilenceWatch, fillMicPicker, levelPercent, openMic, type Mic } from "../../lib/tools/audio";
   import { ChordListener, type Heard } from "../../lib/tools/listener";
   import { ROOTS, scoreChord } from "../../lib/tools/chroma";
   import { diagramSvg, getGuitarShape } from "../../lib/tools/diagram";
@@ -248,6 +251,8 @@ const progressions = [
   import { track } from "../../lib/analytics";
 
   const gate = initGate("practice_chords", "practice");
+  const noiseGate = new NoiseGate(55);
+  const silence = new SilenceWatch();
   const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
   const all = <T extends HTMLElement>(selector: string) => [...document.querySelectorAll<T>(selector)];
 
@@ -398,7 +403,7 @@ const progressions = [
     sens.value = String(prefs.sens);
     sens.style.setProperty("--fill", `${prefs.sens}%`);
     $("sens-out").textContent = prefs.sens < 35 ? "Low" : prefs.sens < 70 ? "Medium" : "High";
-    if (listener) listener.options.gate = gateLevel(prefs.sens);
+    noiseGate.sensitivity = prefs.sens;
   }
   all<HTMLButtonElement>("[data-mode]").forEach((b) => b.addEventListener("click", () => { if (running) stopAll(); prefs.mode = b.dataset.mode as Mode; save(); drawSettings(); idleStage(); drawStats(); }));
   all<HTMLButtonElement>("[data-per]").forEach((b) => b.addEventListener("click", () => { prefs.per = Number(b.dataset.per); save(); drawSettings(); if (running) restartFollow(); }));
@@ -509,7 +514,9 @@ const progressions = [
     $("limit-fill").style.width = "100%";
   }
   function onHeard(h: Heard) {
-    $("level").style.width = `${Math.min(100, Math.sqrt(h.level / 0.25) * 100)}%`;
+    $("level").style.width = `${levelPercent(h.level)}%`;
+    $("level").classList.toggle("open", !!h.chroma);
+    $("mic-warn").hidden = !silence.feed(h.level);
     $("heard").textContent = h.chord ?? "–";
     if (locked || !h.chroma || performance.now() - shownAt < 450) { if (!h.chroma) okFrames = 0; return; }
     const score = scoreChord(h.chroma, target);
@@ -536,10 +543,14 @@ const progressions = [
       error(err instanceof MicError ? err.message : "The microphone could not be started.");
       return false;
     }
+    $("mic-warn").textContent = SILENT_MIC_TEXT;
+    $("mic-warn").hidden = true;
+    $("mic-name").textContent = mic.label ? `Microphone: ${mic.label}` : "";
+    void fillMicPicker($<HTMLSelectElement>("mic-select"), mic.deviceId, () => { if (running && prefs.mode === "listen") { stopAll(); void startAll(); } });
     Object.assign(stats, { right: 0, streak: 0, bestStreak: 0, times: [], missed: 0 });
     seq = 0;
     target = "";
-    listener = new ChordListener(mic, { gate: gateLevel(prefs.sens) }, onHeard);
+    listener = new ChordListener(mic, { gate: noiseGate }, onHeard);
     listener.start(110);
     nextTarget();
     listenStats();
@@ -649,6 +660,7 @@ const progressions = [
     phase = "idle";
     $<HTMLButtonElement>("changed").disabled = true;
     $("level").style.width = "0";
+    $("mic-warn").hidden = true;
     $("heard").textContent = "–";
     $("limit-bar").hidden = true;
     $("clock").textContent = "1:00";

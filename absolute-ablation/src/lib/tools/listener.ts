@@ -1,5 +1,5 @@
 // Listens to the microphone and keeps naming the chord being played, steadily enough to read.
-import { audioContext, rms, type Mic } from "./audio";
+import { audioContext, rms, type Mic, type NoiseGate } from "./audio";
 import { chromaOf, matchChords, type ChordGuess } from "./chroma";
 
 export interface Heard {
@@ -16,8 +16,8 @@ export interface Heard {
 }
 
 export interface ListenerOptions {
-  /** Loudness below which it counts as silence (see gateLevel). */
-  gate: number;
+  /** Tells the sound of playing from the sound of the room. */
+  gate: NoiseGate;
   /** Only name these kinds of chord ("", "m", "7"...). All of them when left out. */
   suffixes?: string[];
 }
@@ -52,7 +52,7 @@ export class ChordListener {
     this.mic.analyser.getFloatTimeDomainData(this.buf);
     const level = rms(this.buf);
     const now = performance.now();
-    if (level < this.options.gate) {
+    if (!this.options.gate.update(level, now)) {
       // a brief gap between strums keeps the last chord; a longer one clears it
       if (now - this.lastSound > 900) this.current = this.pending = null;
       this.onHeard({ level, chroma: null, guesses: [], chord: this.current, score: 0 });
