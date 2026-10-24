@@ -28,7 +28,8 @@ export class MicError extends Error {
 }
 
 const MIC_TEXT: Record<MicProblem, string> = {
-  denied: "The microphone is blocked. Allow it for this site in your browser's address bar, then try again.",
+  denied:
+    "The microphone is blocked. Tap the lock icon next to the address, choose Permissions, allow the Microphone, then reload and try again. On Android, if the phone says this site can't ask for permission, close any floating bubbles, screen recorders or screen filters first.",
   none: "No microphone was found. Plug one in, or check that your device has one, then try again.",
   busy: "The microphone is being used by another app. Close that app and try again.",
   insecure: "The microphone only works on a secure (https) page.",
