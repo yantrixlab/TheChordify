@@ -26,7 +26,7 @@ from scipy.interpolate import interp1d
 from scipy.ndimage import uniform_filter1d
 
 from .chord_detection import NOTE_NAMES, estimate_beats
-from .meter import beat_signals, estimate_meter
+from .meter import beat_signals, estimate_meter, fast_triple_grid
 from .pulse import estimate_pulse_grid
 from .sections_ai import SectionsJob
 from .structure import (
@@ -406,7 +406,16 @@ def extract_features(y: np.ndarray, progress: Optional[ProgressFn] = None, tta: 
         try:
             env = librosa.onset.onset_strength(y=y, sr=SAMPLE_RATE, hop_length=512)
             accent, change = beat_signals(beat_times, env, SAMPLE_RATE / 512, chroma, FRAMES_PER_SECOND)
-            meter, _ = estimate_meter(beat_times, accent, change, bpm)
+            meter, evidence = estimate_meter(beat_times, accent, change, bpm)
+            # A quick waltz is often tracked at half its speed: when it is clearly counted in threes at the quicker
+            # pulse, that pulse is the grid (about twice the tempo, three beats a bar).
+            quick = fast_triple_grid(
+                env, SAMPLE_RATE / 512, 512, chroma, FRAMES_PER_SECOND, sound_starts, duration, evidence.get("scores", {})
+            )
+            if quick is not None:
+                beat_times, bpm = np.asarray(quick[0], dtype=float), quick[1]
+                boundaries = np.unique(np.concatenate([[0.0], beat_times[beat_times < duration], [duration]]))
+                meter = 3
         except Exception:  # a failure here must never cost the song its chords: fall back on four
             meter = 4
     return Features(

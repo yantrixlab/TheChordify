@@ -13,10 +13,16 @@ position stands clear of the others, bar after bar. When m is wrong the position
 profile goes flat. How far the best position stands out, above what chance alone gives, is the score for m.
 
 Four is the default and is only given up for a clearly better score, so a song with no clear pulse keeps four.
+
+The beat grid itself can be at the wrong speed: the tracker settles on a beat that is half of what a player counts
+(a quick waltz tracked at 86 BPM when it is felt at 172, three to a bar). `fast_triple_grid` looks for that case.
 """
 
 from __future__ import annotations
 
+from typing import Optional
+
+import librosa
 import numpy as np
 
 CANDIDATES = (3, 4, 5, 6, 7)
@@ -67,6 +73,38 @@ def _stand_out(signal: np.ndarray, m: int) -> float:
 def meter_scores(accent: np.ndarray, change: np.ndarray, candidates=CANDIDATES) -> dict[int, float]:
     """A score per candidate bar length (higher is a better fit)."""
     return {m: _stand_out(accent, m) + _stand_out(change, m) for m in candidates}
+
+
+FAST_MIN_BPM, FAST_MAX_BPM = 125.0, 240.0
+
+
+def fast_triple_grid(
+    env: np.ndarray, env_fps: float, hop: int, chroma: np.ndarray, chroma_fps: float, start: float, duration: float,
+    slow_scores: dict,
+) -> Optional[tuple[np.ndarray, float]]:
+    """(beats, bpm) at the quicker pulse when the music is clearly counted in threes at that speed, else None.
+
+    The tracker's own tempo (without the usual halving of anything above 140) is tried as the beat. It is taken only
+    when three beats to a bar fits it far better than any other length (and at least as well as six), and the slower
+    grid in use shows no sign of four. Songs in four, and waltzes already tracked at their own speed, keep their grid.
+    """
+    from .structure import fit_beat_grid  # imported here: structure does not depend on this module
+
+    if slow_scores.get(4, 0.0) > 6.0:
+        return None
+    sr = int(round(env_fps * hop))
+    tempo, frames = librosa.beat.beat_track(onset_envelope=env, sr=sr, hop_length=hop)
+    bpm = float(np.atleast_1d(tempo)[0])
+    if not FAST_MIN_BPM <= bpm <= FAST_MAX_BPM or len(frames) < MIN_BEATS:
+        return None
+    beats = fit_beat_grid(librosa.frames_to_time(frames, sr=sr, hop_length=hop), start, duration)
+    if len(beats) < MIN_BEATS:
+        return None
+    accent, change = beat_signals(beats, env, env_fps, chroma, chroma_fps)
+    s = {m: max(v, 0.0) for m, v in meter_scores(accent, change).items()}
+    if s[3] > 8.0 and s[3] > 2.0 * s[4] + 3.0 and s[3] >= s[6]:
+        return beats, 60.0 / float(np.median(np.diff(beats)))
+    return None
 
 
 def estimate_meter(beats: np.ndarray, accent: np.ndarray, change: np.ndarray, bpm: float) -> tuple[int, dict]:

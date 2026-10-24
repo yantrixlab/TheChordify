@@ -75,7 +75,8 @@ except Exception as exc:
 # 11: chords that recur on the same beat of nearby bars are favoured there (restores faint repeats); slivers under 0.3 s are absorbed.
 # 12: bars are as long as the song counts them instead of always four; the result says `beatsPerBar`.
 # 13: five and seven beats a bar are found too.
-ANALYSIS_VERSION = 13
+# 14: a quick waltz tracked at half its speed is counted at its own (about twice the tempo, three beats a bar).
+ANALYSIS_VERSION = 14
 
 ALLOWED_UPLOAD_EXTENSIONS ={".mp3", ".wav", ".flac", ".m4a"}
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50MB
