@@ -26,6 +26,7 @@ from scipy.interpolate import interp1d
 from scipy.ndimage import uniform_filter1d
 
 from .chord_detection import NOTE_NAMES, estimate_beats
+from .meter import beat_signals, estimate_meter
 from .pulse import estimate_pulse_grid
 from .sections_ai import SectionsJob
 from .structure import (
@@ -238,6 +239,7 @@ class Features:
     beats: np.ndarray = None  # type: ignore[assignment]  # real beat times in seconds (no artificial 0.0)
     audible_start: float = 0.0  # when sound begins (quiet playing counts); the opening before it is silence
     texture: np.ndarray = None  # type: ignore[assignment]  # (8, frames) how loud, bright and dense the sound is
+    beats_per_bar: int = 4  # the song's bar length: 4 unless the audio clearly counts in 3 or 6 (see meter.py)
 
 
 @dataclass
@@ -397,9 +399,19 @@ def extract_features(y: np.ndarray, progress: Optional[ProgressFn] = None, tta: 
     # Loudness and timbre tell choruses from verses when they share the same chords (see structure.py).
     mfcc = librosa.feature.mfcc(y=y, sr=SAMPLE_RATE, n_mfcc=13, hop_length=HOP_LENGTH)
     n = chroma.shape[1]
+    beat_times = np.asarray(beat_times, dtype=float)
+    # How the beats group into bars: counted from how hard each beat hits and how often the harmony changes on it.
+    meter = 4
+    if len(beat_times) >= 2:
+        try:
+            env = librosa.onset.onset_strength(y=y, sr=SAMPLE_RATE, hop_length=512)
+            accent, change = beat_signals(beat_times, env, SAMPLE_RATE / 512, chroma, FRAMES_PER_SECOND)
+            meter, _ = estimate_meter(beat_times, accent, change, bpm)
+        except Exception:  # a failure here must never cost the song its chords: fall back on four
+            meter = 4
     return Features(
         duration, bpm, boundaries, probs, bass_chroma, chroma, rms[:n], mfcc[:, :n],
-        np.asarray(beat_times, dtype=float), sound_starts, _texture_features(y, n),
+        beat_times, sound_starts, _texture_features(y, n), meter,
     )
 
 
@@ -419,11 +431,12 @@ def _repeat_weights(f: Features, probs: np.ndarray, strength: float) -> np.ndarr
     when the playing gets denser. For every beat the triad probabilities are compared across the same beat of the
     bars around it with the average over all beats of those bars: a chord that is clearly more likely at this beat
     position than elsewhere (and recurs in several bars) is boosted here, and the chords it is rarer than are
-    softened. Beats are four to a bar, so only beat counts matter, not which beat starts a bar.
+    softened. Beats are grouped by the song's bar length, so only beat counts matter, not which beat starts a bar.
     """
     beats = f.beats
     weights = np.ones((len(probs), NUM_CHORDS))
-    if strength <= 0 or beats is None or len(beats) < 4 * (_REPEAT_MIN_BARS + 1):
+    bpb = f.beats_per_bar
+    if strength <= 0 or beats is None or len(beats) < bpb * (_REPEAT_MIN_BARS + 1):
         return weights
     folded = probs @ _FOLD  # (frames, 37)
     nb = len(beats)
@@ -433,10 +446,10 @@ def _repeat_weights(f: Features, probs: np.ndarray, strength: float) -> np.ndarr
     beat_p = np.array([folded[lo:hi].mean(axis=0) for lo, hi in zip(frame_lo, frame_hi)])  # (beats, 37)
 
     boost = np.ones((nb, 37))
-    reach = 4 * _REPEAT_BARS
+    reach = bpb * _REPEAT_BARS
     for b in range(nb):
         near = np.arange(max(0, b - reach), min(nb, b + reach + 1))
-        same = near[(near - b) % 4 == 0]
+        same = near[(near - b) % bpb == 0]
         if len(same) < _REPEAT_MIN_SAME:
             continue
         at_position = beat_p[same].mean(axis=0)
@@ -559,21 +572,22 @@ def detect_chords_ai(audio_path: str, on_progress: Optional[ProgressFn] = None) 
 
     progress(94, "Finding the song's sections")
     # Which beat cell of the chord grid each chord is written in (times themselves stay as detected).
-    phase = downbeat_phase(features.beats, simple)
-    simple = place_chords_on_grid(simple, features.beats, phase, features.duration)
-    detailed = place_chords_on_grid(detailed, features.beats, phase, features.duration)
+    bpb = features.beats_per_bar
+    phase = downbeat_phase(features.beats, simple, bpb)
+    simple = place_chords_on_grid(simple, features.beats, phase, features.duration, bpb)
+    detailed = place_chords_on_grid(detailed, features.beats, phase, features.duration, bpb)
     structure_inputs = (
         features.beats, features.duration, features.chroma, features.mfcc, features.rms,
         features.audible_start, phase, features.texture,
     )
-    structure = analyze_structure(simple, *structure_inputs)
+    structure = analyze_structure(simple, *structure_inputs, None, bpb)
 
     def upgrade_sections() -> Optional[list[dict]]:
         """Waits for the structure model; its sections on our bars, or None when it gave none."""
         learned = sections_job.result()
         if not learned:
             return None
-        return analyze_structure(simple, *structure_inputs, learned)["sections"]
+        return analyze_structure(simple, *structure_inputs, learned, bpb)["sections"]
 
     beat_list = [float(t) for t in features.boundaries[:-1]]
     if beat_list and beat_list[0] > 0.01:
@@ -587,7 +601,8 @@ def detect_chords_ai(audio_path: str, on_progress: Optional[ProgressFn] = None) 
         "key": estimate_key(simple),
         "tempo": round(features.bpm, 1),
         "beatTimes": beat_list,
-        # bars of four beats starting where chords tend to change; a pickup / short last bar has null beats
+        # bars of `beatsPerBar` beats (3, 4 or 6) starting where chords tend to change; a pickup / short last bar has null beats
+        "beatsPerBar": bpb,
         "bars": structure["bars"],
         "sections": structure["sections"],
         # Better sections from the structure model, for the caller to wait for (and strip before saving), or None.

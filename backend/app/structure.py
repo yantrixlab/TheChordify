@@ -2,7 +2,8 @@
 
 No extra model is needed. Everything comes from what the chord analysis already computed:
 
-1. Bars. Beats are grouped in fours, starting at the beat where chord changes most often land.
+1. Bars. Beats are grouped into bars of the song's own length (usually four, sometimes three or six; see meter.py),
+   starting at the beat where chord changes most often land.
 0. Sections can come from a trained model (sections_ai.py); everything below is the model-free fallback.
 2. Boundaries. A "novelty" curve over a bar-by-bar similarity matrix (harmony + timbre) peaks
    where the music changes character; the strongest peaks become section starts.
@@ -27,7 +28,7 @@ from sklearn.cluster import AgglomerativeClustering
 from sklearn.metrics import silhouette_score
 
 FRAMES_PER_SECOND = 22050 / 2048
-BEATS_PER_BAR = 4
+BEATS_PER_BAR = 4  # the usual bar; every function below takes the song's own `bpb` and defaults to this
 PHRASE = 4  # bars per phrase: sections start and end on this grid
 MAX_MERGED_BARS = 16  # neighbouring look-alike sections are merged only up to this many bars
 MAX_SECTION_BARS = 20  # a section longer than this is split at its strongest internal change...
@@ -66,23 +67,23 @@ def regularize_beats(beats: np.ndarray, start: float) -> np.ndarray:
     return np.array([t for t in prefix if t >= 0.0] + filled)
 
 
-def downbeat_phase(beats: np.ndarray, chords: list[dict]) -> int:
-    """Which of the four beat positions chords change on most often: that beat starts the bar."""
+def downbeat_phase(beats: np.ndarray, chords: list[dict], bpb: int = BEATS_PER_BAR) -> int:
+    """Which of the bar's beat positions chords change on most often: that beat starts the bar."""
     if len(beats) < 8:
         return 0
     beat_len = float(np.median(np.diff(beats)))
-    counts = np.zeros(BEATS_PER_BAR)
+    counts = np.zeros(bpb)
     for chord in chords[1:]:
         if chord["chord"] == "N":
             continue
         i = int(np.argmin(np.abs(beats - chord["start"])))
         if abs(beats[i] - chord["start"]) < 0.3 * beat_len:
-            counts[i % BEATS_PER_BAR] += 1
+            counts[i % bpb] += 1
     return int(counts.argmax())
 
 
-def build_bars(beats: np.ndarray, duration: float, phase: int) -> list[dict]:
-    """Bars of four beats. Each bar: {"start", "beats": 4 beat times + the next bar's start}.
+def build_bars(beats: np.ndarray, duration: float, phase: int, bpb: int = BEATS_PER_BAR) -> list[dict]:
+    """Bars of `bpb` beats. Each bar: {"start", "beats": bpb beat times + the next bar's start}.
 
     A short last bar is padded with None beats. A pickup (the music starts part-way through a bar) is completed
     backwards at the song's own beat length, so the first cell of the first bar is the first beat of the song:
@@ -93,16 +94,16 @@ def build_bars(beats: np.ndarray, duration: float, phase: int) -> list[dict]:
         return bars
     if phase > 0:
         period = float(np.median(np.diff(beats))) if len(beats) > 1 else 0.5
-        missing = BEATS_PER_BAR - phase
+        missing = bpb - phase
         lead = [max(0.0, float(beats[0]) - period * (missing - j)) for j in range(missing)]
         bars.append({"start": lead[0], "beats": lead + [float(t) for t in beats[:phase]] + [float(beats[phase])]})
     i = phase
     while i < len(beats):
-        group = [float(t) for t in beats[i : i + BEATS_PER_BAR]]
-        end = float(beats[i + BEATS_PER_BAR]) if i + BEATS_PER_BAR < len(beats) else float(duration)
-        group += [None] * (BEATS_PER_BAR - len(group))
+        group = [float(t) for t in beats[i : i + bpb]]
+        end = float(beats[i + bpb]) if i + bpb < len(beats) else float(duration)
+        group += [None] * (bpb - len(group))
         bars.append({"start": group[0], "beats": group + [end]})
-        i += BEATS_PER_BAR
+        i += bpb
     return bars
 
 
@@ -246,8 +247,8 @@ def _classic_segments(similarity: np.ndarray, novelty: np.ndarray, energy: np.nd
     return segments, labels
 
 
-def _early_chord_bars(chords: list[dict], bars: list[dict]) -> set[int]:
-    """Indices into `bars` of the bars where a chord starts on one of the first three beats. A chord only on the
+def _early_chord_bars(chords: list[dict], bars: list[dict], bpb: int = BEATS_PER_BAR) -> set[int]:
+    """Indices into `bars` of the bars where a chord starts on any beat but the last. A chord only on the
     last beat is a pickup into the next bar, which does not make its own bar the start of anything."""
     out: set[int] = set()
     for chord in chords:
@@ -255,7 +256,7 @@ def _early_chord_bars(chords: list[dict], bars: list[dict]) -> set[int]:
         if t is None:
             continue
         for i, bar in enumerate(bars):
-            if any(bt is not None and abs(bt - t) < 1e-3 for bt in bar["beats"][: BEATS_PER_BAR - 1]):
+            if any(bt is not None and abs(bt - t) < 1e-3 for bt in bar["beats"][: bpb - 1]):
                 out.add(i)
                 break
     return out
@@ -288,6 +289,7 @@ def analyze_structure(
     phase: Optional[int] = None,
     texture: Optional[np.ndarray] = None,
     learned: Optional[list[tuple[float, float, str]]] = None,
+    bpb: int = BEATS_PER_BAR,
 ) -> dict:
     """Returns {"bars": [...], "sections": [{"label","start","end","startBar","endBar"}], "downbeatPhase": int}.
 
@@ -295,11 +297,11 @@ def analyze_structure(
     snapped to our own bars and it supplies the names; without it, sections come from the audio alone.
     """
     if phase is None:
-        phase = downbeat_phase(beats, chords)
-    bars = build_bars(beats, duration, phase)
-    full = [i for i, b in enumerate(bars) if None not in b["beats"][:BEATS_PER_BAR]]
+        phase = downbeat_phase(beats, chords, bpb)
+    bars = build_bars(beats, duration, phase, bpb)
+    full = [i for i, b in enumerate(bars) if None not in b["beats"][:bpb]]
     if len(full) < 8:  # too short to find structure in
-        return {"bars": bars, "downbeatPhase": phase, "sections": _single_section(bars, duration)}
+        return {"bars": bars, "downbeatPhase": phase, "beatsPerBar": bpb, "sections": _single_section(bars, duration)}
 
     n_frames = chroma.shape[1]
 
@@ -314,11 +316,11 @@ def analyze_structure(
     for i in full:
         b = bars[i]["beats"]
         beats_chroma = []
-        for k in range(BEATS_PER_BAR):
+        for k in range(bpb):
             v = chroma[:, frames(b[k], b[k + 1])].mean(axis=1)
             beats_chroma.append(v / (np.linalg.norm(v) + 1e-9))
         chroma_seq.append(np.concatenate(beats_chroma))
-        span = frames(b[0], b[BEATS_PER_BAR])
+        span = frames(b[0], b[bpb])
         parts = [mfcc[:, span].mean(axis=1)]
         if texture is not None:
             parts.append(texture[:, span].mean(axis=1))
@@ -329,7 +331,7 @@ def analyze_structure(
     texture_bars = uniform_filter1d(np.array(texture_bars), size=3, axis=0, mode="nearest")  # steady over +-1 bar
     texture_bars = (texture_bars - texture_bars.mean(axis=0)) / (texture_bars.std(axis=0) + 1e-9)
 
-    harmony = chroma_seq / np.sqrt(BEATS_PER_BAR)
+    harmony = chroma_seq / np.sqrt(bpb)
     harmony = (harmony - harmony.mean(axis=0)) / np.sqrt(max(harmony.shape[1], 1)) * 3.0
     features = np.hstack([harmony, texture_bars / np.sqrt(texture_bars.shape[1])])
     features = features - features.mean(axis=0)
@@ -346,7 +348,7 @@ def analyze_structure(
         shift_limit = MAX_SHIFT_BARS
     else:
         shift_limit = 1  # a model's boundary is already close; at most a lone pickup bar moves
-    segments = _start_where_chords_do(segments, bars, full, _early_chord_bars(chords, bars), shift_limit)
+    segments = _start_where_chords_do(segments, bars, full, _early_chord_bars(chords, bars, bpb), shift_limit)
 
     sections = []
     # Silence is only an opening in which nothing can be heard. A soft intro is music and is part of the grid.
@@ -365,7 +367,7 @@ def analyze_structure(
         prev["end"] = cur["start"]
     if sections and sections[0]["startBar"] is not None:
         sections[0]["start"] = 0.0  # no silence section: the song, and its first section, start at 0:00
-    return {"bars": bars, "downbeatPhase": phase, "sections": sections}
+    return {"bars": bars, "downbeatPhase": phase, "beatsPerBar": bpb, "sections": sections}
 
 
 def _section(label: str, start: float, end: float, start_bar: Optional[int], end_bar: Optional[int]) -> dict:
@@ -487,7 +489,7 @@ def fit_beat_grid(beats: np.ndarray, start: float, duration: float) -> np.ndarra
     return grid[grid >= 0.0]
 
 
-def place_chords_on_grid(chords: list[dict], beats: np.ndarray, phase: int, duration: float) -> list[dict]:
+def place_chords_on_grid(chords: list[dict], beats: np.ndarray, phase: int, duration: float, bpb: int = BEATS_PER_BAR) -> list[dict]:
     """Decide which beat cell of the chord grid each chord is written in.
 
     Chord times are left exactly as detected (playback and accuracy depend on them). Each chord gets a
@@ -508,8 +510,8 @@ def place_chords_on_grid(chords: list[dict], beats: np.ndarray, phase: int, dura
     def nearest(t: float) -> int:
         return int(np.argmin(np.abs(beats - t)))
 
-    positions = [(nearest(c["start"]) - phase) % BEATS_PER_BAR for c in chords[1:]]
-    share = np.bincount(positions, minlength=BEATS_PER_BAR) / max(len(positions), 1)
+    positions = [(nearest(c["start"]) - phase) % bpb for c in chords[1:]]
+    share = np.bincount(positions, minlength=bpb) / max(len(positions), 1)
     penalty = 1.0 - share / max(share.max(), 1e-9)  # 0 where the song often changes chord, 1 where it never does
 
     out_index = 0
@@ -523,7 +525,7 @@ def place_chords_on_grid(chords: list[dict], beats: np.ndarray, phase: int, dura
             j, best_cost = near, 1e9
             for candidate in range(max(near - 1, 0), min(near + 2, len(beats))):
                 distance = abs(float(beats[candidate]) - chord["start"]) / period
-                cost = distance + 0.5 * penalty[(candidate - phase) % BEATS_PER_BAR]
+                cost = distance + 0.5 * penalty[(candidate - phase) % bpb]
                 if distance <= 1.25 and cost < best_cost:
                     j, best_cost = candidate, cost
         if chords[out_index]["chord"] == chord["chord"]:

@@ -18,7 +18,7 @@ export interface ChordSegment {
 
 export interface Bar {
   start: number;
-  // 4 beat starts + the start of the next bar; null where the beat does not exist (a pickup bar, a short last bar)
+  // `beatsPerBar` beat starts + the start of the next bar; null where the beat does not exist (a pickup bar, a short last bar)
   beats: (number | null)[];
 }
 
@@ -45,6 +45,7 @@ export interface ExtractResult {
   videoId?: string; // YouTube songs: the video, so a jam session can be counted
   tempo: number;
   beatTimes: number[];
+  beatsPerBar?: number; // how many beats the song counts to a bar (3, 4 or 6); songs analysed before this was measured are all 4
   bars: Bar[];
   audioUrl: string;
   engine?: "btc" | "classic";

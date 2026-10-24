@@ -73,7 +73,8 @@ except Exception as exc:
 # 10: a pickup bar gets real beat cells (the first cell is the first beat; no leading Silence section), and a section
 #     starts where its chords do.
 # 11: chords that recur on the same beat of nearby bars are favoured there (restores faint repeats); slivers under 0.3 s are absorbed.
-ANALYSIS_VERSION = 11
+# 12: bars are as long as the song counts them (3, 4 or 6 beats) instead of always four; the result says `beatsPerBar`.
+ANALYSIS_VERSION = 12
 
 ALLOWED_UPLOAD_EXTENSIONS ={".mp3", ".wav", ".flac", ".m4a"}
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50MB
@@ -249,6 +250,7 @@ def _run_youtube_job(session_id: str, url: str, meta: dict) -> None:
             "chords": analysis["chords"],
             "tempo": analysis["tempo"],
             "beatTimes": analysis["beatTimes"],
+            "beatsPerBar": analysis.get("beatsPerBar", 4),
             "bars": analysis["bars"],
             "engine": analysis["engine"],
             "chordsDetailed": analysis.get("chordsDetailed", analysis["chords"]),
@@ -302,6 +304,7 @@ def _run_analysis_job(
             "chords": analysis["chords"],
             "tempo": analysis["tempo"],
             "beatTimes": analysis["beatTimes"],
+            "beatsPerBar": analysis.get("beatsPerBar", 4),
             "bars": analysis["bars"],
             "engine": analysis["engine"],
             "chordsDetailed": analysis.get("chordsDetailed", analysis["chords"]),

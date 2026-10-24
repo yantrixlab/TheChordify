@@ -383,8 +383,8 @@ import Nav from "../components/Nav.astro";
   .gs-tag:hover { filter: brightness(0.95); }
   .grid-hide-tags .gs-tag { display: none; }
   .gs-body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
-  .gr { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-bottom: 1px solid #e3deee; }
-  .gb { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); background: #faf9fd; }
+  .gr { display: grid; grid-template-columns: repeat(var(--rb, 4), minmax(0, 1fr)); border-bottom: 1px solid #e3deee; }
+  .gb { display: grid; grid-template-columns: repeat(var(--bpb, 4), minmax(0, 1fr)); background: #faf9fd; }
   .gb + .gb { border-left: 3px solid #4b4560; }
   .gb.is-current { background: #f3f0fc; }
   .gc { min-width: 0; height: 44px; display: flex; align-items: center; padding: 0 3px 0 6px; border: 0; border-left: 1px solid #ece8f5;
@@ -442,8 +442,10 @@ import Nav from "../components/Nav.astro";
     #chord-grid { padding: 8px 6px 55vh; }
     .gs { flex-direction: column; gap: 0; }
     .gs-tag { flex: 0 0 auto; align-self: flex-start; padding: 4px 12px; writing-mode: horizontal-tb; transform: none; }
-    .gr { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .gr { grid-template-columns: repeat(var(--rbm, 2), minmax(0, 1fr)); }
     .gb:nth-child(odd) { border-left: 0; }
+    #chord-grid.wide-bars .gb { border-left: 0; }
+    #chord-grid.wide-bars .gb + .gb { border-top: 3px solid #4b4560; }
     .gc { height: 40px; padding: 0 2px 0 4px; font-size: 16px; }
     .gc[data-len="3"] { font-size: 13px; }
     .gc[data-len="4"] { font-size: 11.5px; }
@@ -544,7 +546,7 @@ import Nav from "../components/Nav.astro";
   const summaryGridEl = document.getElementById("summary-grid")!;
 
   const SEMITONE_NAMES = ["0", "+1", "+2", "+3", "+4", "+5", "+6", "-5", "-4", "-3", "-2", "-1"];
-  const BARS_PER_ROW = 4; // bars per row in the chords grid
+  let BARS_PER_ROW = 4; // bars per row in the chords grid (fewer when a bar has many beats)
 
   let activeInstrument = "guitar";
   let chords: ChordSegment[] = []; // the set being shown: simple (core chords) or detailed
@@ -759,7 +761,7 @@ import Nav from "../components/Nav.astro";
   }
 
   // ---- Chords grid: every bar of the song, grouped into sections ---------------------------------------
-  const BEAT_CELLS = 4;
+  let BEAT_CELLS = 4; // beats in a bar: set from the song (see applyMeter), 4 until it is known
   interface GridCell {
     el: HTMLElement;
     start: number;
@@ -822,9 +824,22 @@ import Nav from "../components/Nav.astro";
   const ANCHOR = 0.28; // where the playing beat / chord sits, as a share of the width
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches; // scroll without animating
   const LEAD_CELLS = 8; // empty cells before the silent bar, so the playing beat can sit a quarter in from the very start
-  const SILENT_CELLS = 4; // the silent bar before the song: three blank cells and a rest sign
+  let SILENT_CELLS = 4; // the silent bar before the song: blank cells and a rest sign, one bar long
   const TAIL_CELLS = 30; // empty cells after the last beat, so the strip can scroll the last beat into place
-  const FIRST_CELL = LEAD_CELLS + SILENT_CELLS; // the first beat of the song
+  let FIRST_CELL = LEAD_CELLS + SILENT_CELLS; // the first beat of the song
+
+  /** A song counts its bars in 3, 4 or 6 beats, not always four: the grid, the strip and the silent bar follow. */
+  function applyMeter(perBar: number) {
+    const n = Number.isFinite(perBar) ? Math.min(12, Math.max(2, Math.round(perBar))) : 4;
+    BEAT_CELLS = n;
+    SILENT_CELLS = n;
+    FIRST_CELL = LEAD_CELLS + SILENT_CELLS;
+    BARS_PER_ROW = n >= 6 ? 2 : 4;
+    chordGridEl.style.setProperty("--bpb", String(n));
+    chordGridEl.style.setProperty("--rb", String(BARS_PER_ROW));
+    chordGridEl.style.setProperty("--rbm", String(n >= 6 ? 1 : 2)); // bars per row on a phone
+    chordGridEl.classList.toggle("wide-bars", n >= 6);
+  }
   const stripEl = document.getElementById("beat-strip")!;
   const stripScrollEl = document.getElementById("bs-scroll")!;
   const stripTrackEl = document.getElementById("bs-track")!;
@@ -1038,7 +1053,7 @@ import Nav from "../components/Nav.astro";
     if (activeView === "diagrams") layoutDiagrams();
   });
 
-  /** Sections as colour-coded blocks; each row is four bars, each bar four beat cells. A chord is written in the
+  /** Sections as colour-coded blocks; each row is four bars (two when a bar has six beats), each bar one cell per beat. A chord is written in the
    *  cell of the beat it starts on and left blank while it keeps ringing; the playing beat is filled in. */
   function renderChordGrid() {
     chordGridEl.innerHTML = "";
@@ -1709,6 +1724,7 @@ import Nav from "../components/Nav.astro";
     chordsDetailed = result.chordsDetailed ?? result.chords;
     chords = chordsSimple;
     bars = result.bars;
+    applyMeter(result.beatsPerBar ?? (bars[0]?.beats.length ? bars[0].beats.length - 1 : 4));
     sections = result.sections ?? [];
     songKey = result.key ?? "";
     duration = result.duration;
