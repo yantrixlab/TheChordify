@@ -20,7 +20,6 @@ const sets = [
   ["7th chords", "G7 C7 D7 A7 E7 Am7 Dm7 Em7 Cmaj7"],
   ["Power chords", "E5 A5 D5 G5 C5"],
 ];
-const keys = [["C", "C"], ["G", "G"], ["D", "D"], ["A", "A"], ["E", "E"], ["B", "B"], ["F", "F"], ["A#", "B♭"], ["D#", "E♭"], ["G#", "A♭"], ["C#", "D♭"], ["F#", "F♯"]];
 const progressions = [
   ["I – IV – V", "I IV V IV"],
   ["I – V – vi – IV", "I V vi IV"],
@@ -83,7 +82,7 @@ const progressions = [
             </div>
           </div>
 
-          <div class="pz-strip" id="strip" data-extra="progression" hidden aria-label="The progression"></div>
+          <div class="pz-strip" id="strip" hidden aria-label="The progression"></div>
 
           <div class="pz-extra" data-extra="follow progression" hidden>
             <div class="pz-beats" id="beats" aria-hidden="true"></div>
@@ -150,6 +149,7 @@ const progressions = [
             <button type="button" data-acc="" aria-pressed="false" aria-label="Natural">♮</button>
             <button type="button" data-acc="#" aria-pressed="false" aria-label="Sharp">♯</button>
           </div>
+          <p class="tk-hint pz-keynote">The note you pick is also the <b>key</b> for progressions.</p>
           <div class="pz-quals" id="quals" role="group" aria-label="Kind of chord">
             {qualities.map(([v, l]) => (<button type="button" data-qual={v} aria-pressed="false">{l}</button>))}
           </div>
@@ -192,18 +192,23 @@ const progressions = [
         <section class="tk-card" id="settings-card">
           <h2>Settings</h2>
 
-          <div class="pz-set" data-for="progression" hidden>
+          <div class="pz-set" data-for="follow listen minute" hidden>
             <div class="tk-field">
-              <label class="tk-label" for="key">Key</label>
-              <select id="key" class="tk-select">
-                {keys.map(([v, l]) => (<option value={v}>{l} major</option>))}
-              </select>
+              <p class="tk-label">Practise with</p>
+              <div class="tk-seg" id="source" role="group" aria-label="Where the chords come from">
+                <button type="button" data-source="mine" aria-pressed="false">My chords</button>
+                <button type="button" data-source="prog" aria-pressed="false">A progression</button>
+              </div>
             </div>
+          </div>
+
+          <div class="pz-set" id="prog-set" hidden>
             <div class="tk-field">
               <p class="tk-label">Progression</p>
               <div class="tk-seg" id="progressions" role="group" aria-label="Progression">
                 {progressions.map(([label, steps]) => (<button type="button" data-steps={steps} aria-pressed="false">{label}</button>))}
               </div>
+              <p class="tk-hint" id="prog-key"></p>
             </div>
           </div>
 
@@ -410,6 +415,8 @@ const progressions = [
   .pz-seg button:active { transform: scale(0.94); }
   .pz-seg button[aria-pressed="true"] { color: #fff; background: var(--color-violet); box-shadow: 0 8px 16px -8px #7c3aed; }
   .pz-acc { margin-top: 8px; }
+  .pz-seg button[hidden] { display: none; }
+  .pz-keynote { margin: 8px 2px 0; }
   .pz-acc button { font-size: 20px; }
   .pz-quals { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 16px; }
   .pz-quals button { min-height: 36px; padding: 0 13px; font: 700 13.5px var(--font-sans); color: var(--color-body); background: #fff; border: 1px solid var(--color-hairline); border-radius: 11px; cursor: pointer; transition: background-color 0.2s, color 0.2s, border-color 0.2s, transform 0.15s; }
@@ -472,14 +479,14 @@ const progressions = [
   type Mode = "explore" | "follow" | "listen" | "minute" | "progression" | "quiz";
   interface Prefs {
     mode: Mode; chords: string[]; shapes: Record<string, number>; order: "random" | "list"; bpm: number; per: number; click: boolean;
-    limit: number; sens: number; prog: { key: string; steps: string }; pick: { root: string; acc: string; q: string };
+    limit: number; sens: number; source: "mine" | "prog"; prog: { steps: string }; pick: { root: string; acc: string; q: string };
     trainer: { on: boolean; every: number; step: number; target: number }; quizAny: boolean;
   }
   const KEY = "cs-practice";
   const BEST = "cs-practice-best";
   let prefs: Prefs = {
-    mode: "explore", chords: ["G", "C", "D", "Em"], shapes: {}, order: "random", bpm: 70, per: 4, click: true, limit: 0, sens: 55,
-    prog: { key: "C", steps: "I V vi IV" }, pick: { root: "C", acc: "", q: "" }, trainer: { on: false, every: 8, step: 5, target: 120 }, quizAny: false,
+    mode: "explore", chords: ["G", "C", "D", "Em"], shapes: {}, order: "random", bpm: 70, per: 4, click: true, limit: 0, sens: 55, source: "mine",
+    prog: { steps: "I V vi IV" }, pick: { root: "C", acc: "", q: "" }, trainer: { on: false, every: 8, step: 5, target: 120 }, quizAny: false,
   };
   try {
     const old = JSON.parse(localStorage.getItem(KEY) || "{}");
@@ -491,10 +498,14 @@ const progressions = [
   const NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
   const FLAT: Record<string, string> = { "C#": "D♭", "D#": "E♭", "F#": "G♭", "G#": "A♭", "A#": "B♭" };
   const FLATS: Record<string, string> = { Db: "C#", Eb: "D#", Gb: "F#", Ab: "G#", Bb: "A#", Cb: "B", Fb: "E", "E#": "F", "B#": "C" };
-  const pretty = (chord: string) => chord.replace("#", "♯");
+  let flatNames = false; // in a flat key (F, B♭, E♭...) the black notes are written as flats
+  const pretty = (chord: string) => {
+    const m = /^([A-G]#)(.*)$/.exec(chord);
+    return flatNames && m && FLAT[m[1]] ? FLAT[m[1]] + m[2] : chord.replace("#", "♯");
+  };
   const prettyWithFlat = (chord: string) => {
     const m = /^([A-G]#?)(.*)$/.exec(chord);
-    return m && FLAT[m[1]] ? `${pretty(m[1])}${m[2]} / ${FLAT[m[1]]}${m[2]}` : pretty(chord);
+    return m && FLAT[m[1]] ? `${m[1].replace("#", "♯")}${m[2]} / ${FLAT[m[1]]}${m[2]}` : pretty(chord);
   };
   const shapesOf = (chord: string): GuitarShape[] => getAllGuitarShapes(chord, 8);
   const shapeIndex = (chord: string) => Math.min(Math.max(0, prefs.shapes[chord] ?? 0), Math.max(0, shapesOf(chord).length - 1));
@@ -504,7 +515,7 @@ const progressions = [
   /** "C♯ / D♭ minor": the note under both of its names, then the kind of chord. */
   const longName = (chord: string) => {
     const root = /^[A-G]#?/.exec(chord)![0];
-    return `${FLAT[root] ? `${pretty(root)} / ${FLAT[root]}` : root} ${kindName(chord)}`;
+    return `${FLAT[root] ? `${root.replace("#", "♯")} / ${FLAT[root]}` : root} ${kindName(chord)}`;
   };
   prefs.chords = prefs.chords.filter(valid);
   if (prefs.chords.length < 2) prefs.chords = ["G", "C", "D", "Em"];
@@ -569,7 +580,13 @@ const progressions = [
     const pc = acc === "#" ? (base + 1) % 12 : acc === "b" ? (base + 11) % 12 : base;
     return NAMES[pc] + q;
   }
+  // B and C, and E and F, have no black key between them: there is no B♯, C♭, E♯ or F♭
+  const ACC_OK: Record<string, string[]> = { C: ["", "#"], D: ["b", "", "#"], E: ["b", ""], F: ["", "#"], G: ["b", "", "#"], A: ["b", "", "#"], B: ["b", ""] };
+  const keyPc = () => (NAMES.indexOf(prefs.pick.root) + (prefs.pick.acc === "#" ? 1 : prefs.pick.acc === "b" ? 11 : 0)) % 12;
+  const keyLabel = () => prefs.pick.root + (prefs.pick.acc === "#" ? "♯" : prefs.pick.acc === "b" ? "♭" : "");
   function drawPicker() {
+    if (!ACC_OK[prefs.pick.root].includes(prefs.pick.acc)) prefs.pick.acc = "";
+    all<HTMLButtonElement>("[data-acc]").forEach((b) => (b.hidden = !ACC_OK[prefs.pick.root].includes(b.dataset.acc ?? "")));
     all<HTMLButtonElement>("[data-root]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.root === prefs.pick.root)));
     all<HTMLButtonElement>("[data-acc]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.acc === prefs.pick.acc)));
     all<HTMLButtonElement>("[data-qual]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.qual === prefs.pick.q)));
@@ -590,6 +607,7 @@ const progressions = [
     add.disabled = !shapes.length;
     drawGallery();
     all(".pz-chip").forEach((c) => c.classList.toggle("on", c.dataset.chord === chord));
+    refreshKey();
   }
   let galleryFor = "";
   function drawGallery() {
@@ -706,11 +724,22 @@ const progressions = [
 
   // ---- progressions ----
   const MAJOR: Record<string, [number, string]> = { I: [0, ""], ii: [2, "m"], iii: [4, "m"], IV: [5, ""], V: [7, ""], vi: [9, "m"], I7: [0, "7"], IV7: [5, "7"], V7: [7, "7"] };
-  const progChords = (): string[] => prefs.prog.steps.split(" ").map((step) => NAMES[(NAMES.indexOf(prefs.prog.key) + MAJOR[step][0]) % 12] + MAJOR[step][1]);
+  const progChords = (): string[] => prefs.prog.steps.split(" ").map((step) => NAMES[(keyPc() + MAJOR[step][0]) % 12] + MAJOR[step][1]);
+  /** True when the chords being practised come from a progression in the picked key, not from My chords. */
+  const usingProg = () => prefs.mode === "progression" || (prefs.source === "prog" && ["follow", "listen", "minute"].includes(prefs.mode));
+  /** The key (and so the names of the chords) changed, or the choice of progression: bring everything that shows them up to date. */
+  function refreshKey() {
+    flatNames = usingProg() && (prefs.pick.acc === "b" || (prefs.pick.acc === "" && prefs.pick.root === "F"));
+    $("prog-key").textContent = `Key of ${keyLabel()} major: ${progChords().map(pretty).join("   ")}`;
+    $("prog-set").hidden = !usingProg();
+    $("strip").hidden = !usingProg();
+    if (usingProg()) drawStrip(-1);
+    if (!running) idleStage();
+  }
   function drawStrip(active = -1) {
     const list = progChords();
     const strip = $("strip");
-    const id = `${prefs.prog.key}|${prefs.prog.steps}`;
+    const id = `${keyPc()}|${prefs.prog.steps}|${flatNames}`;
     if (strip.dataset.id !== id) {
       strip.dataset.id = id;
       strip.replaceChildren(...list.map((c) => Object.assign(document.createElement("span"), { textContent: pretty(c) })));
@@ -720,8 +749,8 @@ const progressions = [
       el.classList.toggle("done", active >= 0 && i < active);
     });
   }
-  all<HTMLButtonElement>("[data-steps]").forEach((b) => b.addEventListener("click", () => { prefs.prog.steps = b.dataset.steps ?? "I V vi IV"; seq = 0; save(); drawSettings(); drawStrip(); if (!running) idleStage(); }));
-  $<HTMLSelectElement>("key").addEventListener("change", (e) => { prefs.prog.key = (e.target as HTMLSelectElement).value; seq = 0; save(); drawStrip(); if (!running) idleStage(); });
+  all<HTMLButtonElement>("[data-steps]").forEach((b) => b.addEventListener("click", () => { prefs.prog.steps = b.dataset.steps ?? "I V vi IV"; seq = 0; save(); drawSettings(); refreshKey(); }));
+  all<HTMLButtonElement>("[data-source]").forEach((b) => b.addEventListener("click", () => { prefs.source = b.dataset.source as Prefs["source"]; seq = 0; save(); drawSettings(); refreshKey(); drawBest(); }));
 
   // ---- modes and settings ----
   const MODES: Record<Mode, string> = {
@@ -762,7 +791,7 @@ const progressions = [
     all<HTMLButtonElement>("[data-limit]").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.limit) === prefs.limit)));
     all<HTMLButtonElement>("[data-order]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.order === prefs.order)));
     all<HTMLButtonElement>("[data-steps]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.steps === prefs.prog.steps)));
-    $<HTMLSelectElement>("key").value = prefs.prog.key;
+    all<HTMLButtonElement>("[data-source]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.source === prefs.source)));
     $<HTMLInputElement>("click-on").checked = prefs.click;
     $<HTMLInputElement>("quiz-any").checked = prefs.quizAny;
     $("bpm-out").textContent = String(metro?.settings.bpm ?? prefs.bpm);
@@ -784,7 +813,6 @@ const progressions = [
     save();
     drawSettings();
     drawPicker();
-    idleStage();
     drawStats();
     if (mode === "quiz") drawQuizIdle();
     error(null);
@@ -811,10 +839,10 @@ const progressions = [
 
   // ---- the best score, kept for each set of chords ----
   const best = (): Record<string, number> => { try { return JSON.parse(localStorage.getItem(BEST) || "{}"); } catch { return {}; } };
-  const setKey = () => [...prefs.chords].sort().join("|");
+  const setKey = () => [...new Set(source())].sort().join("|");
   function drawBest() {
     const score = best()[setKey()];
-    $("best-line").textContent = score ? `Your best with ${prefs.chords.map(pretty).join(" ")}: ${score} changes in a minute.` : "No score yet for this set of chords. Give it a go.";
+    $("best-line").textContent = score ? `Your best with ${[...new Set(source())].map(pretty).join(" ")}: ${score} changes in a minute.` : "No score yet for this set of chords. Give it a go.";
   }
 
   // ---- state shared by the drills ----
@@ -825,18 +853,28 @@ const progressions = [
   let listener: ChordListener | null = null;
   let seq = 0;
 
-  const source = () => (prefs.mode === "progression" ? progChords() : prefs.chords);
+  let lastIdx = 0; // where in the list the chord last handed out sits, to light it in the progression
+  let nowI = 0;
+  let nextI = 0;
+  const source = () => (usingProg() ? progChords() : prefs.chords);
   const ordered = () => prefs.mode === "progression" || prefs.order === "list";
   function pick(after?: string): string {
     const list = source();
-    if (ordered()) return list[seq++ % list.length];
+    if (ordered()) {
+      lastIdx = seq % list.length;
+      return list[seq++ % list.length];
+    }
     let next = list[Math.floor(Math.random() * list.length)];
     for (let i = 0; i < 6 && next === after && list.length > 1; i++) next = list[Math.floor(Math.random() * list.length)];
+    lastIdx = list.indexOf(next);
     return next;
   }
   function idleStage() {
-    if (prefs.mode === "progression") { const l = progChords(); stage(l[0], l[1], false); drawStrip(); }
-    else if (prefs.mode !== "explore" && prefs.mode !== "quiz") stage(prefs.chords[0], prefs.chords[1], false);
+    if (prefs.mode !== "explore" && prefs.mode !== "quiz") {
+      const l = source();
+      stage(l[0], l[1], false);
+      if (usingProg()) drawStrip(-1);
+    }
     $("beats").replaceChildren();
   }
   function drawStats(lines: [string, string | number][] = []) {
@@ -919,11 +957,11 @@ const progressions = [
       void card.offsetWidth;
       card.classList.add("beat");
       if (tick.beat === 0) {
-        if (!now) { now = pick(); next = pick(now); }
-        else { now = next; next = pick(now); }
+        if (!now) { now = pick(); nowI = lastIdx; next = pick(now); nextI = lastIdx; }
+        else { now = next; nowI = nextI; next = pick(now); nextI = lastIdx; }
         played++;
         stage(now, next);
-        if (prefs.mode === "progression") drawStrip((played - 1) % progChords().length);
+        if (usingProg()) drawStrip(nowI);
         drawStats([["Chords", played], ["Time", clock((performance.now() - startedAt) / 1000)], ["Tempo", `${metro.settings.bpm} BPM`]]);
       }
     }
@@ -950,10 +988,12 @@ const progressions = [
   function nextTarget() {
     locked = false;
     okFrames = 0;
-    target = target ? next : pick();
+    if (target) { target = next; nowI = nextI; } else { target = pick(); nowI = lastIdx; }
     next = pick(target);
+    nextI = lastIdx;
     shownAt = performance.now();
     stage(target, next);
+    if (usingProg()) drawStrip(nowI);
     $("limit-fill").style.width = "100%";
     if (listener) listener.options.suffixes = kindsFor(target);
   }
@@ -1023,11 +1063,14 @@ const progressions = [
   }
   function flip() {
     expecting = next;
+    nowI = nextI;
     next = pick(expecting);
+    nextI = lastIdx;
     stage(expecting, next);
+    if (usingProg()) drawStrip(nowI);
     mShownAt = performance.now();
     mOk = 0;
-    if (listener) listener.options.suffixes = kindsFor(...prefs.chords);
+    if (listener) listener.options.suffixes = kindsFor(...source());
   }
   function minuteHeard(h: Heard) {
     meterAndName(h);
@@ -1064,11 +1107,14 @@ const progressions = [
     $("count").textContent = "0";
     seq = 0;
     expecting = pick();
+    nowI = lastIdx;
     next = pick(expecting);
+    nextI = lastIdx;
     stage(expecting, next);
+    if (usingProg()) drawStrip(nowI);
     mShownAt = performance.now();
     mOk = 0;
-    if (listener) listener.options.suffixes = kindsFor(...prefs.chords);
+    if (listener) listener.options.suffixes = kindsFor(...source());
     phase = "ready";
     ring(1);
     let left = 3;
@@ -1111,7 +1157,7 @@ const progressions = [
     }
     drawBest();
     drawStats([["Result", `${count} changes`], ["Best", Math.max(count, old)]]);
-    toast({ icon: record && count > 0 ? "🏆" : "⏱️", title: record && count > 0 ? "New best!" : "Time!", text: `${count} clean changes across ${prefs.chords.length} chords.`, ms: 5000 });
+    toast({ icon: record && count > 0 ? "🏆" : "⏱️", title: record && count > 0 ? "New best!" : "Time!", text: `${count} clean changes across ${new Set(source()).size} chords.`, ms: 5000 });
     setGo(false);
     $("clock").textContent = "1:00";
     ring(1);
