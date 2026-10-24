@@ -1,0 +1,401 @@
+---
+import ToolShell from "../../components/ToolShell.astro";
+import { INSTRUMENTS } from "../../lib/tools/pitch";
+---
+
+<ToolShell
+  title="Tuner — Chord Suno Toolkit"
+  description="A free online tuner for guitar, bass, ukulele, violin, mandolin and banjo, with alternate tunings, a reference tone and an adjustable A4."
+  heading="Tuner"
+  sub="Pick your instrument, pluck a string, and watch the needle. Works with guitars, basses, ukuleles, violins and your voice, and with alternate tunings like Drop D and DADGAD."
+  feature="tuner"
+  tool="tuner"
+  crumb="Tuner"
+>
+  <div class="tk-layout">
+    <section class="tk-console tn" aria-label="Tuner">
+      <div class="tn-top">
+        <span class="tn-status" id="status" role="status">Press Start, then play a string</span>
+        <span class="tn-hz" id="hz" aria-hidden="true"></span>
+      </div>
+
+      <div class="tn-gauge" id="gauge-wrap">
+        <svg id="gauge" viewBox="0 0 320 190" role="img" aria-label="Tuning needle"></svg>
+        <span class="tn-flat" aria-hidden="true">♭</span>
+        <span class="tn-sharp" aria-hidden="true">♯</span>
+      </div>
+
+      <div class="tn-read" aria-live="polite">
+        <div class="tn-note" id="note"><b>–</b><sup></sup></div>
+        <div class="tn-cents" id="cents">&nbsp;</div>
+        <div class="tn-hint" id="hint">&nbsp;</div>
+      </div>
+
+      <div class="tn-strings" id="strings" role="group" aria-label="Strings"></div>
+
+      <div class="tn-meter" aria-hidden="true"><i id="level"></i></div>
+      <div class="tn-actions">
+        <button id="listen" class="tk-btn amber tn-listen" type="button" aria-pressed="false">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"></rect><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3"></path></svg>
+          <span id="listen-text">Start</span>
+        </button>
+      </div>
+      <p class="tk-error" id="error" hidden role="alert"></p>
+    </section>
+
+    <div>
+      <section class="tk-card">
+        <h2>Instrument</h2>
+        <div class="tk-seg" id="instruments" role="group" aria-label="Instrument">
+          {INSTRUMENTS.map((i) => (<button type="button" data-instrument={i.id} aria-pressed="false">{i.name}</button>))}
+        </div>
+        <div class="tk-field" style="margin-top:16px" id="tuning-field">
+          <label class="tk-label" for="tuning">Tuning</label>
+          <select id="tuning" class="tk-select"></select>
+        </div>
+        <p class="tk-hint" id="mode-hint">Auto: the tuner finds which string you are playing. Tap a string to tune that one and hear it.</p>
+      </section>
+
+      <section class="tk-card">
+        <h2>Settings</h2>
+        <div class="tk-field">
+          <label class="tk-label" for="a4">Concert pitch (A4) <output id="a4-out">440 Hz</output></label>
+          <input id="a4" class="tk-range" type="range" min="415" max="466" step="1" value="440" />
+          <p class="tk-hint">440 Hz is standard. Some orchestras use 442, and baroque music 415.</p>
+        </div>
+        <div class="tk-field">
+          <p class="tk-label">How close is in tune?</p>
+          <div class="tk-seg" id="tolerance" role="group" aria-label="Tolerance">
+            <button type="button" data-tol="2" aria-pressed="false">Strict ±2</button>
+            <button type="button" data-tol="5" aria-pressed="false">Normal ±5</button>
+            <button type="button" data-tol="10" aria-pressed="false">Relaxed ±10</button>
+          </div>
+          <p class="tk-hint">Measured in cents, a hundredth of a semitone.</p>
+        </div>
+        <div class="tk-field">
+          <label class="tk-label" for="sens">Microphone sensitivity <output id="sens-out">Medium</output></label>
+          <input id="sens" class="tk-range" type="range" min="0" max="100" value="55" />
+          <p class="tk-hint">Turn it up in a quiet room or for a soft instrument, down if the room is noisy.</p>
+        </div>
+      </section>
+
+      <section class="tk-card">
+        <h2>Tips</h2>
+        <ul class="tn-tips">
+          <li>Pluck one string at a time and let it ring.</li>
+          <li>Tune up to the note: if you are sharp, loosen below it, then tighten up to it.</li>
+          <li>Your sound is analysed on your device and never recorded.</li>
+        </ul>
+      </section>
+    </div>
+  </div>
+</ToolShell>
+
+<style is:global>
+  .tn { padding: 22px 22px 22px; text-align: center; }
+  .tn-top { position: relative; display: flex; justify-content: space-between; align-items: center; gap: 10px; min-height: 30px; }
+  .tn-status { padding: 5px 12px; font: 600 12.5px var(--font-sans); color: #e9ddff; background: #ffffff14; border: 1px solid #ffffff22; border-radius: 99px; }
+  .tn.live .tn-status { color: #6ee7b7; border-color: #34d39966; }
+  .tn-hz { font: 600 13px var(--font-mono); color: #b9a3df; }
+  .tn-gauge { position: relative; max-width: 440px; margin: 6px auto 0; }
+  .tn-gauge svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .tn-flat, .tn-sharp { position: absolute; top: 56%; font-size: 24px; color: #8f78bd; }
+  .tn-flat { left: 4%; }
+  .tn-sharp { right: 4%; }
+  #needle { transform-origin: 160px 172px; transition: transform 0.14s cubic-bezier(.3,.7,.4,1); }
+  .tn.idle #needle { transition: transform 0.6s ease; }
+  .tn-read { position: relative; margin-top: -4px; }
+  .tn-note { font: 800 84px/1 var(--font-sans); letter-spacing: -0.05em; color: #fff; text-shadow: 0 6px 30px #7c3aed99; transition: color 0.2s; }
+  .tn-note sup { margin-left: 4px; font: 700 26px var(--font-sans); color: #b9a3df; letter-spacing: 0; vertical-align: top; position: relative; top: 8px; }
+  .tn.ok .tn-note { color: #6ee7b7; text-shadow: 0 6px 34px #10b981aa; }
+  .tn-cents { margin-top: 4px; font: 700 20px var(--font-mono); color: #fbbf24; font-variant-numeric: tabular-nums; }
+  .tn.ok .tn-cents { color: #6ee7b7; }
+  .tn-hint { min-height: 24px; font: 600 14px var(--font-sans); color: #c4b0e0; }
+  .tn-strings { position: relative; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 16px 0 14px; }
+  .tn-string { display: grid; place-items: center; gap: 0; width: 56px; height: 56px; padding: 0; font: 800 17px/1 var(--font-sans); color: #e9ddff; background: #ffffff10; border: 2px solid #ffffff2a; border-radius: 50%; cursor: pointer; transition: transform 0.12s, background-color 0.15s, border-color 0.15s, box-shadow 0.15s; }
+  .tn-string small { display: block; margin-top: -10px; font: 600 10px var(--font-mono); color: #a78bd0; }
+  .tn-string:hover { background: #ffffff22; }
+  .tn-string.near { border-color: #fbbf24; background: #fbbf2426; transform: scale(1.1); }
+  .tn-string.target { border-color: #fff; box-shadow: 0 0 0 3px #7c3aedaa; }
+  .tn-string.ok { border-color: #34d399; background: #34d39930; box-shadow: 0 0 22px #34d39988; }
+  .tn-auto { width: auto; padding: 0 16px; border-radius: 99px; font-size: 13px; }
+  .tn-meter { position: relative; height: 6px; max-width: 280px; margin: 0 auto 16px; overflow: hidden; border-radius: 6px; background: #ffffff1c; }
+  .tn-meter i { display: block; height: 100%; width: 0; border-radius: 6px; background: linear-gradient(90deg, #34d399, #fbbf24); transition: width 0.08s linear; }
+  .tn-actions { position: relative; }
+  .tn-listen { min-width: 170px; min-height: 54px; font-size: 17px; border-radius: 18px; }
+  .tn .tk-error { text-align: left; }
+  .tn-tips { margin: 0; padding-left: 18px; list-style: disc; font-size: 14px; line-height: 1.7; color: var(--color-body); }
+  @media (max-width: 480px) { .tn-note { font-size: 68px; } .tn-string { width: 50px; height: 50px; } }
+</style>
+
+<script>
+  import { INSTRUMENTS, detectPitch, freqFromMidi, midiFromName, noteFromFreq, noteLabel, type Instrument } from "../../lib/tools/pitch";
+  import { MicError, audioContext, openMic, resumeAudio, rms, type Mic } from "../../lib/tools/audio";
+  import { initGate } from "../../lib/tools/gate";
+
+  const gate = initGate("tuner", "tuner");
+  const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+
+  interface Prefs { instrument: string; tuning: number; a4: number; tol: number; sens: number }
+  const KEY = "cs-tuner";
+  let prefs: Prefs = { instrument: "guitar", tuning: 0, a4: 440, tol: 5, sens: 55 };
+  try { prefs = { ...prefs, ...JSON.parse(localStorage.getItem(KEY) || "{}") }; } catch { /* first visit */ }
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(prefs)); } catch { /* storage is off */ } };
+
+  const instrument = (): Instrument => INSTRUMENTS.find((i) => i.id === prefs.instrument) ?? INSTRUMENTS[0];
+  const strings = (): number[] => (instrument().tunings[prefs.tuning] ?? instrument().tunings[0]).notes.map(midiFromName);
+  let target: number | null = null; // a string chosen by hand; null is automatic
+
+  // ---- the gauge ----
+  const CX = 160, CY = 172, R = 132, SPAN = 62; // degrees for 50 cents each way
+  const polar = (deg: number, r: number) => [CX + r * Math.sin((deg * Math.PI) / 180), CY - r * Math.cos((deg * Math.PI) / 180)];
+  const centsToDeg = (c: number) => (Math.max(-50, Math.min(50, c)) / 50) * SPAN;
+  function drawGauge() {
+    const parts: string[] = [];
+    const tol = centsToDeg(prefs.tol);
+    const [x1, y1] = polar(-tol, R - 12);
+    const [x2, y2] = polar(tol, R - 12);
+    parts.push(`<path d="M${polar(-SPAN, R - 12).join(" ")} A${R - 12} ${R - 12} 0 0 1 ${polar(SPAN, R - 12).join(" ")}" fill="none" stroke="#ffffff14" stroke-width="22" stroke-linecap="round"/>`);
+    parts.push(`<path d="M${x1} ${y1} A${R - 12} ${R - 12} 0 0 1 ${x2} ${y2}" fill="none" stroke="#34d399" stroke-opacity=".55" stroke-width="22" stroke-linecap="butt"/>`);
+    for (let c = -50; c <= 50; c += 5) {
+      const major = c % 10 === 0;
+      const [a, b] = polar(centsToDeg(c), R + 4);
+      const [d, e] = polar(centsToDeg(c), R - (major ? 14 : 8) + 4);
+      parts.push(`<line x1="${a}" y1="${b}" x2="${d}" y2="${e}" stroke="${c === 0 ? "#fff" : "#9b84c8"}" stroke-width="${c === 0 ? 3 : major ? 2 : 1.2}" stroke-linecap="round"/>`);
+      if (c % 25 === 0 && c !== 0) {
+        const [tx, ty] = polar(centsToDeg(c), R + 22);
+        parts.push(`<text x="${tx}" y="${ty + 4}" fill="#8f78bd" font-size="11" font-family="monospace" text-anchor="middle">${c > 0 ? "+" : "−"}${Math.abs(c)}</text>`);
+      }
+    }
+    parts.push(`<g id="needle"><line x1="${CX}" y1="${CY}" x2="${CX}" y2="${CY - R + 6}" stroke="#fbbf24" stroke-width="4" stroke-linecap="round" id="needle-line"/><circle cx="${CX}" cy="${CY}" r="11" fill="#fff"/><circle cx="${CX}" cy="${CY}" r="4" fill="#2a0f5c"/></g>`);
+    $("gauge").innerHTML = parts.join("");
+    point(0);
+  }
+  function point(cents: number) {
+    $("needle").style.transform = `rotate(${centsToDeg(cents)}deg)`;
+  }
+
+  // ---- the controls ----
+  function drawInstrument() {
+    document.querySelectorAll<HTMLButtonElement>("[data-instrument]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.instrument === prefs.instrument)));
+    const inst = instrument();
+    const select = $<HTMLSelectElement>("tuning");
+    select.replaceChildren(...inst.tunings.map((t, i) => Object.assign(document.createElement("option"), { value: String(i), textContent: t.name, selected: i === prefs.tuning })));
+    $("tuning-field").style.display = inst.tunings.length < 2 ? "none" : "";
+    drawStrings();
+  }
+
+  function drawStrings(near: number | null = null, ok = false) {
+    const box = $("strings");
+    const list = strings();
+    if (!list.length) {
+      box.replaceChildren();
+      $("mode-hint").textContent = "Play any note and the tuner names it and shows how far off it is.";
+      return;
+    }
+    $("mode-hint").textContent = "Auto: the tuner finds which string you are playing. Tap a string to tune that one and hear it.";
+    const auto = document.createElement("button");
+    auto.type = "button";
+    auto.className = "tn-string tn-auto" + (target === null ? " target" : "");
+    auto.textContent = "Auto";
+    auto.setAttribute("aria-pressed", String(target === null));
+    auto.addEventListener("click", () => { target = null; drawStrings(); });
+    const buttons = list.map((midi, i) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "tn-string" + (midi === near ? (ok ? " ok" : " near") : "") + (midi === target ? " target" : "");
+      b.innerHTML = `${noteLabel(midi).replace(/\d/, "")}<small>${noteLabel(midi).match(/\d/)?.[0] ?? ""}</small>`;
+      b.setAttribute("aria-label", `String ${i + 1}, ${noteLabel(midi)}. Press to tune this string and hear it.`);
+      b.setAttribute("aria-pressed", String(midi === target));
+      b.addEventListener("click", () => { target = midi; drawStrings(); void playTone(freqFromMidi(midi, prefs.a4)); });
+      return b;
+    });
+    box.replaceChildren(auto, ...buttons);
+  }
+
+  document.querySelectorAll<HTMLButtonElement>("[data-instrument]").forEach((b) =>
+    b.addEventListener("click", () => {
+      prefs.instrument = b.dataset.instrument ?? "guitar";
+      prefs.tuning = 0;
+      target = null;
+      save();
+      drawInstrument();
+      if (mic) mic.analyser.fftSize = instrument().fmin < 50 ? 8192 : 4096;
+    }),
+  );
+  $<HTMLSelectElement>("tuning").addEventListener("change", (e) => { prefs.tuning = Number((e.target as HTMLSelectElement).value); target = null; save(); drawStrings(); });
+
+  const a4 = $<HTMLInputElement>("a4");
+  const fill = (el: HTMLInputElement) => el.style.setProperty("--fill", `${((+el.value - +el.min) / (+el.max - +el.min)) * 100}%`);
+  a4.value = String(prefs.a4);
+  const drawA4 = () => { fill(a4); $("a4-out").textContent = `${prefs.a4} Hz`; };
+  a4.addEventListener("input", () => { prefs.a4 = Number(a4.value); drawA4(); save(); });
+  drawA4();
+
+  const drawTol = () => document.querySelectorAll<HTMLButtonElement>("[data-tol]").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.tol) === prefs.tol)));
+  document.querySelectorAll<HTMLButtonElement>("[data-tol]").forEach((b) => b.addEventListener("click", () => { prefs.tol = Number(b.dataset.tol); save(); drawTol(); drawGauge(); }));
+  drawTol();
+
+  const sens = $<HTMLInputElement>("sens");
+  sens.value = String(prefs.sens);
+  const gateLevel = () => 0.03 * Math.pow(0.07, prefs.sens / 100); // 0.03 (least sensitive) down to about 0.002
+  const drawSens = () => { fill(sens); $("sens-out").textContent = prefs.sens < 35 ? "Low" : prefs.sens < 70 ? "Medium" : "High"; };
+  sens.addEventListener("input", () => { prefs.sens = Number(sens.value); drawSens(); save(); });
+  drawSens();
+
+  // ---- a reference tone ----
+  let tone: { stop(): void } | null = null;
+  async function playTone(freq: number) {
+    const ctx = await resumeAudio();
+    tone?.stop();
+    const out = ctx.createGain();
+    const now = ctx.currentTime;
+    out.gain.setValueAtTime(0.0001, now);
+    out.gain.exponentialRampToValueAtTime(0.28, now + 0.05);
+    out.gain.exponentialRampToValueAtTime(0.0001, now + 2.6);
+    out.connect(ctx.destination);
+    const oscs = [1, 2, 3].map((h) => {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = "sine";
+      o.frequency.value = freq * h;
+      g.gain.value = [1, 0.35, 0.12][h - 1];
+      o.connect(g);
+      g.connect(out);
+      o.start(now);
+      o.stop(now + 2.7);
+      return o;
+    });
+    tone = { stop() { out.gain.cancelScheduledValues(ctx.currentTime); out.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.03); oscs.forEach((o) => { try { o.stop(ctx.currentTime + 0.2); } catch { /* already stopped */ } }); } };
+  }
+
+  // ---- listening ----
+  let mic: Mic | null = null;
+  let timer = 0;
+  let buf = new Float32Array(0);
+  let recent: number[] = []; // midi, a few readings, to smooth over
+  let steady = 0; // readings in a row that were in tune
+  let lastHeard = 0;
+  let wasOk = false;
+  const root = document.querySelector<HTMLElement>(".tn")!;
+
+  function show(reading: { midi: number; cents: number; freq: number } | null, strong: boolean) {
+    if (!reading) {
+      root.classList.remove("ok");
+      root.classList.add("idle");
+      $("hint").innerHTML = "&nbsp;";
+      return;
+    }
+    root.classList.remove("idle");
+    const shown = noteFromFreq(freqFromMidi(reading.midi, prefs.a4), prefs.a4);
+    const cents = reading.cents;
+    const ok = Math.abs(cents) <= prefs.tol;
+    steady = ok ? steady + 1 : 0;
+    const locked = steady >= 4;
+    $("note").innerHTML = `<b>${shown.name.replace("#", "♯")}</b><sup>${shown.octave}</sup>`;
+    $("cents").textContent = `${cents > 0 ? "+" : cents < 0 ? "−" : ""}${Math.abs(Math.round(cents))} cents`;
+    $("hz").textContent = `${reading.freq.toFixed(1)} Hz`;
+    $("hint").textContent = locked ? "In tune ✓" : cents < -prefs.tol ? "A little low: tune up ↑" : cents > prefs.tol ? "A little high: tune down ↓" : "Almost there…";
+    point(cents);
+    root.classList.toggle("ok", locked);
+    $("needle-line").setAttribute("stroke", locked ? "#6ee7b7" : "#fbbf24");
+    if (locked && !wasOk && "vibrate" in navigator) navigator.vibrate?.(25);
+    wasOk = locked;
+    if (strings().length) drawStringsHighlight(reading.midi, locked);
+    void strong;
+  }
+
+  let lastNear: number | null = null;
+  let lastOk = false;
+  function drawStringsHighlight(midi: number, ok: boolean) {
+    if (midi === lastNear && ok === lastOk) return;
+    lastNear = midi;
+    lastOk = ok;
+    document.querySelectorAll<HTMLButtonElement>(".tn-string:not(.tn-auto)").forEach((b, i) => {
+      const m = strings()[i];
+      b.classList.toggle("near", m === midi && !ok);
+      b.classList.toggle("ok", m === midi && ok);
+    });
+  }
+
+  function tick() {
+    if (!mic) return;
+    const inst = instrument();
+    const sr = audioContext().sampleRate;
+    if (buf.length !== mic.analyser.fftSize) buf = new Float32Array(mic.analyser.fftSize);
+    mic.analyser.getFloatTimeDomainData(buf);
+    const level = rms(buf);
+    $("level").style.width = `${Math.min(100, Math.sqrt(level / 0.25) * 100)}%`;
+    const now = performance.now();
+    let pitch = level > gateLevel() ? detectPitch(buf, sr, inst.fmin, inst.fmax) : null;
+    if (pitch && pitch.clarity < 0.82) pitch = null;
+    if (!pitch) {
+      if (now - lastHeard > 900) {
+        recent = [];
+        steady = 0;
+        wasOk = false;
+        $("status").textContent = "Listening… play a string";
+        show(null, false);
+        lastNear = null;
+        drawStringsHighlight(-1, false);
+      }
+      return;
+    }
+    lastHeard = now;
+    const exact = 69 + 12 * Math.log2(pitch.freq / prefs.a4);
+    // a jump of more than a few semitones is usually the tuner catching an overtone: start again from it
+    if (recent.length && Math.abs(exact - recent[recent.length - 1]) > 3) recent = [];
+    recent = [...recent, exact].slice(-5);
+    const smooth = [...recent].sort((a, b) => a - b)[recent.length >> 1];
+    const list = strings();
+    let goal: number;
+    if (target !== null) goal = target;
+    else if (list.length) goal = list.reduce((best, m) => (Math.abs(m - smooth) < Math.abs(best - smooth) ? m : best), list[0]);
+    else goal = Math.round(smooth);
+    const cents = (smooth - goal) * 100;
+    $("status").textContent = "Listening";
+    show({ midi: goal, cents, freq: freqFromMidi(smooth, prefs.a4) }, true);
+  }
+
+  async function start() {
+    if (!gate.allowed()) return;
+    const error = $("error");
+    error.hidden = true;
+    try {
+      mic = await openMic(instrument().fmin < 50 ? 8192 : 4096);
+    } catch (err) {
+      error.textContent = err instanceof MicError ? err.message : "The microphone could not be started.";
+      error.hidden = false;
+      return;
+    }
+    root.classList.add("live", "idle");
+    $("status").textContent = "Listening… play a string";
+    $("listen-text").textContent = "Stop";
+    $("listen").setAttribute("aria-pressed", "true");
+    timer = window.setInterval(tick, 50);
+  }
+  function stop() {
+    window.clearInterval(timer);
+    mic?.stop();
+    mic = null;
+    recent = [];
+    root.classList.remove("live", "ok");
+    root.classList.add("idle");
+    $("status").textContent = "Press Start, then play a string";
+    $("listen-text").textContent = "Start";
+    $("listen").setAttribute("aria-pressed", "false");
+    $("level").style.width = "0";
+    $("note").innerHTML = "<b>–</b><sup></sup>";
+    $("cents").innerHTML = "&nbsp;";
+    $("hint").innerHTML = "&nbsp;";
+    $("hz").textContent = "";
+    point(0);
+    drawStrings();
+  }
+  $("listen").addEventListener("click", () => (mic ? stop() : void start()));
+  window.addEventListener("pagehide", stop);
+
+  drawGauge();
+  drawInstrument();
+  root.classList.add("idle");
+</script>

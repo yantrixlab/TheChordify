@@ -1,0 +1,670 @@
+---
+import ToolShell from "../../components/ToolShell.astro";
+
+const keys = [["C", "C"], ["G", "G"], ["D", "D"], ["A", "A"], ["E", "E"], ["B", "B"], ["F", "F"], ["A#", "B♭"], ["D#", "E♭"], ["G#", "A♭"], ["C#", "D♭"], ["F#", "F♯"]];
+const sets = [
+  ["First four", "G C D Em"],
+  ["Open chords", "Em Am C G D A E Dm"],
+  ["Campfire", "G C D Em Am"],
+  ["Minor mood", "Am Dm Em Bm F#m Cm Gm"],
+  ["Barre chords", "F Bm F#m B Cm Gm C#m Fm"],
+  ["7th chords", "G7 C7 D7 A7 E7 Am7 Dm7 Em7 Cmaj7"],
+];
+const progressions = [
+  ["I – IV – V", "I IV V IV"],
+  ["I – V – vi – IV", "I V vi IV"],
+  ["vi – IV – I – V", "vi IV I V"],
+  ["I – vi – IV – V", "I vi IV V"],
+  ["ii – V – I", "ii V I I"],
+  ["12-bar blues", "I7 I7 I7 I7 IV7 IV7 I7 I7 V7 IV7 I7 V7"],
+];
+---
+
+<ToolShell
+  title="Practice Your Chords — Chord Suno Toolkit"
+  description="Chord change drills for guitar: follow along with a beat, a one-minute changes challenge, and a listen mode that checks the chord you play."
+  heading="Practice your chords"
+  sub="Pick the chords you want to master and drill them three ways: follow along with a beat, race the clock for one minute, or let Chord Suno listen and check each chord you play."
+  feature="practice_chords"
+  tool="practice"
+  crumb="Practice your chords"
+>
+  <div class="tk-layout">
+    <section class="tk-console pr" aria-label="Chord practice">
+      <div class="pr-modes tk-seg on-dark wide" id="modes" role="tablist" aria-label="Practice mode">
+        <button type="button" role="tab" data-mode="follow" aria-pressed="true">Follow along</button>
+        <button type="button" role="tab" data-mode="listen" aria-pressed="false">Listen &amp; check</button>
+        <button type="button" role="tab" data-mode="minute" aria-pressed="false">1-minute changes</button>
+      </div>
+      <p class="pr-blurb" id="blurb"></p>
+
+      <div class="pr-stage">
+        <div class="pr-now" id="now-card">
+          <div class="pr-label">Play now</div>
+          <div class="pr-name" id="now-name">–</div>
+          <div class="pr-diagram" id="now-diagram"></div>
+          <div class="pr-badge" id="badge" hidden></div>
+        </div>
+        <div class="pr-next" id="next-card">
+          <div class="pr-label">Next</div>
+          <div class="pr-next-name" id="next-name">–</div>
+          <div class="pr-diagram" id="next-diagram"></div>
+        </div>
+      </div>
+
+      <!-- follow along -->
+      <div class="pr-panel" data-panel="follow">
+        <div class="pr-beats" id="beats" aria-hidden="true"></div>
+        <div class="pr-bpm">
+          <button class="tk-round" id="bpm-minus" type="button" aria-label="Slower">−</button>
+          <div><b id="bpm-out">80</b><span>BPM</span></div>
+          <button class="tk-round" id="bpm-plus" type="button" aria-label="Faster">+</button>
+        </div>
+      </div>
+
+      <!-- listen and check -->
+      <div class="pr-panel" data-panel="listen" hidden>
+        <div class="pr-heard">I hear: <b id="heard">–</b></div>
+        <div class="pr-meter" aria-hidden="true"><i id="level"></i></div>
+        <div class="pr-timer" id="limit-bar" hidden aria-hidden="true"><i id="limit-fill"></i></div>
+      </div>
+
+      <!-- one minute -->
+      <div class="pr-panel" data-panel="minute" hidden>
+        <div class="pr-clock"><b id="clock">1:00</b><span>left</span></div>
+        <div class="pr-count"><b id="count">0</b><span>clean changes</span></div>
+        <button class="tk-btn amber pr-tapper" id="changed" type="button" disabled>I changed cleanly <span class="tk-kbd" style="margin-left:8px">Space</span></button>
+      </div>
+
+      <div class="pr-stats" id="stats"></div>
+
+      <div class="pr-actions">
+        <button id="go" class="tk-btn amber pr-go" type="button" aria-pressed="false"><span id="go-text">Start</span></button>
+        <button id="skip" class="tk-btn on-dark" type="button" hidden>Skip chord</button>
+      </div>
+      <p class="tk-error" id="error" hidden role="alert"></p>
+    </section>
+
+    <div>
+      <section class="tk-card">
+        <h2>Your chords <small id="chord-count"></small></h2>
+        <div class="tk-seg" id="chord-list" aria-label="Chords in this drill"></div>
+        <form class="tk-inline" id="add-form" autocomplete="off" style="margin-top:12px">
+          <input class="tk-select" id="add-chord" type="text" maxlength="12" placeholder="Add a chord, e.g. Bm or F#m7" aria-label="Add a chord" style="flex:1 1 170px;width:auto" />
+          <button class="tk-btn soft" type="submit">Add</button>
+        </form>
+        <p class="tk-error" id="add-error" hidden></p>
+
+        <div class="tk-field" style="margin-top:18px">
+          <p class="tk-label">Start from a set</p>
+          <div class="tk-seg" id="sets">
+            {sets.map(([label, chords]) => (<button type="button" data-chords={chords}>{label}</button>))}
+          </div>
+        </div>
+
+        <details class="pr-prog">
+          <summary>Practise a chord progression in a key</summary>
+          <div class="tk-field" style="margin-top:12px">
+            <label class="tk-label" for="key">Key</label>
+            <select id="key" class="tk-select">
+              {keys.map(([v, l]) => (<option value={v}>{l} major</option>))}
+            </select>
+          </div>
+          <div class="tk-seg" id="progressions">
+            {progressions.map(([label, steps]) => (<button type="button" data-steps={steps}>{label}</button>))}
+          </div>
+          <p class="tk-hint">Fills the list with that progression, played in order.</p>
+        </details>
+      </section>
+
+      <section class="tk-card">
+        <h2>Settings</h2>
+        <div class="pr-set" data-for="follow">
+          <div class="tk-field">
+            <p class="tk-label">Beats on each chord</p>
+            <div class="tk-seg" id="per-chord" role="group" aria-label="Beats on each chord">
+              {[1, 2, 4, 8].map((n) => (<button type="button" data-per={n} aria-pressed="false">{n}</button>))}
+            </div>
+          </div>
+          <label class="tk-switch">
+            <span>Click<small>Hear the beat as you play</small></span>
+            <input type="checkbox" id="click-on" checked /><i></i>
+          </label>
+        </div>
+        <div class="pr-set" data-for="listen" hidden>
+          <div class="tk-field">
+            <p class="tk-label">Time for each chord</p>
+            <div class="tk-seg" id="limit" role="group" aria-label="Time for each chord">
+              <button type="button" data-limit="0" aria-pressed="false">No limit</button>
+              <button type="button" data-limit="10" aria-pressed="false">10 s</button>
+              <button type="button" data-limit="5" aria-pressed="false">5 s</button>
+            </div>
+          </div>
+          <div class="tk-field">
+            <label class="tk-label" for="sens">Microphone sensitivity <output id="sens-out">Medium</output></label>
+            <input id="sens" class="tk-range" type="range" min="0" max="100" value="55" />
+          </div>
+        </div>
+        <div class="pr-set" data-for="minute" hidden>
+          <div class="tk-field">
+            <p class="tk-label">The two chords</p>
+            <div class="tk-inline">
+              <select id="pair-a" class="tk-select" style="flex:1" aria-label="First chord"></select>
+              <span aria-hidden="true">⇄</span>
+              <select id="pair-b" class="tk-select" style="flex:1" aria-label="Second chord"></select>
+            </div>
+            <p class="tk-hint" id="best-line"></p>
+          </div>
+        </div>
+        <div class="tk-field" data-for="follow listen">
+          <p class="tk-label">Order</p>
+          <div class="tk-seg" id="order" role="group" aria-label="Order">
+            <button type="button" data-order="random" aria-pressed="false">Shuffled</button>
+            <button type="button" data-order="list" aria-pressed="false">In order</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="tk-card">
+        <h2>How it works</h2>
+        <ul class="pr-tips">
+          <li><b>Follow along</b> keeps a beat and moves to the next chord every few beats. Start slow and push the tempo up when it feels easy.</li>
+          <li><b>Listen &amp; check</b> uses your microphone to hear the chord you play. Your sound is analysed on your device and never recorded.</li>
+          <li><b>1-minute changes</b> is the classic challenge: switch between two chords as many times as you can, cleanly, in 60 seconds.</li>
+        </ul>
+      </section>
+    </div>
+  </div>
+</ToolShell>
+
+<style is:global>
+  .pr { padding: 20px 20px 22px; text-align: center; }
+  .pr-modes { position: relative; }
+  .pr-modes button { min-height: 40px; }
+  .pr-blurb { position: relative; margin: 12px 0 0; font-size: 13.5px; line-height: 1.5; color: #c4b0e0; min-height: 40px; }
+  .pr-stage { position: relative; display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 14px; align-items: stretch; margin: 14px 0 16px; text-align: center; }
+  .pr-now, .pr-next { position: relative; display: flex; flex-direction: column; align-items: center; padding: 14px 10px 12px; border-radius: 24px; }
+  .pr-now { background: #fff; color: var(--color-ink); box-shadow: 0 24px 50px -24px #000000aa; transition: box-shadow 0.2s, background-color 0.2s, transform 0.15s; }
+  .pr-now.good { background: #ecfdf5; box-shadow: 0 0 0 4px #34d399, 0 24px 50px -24px #10b981; transform: scale(1.015); }
+  .pr-now.miss { background: #fff7ed; box-shadow: 0 0 0 4px #fb923c, 0 24px 50px -24px #000000aa; }
+  .pr-next { background: #ffffff12; border: 1px solid #ffffff1f; color: #e9ddff; }
+  .pr-label { font: 700 11px var(--font-mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--color-violet); }
+  .pr-next .pr-label { color: #b9a3df; }
+  .pr-name { font: 800 clamp(48px, 8vw, 76px)/1.05 var(--font-sans); letter-spacing: -0.05em; color: var(--color-ink); }
+  .pr-next-name { font: 800 32px/1.2 var(--font-sans); letter-spacing: -0.04em; color: #fff; }
+  .pr-diagram { width: 100%; max-width: 190px; margin-top: 4px; }
+  .pr-next .pr-diagram { max-width: 100px; opacity: 0.9; }
+  .pr-diagram svg { display: block; width: 100%; height: auto; }
+  .pr-next .pr-diagram svg { filter: invert(1) hue-rotate(180deg) brightness(1.4); }
+  .pr-nodiagram { padding: 24px 0; font-size: 13px; color: var(--color-mute); }
+  .pr-badge { position: absolute; top: 10px; right: 10px; padding: 3px 10px; font: 700 12px var(--font-mono); color: #065f46; background: #a7f3d0; border-radius: 99px; }
+  .pr-badge.miss { color: #9a3412; background: #fed7aa; }
+  .pr-badge[hidden] { display: none; }
+
+  .pr-panel { position: relative; }
+  .pr-panel[hidden], .pr-set[hidden] { display: none; }
+  .pr-beats { display: flex; justify-content: center; gap: 8px; margin: 0 0 14px; min-height: 20px; }
+  .pr-beats i { width: 16px; height: 16px; border-radius: 50%; border: 2px solid #ffffff55; transition: transform 0.08s, background-color 0.08s; }
+  .pr-beats i.now { background: #f59e0b; border-color: #f59e0b; transform: scale(1.35); box-shadow: 0 0 16px #f59e0bcc; }
+  .pr-beats i.first.now { background: #fff; border-color: #fff; box-shadow: 0 0 18px #fff; }
+  .pr-bpm { display: flex; align-items: center; justify-content: center; gap: 18px; }
+  .pr-bpm b { display: block; font: 800 44px/1 var(--font-sans); letter-spacing: -0.04em; color: #fff; font-variant-numeric: tabular-nums; }
+  .pr-bpm span { font: 700 11px var(--font-mono); letter-spacing: 0.22em; color: #c4b0e0; }
+  .pr-heard { font-size: 15px; color: #d6c7f2; }
+  .pr-heard b { margin-left: 6px; font: 800 22px var(--font-sans); color: #fff; }
+  .pr-meter, .pr-timer { height: 6px; max-width: 260px; margin: 12px auto 0; overflow: hidden; border-radius: 6px; background: #ffffff1c; }
+  .pr-meter i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #34d399, #fbbf24); transition: width 0.1s linear; }
+  .pr-timer i { display: block; height: 100%; width: 100%; background: #f59e0b; }
+  .pr-timer[hidden] { display: none; }
+  .pr-clock, .pr-count { display: inline-block; margin: 0 16px 12px; }
+  .pr-clock b, .pr-count b { display: block; font: 800 52px/1 var(--font-sans); letter-spacing: -0.04em; color: #fff; font-variant-numeric: tabular-nums; }
+  .pr-clock span, .pr-count span { font: 700 11px var(--font-mono); letter-spacing: 0.18em; text-transform: uppercase; color: #c4b0e0; }
+  .pr-tapper { width: 100%; max-width: 360px; min-height: 60px; font-size: 17px; border-radius: 18px; }
+  .pr-stats { position: relative; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 22px; min-height: 26px; margin: 16px 0 4px; font-size: 13px; color: #b9a3df; }
+  .pr-stats b { margin-left: 4px; font: 700 14px var(--font-mono); color: #fff; }
+  .pr-actions { position: relative; display: flex; justify-content: center; gap: 10px; margin-top: 14px; }
+  .pr-go { min-width: 170px; min-height: 54px; font-size: 17px; border-radius: 18px; }
+  .pr .tk-error { text-align: left; }
+  .pr-prog { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--color-hairline); }
+  .pr-prog summary { font: 700 14px var(--font-sans); color: var(--color-violet-deep); cursor: pointer; }
+  .pr-tips { margin: 0; padding-left: 18px; list-style: disc; font-size: 14px; line-height: 1.65; color: var(--color-body); }
+  .pr-tips li + li { margin-top: 8px; }
+  .tk-chip .x { margin-left: 2px; color: var(--color-mute); font-size: 15px; line-height: 1; }
+  .tk-error + .tk-field { margin-top: 18px; }
+  @media (max-width: 520px) {
+    .pr-stage { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 10px; }
+    .pr-now, .pr-next { padding: 12px 6px 10px; }
+  }
+</style>
+
+<script>
+  import { Metronome, clampBpm, defaultAccents } from "../../lib/tools/metronome";
+  import { MicError, gateLevel, openMic, type Mic } from "../../lib/tools/audio";
+  import { ChordListener, type Heard } from "../../lib/tools/listener";
+  import { ROOTS, scoreChord } from "../../lib/tools/chroma";
+  import { diagramSvg, getGuitarShape } from "../../lib/tools/diagram";
+  import { initGate } from "../../lib/tools/gate";
+  import { toast } from "../../lib/toast";
+  import { track } from "../../lib/analytics";
+
+  const gate = initGate("practice_chords", "practice");
+  const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+  const all = <T extends HTMLElement>(selector: string) => [...document.querySelectorAll<T>(selector)];
+
+  type Mode = "follow" | "listen" | "minute";
+  interface Prefs { chords: string[]; mode: Mode; order: "random" | "list"; bpm: number; per: number; click: boolean; limit: number; sens: number; pair: [string, string] }
+  const KEY = "cs-practice";
+  const BEST = "cs-practice-best";
+  let prefs: Prefs = { chords: ["G", "C", "D", "Em"], mode: "follow", order: "random", bpm: 70, per: 4, click: true, limit: 0, sens: 55, pair: ["G", "C"] };
+  try { prefs = { ...prefs, ...JSON.parse(localStorage.getItem(KEY) || "{}") }; } catch { /* first visit */ }
+  prefs.chords = prefs.chords.filter((c) => getGuitarShape(c));
+  if (prefs.chords.length < 2) prefs.chords = ["G", "C", "D", "Em"];
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(prefs)); } catch { /* storage is off */ } };
+
+  // ---- chord names ----
+  const FLATS: Record<string, string> = { Db: "C#", Eb: "D#", Gb: "F#", Ab: "G#", Bb: "A#", Cb: "B", Fb: "E", "E#": "F", "B#": "C" };
+  function normalise(raw: string): string | null {
+    const m = /^\s*([A-Ga-g])([#b♯♭]?)\s*(.*?)\s*$/.exec(raw);
+    if (!m) return null;
+    let root = m[1].toUpperCase() + m[2].replace("♯", "#").replace("♭", "b");
+    root = FLATS[root] ?? root;
+    const suffix = ({ min: "m", "-": "m", maj: "", major: "", M: "", minor: "m", M7: "maj7", "∆7": "maj7", dom7: "7" } as Record<string, string>)[m[3]] ?? m[3];
+    const name = root + suffix;
+    return getGuitarShape(name) ? name : null;
+  }
+
+  // ---- picking the next chord ----
+  let seq = 0;
+  function pick(after?: string): string {
+    const list = prefs.chords;
+    if (prefs.order === "list") return list[seq++ % list.length];
+    let next = list[Math.floor(Math.random() * list.length)];
+    for (let i = 0; i < 6 && next === after && list.length > 1; i++) next = list[Math.floor(Math.random() * list.length)];
+    return next;
+  }
+
+  // ---- the stage ----
+  function drawChord(prefix: "now" | "next", chord: string | null) {
+    $(`${prefix}-name`).textContent = chord ?? "–";
+    const shape = chord ? getGuitarShape(chord) : undefined;
+    $(`${prefix}-diagram`).innerHTML = shape ? diagramSvg(shape) : chord ? '<p class="pr-nodiagram">No diagram</p>' : "";
+  }
+  const stage = (now: string | null, next: string | null) => {
+    drawChord("now", now);
+    drawChord("next", next);
+  };
+  const flash = (kind: "good" | "miss", text: string) => {
+    const card = $("now-card");
+    const badge = $("badge");
+    card.classList.remove("good", "miss");
+    void card.offsetWidth;
+    card.classList.add(kind);
+    badge.textContent = text;
+    badge.className = `pr-badge ${kind}`;
+    badge.hidden = false;
+    window.setTimeout(() => { card.classList.remove("good", "miss"); badge.hidden = true; }, 750);
+  };
+
+  // ---- the chord list ----
+  function drawChords() {
+    const box = $("chord-list");
+    box.replaceChildren(
+      ...prefs.chords.map((c) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "tk-chip";
+        b.innerHTML = `${c}<span class="x" aria-hidden="true">×</span>`;
+        b.setAttribute("aria-label", `Remove ${c}`);
+        b.addEventListener("click", () => {
+          if (prefs.chords.length <= 2) return showAddError("Keep at least two chords to practise.");
+          prefs.chords = prefs.chords.filter((x) => x !== c);
+          changed();
+        });
+        return b;
+      }),
+    );
+    $("chord-count").textContent = `${prefs.chords.length} chords`;
+    for (const id of ["pair-a", "pair-b"]) {
+      const select = $<HTMLSelectElement>(id);
+      select.replaceChildren(...[...new Set(prefs.chords)].map((c) => Object.assign(document.createElement("option"), { value: c, textContent: c })));
+    }
+    if (!prefs.chords.includes(prefs.pair[0])) prefs.pair[0] = prefs.chords[0];
+    if (!prefs.chords.includes(prefs.pair[1]) || prefs.pair[1] === prefs.pair[0]) prefs.pair[1] = prefs.chords.find((c) => c !== prefs.pair[0]) ?? prefs.chords[1];
+    $<HTMLSelectElement>("pair-a").value = prefs.pair[0];
+    $<HTMLSelectElement>("pair-b").value = prefs.pair[1];
+    drawBest();
+  }
+  function changed() {
+    seq = 0;
+    save();
+    drawChords();
+    if (!running) idleStage();
+  }
+  const showAddError = (message: string) => {
+    const el = $("add-error");
+    el.textContent = message;
+    el.hidden = false;
+    window.setTimeout(() => (el.hidden = true), 3500);
+  };
+  $("add-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const input = $<HTMLInputElement>("add-chord");
+    const name = normalise(input.value);
+    if (!input.value.trim()) return;
+    if (!name) return showAddError(`“${input.value.trim()}” is not a chord we know. Try names like Am, F#m, G7, Cmaj7 or Dsus4.`);
+    if (prefs.chords.includes(name)) return showAddError(`${name} is already in the list.`);
+    if (prefs.chords.length >= 16) return showAddError("That is plenty to practise: take one out before adding another.");
+    prefs.chords = [...prefs.chords, name];
+    input.value = "";
+    changed();
+  });
+  all<HTMLButtonElement>("[data-chords]").forEach((b) => b.addEventListener("click", () => { prefs.chords = (b.dataset.chords ?? "").split(" "); prefs.order = "random"; changed(); drawSettings(); }));
+
+  // a progression in a key
+  const MAJOR: Record<string, [number, string]> = { I: [0, ""], ii: [2, "m"], iii: [4, "m"], IV: [5, ""], V: [7, ""], vi: [9, "m"], I7: [0, "7"], IV7: [5, "7"], V7: [7, "7"] };
+  all<HTMLButtonElement>("[data-steps]").forEach((b) =>
+    b.addEventListener("click", () => {
+      const key = ROOTS.indexOf($<HTMLSelectElement>("key").value);
+      const chords = (b.dataset.steps ?? "").split(" ").map((step) => {
+        const [offset, quality] = MAJOR[step];
+        return ROOTS[(key + offset) % 12] + quality;
+      });
+      // played in order, repeats included, so the progression keeps its shape
+      prefs.chords = chords;
+      prefs.order = "list";
+      changed();
+      drawSettings();
+    }),
+  );
+
+  // ---- settings ----
+  const MODES: Record<Mode, string> = {
+    follow: "A beat keeps time and the chord changes every few beats. The next chord is shown ahead so you can get your fingers ready.",
+    listen: "Play the chord shown. Chord Suno listens through your microphone and moves on when it hears you play it right.",
+    minute: "Switch between two chords as many times as you can in one minute. Press the button (or Space) for each clean change.",
+  };
+  function drawSettings() {
+    all<HTMLButtonElement>("[data-mode]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === prefs.mode)));
+    $("blurb").textContent = MODES[prefs.mode];
+    all("[data-panel]").forEach((p) => (p.hidden = p.dataset.panel !== prefs.mode));
+    all("[data-for]").forEach((p) => (p.hidden = !(p.dataset.for ?? "").split(" ").includes(prefs.mode)));
+    $("skip").hidden = prefs.mode !== "listen" || !running;
+    all<HTMLButtonElement>("[data-per]").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.per) === prefs.per)));
+    all<HTMLButtonElement>("[data-limit]").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.limit) === prefs.limit)));
+    all<HTMLButtonElement>("[data-order]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.order === prefs.order)));
+    $<HTMLInputElement>("click-on").checked = prefs.click;
+    $("bpm-out").textContent = String(prefs.bpm);
+    const sens = $<HTMLInputElement>("sens");
+    sens.value = String(prefs.sens);
+    sens.style.setProperty("--fill", `${prefs.sens}%`);
+    $("sens-out").textContent = prefs.sens < 35 ? "Low" : prefs.sens < 70 ? "Medium" : "High";
+    if (listener) listener.options.gate = gateLevel(prefs.sens);
+  }
+  all<HTMLButtonElement>("[data-mode]").forEach((b) => b.addEventListener("click", () => { if (running) stopAll(); prefs.mode = b.dataset.mode as Mode; save(); drawSettings(); idleStage(); drawStats(); }));
+  all<HTMLButtonElement>("[data-per]").forEach((b) => b.addEventListener("click", () => { prefs.per = Number(b.dataset.per); save(); drawSettings(); if (running) restartFollow(); }));
+  all<HTMLButtonElement>("[data-limit]").forEach((b) => b.addEventListener("click", () => { prefs.limit = Number(b.dataset.limit); save(); drawSettings(); }));
+  all<HTMLButtonElement>("[data-order]").forEach((b) => b.addEventListener("click", () => { prefs.order = b.dataset.order as Prefs["order"]; seq = 0; save(); drawSettings(); }));
+  $<HTMLInputElement>("click-on").addEventListener("change", (e) => { prefs.click = (e.target as HTMLInputElement).checked; if (metro) metro.settings.volume = prefs.click ? 0.7 : 0; save(); });
+  $<HTMLInputElement>("sens").addEventListener("input", (e) => { prefs.sens = Number((e.target as HTMLInputElement).value); save(); drawSettings(); });
+  const setBpm = (bpm: number) => { prefs.bpm = Math.min(200, Math.max(30, clampBpm(bpm))); if (metro) metro.settings.bpm = prefs.bpm; save(); drawSettings(); };
+  $("bpm-minus").addEventListener("click", () => setBpm(prefs.bpm - 5));
+  $("bpm-plus").addEventListener("click", () => setBpm(prefs.bpm + 5));
+  $<HTMLSelectElement>("pair-a").addEventListener("change", (e) => { prefs.pair[0] = (e.target as HTMLSelectElement).value; if (prefs.pair[1] === prefs.pair[0]) prefs.pair[1] = prefs.chords.find((c) => c !== prefs.pair[0]) ?? prefs.pair[1]; save(); drawChords(); idleStage(); });
+  $<HTMLSelectElement>("pair-b").addEventListener("change", (e) => { prefs.pair[1] = (e.target as HTMLSelectElement).value; if (prefs.pair[1] === prefs.pair[0]) prefs.pair[0] = prefs.chords.find((c) => c !== prefs.pair[1]) ?? prefs.pair[0]; save(); drawChords(); idleStage(); });
+
+  const best = (): Record<string, number> => { try { return JSON.parse(localStorage.getItem(BEST) || "{}"); } catch { return {}; } };
+  const pairKey = () => [...prefs.pair].sort().join("|");
+  function drawBest() {
+    const score = best()[pairKey()];
+    $("best-line").textContent = score ? `Your best for ${prefs.pair[0]} ⇄ ${prefs.pair[1]}: ${score} changes in a minute.` : "No score yet for this pair. Give it a go.";
+  }
+
+  // ---- state shared by the modes ----
+  let running = false;
+  let metro: Metronome | null = null;
+  let raf = 0;
+  let mic: Mic | null = null;
+  let listener: ChordListener | null = null;
+  const error = (text: string | null) => { const el = $("error"); el.hidden = !text; el.textContent = text ?? ""; };
+
+  function idleStage() {
+    if (prefs.mode === "minute") stage(prefs.pair[0], prefs.pair[1]);
+    else stage(prefs.chords[0], prefs.chords[1]);
+    $("beats").replaceChildren();
+  }
+  function drawStats(lines: [string, string | number][] = []) {
+    $("stats").innerHTML = lines.map(([k, v]) => `<span>${k}<b>${v}</b></span>`).join("");
+  }
+  function setGo(on: boolean, label = on ? "Stop" : "Start") {
+    running = on;
+    $("go-text").textContent = label;
+    $("go").setAttribute("aria-pressed", String(on));
+    $("skip").hidden = !(on && prefs.mode === "listen");
+  }
+
+  // ---- 1. follow along ----
+  let now = "";
+  let next = "";
+  let played = 0;
+  let startedAt = 0;
+  function startFollow() {
+    seq = 0;
+    played = 0;
+    now = "";
+    metro = new Metronome({
+      bpm: prefs.bpm, beats: prefs.per, accents: defaultAccents(prefs.per, 4), sub: 1, sound: "wood", volume: prefs.click ? 0.7 : 0,
+      trainer: { on: false, every: 4, step: 2, target: 140 }, gap: { on: false, play: 3, mute: 1 },
+    });
+    const beats = $("beats");
+    beats.replaceChildren(...Array.from({ length: prefs.per }, (_, i) => Object.assign(document.createElement("i"), { className: i === 0 ? "first" : "" })));
+    startedAt = performance.now();
+    void metro.start().then(() => { raf = requestAnimationFrame(followFrame); });
+  }
+  function followFrame() {
+    if (!metro?.running) return;
+    for (const tick of metro.due()) {
+      if (tick.sub !== 0) continue;
+      all("#beats i").forEach((dot, i) => dot.classList.toggle("now", i === tick.beat));
+      if (tick.beat === 0) {
+        if (!now) {
+          now = pick();
+          next = pick(now);
+        } else {
+          now = next;
+          next = pick(now);
+        }
+        played++;
+        stage(now, next);
+        drawStats([["Chords", played], ["Time", clock((performance.now() - startedAt) / 1000)], ["Tempo", `${prefs.bpm} BPM`]]);
+      }
+    }
+    raf = requestAnimationFrame(followFrame);
+  }
+  function restartFollow() {
+    cancelAnimationFrame(raf);
+    metro?.stop();
+    startFollow();
+  }
+  const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+
+  // ---- 2. listen and check ----
+  const stats = { right: 0, streak: 0, bestStreak: 0, times: [] as number[], missed: 0 };
+  let target = "";
+  let shownAt = 0;
+  let okFrames = 0;
+  let locked = false;
+  let limitTimer = 0;
+  function listenStats() {
+    const avg = stats.times.length ? (stats.times.reduce((a, b) => a + b, 0) / stats.times.length / 1000).toFixed(1) : "–";
+    const fastest = stats.times.length ? (Math.min(...stats.times) / 1000).toFixed(1) : "–";
+    drawStats([["Right", stats.right], ["Streak", stats.streak], ["Best streak", stats.bestStreak], ["Average", avg === "–" ? avg : `${avg} s`], ["Fastest", fastest === "–" ? fastest : `${fastest} s`], ["Missed", stats.missed]]);
+  }
+  function nextTarget() {
+    locked = false;
+    okFrames = 0;
+    target = target ? next : pick();
+    next = pick(target);
+    shownAt = performance.now();
+    stage(target, next);
+    $("limit-fill").style.width = "100%";
+  }
+  function onHeard(h: Heard) {
+    $("level").style.width = `${Math.min(100, Math.sqrt(h.level / 0.25) * 100)}%`;
+    $("heard").textContent = h.chord ?? "–";
+    if (locked || !h.chroma || performance.now() - shownAt < 450) { if (!h.chroma) okFrames = 0; return; }
+    const score = scoreChord(h.chroma, target);
+    const top = h.guesses[0];
+    const right = score >= 0.8 && (top?.name === target || score >= (top?.score ?? 0) - 0.05);
+    okFrames = right ? okFrames + 1 : 0;
+    if (okFrames >= 2) {
+      locked = true;
+      const ms = performance.now() - shownAt;
+      stats.right++;
+      stats.streak++;
+      stats.bestStreak = Math.max(stats.bestStreak, stats.streak);
+      stats.times.push(ms);
+      flash("good", `${(ms / 1000).toFixed(1)} s`);
+      listenStats();
+      window.setTimeout(() => running && prefs.mode === "listen" && nextTarget(), 850);
+    }
+  }
+  async function startListen() {
+    error(null);
+    try {
+      mic = await openMic(16384);
+    } catch (err) {
+      error(err instanceof MicError ? err.message : "The microphone could not be started.");
+      return false;
+    }
+    Object.assign(stats, { right: 0, streak: 0, bestStreak: 0, times: [], missed: 0 });
+    seq = 0;
+    target = "";
+    listener = new ChordListener(mic, { gate: gateLevel(prefs.sens) }, onHeard);
+    listener.start(110);
+    nextTarget();
+    listenStats();
+    const bar = $("limit-bar");
+    bar.hidden = prefs.limit === 0;
+    limitTimer = window.setInterval(() => {
+      if (!prefs.limit || locked) return;
+      const left = 1 - (performance.now() - shownAt) / (prefs.limit * 1000);
+      $("limit-fill").style.width = `${Math.max(0, left * 100)}%`;
+      if (left <= 0) {
+        locked = true;
+        stats.missed++;
+        stats.streak = 0;
+        flash("miss", "Too slow");
+        listenStats();
+        window.setTimeout(() => running && prefs.mode === "listen" && nextTarget(), 850);
+      }
+    }, 100);
+    return true;
+  }
+  $("skip").addEventListener("click", () => { if (running && prefs.mode === "listen") { stats.streak = 0; stats.missed++; listenStats(); nextTarget(); } });
+
+  // ---- 3. one minute ----
+  let count = 0;
+  let minuteTimer = 0;
+  let expecting = "";
+  let phase: "idle" | "ready" | "run" = "idle";
+  function startMinute() {
+    count = 0;
+    $("count").textContent = "0";
+    $("clock").textContent = "1:00";
+    expecting = prefs.pair[0];
+    stage(expecting, prefs.pair[1]);
+    phase = "ready";
+    let left = 3;
+    $("clock").textContent = String(left);
+    $("go-text").textContent = "Get ready…";
+    minuteTimer = window.setInterval(() => {
+      left--;
+      if (left > 0) return void ($("clock").textContent = String(left));
+      window.clearInterval(minuteTimer);
+      phase = "run";
+      $<HTMLButtonElement>("changed").disabled = false;
+      $("go-text").textContent = "Stop";
+      const t0 = performance.now();
+      minuteTimer = window.setInterval(() => {
+        const remaining = 60 - (performance.now() - t0) / 1000;
+        $("clock").textContent = clock(Math.max(0, Math.ceil(remaining)));
+        if (remaining <= 0) finishMinute();
+      }, 100);
+    }, 1000);
+    $("clock").textContent = "3";
+  }
+  function tapChange() {
+    if (phase !== "run") return;
+    count++;
+    $("count").textContent = String(count);
+    expecting = expecting === prefs.pair[0] ? prefs.pair[1] : prefs.pair[0];
+    stage(expecting, expecting === prefs.pair[0] ? prefs.pair[1] : prefs.pair[0]);
+  }
+  function finishMinute() {
+    window.clearInterval(minuteTimer);
+    phase = "idle";
+    $<HTMLButtonElement>("changed").disabled = true;
+    const scores = best();
+    const old = scores[pairKey()] ?? 0;
+    const record = count > old;
+    if (record) {
+      scores[pairKey()] = count;
+      try { localStorage.setItem(BEST, JSON.stringify(scores)); } catch { /* storage is off */ }
+    }
+    drawBest();
+    drawStats([["Result", `${count} changes`], ["Best", Math.max(count, old)]]);
+    toast({ icon: record && count > 0 ? "🏆" : "⏱️", title: record && count > 0 ? "New best!" : "Time!", text: `${count} clean changes between ${prefs.pair[0]} and ${prefs.pair[1]}.`, ms: 5000 });
+    setGo(false);
+    $("clock").textContent = "1:00";
+  }
+  $("changed").addEventListener("click", tapChange);
+
+  // ---- start and stop ----
+  async function startAll() {
+    if (!gate.allowed()) return;
+    if (prefs.chords.length < 2) return error("Add at least two chords to practise.");
+    error(null);
+    track("practice_start", { mode: prefs.mode, chords: prefs.chords.length });
+    if (prefs.mode === "listen") {
+      if (!(await startListen())) return;
+      setGo(true);
+    } else if (prefs.mode === "follow") {
+      setGo(true);
+      startFollow();
+    } else {
+      setGo(true);
+      startMinute();
+    }
+  }
+  function stopAll() {
+    cancelAnimationFrame(raf);
+    metro?.stop();
+    metro = null;
+    window.clearInterval(limitTimer);
+    window.clearInterval(minuteTimer);
+    listener?.stop();
+    listener = null;
+    mic?.stop();
+    mic = null;
+    phase = "idle";
+    $<HTMLButtonElement>("changed").disabled = true;
+    $("level").style.width = "0";
+    $("heard").textContent = "–";
+    $("limit-bar").hidden = true;
+    $("clock").textContent = "1:00";
+    setGo(false);
+    idleStage();
+  }
+  $("go").addEventListener("click", () => (running ? stopAll() : void startAll()));
+  document.addEventListener("keydown", (e) => {
+    const t = e.target as HTMLElement;
+    if (["INPUT", "SELECT", "TEXTAREA", "BUTTON"].includes(t.tagName) || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.key === " " && prefs.mode === "minute" && phase === "run") { e.preventDefault(); tapChange(); }
+  });
+  window.addEventListener("pagehide", stopAll);
+
+  drawChords();
+  drawSettings();
+  idleStage();
+  drawStats();
+</script>

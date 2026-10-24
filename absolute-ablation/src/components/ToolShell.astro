@@ -1,0 +1,86 @@
+---
+// The frame every Toolkit page shares: the menu, the page heading, the tool itself (kept for the plans that include it) and links to the other tools.
+import Layout from "../layouts/Layout.astro";
+import Nav from "./Nav.astro";
+import Footer from "./Footer.astro";
+import { TOOLS } from "../lib/tools/catalog";
+import "../styles/toolkit.css";
+
+interface Props {
+  title: string;
+  description: string;
+  heading: string;
+  sub: string;
+  eyebrow?: string;
+  /** The feature (in the admin's Features & limits) that decides who may use this tool. Leave out for a page everybody can open. */
+  feature?: string;
+  tool?: string;
+  crumb?: string;
+}
+
+const { title, description, heading, sub, eyebrow = "Toolkit", feature, tool = "", crumb } = Astro.props;
+---
+
+<Layout title={title} description={description}>
+  <Nav />
+  <main id="main-content" class="tk" data-feature={feature ?? ""} data-tool={tool}>
+    <div class="tk-wrap">
+      <nav class="tk-crumbs" aria-label="Breadcrumb">
+        <a href="/toolkit/">Toolkit</a>
+        {crumb && (<><span aria-hidden="true">›</span><span aria-current="page">{crumb}</span></>)}
+      </nav>
+      <header class="tk-head">
+        <p class="tk-eyebrow">{eyebrow}</p>
+        <h1>{heading}</h1>
+        <p>{sub}</p>
+      </header>
+
+      <div class="tk-stage">
+        <div id="tool-body" class="tk-body"><slot /></div>
+        {feature && (
+          <div id="tool-gate" class="tk-gate" hidden role="status">
+            <div class="tk-gate-card">
+              <div class="tk-gate-lock" aria-hidden="true">🔒</div>
+              <h2>Not in your plan</h2>
+              <p data-gate-note>This tool is not part of your current plan.</p>
+              <div class="tk-gate-actions">
+                <a class="tk-btn amber" href="/pricing/">See the plans</a>
+                <button class="tk-btn ghost" type="button" data-auth="open" data-gate-signin>Sign in</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {tool && (
+        <section class="tk-more" aria-labelledby="tk-more-title">
+          <h2 id="tk-more-title">More in the Toolkit</h2>
+          <div class="tk-more-grid">
+            {TOOLS.map((t) => (
+              <a href={t.href} data-tool-link={t.feature} aria-current={t.id === tool ? "page" : undefined} style={`--h1:${t.hue[0]};--h2:${t.hue[1]}`}>
+                <span class="tk-tile"><svg viewBox="0 0 24 24" aria-hidden="true" set:html={t.icon} /></span>
+                <span><strong>{t.name}</strong><small>Open</small></span>
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
+  </main>
+  <Footer />
+</Layout>
+
+<script>
+  import { can, loadPlan } from "../lib/plan";
+
+  // mark the tools the visitor's plan leaves out, wherever they are listed
+  const mark = () => {
+    document.querySelectorAll<HTMLElement>("[data-tool-link]").forEach((link) => {
+      link.classList.toggle("is-locked", !can(link.dataset.toolLink ?? ""));
+      const small = link.querySelector("small");
+      if (small) small.textContent = can(link.dataset.toolLink ?? "") ? "Open" : "Paid plan";
+    });
+  };
+  window.addEventListener("plan-change", mark);
+  void loadPlan();
+</script>

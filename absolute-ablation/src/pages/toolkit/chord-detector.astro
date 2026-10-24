@@ -1,0 +1,294 @@
+---
+import ToolShell from "../../components/ToolShell.astro";
+---
+
+<ToolShell
+  title="Live Chord Detection — Chord Suno Toolkit"
+  description="Play your guitar, piano or ukulele and see the chord name appear live, with its notes and a guitar chord diagram."
+  heading="Live chord detection"
+  sub="Play a chord and the name appears as you play. See the notes it is made of, a guitar diagram for it, and a history of the chords you have played."
+  feature="chord_detector"
+  tool="chord-detector"
+  crumb="Live chord detection"
+>
+  <div class="tk-layout">
+    <section class="tk-console cd" aria-label="Live chord detection">
+      <div class="cd-top">
+        <span class="cd-status" id="status" role="status">Press Start, then play a chord</span>
+        <label class="cd-hold"><input type="checkbox" id="hold" /> <span>Hold</span></label>
+      </div>
+
+      <div class="cd-main">
+        <div class="cd-name-wrap" aria-live="polite">
+          <div class="cd-name" id="name">–</div>
+          <div class="cd-kind" id="kind">Waiting for a chord</div>
+          <div class="cd-notes" id="notes"></div>
+          <div class="cd-conf" aria-hidden="true"><i id="conf"></i></div>
+          <div class="cd-conf-label" id="conf-label"></div>
+        </div>
+        <div class="cd-shape" id="shape-card" hidden>
+          <div class="cd-diagram" id="diagram"></div>
+          <div class="cd-pick">
+            <button type="button" id="shape-prev" aria-label="Previous way to play it">‹</button>
+            <span id="shape-count">1 of 1</span>
+            <button type="button" id="shape-next" aria-label="Next way to play it">›</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="cd-bars" id="bars" aria-label="Notes heard" role="img"></div>
+
+      <div class="cd-meter" aria-hidden="true"><i id="level"></i></div>
+      <div class="cd-actions">
+        <button id="listen" class="tk-btn amber cd-listen" type="button" aria-pressed="false">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"></rect><path d="M5.5 11.5a6.5 6.5 0 0 0 13 0M12 18v3"></path></svg>
+          <span id="listen-text">Start</span>
+        </button>
+      </div>
+      <p class="tk-error" id="error" hidden role="alert"></p>
+    </section>
+
+    <div>
+      <section class="tk-card">
+        <h2>Chords you played <small id="history-count"></small></h2>
+        <div class="cd-history" id="history" aria-live="off"></div>
+        <div class="tk-inline" style="margin-top:14px">
+          <button class="tk-btn soft" id="copy" type="button">Copy progression</button>
+          <button class="tk-btn ghost" id="clear" type="button">Clear</button>
+        </div>
+        <p class="tk-hint" id="progression"></p>
+      </section>
+
+      <section class="tk-card">
+        <h2>Settings</h2>
+        <div class="tk-field">
+          <label class="tk-label" for="sens">Microphone sensitivity <output id="sens-out">Medium</output></label>
+          <input id="sens" class="tk-range" type="range" min="0" max="100" value="55" />
+        </div>
+        <label class="tk-switch">
+          <span>Simple chords only<small>Major, minor and 7th chords. Fewer surprises while you learn.</small></span>
+          <input type="checkbox" id="simple" /><i></i>
+        </label>
+        <label class="tk-switch">
+          <span>Show the guitar diagram<small>For the chord it hears</small></span>
+          <input type="checkbox" id="show-shape" checked /><i></i>
+        </label>
+      </section>
+
+      <section class="tk-card">
+        <h2>Getting a good reading</h2>
+        <ul class="cd-tips">
+          <li>Strum and let the chord ring for a second or two.</li>
+          <li>Hold the instrument close to the microphone, in a quiet room.</li>
+          <li>One instrument at a time works best. A band or a loud song confuses it, so for those use a song on Chord Suno.</li>
+          <li>If you play a chord with extra notes, it may name the nearest plain chord.</li>
+        </ul>
+      </section>
+    </div>
+  </div>
+</ToolShell>
+
+<style is:global>
+  .cd { padding: 22px; }
+  .cd-top { position: relative; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  .cd-status { padding: 5px 12px; font: 600 12.5px var(--font-sans); color: #e9ddff; background: #ffffff14; border: 1px solid #ffffff22; border-radius: 99px; }
+  .cd.live .cd-status { color: #6ee7b7; border-color: #34d39966; }
+  .cd-hold { display: inline-flex; align-items: center; gap: 7px; font: 600 13px var(--font-sans); color: #d6c7f2; cursor: pointer; }
+  .cd-hold input { accent-color: #f59e0b; width: 16px; height: 16px; }
+  .cd-main { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px; align-items: center; margin: 22px 0 6px; }
+  .cd-main:has(#shape-card[hidden]) { grid-template-columns: minmax(0, 1fr); text-align: center; }
+  .cd-name { font: 800 clamp(64px, 11vw, 112px)/1 var(--font-sans); letter-spacing: -0.05em; color: #fff; text-shadow: 0 8px 40px #7c3aedaa; min-height: 1em; transition: color 0.2s, transform 0.15s; }
+  .cd-name.pop { transform: scale(1.04); color: #fde68a; }
+  .cd-kind { margin-top: 6px; font: 600 16px var(--font-sans); color: #d6c7f2; min-height: 24px; }
+  .cd-notes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; min-height: 34px; }
+  .cd-main:has(#shape-card[hidden]) .cd-notes { justify-content: center; }
+  .cd-notes span { padding: 4px 12px; font: 700 14px var(--font-mono); color: #1a0533; background: #fbbf24; border-radius: 99px; }
+  .cd-notes span:first-child { background: #fff; }
+  .cd-conf { height: 6px; max-width: 260px; margin-top: 16px; overflow: hidden; border-radius: 6px; background: #ffffff1c; }
+  .cd-main:has(#shape-card[hidden]) .cd-conf { margin-inline: auto; }
+  .cd-conf i { display: block; width: 0; height: 100%; border-radius: 6px; background: linear-gradient(90deg, #fbbf24, #34d399); transition: width 0.2s; }
+  .cd-conf-label { margin-top: 6px; font: 600 12px var(--font-mono); color: #a78bd0; min-height: 18px; }
+  .cd-shape { padding: 12px 14px 10px; background: #fff; border-radius: 22px; box-shadow: 0 20px 40px -20px #00000088; }
+  .cd-shape[hidden] { display: none; }
+  .cd-diagram { width: 150px; }
+  .cd-diagram svg { display: block; width: 100%; height: auto; }
+  .cd-pick { display: flex; align-items: center; justify-content: space-between; margin-top: 2px; font: 600 12px var(--font-mono); color: var(--color-mute); }
+  .cd-pick button { width: 30px; height: 30px; font-size: 20px; line-height: 1; color: var(--color-violet-deep); background: var(--color-canvas-soft-2); border: 0; border-radius: 50%; cursor: pointer; }
+  .cd-pick button:disabled { opacity: 0.35; cursor: default; }
+  .cd-bars { position: relative; display: grid; grid-template-columns: repeat(12, 1fr); gap: 6px; align-items: end; height: 110px; margin: 18px 0 14px; padding: 12px 12px 8px; background: #ffffff0d; border: 1px solid #ffffff14; border-radius: 18px; }
+  .cd-bar { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 6px; height: 100%; }
+  .cd-bar i { display: block; width: 100%; max-width: 22px; height: 3px; border-radius: 5px; background: #8b6fd0; transition: height 0.12s ease-out, background-color 0.15s; }
+  .cd-bar.in i { background: #fbbf24; box-shadow: 0 0 14px #f59e0b88; }
+  .cd-bar b { font: 600 10.5px var(--font-mono); color: #a78bd0; }
+  .cd-bar.in b { color: #fde68a; }
+  .cd-meter { height: 6px; max-width: 280px; margin: 0 auto 16px; overflow: hidden; border-radius: 6px; background: #ffffff1c; }
+  .cd-meter i { display: block; height: 100%; width: 0; border-radius: 6px; background: linear-gradient(90deg, #34d399, #fbbf24); transition: width 0.1s linear; }
+  .cd-actions { text-align: center; }
+  .cd-listen { min-width: 170px; min-height: 54px; font-size: 17px; border-radius: 18px; }
+  .cd .tk-error { text-align: left; }
+  .cd-history { display: flex; flex-wrap: wrap; gap: 8px; min-height: 40px; align-content: flex-start; }
+  .cd-history span { padding: 5px 12px; font: 700 14px var(--font-mono); color: var(--color-violet-deep); background: var(--color-canvas-soft-2); border-radius: 10px; }
+  .cd-history span:last-child { color: #fff; background: var(--color-violet); }
+  .cd-history em { font: 400 13px var(--font-sans); font-style: normal; color: var(--color-mute); }
+  .cd-tips { margin: 0; padding-left: 18px; list-style: disc; font-size: 14px; line-height: 1.7; color: var(--color-body); }
+  @media (max-width: 560px) {
+    .cd-main { grid-template-columns: minmax(0, 1fr); text-align: center; }
+    .cd-main .cd-notes { justify-content: center; }
+    .cd-conf { margin-inline: auto; }
+    .cd-shape { justify-self: center; }
+  }
+</style>
+
+<script>
+  import { MicError, gateLevel, openMic, type Mic } from "../../lib/tools/audio";
+  import { ChordListener, type Heard } from "../../lib/tools/listener";
+  import { NOTE_NAMES } from "../../lib/tools/pitch";
+  import { pitchClassesOf } from "../../lib/tools/chroma";
+  import { diagramSvg, getGuitarShapes } from "../../lib/tools/diagram";
+  import { chordKeyLabel, chordNotes } from "../../lib/chordShapes";
+  import { initGate } from "../../lib/tools/gate";
+  import { toast } from "../../lib/toast";
+
+  const gate = initGate("chord_detector", "chord-detector");
+  const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+  const root = document.querySelector<HTMLElement>(".cd")!;
+
+  const SIMPLE = ["", "m", "7"];
+  interface Prefs { sens: number; simple: boolean; shape: boolean }
+  const KEY = "cs-chord-detector";
+  let prefs: Prefs = { sens: 55, simple: false, shape: true };
+  try { prefs = { ...prefs, ...JSON.parse(localStorage.getItem(KEY) || "{}") }; } catch { /* first visit */ }
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify(prefs)); } catch { /* storage is off */ } };
+
+  // the twelve note bars
+  const bars = $("bars");
+  bars.innerHTML = NOTE_NAMES.map((n) => `<div class="cd-bar"><i></i><b>${n.replace("#", "♯")}</b></div>`).join("");
+  const barEls = [...bars.querySelectorAll<HTMLElement>(".cd-bar")];
+
+  // ---- settings ----
+  const sens = $<HTMLInputElement>("sens");
+  sens.value = String(prefs.sens);
+  const drawSens = () => {
+    sens.style.setProperty("--fill", `${prefs.sens}%`);
+    $("sens-out").textContent = prefs.sens < 35 ? "Low" : prefs.sens < 70 ? "Medium" : "High";
+    if (listener) listener.options.gate = gateLevel(prefs.sens);
+  };
+  sens.addEventListener("input", () => { prefs.sens = Number(sens.value); drawSens(); save(); });
+  $<HTMLInputElement>("simple").checked = prefs.simple;
+  $<HTMLInputElement>("simple").addEventListener("change", (e) => { prefs.simple = (e.target as HTMLInputElement).checked; if (listener) listener.options.suffixes = prefs.simple ? SIMPLE : undefined; save(); });
+  $<HTMLInputElement>("show-shape").checked = prefs.shape;
+  $<HTMLInputElement>("show-shape").addEventListener("change", (e) => { prefs.shape = (e.target as HTMLInputElement).checked; save(); drawChord(shown, true); });
+
+  // ---- showing the chord ----
+  let shown: string | null = null;
+  let shapeIndex = 0;
+  function drawChord(chord: string | null, force = false) {
+    if (chord === shown && !force) return;
+    if (chord !== shown) shapeIndex = 0;
+    shown = chord;
+    const name = $("name");
+    name.textContent = chord ? chord : "–";
+    if (chord) {
+      name.classList.add("pop");
+      window.setTimeout(() => name.classList.remove("pop"), 160);
+    }
+    $("kind").textContent = chord ? chordKeyLabel(chord) : listener ? "Listening… play a chord" : "Waiting for a chord";
+    $("notes").innerHTML = chord ? chordNotes(chord).map((n) => `<span>${n.replace("#", "♯")}</span>`).join("") : "";
+    const shapes = chord && prefs.shape ? getGuitarShapes(chord) : [];
+    $("shape-card").hidden = shapes.length === 0;
+    if (shapes.length) {
+      shapeIndex = Math.min(shapeIndex, shapes.length - 1);
+      $("diagram").innerHTML = diagramSvg(shapes[shapeIndex]);
+      $("shape-count").textContent = `${shapeIndex + 1} of ${shapes.length}`;
+      $<HTMLButtonElement>("shape-prev").disabled = shapeIndex === 0;
+      $<HTMLButtonElement>("shape-next").disabled = shapeIndex >= shapes.length - 1;
+    }
+  }
+  $("shape-prev").addEventListener("click", () => { shapeIndex--; drawChord(shown, true); });
+  $("shape-next").addEventListener("click", () => { shapeIndex++; drawChord(shown, true); });
+
+  // ---- the history of chords ----
+  let history: { chord: string; at: number }[] = [];
+  let startedAt = 0;
+  const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+  function drawHistory() {
+    $("history").innerHTML = history.length ? history.map((h) => `<span title="at ${clock(h.at)}">${h.chord}</span>`).join("") : '<em>Chords you play will line up here.</em>';
+    $("history-count").textContent = history.length ? `${history.length} chord${history.length === 1 ? "" : "s"}` : "";
+    $("progression").textContent = history.length > 1 ? history.map((h) => h.chord).join(" – ") : "";
+  }
+  $("clear").addEventListener("click", () => { history = []; drawHistory(); });
+  $("copy").addEventListener("click", async () => {
+    if (!history.length) return;
+    const text = history.map((h) => h.chord).join(" - ");
+    try {
+      await navigator.clipboard.writeText(text);
+      toast({ icon: "📋", title: "Copied", text, ms: 2500 });
+    } catch {
+      toast({ icon: "📋", title: "Could not copy", text: "Select the chords and copy them by hand.", ms: 3500 });
+    }
+  });
+
+  // ---- listening ----
+  let mic: Mic | null = null;
+  let listener: ChordListener | null = null;
+
+  function onHeard(h: Heard) {
+    $("level").style.width = `${Math.min(100, Math.sqrt(h.level / 0.25) * 100)}%`;
+    const hold = $<HTMLInputElement>("hold").checked;
+    const tones = h.chord ? pitchClassesOf(h.chord) : [];
+    barEls.forEach((bar, i) => {
+      const v = h.chroma ? h.chroma[i] : 0;
+      (bar.firstElementChild as HTMLElement).style.height = `${Math.max(3, v * 70)}px`;
+      bar.classList.toggle("in", !!h.chroma && tones.includes(i) && v > 0.25);
+    });
+    if (hold) return;
+    if (h.chord && h.chord !== history[history.length - 1]?.chord) {
+      history = [...history, { chord: h.chord, at: (performance.now() - startedAt) / 1000 }].slice(-40);
+      drawHistory();
+    }
+    drawChord(h.chord);
+    $("conf").style.width = h.chord ? `${Math.round(h.score * 100)}%` : "0";
+    $("conf-label").textContent = h.chord ? `${Math.round(h.score * 100)}% match` : "";
+    $("status").textContent = h.chroma ? "Hearing you" : "Listening… play a chord";
+  }
+
+  async function start() {
+    if (!gate.allowed()) return;
+    $("error").hidden = true;
+    try {
+      mic = await openMic(16384);
+    } catch (err) {
+      $("error").textContent = err instanceof MicError ? err.message : "The microphone could not be started.";
+      $("error").hidden = false;
+      return;
+    }
+    startedAt = performance.now();
+    listener = new ChordListener(mic, { gate: gateLevel(prefs.sens), suffixes: prefs.simple ? SIMPLE : undefined }, onHeard);
+    listener.start();
+    root.classList.add("live");
+    $("status").textContent = "Listening… play a chord";
+    $("kind").textContent = "Listening… play a chord";
+    $("listen-text").textContent = "Stop";
+    $("listen").setAttribute("aria-pressed", "true");
+  }
+  function stop() {
+    listener?.stop();
+    listener = null;
+    mic?.stop();
+    mic = null;
+    root.classList.remove("live");
+    $("status").textContent = "Press Start, then play a chord";
+    $("listen-text").textContent = "Start";
+    $("listen").setAttribute("aria-pressed", "false");
+    $("level").style.width = "0";
+    $("conf").style.width = "0";
+    $("conf-label").textContent = "";
+    barEls.forEach((bar) => { (bar.firstElementChild as HTMLElement).style.height = "3px"; bar.classList.remove("in"); });
+  }
+  $("listen").addEventListener("click", () => (mic ? stop() : void start()));
+  window.addEventListener("pagehide", stop);
+
+  drawSens();
+  drawHistory();
+  drawChord(null, true);
+</script>

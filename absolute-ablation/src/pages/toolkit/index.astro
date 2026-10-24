@@ -1,0 +1,70 @@
+---
+import ToolShell from "../../components/ToolShell.astro";
+import { TOOLS } from "../../lib/tools/catalog";
+---
+
+<ToolShell
+  title="Toolkit — Chord Suno"
+  description="Free-to-try practice tools for guitar and more: a metronome, a tuner, chord practice drills and live chord detection."
+  eyebrow="Toolkit"
+  heading="Everything for your practice session"
+  sub="A metronome, a tuner, chord drills and live chord detection, built into Chord Suno. They run on your device and work with your guitar, ukulele, piano and voice."
+>
+  <div class="tkh-grid">
+    {TOOLS.map((t) => (
+      <a class="tkh-card" href={t.href} data-feature={t.feature} style={`--h1:${t.hue[0]};--h2:${t.hue[1]}`}>
+        <span class="tk-tile tkh-tile"><svg viewBox="0 0 24 24" aria-hidden="true" set:html={t.icon} /></span>
+        <h2>{t.name}</h2>
+        <p>{t.blurb}</p>
+        <ul>
+          {t.points.map((p) => (<li>{p}</li>))}
+        </ul>
+        <span class="tkh-cta" data-cta>Open {t.name.toLowerCase().startsWith("practice") ? "the drills" : "it"} <span aria-hidden="true">→</span></span>
+      </a>
+    ))}
+  </div>
+
+  <aside class="tkh-note">
+    <strong>Your sound stays with you.</strong>
+    The tuner, chord detection and practice drills listen through your microphone, and the sound is analysed on your device. It is never recorded, uploaded or stored.
+  </aside>
+</ToolShell>
+
+<style is:global>
+  .tkh-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr)); gap: 18px; }
+  .tkh-card { position: relative; display: flex; flex-direction: column; padding: 26px; text-decoration: none; color: var(--color-ink); background: #fff; border: 1px solid var(--color-hairline); border-radius: 28px; overflow: hidden; box-shadow: 0 1px 2px #1a053308, 0 16px 36px -22px #1a053330; transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s; }
+  .tkh-card::before { content: ""; position: absolute; inset: -40% -30% auto auto; width: 70%; aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle, var(--h1) 0%, transparent 70%); opacity: 0.12; transition: opacity 0.2s; pointer-events: none; }
+  .tkh-card:hover { transform: translateY(-4px); border-color: var(--color-hairline-strong); box-shadow: 0 2px 4px #1a05330a, 0 28px 50px -24px #1a053344; }
+  .tkh-card:hover::before { opacity: 0.22; }
+  .tkh-tile { width: 56px; height: 56px; margin-bottom: 18px; border-radius: 18px; }
+  .tkh-tile svg { width: 30px; height: 30px; }
+  .tkh-card h2 { margin: 0 0 8px; font-size: 22px; font-weight: 800; letter-spacing: -0.03em; }
+  .tkh-card p { margin: 0 0 14px; font-size: 15px; line-height: 1.55; color: var(--color-body); }
+  .tkh-card ul { margin: 0 0 20px; padding: 0; list-style: none; display: grid; gap: 7px; }
+  .tkh-card li { position: relative; padding-left: 24px; font-size: 14px; color: var(--color-body); }
+  .tkh-card li::before { content: ""; position: absolute; left: 0; top: 3px; width: 16px; height: 16px; border-radius: 50%; background: #d1fae5 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m4.6 8.4 2.1 2.1 4.7-4.9' fill='none' stroke='%23059669' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/100% no-repeat; }
+  .tkh-cta { margin-top: auto; display: inline-flex; align-items: center; gap: 6px; font: 700 14.5px var(--font-sans); color: var(--color-violet-deep); }
+  .tkh-card.is-locked .tkh-cta { color: var(--color-body); }
+  .tkh-card.is-locked .tkh-tile { filter: grayscale(0.5); }
+  .tkh-note { margin: 34px auto 0; max-width: 720px; padding: 16px 20px; text-align: center; font-size: 14.5px; line-height: 1.6; color: var(--color-body); background: #fff; border: 1px dashed var(--color-hairline-strong); border-radius: 18px; }
+  .tkh-note strong { color: var(--color-ink); }
+</style>
+
+<script>
+  import { can, loadPlan } from "../../lib/plan";
+  import { track } from "../../lib/analytics";
+
+  const cards = document.querySelectorAll<HTMLAnchorElement>(".tkh-card");
+  const mark = () => {
+    cards.forEach((card) => {
+      const open = can(card.dataset.feature ?? "");
+      card.classList.toggle("is-locked", !open);
+      const cta = card.querySelector<HTMLElement>("[data-cta]");
+      if (cta && !card.dataset.label) card.dataset.label = cta.innerHTML;
+      if (cta) cta.innerHTML = open ? (card.dataset.label ?? "") : "🔒 Not in your plan · See details <span aria-hidden=\"true\">→</span>";
+    });
+  };
+  window.addEventListener("plan-change", mark);
+  void loadPlan();
+  track("toolkit_open");
+</script>

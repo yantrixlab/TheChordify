@@ -33,7 +33,7 @@ KINDS = ("flag", "limit")
 _MONTHS = {"daily": 1 / 30, "weekly": 12 / 52, "monthly": 1, "quarterly": 3, "yearly": 12}
 
 # Features the product itself checks today. The rest still show on the pricing page, but switching them changes nothing in the app.
-ENFORCED = {"songs_per_day", "favorites_max", "chord_detail", "chord_voicings", "transpose_capo", "upload_song"}
+ENFORCED = {"songs_per_day", "favorites_max", "chord_detail", "chord_voicings", "transpose_capo", "upload_song", "metronome", "tuner", "practice_chords", "chord_detector"}
 
 # (key, label, description, kind, unit, group, status)
 _DEFAULT_FEATURES = [
@@ -51,9 +51,11 @@ _DEFAULT_FEATURES = [
     ("pdf_export", "Chord sheet PDF", "Download a song's chords as a printable PDF.", "flag", "", "Export & tools", "soon"),
     ("midi_export", "Chord MIDI files", "Download a song's chords as MIDI.", "flag", "", "Export & tools", "soon"),
     ("lyrics", "Lyrics", "Read the lyrics with the chords.", "flag", "", "Export & tools", "soon"),
-    ("tuner", "Tuner", "Tune your instrument with the built-in tuner.", "flag", "", "Export & tools", "soon"),
-    ("metronome", "Metronome", "A metronome that follows the song's tempo.", "flag", "", "Export & tools", "soon"),
     ("offline_mode", "Offline mode", "Open your songs without a connection.", "flag", "", "Export & tools", "soon"),
+    ("metronome", "Metronome", "Tap tempo, time signatures, subdivisions, accents and a speed trainer, in the Toolkit.", "flag", "", "Toolkit", "live"),
+    ("tuner", "Tuner", "Tune guitar, bass, ukulele, violin and more with your microphone, in the Toolkit.", "flag", "", "Toolkit", "live"),
+    ("practice_chords", "Practice your chords", "Chord-change drills with a metronome, a one-minute challenge, and a mode that listens and checks you.", "flag", "", "Toolkit", "live"),
+    ("chord_detector", "Live chord detection", "Play your instrument and see the chord name appear as you play, in the Toolkit.", "flag", "", "Toolkit", "live"),
     ("priority_processing", "Priority processing", "Your new songs go to the front of the line.", "flag", "", "Support & teams", "soon"),
     ("priority_support", "Priority support", "Quicker answers when you need help.", "flag", "", "Support & teams", "soon"),
     ("team_seats", "Team seats", "People you can add to your plan.", "limit", "seats", "Support & teams", "soon"),
@@ -61,8 +63,8 @@ _DEFAULT_FEATURES = [
 ]
 
 # What each starting plan includes: key -> True (on), a number (limit), None (a limit that is unlimited). Anything missing is off.
-_FREE_ON = {"songs_per_day": None, "upload_song": True, "chord_detail": True, "chord_voicings": True, "transpose_capo": True, "tempo_loop": True, "no_ads": True, "favorites_max": 25, "library_history": True, "xp_levels": True}
-_PREMIUM_ON = {**_FREE_ON, "favorites_max": None, "instruments_more": True, "pdf_export": True, "midi_export": True, "lyrics": True, "tuner": True, "metronome": True, "offline_mode": True, "priority_processing": True}
+_FREE_ON = {"songs_per_day": None, "upload_song": True, "practice_chords": True, "chord_detail": True, "chord_voicings": True, "transpose_capo": True, "tempo_loop": True, "no_ads": True, "favorites_max": 25, "library_history": True, "xp_levels": True}
+_PREMIUM_ON = {**_FREE_ON, "favorites_max": None, "instruments_more": True, "pdf_export": True, "midi_export": True, "lyrics": True, "tuner": True, "metronome": True, "chord_detector": True, "offline_mode": True, "priority_processing": True}
 _PRO_ON = {**_PREMIUM_ON, "priority_support": True, "team_seats": 5, "api_access": True}
 _DEFAULT_MATRIX = {"free": _FREE_ON, "premium": _PREMIUM_ON, "pro": _PRO_ON}
 
@@ -231,6 +233,7 @@ class PlanStore:
                     (key, label, description, kind, unit, group, status, order),
                 )
         self._add_new_features()
+        self._toolkit_live()
         # The starting grid, for a starting plan that has no rules at all yet.
         for code, ons in _DEFAULT_MATRIX.items():
             plan, _ = self._db.run("SELECT id FROM plans WHERE code = ?", (code,))
@@ -249,7 +252,13 @@ class PlanStore:
     def _add_new_features(self) -> None:
         """Features added to the product after a database was first filled. Each is created once, and switched on for the
         plans that exist (what everybody had before it became a setting); from then on the admin decides."""
-        for key in ("upload_song",):
+        # what each starting plan gets when the feature is first created; any other plan gets what Premium gets
+        defaults = {
+            "upload_song": {"free": True, "premium": True, "pro": True},
+            "practice_chords": {"free": True, "premium": True, "pro": True},
+            "chord_detector": {"free": False, "premium": True, "pro": True},
+        }
+        for key in defaults:
             exists, _ = self._db.run("SELECT key FROM features WHERE key = ?", (key,))
             if exists:
                 continue
@@ -259,11 +268,22 @@ class PlanStore:
                 "INSERT INTO features (key, label, description, kind, unit, grp, status, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 (key, label, description, kind, unit, group, status, order),
             )
-            for plan in self._db.run("SELECT id FROM plans")[0]:
+            for plan in self._db.run("SELECT id, code FROM plans")[0]:
+                on = defaults[key].get(plan["code"], defaults[key]["premium"])
                 self._db.run(
-                    "INSERT INTO plan_features (plan_id, feature_key, enabled, value) VALUES (?, ?, 1, NULL) ON CONFLICT(plan_id, feature_key) DO NOTHING",
-                    (plan["id"], key),
+                    "INSERT INTO plan_features (plan_id, feature_key, enabled, value) VALUES (?, ?, ?, NULL) ON CONFLICT(plan_id, feature_key) DO NOTHING",
+                    (plan["id"], key, 1 if on else 0),
                 )
+
+    def _toolkit_live(self) -> None:
+        """The metronome and the tuner used to be listed as coming soon. Now they are built, once: move them into the Toolkit
+        group and mark them live. Whatever plans the admin gave them stays as it is."""
+        if self._flag("toolkit_live"):
+            return
+        for key in ("metronome", "tuner"):
+            _, label, description, kind, unit, group, status = next(f for f in _DEFAULT_FEATURES if f[0] == key)
+            self._db.run("UPDATE features SET description = ?, grp = ?, status = ? WHERE key = ?", (description, group, status, key))
+        self._set_flag("toolkit_live")
 
     def _ensure_free_plan(self) -> None:
         rows, _ = self._db.run("SELECT id FROM plans WHERE code = ?", (FREE_CODE,))
