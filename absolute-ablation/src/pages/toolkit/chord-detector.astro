@@ -68,10 +68,15 @@ import ToolShell from "../../components/ToolShell.astro";
           <label class="tk-label" for="sens">Microphone sensitivity <output id="sens-out">Medium</output></label>
           <input id="sens" class="tk-range" type="range" min="0" max="100" value="55" />
         </div>
-        <label class="tk-switch">
-          <span>Simple chords only<small>Major, minor and 7th chords. Fewer surprises while you learn.</small></span>
-          <input type="checkbox" id="simple" /><i></i>
-        </label>
+        <div class="tk-field">
+          <p class="tk-label">Kinds of chord to listen for</p>
+          <div class="tk-seg" id="types" role="group" aria-label="Kinds of chord">
+            <button type="button" data-types="basic" aria-pressed="false">Major &amp; minor</button>
+            <button type="button" data-types="sevenths" aria-pressed="false">+ 7ths</button>
+            <button type="button" data-types="all" aria-pressed="false">All</button>
+          </div>
+          <p class="tk-hint">Major and minor is the steadiest. Add 7ths or all kinds once you play those chords: the more kinds it listens for, the more often it can mistake a plain chord for a fancier one.</p>
+        </div>
         <label class="tk-switch">
           <span>Show the guitar diagram<small>For the chord it hears</small></span>
           <input type="checkbox" id="show-shape" checked /><i></i>
@@ -156,10 +161,10 @@ import ToolShell from "../../components/ToolShell.astro";
   const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
   const root = document.querySelector<HTMLElement>(".cd")!;
 
-  const SIMPLE = ["", "m", "7"];
-  interface Prefs { sens: number; simple: boolean; shape: boolean }
+  const TYPES: Record<string, string[] | undefined> = { basic: ["", "m"], sevenths: ["", "m", "7", "m7", "maj7"], all: undefined };
+  interface Prefs { sens: number; types: string; shape: boolean }
   const KEY = "cs-chord-detector";
-  let prefs: Prefs = { sens: 55, simple: false, shape: true };
+  let prefs: Prefs = { sens: 55, types: "basic", shape: true };
   try { prefs = { ...prefs, ...JSON.parse(localStorage.getItem(KEY) || "{}") }; } catch { /* first visit */ }
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(prefs)); } catch { /* storage is off */ } };
 
@@ -181,8 +186,10 @@ import ToolShell from "../../components/ToolShell.astro";
     noiseGate.sensitivity = prefs.sens;
   };
   sens.addEventListener("input", () => { prefs.sens = Number(sens.value); drawSens(); save(); });
-  $<HTMLInputElement>("simple").checked = prefs.simple;
-  $<HTMLInputElement>("simple").addEventListener("change", (e) => { prefs.simple = (e.target as HTMLInputElement).checked; if (listener) listener.options.suffixes = prefs.simple ? SIMPLE : undefined; save(); });
+  const drawTypes = () => document.querySelectorAll<HTMLButtonElement>("[data-types]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.types === prefs.types)));
+  document.querySelectorAll<HTMLButtonElement>("[data-types]").forEach((b) => b.addEventListener("click", () => { prefs.types = b.dataset.types ?? "basic"; if (listener) listener.options.suffixes = TYPES[prefs.types]; drawTypes(); save(); }));
+  if (!(prefs.types in TYPES)) prefs.types = "basic";
+  drawTypes();
   $<HTMLInputElement>("show-shape").checked = prefs.shape;
   $<HTMLInputElement>("show-shape").addEventListener("change", (e) => { prefs.shape = (e.target as HTMLInputElement).checked; save(); drawChord(shown, true); });
 
@@ -272,7 +279,7 @@ import ToolShell from "../../components/ToolShell.astro";
       return;
     }
     startedAt = performance.now();
-    listener = new ChordListener(mic, { gate: noiseGate, suffixes: prefs.simple ? SIMPLE : undefined }, onHeard);
+    listener = new ChordListener(mic, { gate: noiseGate, suffixes: TYPES[prefs.types] }, onHeard);
     listener.start();
     $("mic-warn").hidden = true;
     $("mic-name").textContent = mic.label ? `Microphone: ${mic.label}` : "";

@@ -64,11 +64,6 @@ const progressions = [
 
       <!-- listen and check -->
       <div class="pr-panel" data-panel="listen" hidden>
-        <div class="pr-heard">I hear: <b id="heard">–</b></div>
-        <div class="pr-meter" aria-hidden="true"><i id="level"></i></div>
-      <p class="mic-name" id="mic-name"></p>
-      <select id="mic-select" class="tk-select mic-select" aria-label="Microphone" hidden></select>
-      <p class="mic-warn" id="mic-warn" hidden role="alert"></p>
         <div class="pr-timer" id="limit-bar" hidden aria-hidden="true"><i id="limit-fill"></i></div>
       </div>
 
@@ -76,7 +71,17 @@ const progressions = [
       <div class="pr-panel" data-panel="minute" hidden>
         <div class="pr-clock"><b id="clock">1:00</b><span>left</span></div>
         <div class="pr-count"><b id="count">0</b><span>clean changes</span></div>
-        <button class="tk-btn amber pr-tapper" id="changed" type="button" disabled>I changed cleanly <span class="tk-kbd" style="margin-left:8px">Space</span></button>
+        <p class="pr-auto" id="auto-note">Play the chord shown. Each time Chord Suno hears you switch to the other chord, it counts.</p>
+        <button class="tk-btn on-dark pr-tapper" id="changed" type="button" disabled>Count a change myself <span class="tk-kbd" style="margin-left:8px">Space</span></button>
+      </div>
+
+      <!-- what the microphone hears, for listen and 1-minute -->
+      <div class="pr-panel" data-panel="listen minute" hidden>
+        <div class="pr-heard">I hear: <b id="heard">–</b></div>
+        <div class="pr-meter" aria-hidden="true"><i id="level"></i></div>
+        <p class="mic-name" id="mic-name"></p>
+        <select id="mic-select" class="tk-select mic-select" aria-label="Microphone" hidden></select>
+        <p class="mic-warn" id="mic-warn" hidden role="alert"></p>
       </div>
 
       <div class="pr-stats" id="stats"></div>
@@ -219,6 +224,7 @@ const progressions = [
   .pr-meter i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #34d399, #fbbf24); transition: width 0.1s linear; }
   .pr-timer i { display: block; height: 100%; width: 100%; background: #f59e0b; }
   .pr-timer[hidden] { display: none; }
+  .pr-auto { margin: 0 0 12px; font-size: 13px; line-height: 1.5; color: #c4b0e0; }
   .pr-clock, .pr-count { display: inline-block; margin: 0 16px 12px; }
   .pr-clock b, .pr-count b { display: block; font: 800 52px/1 var(--font-sans); letter-spacing: -0.04em; color: #fff; font-variant-numeric: tabular-nums; }
   .pr-clock span, .pr-count span { font: 700 11px var(--font-mono); letter-spacing: 0.18em; text-transform: uppercase; color: #c4b0e0; }
@@ -386,12 +392,12 @@ const progressions = [
   const MODES: Record<Mode, string> = {
     follow: "A beat keeps time and the chord changes every few beats. The next chord is shown ahead so you can get your fingers ready.",
     listen: "Play the chord shown. Chord Suno listens through your microphone and moves on when it hears you play it right.",
-    minute: "Switch between two chords as many times as you can in one minute. Press the button (or Space) for each clean change.",
+    minute: "Switch between two chords as many times as you can in one minute. Chord Suno listens through your microphone and counts each change it hears. No microphone? Press the button or Space yourself.",
   };
   function drawSettings() {
     all<HTMLButtonElement>("[data-mode]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.mode === prefs.mode)));
     $("blurb").textContent = MODES[prefs.mode];
-    all("[data-panel]").forEach((p) => (p.hidden = p.dataset.panel !== prefs.mode));
+    all("[data-panel]").forEach((p) => (p.hidden = !(p.dataset.panel ?? "").split(" ").includes(prefs.mode)));
     all("[data-for]").forEach((p) => (p.hidden = !(p.dataset.for ?? "").split(" ").includes(prefs.mode)));
     $("skip").hidden = prefs.mode !== "listen" || !running;
     all<HTMLButtonElement>("[data-per]").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.per) === prefs.per)));
@@ -512,16 +518,14 @@ const progressions = [
     shownAt = performance.now();
     stage(target, next);
     $("limit-fill").style.width = "100%";
+    if (listener) listener.options.suffixes = kindsFor(target);
   }
   function onHeard(h: Heard) {
-    $("level").style.width = `${levelPercent(h.level)}%`;
-    $("level").classList.toggle("open", !!h.chroma);
-    $("mic-warn").hidden = !silence.feed(h.level);
-    $("heard").textContent = h.chord ?? "–";
+    meterAndName(h);
     if (locked || !h.chroma || performance.now() - shownAt < 450) { if (!h.chroma) okFrames = 0; return; }
     const score = scoreChord(h.chroma, target);
     const top = h.guesses[0];
-    const right = score >= 0.8 && (top?.name === target || score >= (top?.score ?? 0) - 0.05);
+    const right = score >= 0.62 && (top?.name === target || score >= (top?.score ?? 0) - 0.04);
     okFrames = right ? okFrames + 1 : 0;
     if (okFrames >= 2) {
       locked = true;
@@ -535,7 +539,10 @@ const progressions = [
       window.setTimeout(() => running && prefs.mode === "listen" && nextTarget(), 850);
     }
   }
-  async function startListen() {
+  /** The kinds of chord that may be named while practising: plain ones, and the kinds of the chords being practised. */
+  const kindsFor = (...chords: string[]) => ["", "m", ...chords.map((c) => c.replace(/^[A-G]#?/, ""))];
+
+  async function startMic(handler: (h: Heard) => void): Promise<boolean> {
     error(null);
     try {
       mic = await openMic(16384);
@@ -546,12 +553,38 @@ const progressions = [
     $("mic-warn").textContent = SILENT_MIC_TEXT;
     $("mic-warn").hidden = true;
     $("mic-name").textContent = mic.label ? `Microphone: ${mic.label}` : "";
-    void fillMicPicker($<HTMLSelectElement>("mic-select"), mic.deviceId, () => { if (running && prefs.mode === "listen") { stopAll(); void startAll(); } });
+    void fillMicPicker($<HTMLSelectElement>("mic-select"), mic.deviceId, () => {
+      if (!running) return;
+      const mode = prefs.mode;
+      stopAll();
+      prefs.mode = mode;
+      void startAll();
+    });
+    listener = new ChordListener(mic, { gate: noiseGate }, handler);
+    listener.start(110);
+    return true;
+  }
+  function stopMic() {
+    listener?.stop();
+    listener = null;
+    mic?.stop();
+    mic = null;
+    $("level").style.width = "0";
+    $("mic-warn").hidden = true;
+    $("heard").textContent = "–";
+  }
+  function meterAndName(h: Heard) {
+    $("level").style.width = `${levelPercent(h.level)}%`;
+    $("level").classList.toggle("open", !!h.chroma);
+    $("mic-warn").hidden = !silence.feed(h.level);
+    $("heard").textContent = h.chord ?? "–";
+  }
+
+  async function startListen() {
+    if (!(await startMic(onHeard))) return false;
     Object.assign(stats, { right: 0, streak: 0, bestStreak: 0, times: [], missed: 0 });
     seq = 0;
     target = "";
-    listener = new ChordListener(mic, { gate: noiseGate }, onHeard);
-    listener.start(110);
     nextTarget();
     listenStats();
     const bar = $("limit-bar");
@@ -578,12 +611,56 @@ const progressions = [
   let minuteTimer = 0;
   let expecting = "";
   let phase: "idle" | "ready" | "run" = "idle";
-  function startMinute() {
+  let mShownAt = 0;
+  let mOk = 0;
+  let mStarted = false; // the first chord only starts the changes: playing it is not a change itself
+  function flip() {
+    expecting = expecting === prefs.pair[0] ? prefs.pair[1] : prefs.pair[0];
+    stage(expecting, expecting === prefs.pair[0] ? prefs.pair[1] : prefs.pair[0]);
+    mShownAt = performance.now();
+    mOk = 0;
+    if (listener) listener.options.suffixes = kindsFor(prefs.pair[0], prefs.pair[1]);
+  }
+  function minuteHeard(h: Heard) {
+    meterAndName(h);
+    if (phase !== "run" || !h.chroma || performance.now() - mShownAt < 450) {
+      if (!h.chroma) mOk = 0;
+      return;
+    }
+    const score = scoreChord(h.chroma, expecting);
+    const top = h.guesses[0];
+    mOk = score >= 0.62 && (top?.name === expecting || score >= (top?.score ?? 0) - 0.04) ? mOk + 1 : 0;
+    if (mOk < 2) return;
+    if (mStarted) {
+      count++;
+      $("count").textContent = String(count);
+      flash("good", "+1");
+    } else {
+      mStarted = true;
+      flash("good", "Go!");
+    }
+    flip();
+  }
+  async function startMinute() {
+    mStarted = false;
+    const listening = await startMic(minuteHeard);
+    if (!listening) {
+      // no microphone: the button and Space still count
+      error(`${$("error").textContent ?? ""} You can still count your changes yourself with the button or Space.`.trim());
+      mStarted = true;
+    }
+    $("auto-note").textContent = listening
+      ? "Play the first chord to start. Each time Chord Suno hears you switch to the other chord, it counts."
+      : "Press the button, or Space, each time you switch chords cleanly.";
+    if (!running) return stopMic();
     count = 0;
     $("count").textContent = "0";
     $("clock").textContent = "1:00";
     expecting = prefs.pair[0];
     stage(expecting, prefs.pair[1]);
+    mShownAt = performance.now();
+    mOk = 0;
+    if (listener) listener.options.suffixes = kindsFor(prefs.pair[0], prefs.pair[1]);
     phase = "ready";
     let left = 3;
     $("clock").textContent = String(left);
@@ -606,15 +683,16 @@ const progressions = [
   }
   function tapChange() {
     if (phase !== "run") return;
+    mStarted = true;
     count++;
     $("count").textContent = String(count);
-    expecting = expecting === prefs.pair[0] ? prefs.pair[1] : prefs.pair[0];
-    stage(expecting, expecting === prefs.pair[0] ? prefs.pair[1] : prefs.pair[0]);
+    flip();
   }
   function finishMinute() {
     window.clearInterval(minuteTimer);
     phase = "idle";
     $<HTMLButtonElement>("changed").disabled = true;
+    stopMic();
     const scores = best();
     const old = scores[pairKey()] ?? 0;
     const record = count > old;
@@ -644,7 +722,7 @@ const progressions = [
       startFollow();
     } else {
       setGo(true);
-      startMinute();
+      void startMinute();
     }
   }
   function stopAll() {
@@ -653,15 +731,9 @@ const progressions = [
     metro = null;
     window.clearInterval(limitTimer);
     window.clearInterval(minuteTimer);
-    listener?.stop();
-    listener = null;
-    mic?.stop();
-    mic = null;
+    stopMic();
     phase = "idle";
     $<HTMLButtonElement>("changed").disabled = true;
-    $("level").style.width = "0";
-    $("mic-warn").hidden = true;
-    $("heard").textContent = "–";
     $("limit-bar").hidden = true;
     $("clock").textContent = "1:00";
     setGo(false);

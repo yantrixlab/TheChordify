@@ -86,8 +86,8 @@ export function chromaOf(samples: Float32Array, sampleRate: number): Chroma {
   if (top < 1e-3) return { bins, energy: 0 };
 
   // the strong peaks, each with its place between bins found from its neighbours
-  const peaks: { midi: number; weight: number }[] = [];
-  const floor = top * 0.06;
+  const peaks: { freq: number; midi: number; mag: number; weight: number }[] = [];
+  const floor = top * 0.05;
   for (let i = lo; i <= hi; i++) {
     const m = mag[i];
     if (m < floor || m < mag[i - 1] || m <= mag[i + 1]) continue;
@@ -97,11 +97,31 @@ export function chromaOf(samples: Float32Array, sampleRate: number): Chroma {
     const denom = a - 2 * b + c;
     const shift = denom === 0 ? 0 : (0.5 * (a - c)) / denom;
     const freq = (i + shift) * binHz;
-    // high partials are mostly overtones of lower notes, so they count for less
-    const weight = Math.sqrt(m / top) / (1 + Math.max(0, freq - 500) / 1200);
-    peaks.push({ midi: 69 + 12 * Math.log2(freq / 440), weight });
+    peaks.push({ freq, midi: 69 + 12 * Math.log2(freq / 440), mag: m, weight: 0 });
   }
   if (!peaks.length) return { bins, energy: 0 };
+
+  // A plucked string rings with overtones at 2, 3, 4... times its pitch, and those land on notes that are not in the chord (the
+  // third overtone of an E is a B, which would read as a major 7th over a C chord). So from the lowest peak upwards, take away the
+  // overtones each peak is expected to bring with it; what is left is what was really played.
+  const left = peaks.map((p) => p.mag);
+  for (let i = 0; i < peaks.length; i++) {
+    if (left[i] <= 0) continue;
+    for (let n = 2; n <= 10; n++) {
+      const at = peaks[i].freq * n;
+      for (let j = i + 1; j < peaks.length; j++) {
+        if (peaks[j].freq > at * 1.02) break;
+        if (Math.abs(1200 * Math.log2(peaks[j].freq / at)) < 35) {
+          left[j] = Math.max(0, left[j] - left[i] * (1.05 / n));
+          break;
+        }
+      }
+    }
+  }
+  peaks.forEach((p, i) => {
+    // high notes are mostly overtones of lower ones, so they count for less
+    p.weight = Math.pow(left[i] / top, 0.85) / (1 + Math.max(0, p.freq - 500) / 1200);
+  });
 
   // an instrument a little flat or sharp is still in tune with itself: find the common offset and take it out
   let offset = 0;
@@ -131,15 +151,15 @@ interface Shape {
 const SHAPES: Shape[] = [
   { suffix: "", intervals: [0, 4, 7], prior: 1 },
   { suffix: "m", intervals: [0, 3, 7], prior: 1 },
-  { suffix: "7", intervals: [0, 4, 7, 10], prior: 0.97 },
-  { suffix: "m7", intervals: [0, 3, 7, 10], prior: 0.97 },
-  { suffix: "maj7", intervals: [0, 4, 7, 11], prior: 0.96 },
-  { suffix: "sus4", intervals: [0, 5, 7], prior: 0.95 },
-  { suffix: "sus2", intervals: [0, 2, 7], prior: 0.95 },
-  { suffix: "dim", intervals: [0, 3, 6], prior: 0.93 },
-  { suffix: "aug", intervals: [0, 4, 8], prior: 0.93 },
-  { suffix: "6", intervals: [0, 4, 7, 9], prior: 0.92 },
-  { suffix: "m7b5", intervals: [0, 3, 6, 10], prior: 0.92 },
+  { suffix: "7", intervals: [0, 4, 7, 10], prior: 0.93 },
+  { suffix: "m7", intervals: [0, 3, 7, 10], prior: 0.93 },
+  { suffix: "maj7", intervals: [0, 4, 7, 11], prior: 0.9 },
+  { suffix: "sus4", intervals: [0, 5, 7], prior: 0.9 },
+  { suffix: "sus2", intervals: [0, 2, 7], prior: 0.9 },
+  { suffix: "dim", intervals: [0, 3, 6], prior: 0.88 },
+  { suffix: "aug", intervals: [0, 4, 8], prior: 0.88 },
+  { suffix: "6", intervals: [0, 4, 7, 9], prior: 0.86 },
+  { suffix: "m7b5", intervals: [0, 3, 6, 10], prior: 0.86 },
 ];
 
 const TEMPLATES = ROOTS.flatMap((root, r) =>
@@ -187,4 +207,55 @@ export function scoreChord(bins: Float32Array, name: string): number {
   let dot = 0;
   for (let i = 0; i < 12; i++) dot += bins[i] * tpl.t[i];
   return dot / (norm * tpl.norm);
+}
+
+/** The same, with the nudge towards plain chords: what `matchChords` ranks by. */
+export function scoreWithPrior(bins: Float32Array, name: string): number {
+  const tpl = TEMPLATES.find((t) => t.name === name);
+  return tpl ? scoreChord(bins, name) * tpl.prior : 0;
+}
+
+/**
+ * Turns a stream of readings, one every fraction of a second, into the chord to show. The notes are averaged over a moment, and a
+ * new chord has to win most of the recent readings before it replaces the one on show, so a strum's attack, a fading ring or a
+ * passing overtone does not make the name flicker.
+ */
+export class ChordTracker {
+  private smooth: Float32Array | null = null;
+  private votes: string[] = [];
+  private quiet = 0;
+  current: string | null = null;
+
+  constructor(public suffixes?: string[]) {}
+
+  /** `bins` from `chromaOf`, or null when nothing is being played. */
+  push(bins: Float32Array | null): { chord: string | null; score: number; guesses: ChordGuess[] } {
+    if (!bins) {
+      // a short gap between strums keeps the chord; a long one lets go of it
+      if (++this.quiet > 8) this.reset();
+      return { chord: this.current, score: 0, guesses: [] };
+    }
+    this.quiet = 0;
+    if (!this.smooth) this.smooth = Float32Array.from(bins);
+    else for (let i = 0; i < 12; i++) this.smooth[i] = this.smooth[i] * 0.55 + bins[i] * 0.45;
+    const top = Math.max(...this.smooth) || 1;
+    const view = this.smooth.map((v) => v / top);
+    const guesses = matchChords(view, 3, this.suffixes);
+    this.votes.push(guesses[0] && guesses[0].score >= 0.68 ? guesses[0].name : "?");
+    if (this.votes.length > 6) this.votes.shift();
+
+    const counts = new Map<string, number>();
+    for (const v of this.votes) if (v !== "?") counts.set(v, (counts.get(v) ?? 0) + 1);
+    let leader: string | null = null;
+    for (const [name, n] of counts) if (!leader || n > (counts.get(leader) ?? 0)) leader = name;
+    if (leader && (!this.current ? (counts.get(leader) ?? 0) >= 3 : leader !== this.current && (counts.get(leader) ?? 0) >= 4)) this.current = leader;
+    return { chord: this.current, score: this.current ? scoreChord(view, this.current) : 0, guesses };
+  }
+
+  reset() {
+    this.smooth = null;
+    this.votes = [];
+    this.current = null;
+    this.quiet = 0;
+  }
 }

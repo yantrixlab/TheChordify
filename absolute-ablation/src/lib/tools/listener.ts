@@ -1,6 +1,6 @@
 // Listens to the microphone and keeps naming the chord being played, steadily enough to read.
 import { audioContext, rms, type Mic, type NoiseGate } from "./audio";
-import { chromaOf, matchChords, type ChordGuess } from "./chroma";
+import { ChordTracker, chromaOf, matchChords, type ChordGuess } from "./chroma";
 
 export interface Heard {
   /** How loud it is, 0 to about 1. */
@@ -27,10 +27,7 @@ const SIZE = 16384; // about a third of a second of sound
 export class ChordListener {
   private buf = new Float32Array(SIZE);
   private timer = 0;
-  private current: string | null = null;
-  private pending: string | null = null;
-  private pendingFor = 0;
-  private lastSound = 0;
+  private tracker = new ChordTracker();
 
   constructor(
     private mic: Mic,
@@ -51,35 +48,19 @@ export class ChordListener {
   private step() {
     this.mic.analyser.getFloatTimeDomainData(this.buf);
     const level = rms(this.buf);
-    const now = performance.now();
-    if (!this.options.gate.update(level, now)) {
-      // a brief gap between strums keeps the last chord; a longer one clears it
-      if (now - this.lastSound > 900) this.current = this.pending = null;
-      this.onHeard({ level, chroma: null, guesses: [], chord: this.current, score: 0 });
+    this.tracker.suffixes = this.options.suffixes;
+    if (!this.options.gate.update(level, performance.now())) {
+      const { chord } = this.tracker.push(null);
+      this.onHeard({ level, chroma: null, guesses: [], chord, score: 0 });
       return;
     }
-    this.lastSound = now;
     const { bins, energy } = chromaOf(this.buf, audioContext().sampleRate);
-    const guesses = energy > 0 ? matchChords(bins, 3, this.options.suffixes) : [];
-    const best = guesses[0];
-    let score = 0;
-    if (best && best.score >= 0.7) {
-      // a new chord has to be heard twice running before it replaces the one on show, so a passing wobble does not flicker
-      if (best.name === this.current) {
-        this.pending = null;
-        score = best.score;
-      } else if (best.name === this.pending) {
-        if (++this.pendingFor >= 2) {
-          this.current = best.name;
-          this.pending = null;
-          score = best.score;
-        }
-      } else {
-        this.pending = best.name;
-        this.pendingFor = 1;
-      }
+    if (energy === 0) {
+      const { chord } = this.tracker.push(null);
+      this.onHeard({ level, chroma: null, guesses: [], chord, score: 0 });
+      return;
     }
-    if (this.current) score = guesses.find((g) => g.name === this.current)?.score ?? score;
-    this.onHeard({ level, chroma: bins, guesses, chord: this.current, score });
+    const { chord, score } = this.tracker.push(bins);
+    this.onHeard({ level, chroma: bins, guesses: matchChords(bins, 3, this.options.suffixes), chord, score });
   }
 }
