@@ -1,0 +1,8 @@
+# Chord Suno: the public pages are open to search engines. Pages that should not be listed (a player's own song, search results, the library) carry a noindex tag instead, so a crawler has to be allowed to read them.
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /media/
+
+Sitemap: https://chordsuno.com/sitemap.xml

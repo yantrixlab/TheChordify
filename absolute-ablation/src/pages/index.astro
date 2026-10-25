@@ -11,9 +11,39 @@ import Features from "../components/Features.astro";
 import Pricing from "../components/Pricing.astro";
 import CTABand from "../components/CTABand.astro";
 import Footer from "../components/Footer.astro";
+
+const jsonLd = [
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "Chord Suno",
+    url: "https://chordsuno.com/",
+    description: "Get the chords of any song from a YouTube link or an audio file, for guitar, piano, ukulele and mandolin.",
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "Chord Suno",
+    legalName: "Yantrix Labs",
+    url: "https://chordsuno.com/",
+    logo: "https://chordsuno.com/icon-512.png",
+    email: "yantrixlab@gmail.com",
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    name: "Chord Suno",
+    url: "https://chordsuno.com/",
+    applicationCategory: "MusicApplication",
+    operatingSystem: "Any (runs in the browser)",
+    description:
+      "Listens to a YouTube link or an audio file and writes out every chord, synced to the beat, with chord diagrams for guitar, piano, ukulele and mandolin. Includes a tuner, metronome, chord practice drills and live chord detection.",
+    offers: { "@type": "Offer", price: "0", priceCurrency: "INR" },
+  },
+];
 ---
 
-<Layout>
+<Layout jsonLd={jsonLd}>
   <Nav />
   <main>
     <Hero />

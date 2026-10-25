@@ -7,14 +7,20 @@ interface Props {
   description?: string;
   noindex?: boolean; // keep the page out of search engines (the admin page)
   analytics?: boolean; // count visits to this page in Google Analytics (the admin pages turn it off)
+  image?: string; // the picture shown when the page is shared (a path on this site); the Chord Suno card by default
+  jsonLd?: object | object[]; // structured data for search engines
 }
 
 const {
   noindex = false,
   analytics = true,
-  title = "Chord Suno — Hear Every Chord. Play Every Song.",
-  description = "Chord Suno listens to any YouTube link or audio file and writes out every chord, synced to the beat, for guitar, piano, ukulele and mandolin. Suno means listen.",
+  title = "Guitar Chord Finder from Any YouTube Song — Chord Suno",
+  description = "Paste a YouTube link or upload a song and get every chord synced to the beat, for guitar, piano, ukulele and mandolin. Free to start, no card needed.",
+  image = "/og-image.png",
+  jsonLd,
 } = Astro.props;
+const pageUrl = new URL(Astro.url.pathname, "https://chordsuno.com").href;
+const imageUrl = new URL(image, "https://chordsuno.com").href;
 ---
 
 <!doctype html>
@@ -23,8 +29,10 @@ const {
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content={description} />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="canonical" href={new URL(Astro.url.pathname, "https://chordsuno.com").href} />
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="canonical" href={pageUrl} />
     <meta name="application-name" content="Chord Suno" />
     {noindex && <meta name="robots" content="noindex, nofollow" />}
     {
@@ -59,8 +67,16 @@ const {
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://chordsuno.com" />
+    <meta property="og:url" content={pageUrl} />
     <meta property="og:site_name" content="Chord Suno" />
+    <meta property="og:image" content={imageUrl} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={imageUrl} />
+    {jsonLd && <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />}
     <!-- Theme color -->
     <meta name="theme-color" content="#1a0533" />
   </head>
