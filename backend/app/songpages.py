@@ -17,6 +17,7 @@ import os
 import re
 import time
 import unicodedata
+from html.parser import HTMLParser
 from typing import Optional
 
 log = logging.getLogger("chordify.songpages")
@@ -87,6 +88,127 @@ def _time_signature(per_bar: int) -> str:
 
 def _esc(text: object) -> str:
     return html.escape(str(text), quote=True)
+
+
+# ---- the admin's own words for a song page: HTML, kept to a safe set of tags ----------------------------------------------
+
+_ALLOWED_TAGS = {
+    "p", "br", "hr", "h2", "h3", "h4", "ul", "ol", "li", "strong", "b", "em", "i", "u", "s", "a", "blockquote", "code", "pre",
+    "img", "figure", "figcaption", "table", "thead", "tbody", "tr", "th", "td", "span", "div", "details", "summary", "sub", "sup",
+}
+_VOID_TAGS = {"br", "hr", "img"}
+_DROP_WITH_CONTENT = {"script", "style", "iframe", "object", "embed", "noscript", "template", "svg", "math", "form", "textarea", "select"}
+_ALLOWED_ATTRS = {
+    "a": {"href", "title"},
+    "img": {"src", "alt", "width", "height", "title"},
+    "td": {"colspan", "rowspan"},
+    "th": {"colspan", "rowspan"},
+    "ol": {"start"},
+}
+_MAX_RICH = 20000
+
+
+def _safe_url(value: str, allow_mailto: bool) -> str:
+    v = value.strip()
+    low = re.sub(r"[\s\x00-\x1f]+", "", v).lower()
+    if low.startswith(("https://", "http://", "/", "#")) and not low.startswith("//"):
+        return v
+    if allow_mailto and low.startswith("mailto:"):
+        return v
+    return ""
+
+
+class _Cleaner(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=False)
+        self.out: list[str] = []
+        self.open: list[str] = []
+        self.skip = 0  # inside a tag whose content is thrown away
+
+    def handle_starttag(self, tag: str, attrs: list) -> None:
+        if tag in _DROP_WITH_CONTENT:
+            self.skip += 1
+            return
+        if self.skip or tag not in _ALLOWED_TAGS:
+            return
+        kept = []
+        href = ""
+        for name, value in attrs:
+            if name not in _ALLOWED_ATTRS.get(tag, ()) or value is None:
+                continue
+            if name == "href":
+                value = _safe_url(value, True)
+                if not value:
+                    continue
+                href = value
+            elif name == "src":
+                value = _safe_url(value, False)
+                if not value or value.startswith("#"):
+                    continue
+            elif name in ("width", "height", "colspan", "rowspan", "start"):
+                if not re.fullmatch(r"\d{1,4}", value.strip()):
+                    continue
+            kept.append(f' {name}="{html.escape(value, quote=True)}"')
+        if tag == "a":
+            external = href.lower().startswith(("http://", "https://")) and "chordsuno.com" not in href.lower()
+            kept.append(' rel="noopener nofollow ugc" target="_blank"' if external else ' rel="noopener"')
+        if tag == "img":
+            if not any(k.startswith(" src=") for k in kept):
+                return  # a picture with no safe address is dropped
+            kept.append(' loading="lazy"')
+        self.out.append(f"<{tag}{''.join(kept)}>")
+        if tag not in _VOID_TAGS:
+            self.open.append(tag)
+
+    def handle_startendtag(self, tag: str, attrs: list) -> None:
+        if tag in _DROP_WITH_CONTENT:
+            return  # <script/> and the like: nothing to skip
+        self.handle_starttag(tag, attrs)
+        if tag not in _VOID_TAGS and tag in self.open:
+            self.handle_endtag(tag)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in _DROP_WITH_CONTENT:
+            self.skip = max(self.skip - 1, 0)
+            return
+        if self.skip or tag not in _ALLOWED_TAGS or tag in _VOID_TAGS or tag not in self.open:
+            return
+        while self.open:  # close anything left open inside it
+            top = self.open.pop()
+            self.out.append(f"</{top}>")
+            if top == tag:
+                break
+
+    def handle_data(self, data: str) -> None:
+        if not self.skip:
+            self.out.append(html.escape(data, quote=False))
+
+    def handle_entityref(self, name: str) -> None:
+        if not self.skip:
+            self.out.append(f"&{name};" if re.fullmatch(r"[a-zA-Z0-9]{1,12}", name) else "")
+
+    def handle_charref(self, name: str) -> None:
+        if not self.skip:
+            self.out.append(f"&#{name};" if re.fullmatch(r"x?[0-9a-fA-F]{1,6}", name) else "")
+
+    def result(self) -> str:
+        while self.open:
+            self.out.append(f"</{self.open.pop()}>")
+        return "".join(self.out)
+
+
+def clean_rich(text: str) -> str:
+    """The admin's text as safe HTML: only the tags above, links and pictures only to http(s) addresses, no scripts, no styles,
+    no event handlers. Text with no tags at all (older pages) becomes paragraphs."""
+    text = (text or "").strip()[:_MAX_RICH]
+    if not text:
+        return ""
+    if "<" not in text:
+        return "".join(f"<p>{html.escape(part.strip())}</p>" for part in re.split(r"\n\s*\n", text) if part.strip())
+    cleaner = _Cleaner()
+    cleaner.feed(text)
+    cleaner.close()
+    return cleaner.result()
 
 
 class SongPages:
@@ -190,7 +312,7 @@ class SongPages:
             ON CONFLICT(video_id) DO UPDATE SET slug = excluded.slug, title = excluded.title, artist = excluded.artist,
                 intro = excluded.intro, updated_at = excluded.updated_at
             """,
-            (video_id, final, title, artist, intro.strip()[:1500], now, now),
+            (video_id, final, title, artist, clean_rich(intro), now, now),
         )
         return {"slug": final, "title": title, "artist": artist}
 
@@ -295,7 +417,22 @@ class SongPages:
         if duration:
             facts.append(("Length", _minutes(duration)))
         facts_html = "".join(f"<div><dt>{_esc(k)}</dt><dd>{_esc(v)}</dd></div>" for k, v in facts)
-        chips = "".join(f"<span>{_esc(c)}</span>" for c in used[:12])
+        chips = "".join(f"<span>{_esc(c)}</span>" for c in used[:24])
+        # the diagrams are drawn in the browser (the same shapes as the player); the name is here for everyone else
+        diagrams = "".join(
+            f'<figure class="sp-dg" data-chord="{_esc(c)}"><div class="sp-dg-art" aria-hidden="true"></div>'
+            f'<figcaption><strong>{_esc(c)}</strong><small class="sp-dg-notes"></small></figcaption>'
+            '<div class="sp-dg-nav" hidden><button type="button" data-step="-1" aria-label="Previous way to play">‹</button>'
+            '<span></span><button type="button" data-step="1" aria-label="Next way to play">›</button></div></figure>'
+            for c in used[:24]
+        )
+        diagrams_html = (
+            f'<section class="sp-block" id="diagrams"><h2>Chord diagrams</h2>'
+            f'<p class="sp-sub">Every chord in {_esc(title)}, as it is fingered on guitar. Use the arrows on a chord to see other ways to play it.</p>'
+            f'<div class="sp-dgs">{diagrams}</div></section>'
+            if used
+            else ""
+        )
 
         # the chords of each section, as they follow one another (repeats of the same chord merged)
         prog_html = ""
@@ -311,20 +448,19 @@ class SongPages:
                     chain.append(c["chord"])
             if len(chain) >= 2:
                 seen_labels.add(kind)
-                prog_html += f"<li><strong>{_esc(label)}</strong><span>{' <b>›</b> '.join(_esc(c) for c in chain[:16])}</span></li>"
-        progression = f'<section class="sp-block"><h2>Chord progression</h2><ul class="sp-prog">{prog_html}</ul></section>' if prog_html else ""
+                prog_html += f"<li><strong>{_esc(label)}</strong><span>{''.join(f'<i>{_esc(c)}</i>' for c in chain[:16])}</span></li>"
+        progression = f'<section class="sp-block" id="progression"><h2>Chord progression</h2><ul class="sp-prog">{prog_html}</ul></section>' if prog_html else ""
 
-        intro = row["intro"].strip()
-        about = (
-            f"<p>{_esc(intro)}</p>"
-            if intro
-            else (
+        intro = clean_rich(row["intro"])
+        if intro:
+            about = f'<div class="sp-rich">{intro}</div>'
+        else:
+            about = (
                 f"<p>{_esc(title)}{(' by ' + _esc(artist)) if artist else ''} is in the key of {_esc(key)} at about {tempo} BPM, "
                 f"counted in {_time_signature(per_bar)}.</p>"
                 if key and tempo
                 else f"<p>Chords for {_esc(name)}.</p>"
             )
-        )
         about += (
             f"<p>These chords were worked out automatically from the song's audio, with the chord changes placed on the beat. "
             f"Open the player to follow {_esc(title)} chord by chord, slow it down, loop a section, transpose it, or see it for "
@@ -345,15 +481,18 @@ class SongPages:
             '<article class="sp-wrap">'
             '<nav class="sp-crumb" aria-label="Breadcrumb"><a href="/">Chord Suno</a><span>›</span><a href="/songs/">Songs</a>'
             f"<span>›</span><span>{_esc(title)}</span></nav>"
-            f'<header class="sp-hero"><img src="https://i.ytimg.com/vi/{_esc(row["video_id"])}/hqdefault.jpg" alt="{_esc(name)}" width="480" height="360" />'
-            f'<div><p class="sp-eyebrow">Chords</p><h1>{_esc(title)} chords</h1>'
+            '<header class="sp-hero">'
+            f'<img src="https://i.ytimg.com/vi/{_esc(row["video_id"])}/hqdefault.jpg" alt="{_esc(name)}" width="480" height="360" />'
+            f'<div class="sp-hero-text"><p class="sp-eyebrow">Chords</p><h1>{_esc(title)} chords</h1>'
             f'{f"<p class=sp-by>{_esc(artist)}</p>" if artist else ""}'
-            f'<a class="sp-play" href="/play?session={_esc(row["session_id"])}">▶ Play along with the chords</a>'
-            "<small>Synced to the beat · guitar, piano, ukulele &amp; mandolin diagrams</small></div></header>"
+            f'<div class="sp-cta"><a class="sp-play" href="/play?session={_esc(row["session_id"])}">▶ Play along with the chords</a>'
+            f'{"<a class=sp-ghost href=#diagrams>Chord diagrams</a>" if used else ""}</div>'
+            "<small>Synced to the beat · chord diagrams for guitar, piano, ukulele &amp; mandolin</small></div></header>"
             f'<dl class="sp-facts">{facts_html}</dl>'
             f'<section class="sp-block"><h2>Chords used in {_esc(title)}</h2><div class="sp-chips">{chips}</div></section>'
+            f"{diagrams_html}"
             f"{progression}"
-            f'<section class="sp-block"><h2>About these chords</h2>{about}</section>'
+            f'<section class="sp-block" id="about"><h2>About these chords</h2>{about}</section>'
             f"{related_html}"
             '<aside class="sp-note">Chord charts are transcriptions made by software for learning and practice. Chord Suno does not show lyrics.</aside>'
             "</article>"

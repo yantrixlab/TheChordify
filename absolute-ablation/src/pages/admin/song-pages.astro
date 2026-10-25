@@ -42,6 +42,28 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
   .sp-edit label { display: grid; gap: 5px; font: 600 12.5px var(--font-sans); color: var(--color-body); }
   .sp-edit .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .sp-edit .url { margin-top: -6px; font: 500 12.5px var(--font-mono); color: var(--color-mute); word-break: break-all; }
+  /* the editor for the page's own words: a visual one and an HTML one */
+  .rt-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .rt-head > span { font: 600 12.5px var(--font-sans); color: var(--color-body); }
+  .rt-seg { display: inline-flex; padding: 3px; border-radius: 999px; background: var(--color-violet-soft); }
+  .rt-seg button { height: 28px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent; font: 650 12.5px var(--font-sans); color: var(--color-violet-deep); cursor: pointer; }
+  .rt-seg button.is-on { background: #fff; color: var(--color-ink); box-shadow: 0 1px 3px rgb(26 5 51 / 0.16); }
+  .rt-box { overflow: hidden; border: 1.5px solid var(--color-hairline); border-radius: 12px; background: #fff; }
+  .rt-box:focus-within { border-color: var(--color-violet); box-shadow: 0 0 0 3px #7c3aed1f; }
+  .rt-tools { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px; border-bottom: 1px solid #f1eaf9; background: #fcfaff; }
+  .rt-tools button { min-width: 32px; height: 30px; padding: 0 8px; border: 0; border-radius: 8px; background: transparent; font: 700 13px var(--font-sans); color: var(--color-body); cursor: pointer; }
+  .rt-tools button:hover { background: var(--color-violet-soft); color: var(--color-violet-deep); }
+  .rt-tools i { align-self: center; width: 1px; height: 18px; margin: 0 4px; background: #e8dff5; }
+  .rt-visual { min-height: 170px; max-height: 420px; overflow-y: auto; padding: 14px 16px; font: 500 15px/1.7 var(--font-sans); color: var(--color-ink); outline: none; }
+  .rt-visual h2 { margin: 0.8em 0 0.3em; font-size: 20px; } .rt-visual h3 { margin: 0.8em 0 0.3em; font-size: 17px; }
+  .rt-visual p { margin: 0 0 10px; } .rt-visual ul, .rt-visual ol { margin: 0 0 10px; padding-left: 22px; } .rt-visual ul { list-style: disc; } .rt-visual ol { list-style: decimal; }
+  .rt-visual a { color: var(--color-violet-deep); text-decoration: underline; }
+  .rt-visual blockquote { margin: 10px 0; padding-left: 14px; border-left: 3px solid #cdbff0; font-style: italic; }
+  .rt-visual img { max-width: 100%; height: auto; border-radius: 10px; }
+  .rt-visual:empty::before { content: attr(data-placeholder); color: var(--color-mute); }
+  .adm-main .rt-code { display: block; min-height: 190px; max-height: 420px; border: 0; border-radius: 0; font: 500 13px/1.6 var(--font-mono); resize: vertical; box-shadow: none; }
+  .adm-main .rt-code:focus { box-shadow: none; }
+  .rt-help { margin: 6px 0 0; font-size: 12.5px; color: var(--color-mute); }
   @media (max-width: 680px) {
     .sp-line { grid-template-columns: 72px minmax(0, 1fr); }
     .sp-line img { width: 72px; height: 42px; }
@@ -66,6 +88,121 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
   let page = 1;
   let query = "";
   let latest = 0;
+
+  /** The page's own words as HTML that is safe to show in the editor (the server cleans it again before it is saved or shown). */
+  function tidy(html: string): string {
+    const doc = new DOMParser().parseFromString(html, "text/html");
+    doc.querySelectorAll("script, style, iframe, object, embed, form, svg, math, template, link, meta").forEach((n) => n.remove());
+    doc.body.querySelectorAll<HTMLElement>("*").forEach((n) => {
+      for (const attr of Array.from(n.attributes)) {
+        const v = attr.value.replace(/[\s\u0000-\u001f]+/g, "").toLowerCase();
+        if (attr.name.startsWith("on") || ((attr.name === "href" || attr.name === "src") && /^(javascript|data|vbscript):/.test(v))) n.removeAttribute(attr.name);
+      }
+    });
+    return doc.body.innerHTML;
+  }
+
+  function asHtml(text: string): string {
+    const t = text.trim();
+    if (!t) return "";
+    if (t.includes("<")) return tidy(t);
+    return t
+      .split(/\n\s*\n/)
+      .map((part) => `<p>${part.trim().replace(/&/g, "&amp;").replace(/</g, "&lt;")}</p>`)
+      .join("");
+  }
+
+  /** A small editor: a visual page (bold, headings, lists, links, pictures) and the raw HTML, switched at the top right. */
+  function richEditor(initial: string) {
+    const wrap = el("div");
+    const head = el("div", "rt-head");
+    head.append(el("span", "", "About the song (optional)"));
+    const seg = el("div", "rt-seg");
+    const visualTab = el("button", "is-on", "Visual");
+    const htmlTab = el("button", "", "HTML");
+    visualTab.type = htmlTab.type = "button";
+    seg.append(visualTab, htmlTab);
+    head.append(seg);
+
+    const box = el("div", "rt-box");
+    const tools = el("div", "rt-tools");
+    const visual = el("div", "rt-visual");
+    visual.contentEditable = "true";
+    visual.setAttribute("role", "textbox");
+    visual.setAttribute("aria-multiline", "true");
+    visual.setAttribute("aria-label", "About the song, visual editor");
+    visual.dataset.placeholder = "Two or three sentences about the song: its mood, who it suits, how it is played. A page with its own words does better in search.";
+    const code = el("textarea", "rt-code");
+    code.spellcheck = false;
+    code.setAttribute("aria-label", "About the song, HTML");
+    code.hidden = true;
+    visual.innerHTML = asHtml(initial);
+
+    const run = (command: string, value?: string) => {
+      visual.focus();
+      document.execCommand(command, false, value);
+    };
+    const button = (label: string, title: string, action: () => void, extra = "") => {
+      const b = el("button", extra, label);
+      b.type = "button";
+      b.title = title;
+      b.setAttribute("aria-label", title);
+      b.addEventListener("mousedown", (event) => event.preventDefault()); // keep the selection in the text
+      b.addEventListener("click", action);
+      tools.append(b);
+    };
+    button("B", "Bold", () => run("bold"));
+    button("I", "Italic", () => run("italic"));
+    button("U", "Underline", () => run("underline"));
+    tools.append(el("i"));
+    button("H2", "Heading", () => run("formatBlock", "h2"));
+    button("H3", "Smaller heading", () => run("formatBlock", "h3"));
+    button("¶", "Paragraph", () => run("formatBlock", "p"));
+    button("❝", "Quote", () => run("formatBlock", "blockquote"));
+    tools.append(el("i"));
+    button("• List", "Bulleted list", () => run("insertUnorderedList"));
+    button("1. List", "Numbered list", () => run("insertOrderedList"));
+    tools.append(el("i"));
+    button("Link", "Add a link", () => {
+      const url = prompt("Link address (starting with https:// or /)", "https://");
+      if (url && /^(https?:\/\/|\/)/i.test(url.trim())) run("createLink", url.trim());
+    });
+    button("Image", "Add a picture", () => {
+      const url = prompt("Picture address (starting with https://)", "https://");
+      if (url && /^https:\/\//i.test(url.trim())) run("insertImage", url.trim());
+    });
+    button("―", "Divider line", () => run("insertHorizontalRule"));
+    button("Clear", "Remove formatting", () => run("removeFormat"));
+
+    box.append(tools, visual, code);
+    const help = el("p", "rt-help", "Links and pictures need an http(s) address. Scripts, styles and forms are removed when the page is saved.");
+    wrap.append(head, box, help);
+
+    let mode: "visual" | "html" = "visual";
+    const setMode = (next: "visual" | "html") => {
+      if (next === mode) return;
+      if (next === "html") code.value = tidy(visual.innerHTML);
+      else visual.innerHTML = asHtml(code.value);
+      mode = next;
+      visual.hidden = tools.hidden = next === "html";
+      code.hidden = next === "visual";
+      visualTab.classList.toggle("is-on", next === "visual");
+      htmlTab.classList.toggle("is-on", next === "html");
+      (next === "html" ? code : visual).focus();
+    };
+    visualTab.addEventListener("click", () => setMode("visual"));
+    htmlTab.addEventListener("click", () => setMode("html"));
+
+    return {
+      el: wrap,
+      /** What to save: the HTML of whichever editor is showing (empty when there is nothing in it). */
+      value(): string {
+        const html = mode === "html" ? code.value.trim() : tidy(visual.innerHTML).trim();
+        const probe = new DOMParser().parseFromString(html, "text/html").body;
+        return probe.textContent?.trim() || probe.querySelector("img, hr") ? html : "";
+      },
+    };
+  }
 
   function field(label: string, input: HTMLElement): HTMLElement {
     const wrap = el("label", "", label);
@@ -111,12 +248,7 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
     slug.type = "text";
     slug.maxLength = 100;
     slug.value = song.published ? song.slug : song.suggestedSlug;
-    const intro = el("textarea");
-    intro.rows = 4;
-    intro.maxLength = 1500;
-    intro.placeholder =
-      "Optional: two or three sentences about the song (its mood, who it suits, how it is played). A page with its own words does better in search.";
-    intro.value = song.intro;
+    const intro = richEditor(song.intro);
     const url = el("div", "url", `https://chordsuno.com/songs/${slug.value}/`);
     slug.addEventListener("input", () => (url.textContent = `https://chordsuno.com/songs/${slug.value || "…"}/`));
 
@@ -129,7 +261,7 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
       try {
         const done = await adminFetch(`/api/admin/song-pages/${encodeURIComponent(song.videoId)}`, {
           method: "PUT",
-          body: JSON.stringify({ title: title.value, artist: artist.value, slug: slug.value, intro: intro.value }),
+          body: JSON.stringify({ title: title.value, artist: artist.value, slug: slug.value, intro: intro.value() }),
         });
         say("msg", `Published at ${done.url}`, "ok");
         await load();
@@ -138,7 +270,7 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
         save.disabled = false;
       }
     });
-    edit.append(two, field("Page address", slug), url, field("About the song (optional)", intro), save);
+    edit.append(two, field("Page address", slug), url, intro.el, save);
 
     const toggle = el("button", `adm-btn small ${song.published ? "ghost" : ""}`, song.published ? "Edit" : "Publish…");
     toggle.type = "button";
