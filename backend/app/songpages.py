@@ -90,8 +90,9 @@ def _esc(text: object) -> str:
 
 
 class SongPages:
-    def __init__(self, catalog, template_path: str) -> None:
+    def __init__(self, catalog, template_path: str, analysis_version: int = 0) -> None:
         self._catalog = catalog
+        self._version = analysis_version
         self._db = catalog.db
         self._template_path = template_path
         for statement in _SCHEMA:
@@ -131,6 +132,16 @@ class SongPages:
                 {base} ORDER BY (p.video_id IS NULL), s.jams DESC, s.updated_at DESC LIMIT ? OFFSET ?""",
             tuple(params) + (size, max(page - 1, 0) * size),
         )
+        # which of these songs were analysed by the current detector (the others still open, but an admin can re-analyse them)
+        current: set[str] = set()
+        if rows:
+            keys = [r["session_id"] for r in rows]
+            marks = ",".join("?" * len(keys))
+            fresh, _ = self._db.run(
+                f"SELECT key FROM results WHERE key IN ({marks}) AND data LIKE ?",
+                tuple(keys) + (f'%"analysisVersion": {self._version}%',),
+            )
+            current = {f["key"] for f in fresh}
         songs = []
         for r in rows:
             sug = self.suggestion(r)
@@ -152,6 +163,7 @@ class SongPages:
                     "intro": r["page_intro"] or "",
                     "suggestedSlug": sug["slug"],
                     "publishedAt": r["page_published_at"],
+                    "analysed": r["session_id"] in current,
                 }
             )
         return {"songs": songs, "total": total[0]["n"], "published": self.count()}

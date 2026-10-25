@@ -218,6 +218,17 @@ def _load_cached_result(key: str) -> Optional[dict]:
     return result if result and result.get("analysisVersion") == ANALYSIS_VERSION else None
 
 
+def _load_saved_result(key: str) -> Optional[dict]:
+    """Whatever analysis is saved for a song, even one from an older detector. Opening a song that is already saved should
+    never fail just because the detector has improved since: it is shown as it is, and a newer analysis replaces it when
+    the song is next chordified from search (or when an admin re-analyses it)."""
+    try:
+        return catalog.load_result(key)
+    except Exception as exc:
+        log.warning("Could not read the saved result %s: %s", key, exc)
+        return None
+
+
 def _save_result(key: str, result: dict) -> None:
     try:
         catalog.save_result(key, {**result, "analysisVersion": ANALYSIS_VERSION})
@@ -971,7 +982,7 @@ def _library_meta(session_id: str, supplied: Optional[dict] = None) -> tuple[Opt
     """What the library should remember about a song, and whether we have really analysed it (so it is worth XP).
     What we hold ourselves is trusted; what the browser supplies is only used for a YouTube song we have not analysed, and is clipped."""
     video_id = session_id[3:] if session_id.startswith("yt_") and is_video_id(session_id[3:]) else ""
-    result = _load_cached_result(session_id)
+    result = _load_cached_result(session_id) or _load_saved_result(session_id)
     if result:
         song = catalog.get_song(video_id) if video_id else None
         thumbnail = (song or {}).get("thumbnail") or (f"https://i.ytimg.com/vi/{video_id}/mqdefault.jpg" if video_id else "")
@@ -1307,14 +1318,17 @@ def get_result(session_id: str) -> dict:
     _check_key(session_id)
     cached = _load_cached_result(session_id)
     if not cached:
-        raise HTTPException(status_code=404, detail="Unknown session")
+        cached = _load_saved_result(session_id)  # an older analysis still opens
+        if not cached:
+            raise HTTPException(status_code=404, detail="Unknown session")
+        return {**cached, "outdated": True}
     return _with_pending(session_id, cached)
 
 
 # ---- public song pages (the admin chooses which songs get one) -----------------------------------------------------------
 
 _STATIC_DIR = os.environ.get("STATIC_DIR", os.path.join(os.path.dirname(__file__), "..", "static"))
-song_pages = SongPages(catalog, os.path.join(_STATIC_DIR, "song-template", "index.html"))
+song_pages = SongPages(catalog, os.path.join(_STATIC_DIR, "song-template", "index.html"), ANALYSIS_VERSION)
 
 
 class SongPageBody(BaseModel):

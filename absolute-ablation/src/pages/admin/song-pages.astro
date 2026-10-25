@@ -88,6 +88,7 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
     );
     const meta = el("div", "sp-meta");
     meta.append(el("span", `adm-pill ${song.published ? "ok" : ""}`, song.published ? "Published" : "Not published"));
+    if (!song.analysed) meta.append(el("span", "adm-pill warn", "Older analysis"));
     if (song.key) meta.append(el("i", "", song.key));
     if (song.tempo) meta.append(el("i", "", `${Math.round(song.tempo)} BPM`));
     meta.append(el("i", "", `${number(song.jams)} plays`));
@@ -164,6 +165,27 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
         }
       });
       acts.append(view, off);
+    }
+
+    if (!song.analysed) {
+      // The song still opens as it was analysed. This runs the current detector on it again (it needs the audio from YouTube).
+      const again = el("button", "adm-btn ghost small", "Re-analyse");
+      again.type = "button";
+      again.title = "Run the latest chord detector on this song again";
+      again.addEventListener("click", async () => {
+        again.disabled = true;
+        try {
+          await adminFetch("/api/extract/youtube", {
+            method: "POST",
+            body: JSON.stringify({ url: `https://www.youtube.com/watch?v=${song.videoId}`, title: song.title, artist: song.artist, thumbnail: song.thumbnail }),
+          });
+          say("msg", `“${song.title}” is being analysed again. It takes a minute or two; reload this page to see it marked as up to date.`, "ok");
+        } catch (err) {
+          say("msg", err instanceof Error ? err.message : "Could not start that.", "bad");
+          again.disabled = false;
+        }
+      });
+      acts.append(again);
     }
 
     const line = el("div", "sp-line");
