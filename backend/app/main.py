@@ -82,7 +82,8 @@ except Exception as exc:
 # 16: the result carries the song's strumming pattern.
 # 17: the strumming pattern is told from the chord's own notes, so drums and vocals no longer make every song look the same.
 # 18: a song can have several strumming patterns (one per kind of section), in eighths or sixteenths.
-ANALYSIS_VERSION = 18
+# 19: strikes are found as sudden rises of the chord's own notes and tested against chance, so strokes that follow close on another are not lost.
+ANALYSIS_VERSION = 19
 
 ALLOWED_UPLOAD_EXTENSIONS ={".mp3", ".wav", ".flac", ".m4a"}
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50MB

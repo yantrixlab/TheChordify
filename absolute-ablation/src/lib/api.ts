@@ -42,7 +42,7 @@ export interface StrumOne {
 }
 
 export interface StrumPattern {
-  v?: number; // the detector that made it (2 and later are shown)
+  v?: number; // the detector that made it (4 and later are shown)
   patterns?: StrumOne[]; // one per way the song is played (v3)
   pattern: string[]; // the first pattern, for older results: two slots to a beat ("1 & 2 & ..."): "D" down-strum, "U" up-strum, "-" no strum
   sub?: number;

@@ -2,12 +2,12 @@
 
 A strum adds energy to the notes of the chord being played. A drum hit, a cymbal or a breath adds energy to every note alike. So for
 every moment of the recording the energy on the chord's own notes minus its fair share of the energy everywhere else is the playing
-(and sound that is the same on every note drops out). Every beat of a bar is cut into four slots, a sixteenth note each ("1 e & a"),
-and at each slot the rise of that energy is measured: the average just after it minus the average just before it.
+(and sound that is the same on every note drops out). Each sudden rise of it is a strike.
 
-Averaged over the bars, a slot that is really struck rises every time, and a slot that is not averages out to nothing, however much else
-is going on. A slot is part of the pattern only when its average rise is clearly above what chance would give. If no sixteenth between
-the beats and the "&" is struck, the pattern is shown in eighths; if some are, in sixteenths.
+Every beat of a bar is cut into four slots, a sixteenth note each ("1 e & a"). In every bar each slot either has a strike on it or not.
+Between the slots are stretches where no strum can fall, and the strikes found there (other instruments, the voice) say how often a
+strike lands on a slot by chance. A slot is part of the pattern when strikes land on it in many bars, and clearly more often than that.
+If none of the sixteenths between the beat and the "&" is struck, the pattern is shown in eighths; if some are, in sixteenths.
 
 Songs often play one way in the verses and another in the chorus. So the bars of each kind of section (verse, chorus...) are measured
 on their own, and when they come out different the song gets a pattern for each, with where it is played.
@@ -15,9 +15,9 @@ on their own, and when they come out different the song gets a pattern for each,
 Down and up strokes cannot be heard in a recording. The usual picture of the guitar is used: the strumming hand keeps moving down and
 up in eighths (or sixteenths when sixteenths are played), so a stroke on the beat is a down-strum and one on the "&" an up-strum.
 
-The result says how sure it is ("kind"): heard (the slots clearly rise), guess (they rise a little, so the slots that do are shown as a
-best guess) or typical (nothing stands out, as in a piano ballad, an arpeggiated intro or a loose recording, so a typical pattern for the
-song's time signature is offered, marked as a suggestion).
+The result says how sure it is ("kind"): heard (the slots are clearly struck), guess (they are struck a little, so the slots that are
+are shown as a best guess) or typical (nothing stands out, as in a piano ballad, an arpeggiated intro or a loose recording, so a typical
+pattern for the song's time signature is offered, marked as a suggestion).
 """
 
 from __future__ import annotations
@@ -34,15 +34,17 @@ log = logging.getLogger("chordify.strum")
 HOP = 512
 SUB = 4  # slots to a beat
 MIN_BARS = 14  # bars needed to tell a pattern at all
-MIN_GROUP_BARS = 12  # bars of one kind of section needed to give it a pattern of its own
+MIN_GROUP_BARS = 10  # bars of one kind of section needed to give it a pattern of its own
 LOW_HZ, HIGH_HZ = 110.0, 3200.0  # the range a strummed guitar lives in; below it are the kick and the bass
-BEFORE = (0.45, 0.05)  # the stretch before a slot (as shares of a slot) whose level is compared with...
-AFTER = (0.0, 0.5)  # ...the stretch after it
-DECAY = 0.0  # how much of the fall before a slot is taken off its rise (off: it was tried, and hid the first beat of each bar)
-SURE = 3.5  # a slot counts when its average rise is this many standard errors above nothing
-FINE_EXTRA = 1.0  # the sixteenths between the beat and the "&" must be this much surer, so noise does not invent them
-GUESS = 2.0  # below SURE but above this, the slots that rise still say something: a best guess, labelled as one
-SHARE = 0.22  # a slot must also reach this share of the strongest slot's rise
+STRIKE_DELTA = 0.1  # how far a rise of the chord's notes must stand out from its surroundings to be a strike
+PURITY = 0.65  # and how much of the rise must be on the chord's notes (a drum hit rises on every note alike: about half)
+WINDOW = 0.3  # a strike belongs to a slot when it falls within this share of a slot either side of its centre
+
+# For each kind of slot: the share of bars that must have a strike on it, and how many standard errors that must be above the chance share.
+# Beats are the surest places; the "&" is next; the "e" and "a" in between are the easiest to invent, so they must show more.
+#                       (beat)      ("&")       (e, a)
+HEARD = {"beat": (0.50, 3.0), "and": (0.55, 3.5), "fine": (0.60, 4.5)}
+GUESS = {"beat": (0.40, 2.0), "and": (0.45, 2.5), "fine": (0.50, 3.5)}
 
 # What to offer when the recording does not show a clear strum, by beats to the bar (two slots to a beat).
 _DEFAULTS = {
@@ -68,8 +70,11 @@ def _chord_tones(chord: str) -> set[int]:
     return {root, (root + third) % 12, (root + fifth) % 12}
 
 
-def _playing(y: np.ndarray, sr: int, chords: list[dict]) -> np.ndarray:
-    """The energy on the chord's own notes beyond its fair share of the rest, one value per HOP samples (zero where no chord sounds)."""
+def _playing(y: np.ndarray, sr: int, chords: list[dict]) -> tuple[np.ndarray, np.ndarray]:
+    """(energy, purity), one value per HOP samples.
+
+    energy: the energy on the chord's own notes beyond its fair share of the rest (zero where no chord sounds).
+    purity: how much of the latest rise of sound was on the chord's own notes: near 1 for a strum, about a half for a drum hit."""
     spec = np.abs(librosa.stft(y, n_fft=2048, hop_length=HOP))
     lo, hi = int(LOW_HZ * 2048 / sr), int(HIGH_HZ * 2048 / sr)
     band = np.zeros_like(spec)
@@ -94,44 +99,61 @@ def _playing(y: np.ndarray, sr: int, chords: list[dict]) -> np.ndarray:
     tone_sum = (amp * mask).sum(axis=0)
     other_sum = (amp * ~mask).sum(axis=0)
     n_tone = np.maximum(mask.sum(axis=0), 1)
-    excess = tone_sum - (n_tone / np.maximum(12 - n_tone, 1)) * other_sum  # zero on average for sound that is the same on every note
-    return excess * mask.any(axis=0)
+    share = n_tone / np.maximum(12 - n_tone, 1)
+    excess = tone_sum - share * other_sum  # zero on average for sound that is the same on every note
+    rise_tone = np.maximum(np.diff(tone_sum, prepend=tone_sum[:1]), 0.0)
+    rise_other = share * np.maximum(np.diff(other_sum, prepend=other_sum[:1]), 0.0)
+    purity = rise_tone / (rise_tone + rise_other + 1e-9)
+    purity = np.maximum.reduce([purity, np.roll(purity, 1), np.roll(purity, -1)])  # the peak may sit a frame either side
+    return excess * mask.any(axis=0), purity
+
+
+def _strikes(energy: np.ndarray, purity: np.ndarray) -> np.ndarray:
+    """True at every frame where the chord's notes suddenly get louder (a strum, or a new chord)."""
+    flux = np.maximum(np.diff(energy, prepend=energy[:1]), 0.0)
+    flux = flux / (np.percentile(flux, 99) + 1e-9)
+    picked = librosa.util.peak_pick(flux, pre_max=2, post_max=2, pre_avg=8, post_avg=8, delta=STRIKE_DELTA, wait=2)
+    picked = picked[purity[picked] >= PURITY]  # a rise that lifted every note alike was not a strum
+    out = np.zeros(len(flux), dtype=bool)
+    out[picked] = True
+    return out
 
 
 def label(pattern: list[str]) -> str:
     return " ".join(pattern).replace("-", "–")
 
 
-def _decide(grid: np.ndarray, per_bar: int) -> dict:
-    """The pattern the rows (bars x slots, SUB slots to a beat) show: {"pattern", "sub", "kind", "confidence", "evidence"}."""
-    scale = float(np.percentile(np.abs(grid), 90)) + 1e-9
-    grid = np.clip(grid / scale, -4.0, 4.0)  # one very loud bar must not decide the pattern
-    mean = grid.mean(axis=0)
-    error = grid.std(axis=0, ddof=1) / np.sqrt(len(grid)) + 1e-9
-    sure = mean / error  # how many standard errors above "nothing" each slot rises
-    top = float(mean.max())
-    fine = np.arange(len(mean)) % 2 == 1  # the e and the a of "1 e & a"
+def _decide(on_rows: np.ndarray, off_rows: np.ndarray) -> dict:
+    """The pattern that bars of strikes show. `on_rows` has a column per slot (SUB to a beat), `off_rows` the gaps between them."""
+    n = len(on_rows)
+    share = on_rows.mean(axis=0)
+    chance = float(np.clip(off_rows.mean(), 0.02, 0.9))  # how often a strike lands where no strum can
+    sure = (share - chance) / np.sqrt(chance * (1 - chance) / n)  # standard errors above chance
+    kind_of = np.array(["beat" if k % SUB == 0 else "and" if k % SUB == SUB // 2 else "fine" for k in range(len(share))])
+    fine = kind_of == "fine"
 
-    def on_from(threshold: float, extra: float) -> np.ndarray:
-        on = (sure >= threshold + np.where(fine, extra, 0.0)) & (mean >= SHARE * top) & (top > 0)
+    def on_from(table: dict) -> np.ndarray:
+        need_share = np.array([table[k][0] for k in kind_of])
+        need_sure = np.array([table[k][1] for k in kind_of])
+        on = (share >= need_share) & (sure >= need_sure)
         if not on[0]:
-            on[0] = bool(sure[0] >= threshold * 0.6 and mean[0] > 0)  # the first beat of a bar is almost always struck
+            on[0] = bool(share[0] >= table["beat"][0] * 0.8 and sure[0] >= 2.0)  # the first beat of a bar is almost always struck
         return on
 
     def shape(on: np.ndarray) -> tuple[list[str], int]:
         if bool(on[fine].any()):  # sixteenths are played: the hand moves down-up in sixteenths
             return [("D" if k % 2 == 0 else "U") if on[k] else "-" for k in range(len(on))], 4
-        eighths = on[::2]  # the beat and the "&"
+        eighths = on[:: SUB // 2]  # the beat and the "&"
         return [("D" if k % 2 == 0 else "U") if eighths[k] else "-" for k in range(len(eighths))], 2
 
-    evidence = [round(float(x), 1) for x in sure]
-    on = on_from(SURE, FINE_EXTRA)
+    evidence = {"share": [round(float(x), 2) for x in share], "sure": [round(float(x), 1) for x in sure], "chance": round(chance, 2)}
+    on = on_from(HEARD)
     hits = int(on.sum())
-    confidence = round(float(np.clip((np.median(sure[on]) - SURE) / 8.0 + 0.35, 0.0, 1.0)), 2) if hits else 0.0
+    confidence = round(float(np.clip((np.median(sure[on]) - 2.0) / 7.0 + 0.2, 0.0, 1.0)), 2) if hits else 0.0
     if hits >= 2 and confidence >= 0.35:
         pattern, sub = shape(on)
         return {"pattern": pattern, "sub": sub, "kind": "heard", "confidence": confidence, "evidence": evidence}
-    soft = on_from(GUESS, FINE_EXTRA)
+    soft = on_from(GUESS)
     if int(soft.sum()) >= 2:
         pattern, sub = shape(soft)
         low = round(float(np.clip(np.median(sure[soft]) / 10.0, 0.05, 0.34)), 2)
@@ -155,18 +177,17 @@ def estimate_strum(
         ]
         if len(full) < MIN_BARS or not chords:
             return _typical(per_bar, bpm)
-        energy = _playing(y, sr, chords)
+        strikes = _strikes(*_playing(y, sr, chords))
         fps = sr / HOP
 
-        def level(a: float, b: float) -> float:
-            lo, hi = max(int(a * fps), 0), int(b * fps) + 1
-            hi = min(max(hi, lo + 1), len(energy))
-            return float(energy[lo:hi].mean()) if hi > lo else 0.0
+        def struck(a: float, b: float) -> bool:
+            lo, hi = max(int(round(a * fps)), 0), int(round(b * fps)) + 1
+            return bool(strikes[lo : max(hi, lo + 1)].any())
 
-        index, rows = [], []
+        index, on_rows, off_rows = [], [], []
         for i, bar in full:
             beats = [float(t) for t in bar["beats"][: per_bar + 1]]
-            row = []
+            on_row, off_row = [], []
             for k in range(per_bar):
                 period = beats[k + 1] - beats[k]
                 if period <= 0.08:
@@ -174,19 +195,17 @@ def estimate_strum(
                 d = period / SUB
                 for j in range(SUB):
                     c = beats[k] + j * d
-                    after = level(c + AFTER[0] * d, c + AFTER[1] * d)
-                    before = level(c - BEFORE[0] * d, c - BEFORE[1] * d)
-                    earlier = level(c - (BEFORE[0] + 0.5) * d, c - (BEFORE[0] - 0.0) * d)
-                    # the rise, less the fall the earlier strum's ringing was already taking (a ring that just fades gives nothing)
-                    row.append((after - before) - max(earlier - before, 0.0) * DECAY)
-            if len(row) == per_bar * SUB:
+                    on_row.append(struck(c - WINDOW * d, c + WINDOW * d))
+                    off_row.append(struck(c + WINDOW * d, c + (1 - WINDOW) * d))
+            if len(on_row) == per_bar * SUB:
                 index.append(i)
-                rows.append(row)
-        if len(rows) < MIN_BARS:
+                on_rows.append(on_row)
+                off_rows.append(off_row)
+        if len(on_rows) < MIN_BARS:
             return _typical(per_bar, bpm)
-        grid = np.array(rows)
+        on_grid, off_grid = np.array(on_rows), np.array(off_rows)
 
-        overall = _decide(grid, per_bar)
+        overall = _decide(on_grid, off_grid)
 
         # the bars of each kind of section (verse, chorus...) on their own
         kind_of_bar: dict[int, str] = {}
@@ -204,7 +223,7 @@ def estimate_strum(
         for kind, picks in by_kind.items():
             if len(picks) < MIN_GROUP_BARS:
                 continue
-            d = _decide(grid[picks], per_bar)
+            d = _decide(on_grid[picks], off_grid[picks])
             if d["kind"] != "heard":
                 continue
             key = (tuple(d["pattern"]), d["sub"])
@@ -218,11 +237,11 @@ def estimate_strum(
         elif overall["kind"] == "typical":
             return {**_typical(per_bar, bpm), "evidence": overall["evidence"]}
         else:
-            chosen = [{**overall, "where": [], "bars": len(rows)}]
+            chosen = [{**overall, "where": [], "bars": len(on_rows)}]
         patterns = [_describe(p, per_bar) for p in chosen]
         first = patterns[0]
         return {
-            "v": 3,
+            "v": 4,  # the detector that made it: patterns of earlier ones (which read every song alike, or missed the third beat) are not shown
             "perBar": per_bar,
             "bpm": round(float(bpm), 1),
             "patterns": patterns,
@@ -256,7 +275,7 @@ def _typical(per_bar: int, bpm: float) -> dict:
     pattern = list(_DEFAULTS.get(per_bar) or _DEFAULTS[4])
     one = _describe({"pattern": pattern, "sub": 2, "kind": "typical", "confidence": 0.0}, per_bar)
     return {
-        "v": 3,
+        "v": 4,  # the detector that made it: patterns of earlier ones (which read every song alike, or missed the third beat) are not shown
         "perBar": per_bar,
         "bpm": round(float(bpm), 1),
         "patterns": [one],

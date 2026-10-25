@@ -476,7 +476,7 @@ def _strum_tiles(pattern: list, sub: int) -> str:
 
 def _strum_html(strum: Optional[dict], title: str) -> str:
     """The strumming patterns as the player shows them (arrows over a count), for a song page."""
-    if not isinstance(strum, dict) or int(strum.get("v") or 1) < 2:
+    if not isinstance(strum, dict) or int(strum.get("v") or 1) < 4:
         return ""
     found = strum.get("patterns") or [
         {"pattern": strum.get("pattern"), "sub": strum.get("sub") or 2, "kind": strum.get("kind") or ("heard" if strum.get("detected") else "typical"), "where": []}

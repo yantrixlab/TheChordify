@@ -2165,7 +2165,7 @@ import Nav from "../components/Nav.astro";
     renderChordGrid();
     renderSummary();
     renderDetails();
-    strum = result.strum && (result.strum.v ?? 1) >= 2 && Array.isArray(result.strum.pattern) && result.strum.pattern.length >= 4 ? result.strum : null;
+    strum = result.strum && (result.strum.v ?? 1) >= 4 && Array.isArray(result.strum.pattern) && result.strum.pattern.length >= 4 ? result.strum : null;
     strumList = strum
       ? (strum.patterns && strum.patterns.length
           ? strum.patterns
