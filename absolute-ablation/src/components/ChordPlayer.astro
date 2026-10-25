@@ -1,331 +1,160 @@
 ---
-// Simulated chord timeline for the demo mockup
-const chords = [
-  { name: "Am", beat: 1 },
-  { name: "G", beat: 2 },
-  { name: "C", beat: 3 },
-  { name: "F", beat: 4 },
-  { name: "Am", beat: 5 },
-  { name: "Em", beat: 6 },
-  { name: "Dm", beat: 7 },
-  { name: "E7", beat: 8 },
+// A static demo of the player: it shows what playing along looks like, nothing here plays.
+const chords = ["Am", "G", "C", "F", "Am", "Em", "Dm", "E7"];
+const playing = 1;
+
+const strings = [
+  { fret: "0", finger: "" },
+  { fret: "1", finger: "1" },
+  { fret: "2", finger: "2" },
+  { fret: "2", finger: "3" },
+  { fret: "0", finger: "" },
+  { fret: "×", finger: "" },
 ];
 
-const guitarDiagram = [
-  { string: "E", fret: "0", finger: "" },
-  { string: "B", fret: "1", finger: "1" },
-  { string: "G", fret: "2", finger: "2" },
-  { string: "D", fret: "2", finger: "3" },
-  { string: "A", fret: "0", finger: "" },
-  { string: "E", fret: "×", finger: "" },
+const points = [
+  "Live chord scrolling synced to audio",
+  "Visual fingering diagrams for all 4 instruments",
+  "Slow-down mode — 0.5× to 1× speed",
+  "Loop any section with A–B repeat",
+  "Transpose up/down to match your key",
 ];
 ---
 
-<section
-  class="gradient-mesh relative overflow-hidden"
-  style="padding: var(--space-5xl) var(--space-lg);"
->
-  <!-- Ambient glow -->
-  <div
-    class="absolute inset-0 pointer-events-none"
-    style="background:radial-gradient(ellipse 70% 50% at 50% 50%, #7c3aed22, transparent);"
-  ></div>
+<section class="cp" aria-labelledby="cp-title">
+  <div class="cp-in">
+    <div class="cp-copy">
+      <div class="cp-eyebrow">Real-time playback</div>
+      <h2 id="cp-title" class="cp-title">Chords scroll with <em>every beat.</em></h2>
+      <p class="cp-lead">
+        Watch chords highlight in perfect sync with the music. Loop any section, slow it down, and nail that tricky
+        progression — at your own pace.
+      </p>
 
-  <div class="max-w-6xl mx-auto relative" style="z-index:1;">
-    <div class="grid lg:grid-cols-2 gap-12 items-center">
-      <!-- Left: copy -->
-      <div>
-        <div
-          class="inline-block rounded-full mb-5"
-          style="
-            padding:4px 12px;
-            background:#7c3aed22;
-            border:1px solid #7c3aed44;
-            font-size:12px;
-            font-weight:600;
-            color:#c4b5fd;
-            font-family:var(--font-mono);
-            text-transform:uppercase;
-            letter-spacing:0.08em;
-          "
-        >
-          Real-time playback
-        </div>
-        <h2 class="display-lg" style="color:white;margin-bottom:16px;">
-          Chords scroll with<br />
-          <span style="color:var(--color-accent);">every beat.</span>
-        </h2>
-        <p style="font-size:17px;color:#c4b5fd;line-height:1.6;margin-bottom:32px;">
-          Watch chords highlight in perfect sync with the music. Loop any
-          section, slow it down, and nail that tricky progression — at your own
-          pace.
-        </p>
+      <ul class="cp-list">
+        {
+          points.map((item) => (
+            <li>
+              <span class="cp-tick" aria-hidden="true">
+                <svg width="11" height="11" viewBox="0 0 10 10" fill="none"><path d="M2 5.2 4 7.2 8 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
+              </span>
+              {item}
+            </li>
+          ))
+        }
+      </ul>
 
-        <ul class="flex flex-col gap-3" style="list-style:none;padding:0;margin:0;">
-          {
-            [
-              "Live chord scrolling synced to audio",
-              "Visual fingering diagrams for all 4 instruments",
-              "Slow-down mode — 0.5× to 1× speed",
-              "Loop any section with A–B repeat",
-              "Transpose up/down to match your key",
-            ].map((item) => (
-              <li class="flex items-start gap-3" style="font-size:15px;color:#e0d7f5;">
-                <span
-                  class="flex-shrink-0 rounded-full flex items-center justify-center"
-                  style="width:20px;height:20px;background:var(--color-accent);margin-top:1px;"
-                >
-                  <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                    <path d="M2 5l2 2 4-4" stroke="var(--color-on-accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
-                </span>
-                {item}
-              </li>
-            ))
-          }
-        </ul>
-
-        <div class="flex gap-3 mt-10">
-          <a
-            href="#"
-            class="inline-flex items-center gap-2 rounded-full font-semibold"
-            style="
-              height:48px;
-              padding:0 var(--space-lg);
-              font-size:15px;
-              background:var(--color-accent);
-              color:var(--color-on-accent);
-              text-decoration:none;
-              transition:background 0.15s;
-            "
-            onmouseover="this.style.background='var(--color-accent-deep)'"
-            onmouseout="this.style.background='var(--color-accent)'"
-          >
-            Try it free
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M3 7h8M7 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </a>
-          <a
-            href="#"
-            class="inline-flex items-center gap-2 rounded-full font-medium"
-            style="
-              height:48px;
-              padding:0 var(--space-md);
-              font-size:15px;
-              color:#c4b5fd;
-              text-decoration:none;
-            "
-          >
-            Watch demo
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.2"/>
-              <path d="M5.5 5l4 2-4 2V5z" fill="currentColor"/>
-            </svg>
-          </a>
-        </div>
+      <div class="cp-actions">
+        <a class="cp-btn" href="/#find">
+          Try it free
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M3 7h8M7 3l4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </a>
+        <a class="cp-link" href="/#how-it-works">See how it works</a>
       </div>
+    </div>
 
-      <!-- Right: chord player mockup -->
-      <div>
-        <div
-          class="rounded-2xl overflow-hidden shadow-float"
-          style="
-            background:#0d0019;
-            border:1px solid #7c3aed33;
-          "
-        >
-          <!-- Mock player header -->
-          <div
-            class="flex items-center gap-3 px-5 py-4"
-            style="border-bottom:1px solid #7c3aed22;"
-          >
-            <div class="flex gap-1.5">
-              <div class="rounded-full" style="width:10px;height:10px;background:#ff5f57;"></div>
-              <div class="rounded-full" style="width:10px;height:10px;background:#febc2e;"></div>
-              <div class="rounded-full" style="width:10px;height:10px;background:#28c840;"></div>
-            </div>
-            <div
-              class="flex-1 rounded-full text-center"
-              style="
-                background:#1a0533;
-                padding:4px 12px;
-                font-family:var(--font-mono);
-                font-size:11px;
-                color:#8b7fa8;
-              "
-            >
-              Hotel California — Eagles
-            </div>
-            <div style="font-family:var(--font-mono);font-size:12px;color:var(--color-accent);">
-              ♩ = 74 BPM
-            </div>
+    <div class="cp-demo" aria-hidden="true">
+      <div class="cp-win">
+        <div class="cp-bar">
+          <span class="cp-dots"><i></i><i></i><i></i></span>
+          <span class="cp-song">Hotel California — Eagles</span>
+          <span class="cp-bpm">♩ = 74 BPM</span>
+        </div>
+
+        <div class="cp-body">
+          <div class="cp-label">Chord progression</div>
+          <div class="cp-chords">
+            {chords.map((c, i) => <span class={`cp-chord ${i === playing ? "is-on" : ""}`}>{c}</span>)}
           </div>
+          <div class="cp-track"><span></span></div>
 
-          <!-- Chord timeline -->
-          <div class="px-5 py-5">
-            <div style="font-family:var(--font-mono);font-size:11px;color:#8b7fa8;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.06em;">
-              Chord progression
-            </div>
-            <div class="flex flex-wrap gap-2 mb-5">
-              {
-                chords.map((c, i) => (
-                  <div
-                    class={`chord-pill ${i === 1 ? "active" : ""}`}
-                    style={`
-                      background:${i === 1 ? "var(--color-accent)" : "#1a0533"};
-                      color:${i === 1 ? "var(--color-on-accent)" : "#c4b5fd"};
-                      box-shadow:${i === 1 ? "0 0 12px var(--color-accent)44" : "0 0 0 1px #7c3aed33"};
-                    `}
-                  >
-                    {c.name}
-                  </div>
-                ))
-              }
-            </div>
-
-            <!-- Progress bar -->
-            <div
-              class="rounded-full relative mb-5"
-              style="height:4px;background:#1a0533;overflow:hidden;"
-            >
-              <div
-                class="absolute left-0 top-0 h-full rounded-full"
-                style="width:28%;background:linear-gradient(90deg, var(--color-violet), var(--color-accent));"
-              ></div>
-            </div>
-
-            <!-- Guitar diagram for Am -->
-            <div style="border-top:1px solid #7c3aed22;padding-top:16px;">
-              <div style="font-family:var(--font-mono);font-size:11px;color:#8b7fa8;margin-bottom:10px;text-transform:uppercase;letter-spacing:0.06em;">
-                Am — Guitar fingering
+          <div class="cp-fing">
+            <div class="cp-label">Am — Guitar fingering</div>
+            <div class="cp-fing-row">
+              <div class="cp-grid">
+                {
+                  strings.map((s) => (
+                    <div class="cp-str">
+                      <span class={`cp-fret ${s.fret === "×" ? "is-x" : s.fret === "0" ? "is-open" : ""}`}>{s.fret}</span>
+                      {s.finger && <span class="cp-finger">{s.finger}</span>}
+                    </div>
+                  ))
+                }
               </div>
-              <div class="flex items-start gap-6">
-                <!-- Chord grid -->
-                <div
-                  style="
-                    display:grid;
-                    grid-template-columns:repeat(6,1fr);
-                    gap:0;
-                    width:96px;
-                  "
-                >
-                  {
-                    guitarDiagram.map((s) => (
-                      <div class="flex flex-col items-center">
-                        <div
-                          style={`
-                            font-family:var(--font-mono);
-                            font-size:10px;
-                            color:${s.fret === "×" ? "#ef4444" : s.fret === "0" ? "var(--color-accent)" : "#8b7fa8"};
-                            margin-bottom:4px;
-                          `}
-                        >
-                          {s.fret}
-                        </div>
-                        {s.finger && (
-                          <div
-                            class="rounded-full flex items-center justify-center"
-                            style="width:16px;height:16px;background:var(--color-violet);font-size:9px;color:white;font-weight:600;"
-                          >
-                            {s.finger}
-                          </div>
-                        )}
-                      </div>
-                    ))
-                  }
-                </div>
-
-                <!-- Notes -->
-                <div class="flex flex-col gap-1.5">
-                  {
-                    [
-                      { label: "Root", value: "A" },
-                      { label: "Key", value: "A minor" },
-                      { label: "Notes", value: "A C E" },
-                    ].map((item) => (
-                      <div class="flex gap-2 items-center">
-                        <span style="font-family:var(--font-mono);font-size:10px;color:#8b7fa8;min-width:36px;">{item.label}</span>
-                        <span style="font-family:var(--font-mono);font-size:11px;color:#c4b5fd;font-weight:600;">{item.value}</span>
-                      </div>
-                    ))
-                  }
-                </div>
-              </div>
+              <dl class="cp-facts">
+                <div><dt>Root</dt><dd>A</dd></div>
+                <div><dt>Key</dt><dd>A minor</dd></div>
+                <div><dt>Notes</dt><dd>A C E</dd></div>
+              </dl>
             </div>
           </div>
+        </div>
 
-          <!-- Playback controls -->
-          <div
-            class="flex items-center justify-between px-5 py-4"
-            style="border-top:1px solid #7c3aed22;background:#0a0015;"
-            role="group"
-            aria-label="Playback controls"
-          >
-            <div class="flex items-center gap-3">
-              <!-- Rewind -->
-              <button
-                class="flex items-center justify-center rounded-full"
-                style="width:32px;height:32px;background:#1a0533;border:none;cursor:pointer;"
-                aria-label="Skip backward"
-              >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-                  <path d="M10 3L5 7l5 4V3z" fill="#8b7fa8"/>
-                  <rect x="2" y="3" width="2" height="8" rx="1" fill="#8b7fa8"/>
-                </svg>
-              </button>
-              <!-- Play -->
-              <button
-                class="flex items-center justify-center rounded-full"
-                style="width:40px;height:40px;background:var(--color-accent);border:none;cursor:pointer;"
-                aria-label="Play"
-              >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-                  <path d="M4 2.5l7 4.5-7 4.5V2.5z" fill="var(--color-on-accent)"/>
-                </svg>
-              </button>
-              <!-- Fast forward -->
-              <button
-                class="flex items-center justify-center rounded-full"
-                style="width:32px;height:32px;background:#1a0533;border:none;cursor:pointer;"
-                aria-label="Skip forward"
-              >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-                  <path d="M4 3l5 4-5 4V3z" fill="#8b7fa8"/>
-                  <rect x="10" y="3" width="2" height="8" rx="1" fill="#8b7fa8"/>
-                </svg>
-              </button>
-            </div>
-            <div
-              class="flex items-center gap-2"
-              style="font-family:var(--font-mono);font-size:12px;color:#8b7fa8;font-variant-numeric:tabular-nums;"
-              aria-label="Playback position: 0 minutes 48 seconds of 6 minutes 30 seconds"
-            >
-              <span aria-hidden="true">0:48</span>
-              <span aria-hidden="true">/</span>
-              <span aria-hidden="true">6:30</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <button
-                class="rounded font-mono"
-                style="padding:4px 8px;background:#1a0533;border:1px solid #7c3aed33;color:var(--color-accent);font-size:11px;cursor:pointer;"
-                aria-label="Playback speed: 0.75×"
-                aria-pressed="true"
-              >
-                0.75×
-              </button>
-              <button
-                class="rounded font-mono"
-                style="padding:4px 8px;background:#1a0533;border:1px solid #7c3aed33;color:#8b7fa8;font-size:11px;cursor:pointer;"
-                aria-label="A–B loop: off"
-                aria-pressed="false"
-              >
-                A–B
-              </button>
-            </div>
+        <div class="cp-ctl">
+          <div class="cp-btns">
+            <span class="cp-round"><svg width="13" height="13" viewBox="0 0 14 14" fill="currentColor"><path d="M10 3 5 7l5 4z" /><rect x="2" y="3" width="2" height="8" rx="1" /></svg></span>
+            <span class="cp-round is-play"><svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor"><path d="M4 2.5l7 4.5-7 4.5z" /></svg></span>
+            <span class="cp-round"><svg width="13" height="13" viewBox="0 0 14 14" fill="currentColor"><path d="M4 3l5 4-5 4z" /><rect x="10" y="3" width="2" height="8" rx="1" /></svg></span>
           </div>
+          <span class="cp-time">0:48 / 6:30</span>
+          <div class="cp-chips"><span class="is-on">0.75×</span><span>A–B</span></div>
         </div>
       </div>
     </div>
   </div>
 </section>
+
+<style>
+  .cp { position: relative; overflow: hidden; padding: 104px 24px; background: radial-gradient(ellipse 60% 70% at 78% 40%, #3b1d7a55, transparent), linear-gradient(180deg, #120428 0%, #0d001f 100%); }
+  .cp-in { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 64px; align-items: center; max-width: 1120px; margin: 0 auto; }
+  .cp-eyebrow { display: inline-flex; align-items: center; gap: 10px; margin-bottom: 18px; font: 600 12px var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; color: #b9a6f2; }
+  .cp-eyebrow::before { content: ""; width: 22px; height: 1px; background: currentColor; opacity: 0.5; }
+  .cp-title { margin: 0 0 18px; font-size: clamp(30px, 4.4vw, 46px); font-weight: 700; letter-spacing: -0.035em; line-height: 1.08; color: #fff; text-wrap: balance; }
+  .cp-title em { font-style: normal; color: #b9a1ff; }
+  .cp-lead { margin: 0 0 30px; max-width: 480px; font-size: 17px; line-height: 1.65; color: #b7acd0; }
+  .cp-list { display: grid; gap: 13px; margin: 0 0 36px; padding: 0; list-style: none; }
+  .cp-list li { display: flex; align-items: flex-start; gap: 12px; font-size: 15px; line-height: 1.5; color: #e4dcf5; }
+  .cp-tick { display: grid; place-items: center; flex: none; width: 20px; height: 20px; margin-top: 1px; border-radius: 50%; background: #7c3aed33; color: #c7b5ff; }
+  .cp-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 22px; }
+  .cp-btn { display: inline-flex; align-items: center; gap: 8px; height: 48px; padding: 0 24px; border-radius: 999px; background: #fff; color: var(--color-ink); font-size: 15px; font-weight: 650; text-decoration: none; transition: transform 0.15s, box-shadow 0.15s; box-shadow: 0 10px 30px -12px #fff5; }
+  .cp-btn:hover { transform: translateY(-1px); box-shadow: 0 14px 34px -12px #fff8; }
+  .cp-link { font-size: 15px; font-weight: 600; color: #c7b5ff; text-decoration: none; }
+  .cp-link:hover { color: #fff; }
+
+  .cp-win { overflow: hidden; border-radius: 20px; background: #0b0319; border: 1px solid #ffffff14; box-shadow: 0 40px 80px -30px #000c, 0 0 0 1px #7c3aed22; }
+  .cp-bar { display: flex; align-items: center; gap: 14px; padding: 14px 20px; border-bottom: 1px solid #ffffff0f; }
+  .cp-dots { display: flex; gap: 6px; }
+  .cp-dots i { width: 10px; height: 10px; border-radius: 50%; background: #ffffff26; }
+  .cp-song { flex: 1; min-width: 0; padding: 4px 12px; overflow: hidden; border-radius: 999px; background: #ffffff0d; font: 11.5px var(--font-mono); text-align: center; text-overflow: ellipsis; white-space: nowrap; color: #9d92b8; }
+  .cp-bpm { font: 12px var(--font-mono); color: #c7b5ff; white-space: nowrap; }
+  .cp-body { padding: 22px 22px 20px; }
+  .cp-label { margin-bottom: 11px; font: 600 10.5px var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase; color: #8c81a8; }
+  .cp-chords { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+  .cp-chord { display: inline-grid; place-items: center; min-width: 38px; height: 32px; padding: 0 10px; border-radius: 9px; background: #ffffff0d; font: 600 13px var(--font-mono); color: #cfc4ea; }
+  .cp-chord.is-on { background: #7c3aed; color: #fff; box-shadow: 0 0 0 4px #7c3aed33, 0 10px 24px -8px #7c3aed; }
+  .cp-track { height: 4px; margin-bottom: 22px; overflow: hidden; border-radius: 4px; background: #ffffff12; }
+  .cp-track span { display: block; width: 28%; height: 100%; border-radius: 4px; background: linear-gradient(90deg, #7c3aed, #b9a1ff); }
+  .cp-fing { padding-top: 18px; border-top: 1px solid #ffffff0f; }
+  .cp-fing-row { display: flex; align-items: flex-start; gap: 28px; }
+  .cp-grid { display: grid; grid-template-columns: repeat(6, 1fr); width: 108px; }
+  .cp-str { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .cp-fret { font: 11px var(--font-mono); color: #8c81a8; }
+  .cp-fret.is-open { color: #c7b5ff; }
+  .cp-fret.is-x { color: #6f6489; }
+  .cp-finger { display: grid; place-items: center; width: 17px; height: 17px; border-radius: 50%; background: #7c3aed; font: 600 9.5px var(--font-sans); color: #fff; }
+  .cp-facts { display: grid; gap: 7px; margin: 0; }
+  .cp-facts div { display: flex; gap: 10px; align-items: baseline; }
+  .cp-facts dt { min-width: 38px; font: 10.5px var(--font-mono); color: #8c81a8; }
+  .cp-facts dd { margin: 0; font: 600 11.5px var(--font-mono); color: #e4dcf5; }
+  .cp-ctl { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 20px; border-top: 1px solid #ffffff0f; background: #07010f; }
+  .cp-btns { display: flex; align-items: center; gap: 10px; }
+  .cp-round { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: #ffffff0f; color: #9d92b8; }
+  .cp-round.is-play { width: 40px; height: 40px; background: #fff; color: var(--color-ink); }
+  .cp-time { font: 12px var(--font-mono); font-variant-numeric: tabular-nums; color: #9d92b8; }
+  .cp-chips { display: flex; gap: 8px; }
+  .cp-chips span { padding: 4px 9px; border-radius: 7px; border: 1px solid #ffffff1a; font: 11px var(--font-mono); color: #8c81a8; }
+  .cp-chips span.is-on { border-color: #7c3aed88; color: #c7b5ff; }
+
+  @media (max-width: 920px) { .cp-in { grid-template-columns: minmax(0, 1fr); gap: 48px; } }
+  @media (max-width: 640px) { .cp { padding: 72px 18px; } .cp-fing-row { gap: 20px; } .cp-chips { display: none; } }
+</style>

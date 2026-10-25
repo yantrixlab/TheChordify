@@ -3,128 +3,57 @@ const steps = [
   {
     number: "01",
     title: "Paste a link or upload",
-    description:
-      "Drop any YouTube, SoundCloud URL — or upload your MP3, WAV, FLAC. We handle the rest.",
-    icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-      <rect x="3" y="5" width="18" height="14" rx="3" stroke="currentColor" stroke-width="1.5"/>
-      <path d="M8 12h8M10 9l5 3-5 3V9z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-    </svg>`,
+    description: "Drop any YouTube, SoundCloud URL — or upload your MP3, WAV, FLAC. We handle the rest.",
+    icon: `<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9.5 5 2.5-5 2.5z"/></svg>`,
   },
   {
     number: "02",
     title: "AI extracts every chord",
     description:
       "Our neural model analyses the audio in seconds — detecting chord names, timing and transitions, then fitting them to the song's beat.",
-    icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-      <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.5"/>
-      <path d="M8 12c0-2.2 1.8-4 4-4s4 1.8 4 4-1.8 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-      <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
-    </svg>`,
+    icon: `<svg viewBox="0 0 24 24"><path d="M4 12h2.5M8.5 7v10M12.5 4v16M16.5 8v8M20 11v2"/></svg>`,
   },
   {
     number: "03",
     title: "Play along in real-time",
     description:
       "Chords scroll in sync with the music. See fingering diagrams for guitar, piano, ukulele, or mandolin instantly.",
-    icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-      <path d="M9 18V6l12-3v12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-      <circle cx="6" cy="18" r="3" stroke="currentColor" stroke-width="1.5"/>
-      <circle cx="18" cy="15" r="3" stroke="currentColor" stroke-width="1.5"/>
-    </svg>`,
+    icon: `<svg viewBox="0 0 24 24"><path d="M9 18V6l11-2.5V15"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="15" r="3"/></svg>`,
   },
 ];
 ---
 
-<section
-  id="features"
-  style="
-    background:var(--color-canvas-soft);
-    padding: var(--space-5xl) var(--space-lg);
-  "
->
-  <div class="max-w-6xl mx-auto">
-    <!-- Header -->
-    <div class="text-center mb-14">
-      <div
-        class="inline-block rounded-full mb-4"
-        style="
-          padding:4px 12px;
-          background:var(--color-accent-soft);
-          border:1px solid #fde68a;
-          font-size:12px;
-          font-weight:600;
-          color:var(--color-accent-deep);
-          font-family:var(--font-mono);
-          text-transform:uppercase;
-          letter-spacing:0.08em;
-        "
-      >
-        How it works
-      </div>
-      <h2 class="display-lg" style="color:var(--color-ink);margin-bottom:12px;text-wrap:balance;">
-        From song to chords<br />
-        <span class="gradient-violet-text">in under 10 seconds.</span>
-      </h2>
-      <p style="font-size:17px;color:var(--color-body);max-width:480px;margin:0 auto;">
-        No more squinting at tabs. No more pausing and rewinding. Just play.
-      </p>
+<section id="how-it-works" class="hs is-soft">
+  <div class="hs-in">
+    <div class="hs-head">
+      <div class="hs-eyebrow">How it works</div>
+      <h2 class="hs-title">From song to chords <em>in under 10 seconds.</em></h2>
+      <p class="hs-lead">No more squinting at tabs. No more pausing and rewinding. Just play.</p>
     </div>
 
-    <!-- Steps grid -->
-    <div class="grid md:grid-cols-3 gap-6">
+    <ol class="hw-grid">
       {
-        steps.map((step, i) => (
-          <div
-            class="rounded-xl relative overflow-hidden shadow-card"
-            style="transition: box-shadow 0.2s ease, border-color 0.2s ease;"
-            style="
-              background:var(--color-canvas);
-              padding:var(--space-xl);
-              border:1px solid var(--color-hairline);
-              transition: box-shadow 0.2s ease;
-            "
-            onmouseover="this.classList.replace('shadow-card','shadow-card-hover')"
-            onmouseout="this.classList.replace('shadow-card-hover','shadow-card')"
-          >
-            <!-- Step number watermark -->
-            <div
-              class="absolute top-4 right-5 font-bold"
-              style="font-size:56px;color:var(--color-hairline);line-height:1;font-family:var(--font-mono);pointer-events:none;"
-            >
-              {step.number}
+        steps.map((step) => (
+          <li class="hs-card hw-card">
+            <div class="hw-top">
+              <span class="hs-ico" set:html={step.icon} />
+              <span class="hw-num">Step {step.number}</span>
             </div>
-
-            <!-- Icon -->
-            <div
-              class="flex items-center justify-center rounded-xl mb-5"
-              style="
-                width:48px;height:48px;
-                background:var(--color-primary);
-                color:var(--color-accent);
-              "
-              set:html={step.icon}
-            />
-
-            <h3 class="display-sm" style="color:var(--color-ink);margin-bottom:8px;">
-              {step.title}
-            </h3>
-            <p style="font-size:15px;color:var(--color-body);line-height:1.6;margin:0;">
-              {step.description}
-            </p>
-
-            {i < steps.length - 1 && (
-              <div
-                class="hidden md:block absolute"
-                style="top:50%;right:-18px;transform:translateY(-50%);z-index:10;"
-              >
-                <svg width="36" height="16" viewBox="0 0 36 16" fill="none">
-                  <path d="M0 8h30M26 4l6 4-6 4" stroke="var(--color-hairline-strong)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-              </div>
-            )}
-          </div>
+            <h3>{step.title}</h3>
+            <p>{step.description}</p>
+          </li>
         ))
       }
-    </div>
+    </ol>
   </div>
 </section>
+
+<style>
+  .hw-grid { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; margin: 0; padding: 0; list-style: none; }
+  .hw-card { padding: 28px; }
+  .hw-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; }
+  .hw-num { font: 600 12px var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-mute); }
+  .hw-card h3 { margin: 0 0 8px; font-size: 19px; font-weight: 650; letter-spacing: -0.02em; color: var(--color-ink); }
+  .hw-card p { margin: 0; font-size: 15px; line-height: 1.65; color: var(--color-body); }
+  @media (max-width: 860px) { .hw-grid { grid-template-columns: minmax(0, 1fr); } }
+</style>

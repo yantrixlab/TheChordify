@@ -405,3 +405,22 @@ section[id], [id] {
 .pr-card.is-featured .pr-was { color: #b9a6e0; text-decoration-color: #fb7185; }
 .pr-was-total { color: var(--color-mute); text-decoration-thickness: 1.5px; text-decoration-color: #e11d48; }
 .pr-card.is-featured .pr-was-total { color: #9d89c9; text-decoration-color: #fb7185; }
+
+/* ── Home page sections: one quiet style (ink, white, soft grey, a single violet accent) ── */
+.hs { padding: 104px 24px; background: #fff; }
+.hs.is-soft { background: #faf9fc; }
+.hs-in { max-width: 1120px; margin: 0 auto; }
+.hs-head { max-width: 660px; margin: 0 auto 56px; text-align: center; }
+.hs-eyebrow { display: inline-flex; align-items: center; gap: 10px; margin-bottom: 18px; font: 600 12px var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-violet-deep); }
+.hs-eyebrow::before, .hs-eyebrow::after { content: ""; width: 22px; height: 1px; background: currentColor; opacity: 0.35; }
+.hs-title { margin: 0 0 16px; font-size: clamp(30px, 4.4vw, 46px); font-weight: 700; letter-spacing: -0.035em; line-height: 1.08; color: var(--color-ink); text-wrap: balance; }
+.hs-title em { font-style: normal; color: var(--color-violet); }
+.hs-lead { max-width: 540px; margin: 0 auto; font-size: 17px; line-height: 1.65; color: var(--color-body); text-wrap: pretty; }
+.hs-card { background: #fff; border: 1px solid #ebe7f3; border-radius: 20px; box-shadow: 0 1px 2px rgb(26 5 51 / 0.04), 0 14px 30px -20px rgb(26 5 51 / 0.2); transition: transform 0.25s cubic-bezier(0.3, 0.7, 0.2, 1), box-shadow 0.25s, border-color 0.25s; }
+.hs-card:hover { transform: translateY(-3px); border-color: #d8ccf0; box-shadow: 0 2px 4px rgb(26 5 51 / 0.05), 0 24px 40px -22px rgb(91 33 182 / 0.32); }
+.hs-ico { display: grid; place-items: center; flex: none; width: 46px; height: 46px; border-radius: 13px; background: #f4f1fb; color: var(--color-violet-deep); }
+.hs-ico svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.hs-tag { display: inline-block; padding: 3px 9px; border-radius: 999px; background: #f1ecfc; font: 600 11px var(--font-mono); letter-spacing: 0.02em; color: var(--color-violet-deep); }
+.hs-tag.is-dark { background: var(--color-ink); color: #fff; }
+@media (max-width: 640px) { .hs { padding: 72px 18px; } .hs-head { margin-bottom: 38px; } }
+@media (prefers-reduced-motion: reduce) { .hs-card { transition: none; } .hs-card:hover { transform: none; } }
