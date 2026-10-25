@@ -19,9 +19,12 @@ export interface ExportSong {
   beatTimes: number[]; // every beat of the song in seconds, in order (the pickup beats left out)
   pickup: number; // empty beats before the first beat of the first bar
   chords: { start: number; end: number; chord: string }[]; // as shown: "N" for no chord
+  barBeats: (number | null)[][]; // each bar's beats in seconds (the entry after the last beat is where the next bar starts)
+  strumBars: ({ pattern: string[]; sub: number } | null)[]; // the strumming pattern played in each bar (null: none known)
+  duration: number;
 }
 
-function fileName(song: ExportSong, extension: string): string {
+function fileName(song: ExportSong, kind: string, extension: string): string {
   const base = `${song.title}${song.artist ? ` ${song.artist}` : ""}`
     .normalize("NFKD")
     .replace(/[^\w\s-]/g, "")
@@ -29,7 +32,7 @@ function fileName(song: ExportSong, extension: string): string {
     .replace(/\s+/g, "-")
     .toLowerCase()
     .slice(0, 70);
-  return `${base || "song"}-chords.${extension}`;
+  return `${base || "song"}-${kind}.${extension}`;
 }
 
 function save(bytes: Uint8Array, name: string, type: string) {
@@ -106,7 +109,34 @@ function voicing(chord: string): number[] {
   return out;
 }
 
-export function buildMidi(song: ExportSong): Uint8Array {
+interface Strike {
+  time: number;
+  down: boolean;
+}
+
+/** Every stroke of the strumming pattern through the song, in time: a "D" or "U" in the pattern's slot of each beat. */
+function strikesOf(song: ExportSong): Strike[] {
+  const out: Strike[] = [];
+  song.barBeats.forEach((beats, b) => {
+    const strum = song.strumBars[b];
+    if (!strum) return;
+    const nextBar = song.barBeats[b + 1]?.find((t) => t !== null) ?? null;
+    for (let k = 0; k < song.perBar; k++) {
+      const t0 = beats[k];
+      if (t0 === null || t0 === undefined) continue;
+      let t1: number | null = null;
+      for (let j = k + 1; j <= song.perBar && t1 === null; j++) t1 = beats[j] ?? null;
+      if (t1 === null) t1 = nextBar ?? Math.min(song.duration, t0 + 60 / Math.max(song.tempo, 30));
+      for (let j = 0; j < strum.sub; j++) {
+        const mark = strum.pattern[(k * strum.sub + j) % strum.pattern.length];
+        if (mark === "D" || mark === "U") out.push({ time: t0 + ((t1 - t0) * j) / strum.sub, down: mark === "D" });
+      }
+    }
+  });
+  return out.sort((a, b) => a.time - b.time);
+}
+
+export function buildMidi(song: ExportSong, strummed = false): Uint8Array {
   const bpm = songTempo(song);
   const micros = Math.round(60_000_000 / bpm);
   const name = ascii(song.title || "Chord Suno");
@@ -128,12 +158,34 @@ export function buildMidi(song: ExportSong): Uint8Array {
   }
 
   const events: { tick: number; order: number; bytes: number[] }[] = [];
+  const strikes = strummed ? strikesOf(song) : [];
   joined.forEach((seg) => {
-    const on = tickAt(song, seg.start, bpm);
-    const off = Math.max(on + 1, tickAt(song, seg.end, bpm) - 8);
-    voicing(seg.chord).forEach((pitch, i) => {
-      events.push({ tick: on, order: 1, bytes: [0x90, pitch, i === 0 ? 92 : 78] });
-      events.push({ tick: off, order: 0, bytes: [0x80, pitch, 0] });
+    if (!strummed) {
+      const on = tickAt(song, seg.start, bpm);
+      const off = Math.max(on + 1, tickAt(song, seg.end, bpm) - 8);
+      voicing(seg.chord).forEach((pitch, i) => {
+        events.push({ tick: on, order: 1, bytes: [0x90, pitch, i === 0 ? 92 : 78] });
+        events.push({ tick: off, order: 0, bytes: [0x80, pitch, 0] });
+      });
+      return;
+    }
+    // The strokes that fall in this chord. A chord that changes between strokes still gets a down-strum where it starts, and a
+    // chord with no stroke in it at all (a stretch the pattern does not cover) is held as one chord.
+    const slack = 0.12;
+    const own = strikes.filter((st) => st.time >= seg.start - slack && st.time < seg.end - 0.02).map((st) => ({ ...st, time: Math.max(st.time, seg.start) }));
+    if (own.length === 0 || own[0].time > seg.start + 0.2) own.unshift({ time: seg.start, down: true });
+    own.forEach((strike, n) => {
+      const on = tickAt(song, strike.time, bpm);
+      const until = n + 1 < own.length ? own[n + 1].time : seg.end;
+      const off = Math.max(on + 6, tickAt(song, until, bpm) - 6);
+      const notes = voicing(seg.chord);
+      // a down-strum sweeps from the bass up across all the strings, an up-strum from the top down across the highest ones
+      const order = strike.down ? notes : notes.slice(1).reverse();
+      order.forEach((pitch, i) => {
+        const start = on + Math.min(i * 7, 28);
+        events.push({ tick: start, order: 1, bytes: [0x90, pitch, strike.down ? (i === 0 ? 96 : 84) : 64] });
+        events.push({ tick: Math.max(off, start + 1), order: 0, bytes: [0x80, pitch, 0] });
+      });
     });
   });
   events.sort((a, b) => a.tick - b.tick || a.order - b.order);
@@ -155,8 +207,8 @@ export function buildMidi(song: ExportSong): Uint8Array {
   ]);
 }
 
-export function downloadMidi(song: ExportSong) {
-  save(buildMidi(song), fileName(song, "mid"), "audio/midi");
+export function downloadMidi(song: ExportSong, strummed = false) {
+  save(buildMidi(song, strummed), fileName(song, strummed ? "strummed" : "chords", "mid"), "audio/midi");
 }
 
 // ---- PDF ------------------------------------------------------------------------------------------------------
@@ -361,5 +413,5 @@ export function buildPdf(song: ExportSong): Uint8Array {
 }
 
 export function downloadPdf(song: ExportSong) {
-  save(buildPdf(song), fileName(song, "pdf"), "application/pdf");
+  save(buildPdf(song), fileName(song, "chords", "pdf"), "application/pdf");
 }

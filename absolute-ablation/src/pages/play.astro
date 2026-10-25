@@ -33,7 +33,8 @@ import Nav from "../components/Nav.astro";
                   <button id="btn-export" type="button" class="ph-share" aria-haspopup="true" aria-expanded="false">Export</button>
                   <div id="export-menu" class="ph-menu" role="menu" hidden>
                     <button id="export-pdf" type="button" role="menuitem"><b>Chord sheet</b><span>Printable PDF</span></button>
-                    <button id="export-midi" type="button" role="menuitem"><b>Chords as MIDI</b><span>For your music software</span></button>
+                    <button id="export-midi" type="button" role="menuitem"><b>Chords as MIDI</b><span>Held chords, for your music software</span></button>
+                    <button id="export-midi-strum" type="button" role="menuitem" hidden><b>Strummed chords as MIDI</b><span>Played with the strumming pattern</span></button>
                   </div>
                 </div>
                 <button id="btn-share" type="button" class="ph-share">Share</button>
@@ -614,7 +615,7 @@ import Nav from "../components/Nav.astro";
     ["#capo-down, #capo-up, #transpose-down, #transpose-up", "transpose_capo", "Transpose and capo"],
     ["#detail-toggle", "chord_detail", "Full chord detail"],
     ["#export-pdf", "pdf_export", "The chord sheet PDF"],
-    ["#export-midi", "midi_export", "The chords as a MIDI file"],
+    ["#export-midi, #export-midi-strum", "midi_export", "The chords as a MIDI file"],
   ];
   document.addEventListener(
     "click",
@@ -2363,6 +2364,22 @@ import Nav from "../components/Nav.astro";
     }
   });
 
+  /** The strumming pattern of each bar: the one made for the kind of section the bar is in, else the one chosen on the card. */
+  function strumPerBar(): ({ pattern: string[]; sub: number } | null)[] {
+    if (!strum || strumList.length === 0) return bars.map(() => null);
+    const chosen = strumList[Math.min(strumIdx, strumList.length - 1)];
+    const kindOfBar: string[] = [];
+    sections.forEach((sec) => {
+      if (sec.startBar === null) return;
+      const kind = sec.label.replace(/\s*\d+$/, "");
+      for (let b = sec.startBar; b <= (sec.endBar ?? sec.startBar); b++) kindOfBar[b] = kind;
+    });
+    return bars.map((_, b) => {
+      const own = strumList.find((p) => p.where.length > 0 && kindOfBar[b] !== undefined && p.where.includes(kindOfBar[b])) ?? chosen;
+      return { pattern: own.pattern, sub: own.sub === 4 ? 4 : 2 };
+    });
+  }
+
   /** The song as the player shows it now, ready to write out. */
   function songForExport(): ExportSong {
     const written = placeChordsOnBeats();
@@ -2394,6 +2411,9 @@ import Nav from "../components/Nav.astro";
       beatTimes,
       pickup,
       chords: chords.map((seg) => ({ start: seg.start, end: seg.end, chord: seg.chord === "N" ? "N" : displayChord(seg.chord) })),
+      barBeats: bars.map((bar) => bar.beats),
+      strumBars: strumPerBar(),
+      duration,
     };
   }
   document.getElementById("export-pdf")!.addEventListener("click", () => {
@@ -2405,6 +2425,16 @@ import Nav from "../components/Nav.astro";
     if (!can("midi_export") || chords.length === 0) return;
     setExportMenu(false);
     downloadMidi(songForExport());
+  });
+  const exportStrumItem = document.getElementById("export-midi-strum") as HTMLButtonElement;
+  exportStrumItem.addEventListener("click", () => {
+    if (!can("midi_export") || chords.length === 0) return;
+    setExportMenu(false);
+    downloadMidi(songForExport(), true);
+  });
+  // the strummed file is offered once the song has a strumming pattern
+  exportButton.addEventListener("click", () => {
+    exportStrumItem.hidden = !(strum && strumList.length > 0);
   });
 
   // The header shrinks once the page is scrolled. It must not grow back at the same point it shrank at: shrinking makes the page
