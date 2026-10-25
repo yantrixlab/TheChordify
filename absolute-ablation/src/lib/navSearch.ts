@@ -326,7 +326,12 @@ export function initNavSearch() {
       input.blur();
     }
   });
-  (document.getElementById("ns-form") as HTMLFormElement).addEventListener("submit", (event) => event.preventDefault());
+  // The search button: a search for what was typed (a suggestion the pointer happens to rest on is not what was asked for).
+  (document.getElementById("ns-form") as HTMLFormElement).addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (input.value.trim().length >= 2) searchFor(input.value.trim());
+    else input.focus(); // nothing to search for yet
+  });
   openButton.addEventListener("click", openSheet);
   closeButton.addEventListener("click", () => {
     closePanel();

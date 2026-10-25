@@ -57,9 +57,6 @@ const navLinks = [
       <!-- Search: a bar on a computer, a button that opens a full-width bar on a phone or tablet -->
       <div id="ns" class="ns">
         <form id="ns-form" class="ns-form" role="search" autocomplete="off">
-          <span class="ns-icon" aria-hidden="true">
-            <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><circle cx="9" cy="9" r="5.8" stroke="currentColor" stroke-width="1.8" /><path d="m13.5 13.5 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
-          </span>
           <input
             id="ns-input"
             type="text"
@@ -77,6 +74,9 @@ const navLinks = [
             spellcheck="false"
           />
           <kbd class="ns-key" aria-hidden="true">/</kbd>
+          <button id="ns-submit" type="submit" class="ns-submit" aria-label="Search">
+            <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><circle cx="9" cy="9" r="5.8" stroke="currentColor" stroke-width="1.8" /><path d="m13.5 13.5 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
+          </button>
           <button id="ns-close" type="button" class="ns-close" aria-label="Close search">Cancel</button>
         </form>
         <div id="ns-panel" class="ns-panel" role="listbox" aria-label="Search suggestions" hidden></div>
@@ -286,11 +286,14 @@ const navLinks = [
   .ns-form { position: relative; display: flex; align-items: center; width: 232px; height: 40px; border-radius: 999px; background: var(--color-canvas-soft-2); border: 1.5px solid transparent; transition: width 0.22s cubic-bezier(0.3, 0.7, 0.2, 1), background-color 0.15s, border-color 0.15s, box-shadow 0.15s; }
   .ns-form:hover { background: #ebe3fb; }
   .ns.is-focus .ns-form { width: 340px; background: #fff; border-color: var(--color-violet); box-shadow: 0 0 0 4px #7c3aed1f; }
-  .ns-icon { display: grid; place-items: center; flex: none; width: 40px; color: var(--color-mute); }
-  .ns.is-focus .ns-icon { color: var(--color-violet); }
-  .ns-form input { flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; outline: 0; background: transparent; font: 500 14.5px var(--font-sans); color: var(--color-ink); }
+  .ns-submit { display: grid; place-items: center; flex: none; width: 32px; height: 32px; margin-right: 3px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--color-ink); cursor: pointer; transition: background-color 0.15s, color 0.15s; }
+  .ns-submit:hover { background: #fff; color: var(--color-violet-deep); }
+  .ns.is-focus .ns-submit { background: var(--color-violet); color: #fff; }
+  .ns.is-focus .ns-submit:hover { background: var(--color-violet-deep); }
+  .ns-submit:focus-visible { outline: 2px solid var(--color-violet); outline-offset: 2px; }
+  .ns-form input { flex: 1; min-width: 0; height: 100%; padding: 0 0 0 16px; border: 0; outline: 0; background: transparent; font: 500 14.5px var(--font-sans); color: var(--color-ink); }
   .ns-form input::placeholder { color: #9a8fb5; }
-  .ns-key { display: grid; place-items: center; flex: none; width: 22px; height: 22px; margin-right: 10px; border-radius: 6px; border: 1px solid var(--color-hairline-strong); background: #fff; font: 600 12px var(--font-mono); color: var(--color-mute); }
+  .ns-key { display: grid; place-items: center; flex: none; width: 22px; height: 22px; margin-right: 6px; border-radius: 6px; border: 1px solid var(--color-hairline-strong); background: #fff; font: 600 12px var(--font-mono); color: var(--color-mute); }
   .ns.is-focus .ns-key { display: none; }
   .ns-close, .ns-open { display: none; }
   .ns-panel { position: absolute; right: 0; top: calc(100% + 10px); z-index: 70; width: 440px; max-width: calc(100vw - 24px); max-height: min(560px, calc(100vh - 100px)); overflow-y: auto; padding: 8px; border-radius: 20px; background: #fff; border: 1px solid var(--color-hairline); box-shadow: 0 30px 60px -24px #1a053388, 0 6px 16px #1a05331a; overscroll-behavior: contain; animation: ns-in 0.16s ease-out; }
