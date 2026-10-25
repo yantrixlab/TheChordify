@@ -469,29 +469,36 @@ def _strum_html(strum: Optional[dict], title: str) -> str:
     bpm = int(round(float(strum.get("bpm") or 0)))
     feel = "slow, relaxed" if bpm < 80 else "easy" if bpm < 110 else "upbeat" if bpm < 140 else "fast"
     tiles = "".join(
-        f'<div class="sm-tile{" is-rest" if kind == "-" else ""}" role="listitem" aria-label="{i // 2 + 1 if i % 2 == 0 else "and"}: '
-        f'{"down-strum" if kind == "D" else "up-strum" if kind == "U" else "no strum"}">'
-        f'{_ARROW_DOWN if kind == "D" else _ARROW_UP if kind == "U" else "<span aria-hidden=true>·</span>"}'
+        f'<div class="sm-tile {"is-rest" if kind == "-" else "is-down" if kind == "D" else "is-up"}" role="listitem" '
+        f'aria-label="{i // 2 + 1 if i % 2 == 0 else "and"}: {"down-strum" if kind == "D" else "up-strum" if kind == "U" else "no strum"}">'
+        f'<span class="sm-ar">{_ARROW_DOWN if kind == "D" else _ARROW_UP if kind == "U" else "<span aria-hidden=true>·</span>"}</span>'
         f'<small>{i // 2 + 1 if i % 2 == 0 else "&amp;"}</small></div>'
         for i, kind in enumerate(pattern)
     )
     counts = ", ".join(str(i + 1) for i in range(per_bar))
     shown = " ".join("–" if c == "-" else c for c in pattern)
     intro = (
-        f"This is the pattern the recording keeps coming back to, at the song's {feel} {bpm} BPM groove."
+        f"The pattern the recording keeps coming back to, at the song's {feel} {bpm} BPM groove."
         if detected
-        else f"We could not hear one clear strum in this recording, so this is a typical {per_bar}-beat pattern that suits the song's {feel} {bpm} BPM feel."
+        else f"We could not hear one clear strum, so this is a typical {per_bar}-beat pattern for the song's {feel} {bpm} BPM feel."
+    )
+    note = (
+        "Worked out from the recording. Down and up strokes cannot be heard, so hits on the beat are shown as down-strums and hits on the &ldquo;&amp;&rdquo; as up-strums."
+        if detected
+        else "A suggestion for this time signature, not a pattern heard in the song."
     )
     return (
         '<section class="sp-block" id="strumming"><h2>Strumming pattern</h2>'
         '<div class="sm-card">'
-        f'<p class="sm-label">{"Main pattern" if detected else "Suggested pattern"} · {_esc(shown)}</p>'
+        f'<div class="sm-ttl"><span class="sm-pill{" is-heard" if detected else ""}">{"Heard in the song" if detected else "Suggested"}</span></div>'
+        f'<p class="sm-label">{"MAIN PATTERN" if detected else "SUGGESTED PATTERN"}  ·  {_esc(shown)}</p>'
         f'<div class="sm-tiles" style="--cols:{min(len(pattern), 8)}" role="list" aria-label="Strums in one bar">{tiles}</div>'
-        f'<p class="sm-text">{_esc(intro)} ↓ is a down-strum, ↑ an up-strum, and a dim tile is a beat you let ring or skip. '
-        f"Count along: the numbers are the beats and &ldquo;&amp;&rdquo; is the half beat between them. "
-        f"<b>Just starting out?</b> Play steady down-strums on every beat ({counts}) until the chord changes of {_esc(title)} feel comfortable, "
-        "then add the up-strums.</p>"
-        f'<p class="sm-note">{"Worked out from the recording. Down and up strokes cannot be heard, so hits on the beat are shown as down-strums and hits on the &ldquo;&amp;&rdquo; as up-strums." if detected else "A suggestion for this time signature, not a pattern heard in the song."}</p>'
+        f'<p class="sm-text">{_esc(intro)}</p>'
+        '<details class="sm-how"><summary>How to play it</summary><div>'
+        "<p>↓ is a down-strum, ↑ an up-strum, and a dim tile is a beat you let ring or skip. Count along: the numbers are the beats and &ldquo;&amp;&rdquo; is the half beat between them.</p>"
+        f"<p><b>Just starting out?</b> Play steady down-strums on every beat ({counts}) until the chord changes of {_esc(title)} feel comfortable, then add the up-strums.</p>"
+        f"</div></details>"
+        f'<p class="sm-note">{note}</p>'
         "</div></section>"
     )
 

@@ -75,18 +75,51 @@ import Footer from "../components/Footer.astro";
   .sp-dg-nav[hidden] { display: none; }
   .sp-dg-nav button { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 1px solid #e4dcf3; border-radius: 50%; background: #fff; font-size: 16px; line-height: 1; color: var(--color-violet-deep); cursor: pointer; }
   .sp-dg-nav button:hover { background: #f4f1fb; }
-  /* the strumming pattern */
-  .sm-card { padding: 24px 24px 22px; border-radius: 22px; background: linear-gradient(180deg, #170b33, #120726); border: 1px solid #ffffff14; box-shadow: 0 24px 50px -28px #000a; color: #e4dcf5; }
-  .sm-label { margin: 0 0 14px !important; font-size: 16px; font-weight: 700; color: #fff !important; }
-  .sm-tiles { display: grid; grid-template-columns: repeat(var(--cols, 8), minmax(0, 1fr)); gap: 8px; }
-  .sm-tile { display: grid; place-items: center; align-content: center; gap: 6px; aspect-ratio: 1 / 1.08; min-height: 62px; border-radius: 14px; background: linear-gradient(180deg, #7b3df0, #5b21b6); border: 1px solid #ffffff22; color: #fff; }
-  .sm-tile svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
-  .sm-tile small { font: 600 11px var(--font-mono); color: #ffffffa6; }
-  .sm-tile.is-rest { background: #1f1440; border-color: #ffffff10; color: #6f5fa3; }
-  .sm-tile.is-rest small { color: #6f5fa3; }
-  .sp-block .sm-text { margin: 16px 0 0; font-size: 15px; line-height: 1.7; color: #d6cbef; }
-  .sm-text b { color: #fff; }
-  .sp-block .sm-note { margin: 10px 0 0; font-size: 12.5px; color: #9a8cc2; }
+  /* the strumming pattern: a compact row of square tiles that light up with the music */
+  .sm-card { position: relative; overflow: hidden; padding: 20px 22px 18px; border-radius: 20px; background: radial-gradient(120% 150% at 0% 0%, #2b1264 0%, #170b33 46%, #0f0623 100%); border: 1px solid #ffffff17; box-shadow: 0 30px 60px -34px #000c, inset 0 1px 0 #ffffff14; color: #e4dcf5; }
+  .sm-card::before { content: ""; position: absolute; top: -170px; right: -110px; width: 360px; height: 360px; border-radius: 50%; background: radial-gradient(circle, #7c3aed4d, transparent 66%); pointer-events: none; animation: sm-drift 10s ease-in-out infinite alternate; }
+  .sm-card > * { position: relative; }
+  .sm-card[hidden] { display: none; }
+  .sm-head { display: flex; align-items: center; justify-content: space-between; gap: 10px 14px; flex-wrap: wrap; }
+  .sm-ttl { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .sm-head h2, .sp-block .sm-ttl h2 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.02em; color: #fff; }
+  .sm-pill { padding: 3px 10px; border-radius: 999px; background: #ffffff14; border: 1px solid #ffffff1c; font: 600 11px var(--font-mono); letter-spacing: 0.03em; color: #cdbdf5; }
+  .sm-pill.is-heard { background: #fcd34d22; border-color: #fcd34d55; color: #fde68a; }
+  .sm-seg { display: inline-flex; padding: 3px; border-radius: 999px; background: #ffffff12; }
+  .sm-seg button { height: 28px; padding: 0 13px; border: 0; border-radius: 999px; background: transparent; font: 650 12px var(--font-sans); color: #c9bbf0; cursor: pointer; transition: background-color 0.15s, color 0.15s; }
+  .sm-seg button:hover { color: #fff; }
+  .sm-seg button.is-on { background: #fff; color: #1a0d33; }
+  .sm-label { margin: 14px 0 0 !important; font: 600 12.5px var(--font-mono) !important; letter-spacing: 0.06em; color: #b9a8e8 !important; }
+  .sm-tiles { display: grid; grid-template-columns: repeat(var(--cols, 8), minmax(0, 60px)); gap: 8px; justify-content: start; margin: 12px 0 16px; padding: 4px 0 8px; }
+  .sm-tile { position: relative; overflow: hidden; aspect-ratio: 1 / 1; display: grid; place-items: center; align-content: center; gap: 4px; border-radius: 14px; background: linear-gradient(160deg, #7e3ff1 0%, #5421b8 100%); border: 1px solid #ffffff2b; box-shadow: inset 0 1px 0 #ffffff3d, 0 8px 16px -10px #5b21b6; color: #fff; transition: transform 0.28s cubic-bezier(0.3, 1.6, 0.5, 1), box-shadow 0.28s ease, filter 0.28s ease; }
+  .sm-tile .sm-ar { display: grid; place-items: center; line-height: 0; }
+  .sm-tile svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+  .sm-tile small { font: 600 10.5px/1 var(--font-mono); color: #ffffffb3; }
+  .sm-tile.is-rest { background: #1a1037; border: 1px dashed #ffffff1f; box-shadow: none; color: #6f5fa8; }
+  .sm-tile.is-rest small { color: #6f5fa8; }
+  .sm-tile.is-now { z-index: 1; transform: translateY(-3px) scale(1.08); filter: brightness(1.2); box-shadow: 0 0 0 2px #fcd34d, 0 0 26px #f59e0b99, 0 16px 22px -10px #000; animation: sm-hit 0.45s ease-out; }
+  .sm-tile.is-now::after { content: ""; position: absolute; inset: 0; background: linear-gradient(115deg, transparent 30%, #ffffff66 50%, transparent 70%); transform: translateX(-130%); animation: sm-shine 0.55s ease-out forwards; }
+  .sm-tile.is-rest.is-now { filter: none; box-shadow: 0 0 0 2px #fcd34d66, 0 0 18px #f59e0b33; }
+  .sm-tile.is-rest.is-now::after { display: none; }
+  .sm-tile.is-now.is-down .sm-ar { animation: sm-down 0.45s ease-out; }
+  .sm-tile.is-now.is-up .sm-ar { animation: sm-up 0.45s ease-out; }
+  .sm-text { margin: 0 !important; font-size: 14.5px !important; line-height: 1.65 !important; color: #d6cbef !important; }
+  .sm-text b, .sm-how b { color: #fff; }
+  .sm-how { margin-top: 10px; }
+  .sm-how summary { display: inline-flex; align-items: center; gap: 6px; font: 650 13px var(--font-sans); color: #c7b5ff; cursor: pointer; list-style: none; }
+  .sm-how summary::-webkit-details-marker { display: none; }
+  .sm-how summary::after { content: "+"; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: #ffffff14; font-size: 14px; line-height: 1; transition: transform 0.2s; }
+  .sm-how[open] summary::after { content: "–"; }
+  .sm-how > div { margin-top: 8px; font-size: 14px; line-height: 1.7; color: #cbbfe8; }
+  .sm-how > div p { margin: 0 0 8px !important; font-size: 14px !important; line-height: 1.7 !important; color: #cbbfe8 !important; }
+  .sm-note { margin: 12px 0 0 !important; font-size: 12px !important; line-height: 1.5; color: #8f81b8 !important; }
+  @keyframes sm-hit { 0% { box-shadow: 0 0 0 0 #fcd34dcc, 0 0 0 2px #fcd34d, 0 0 26px #f59e0b99, 0 16px 22px -10px #000; } 100% { box-shadow: 0 0 0 14px #fcd34d00, 0 0 0 2px #fcd34d, 0 0 26px #f59e0b99, 0 16px 22px -10px #000; } }
+  @keyframes sm-shine { to { transform: translateX(130%); } }
+  @keyframes sm-down { 0% { transform: translateY(-6px); } 45% { transform: translateY(4px); } 100% { transform: translateY(0); } }
+  @keyframes sm-up { 0% { transform: translateY(6px); } 45% { transform: translateY(-4px); } 100% { transform: translateY(0); } }
+  @keyframes sm-drift { to { transform: translate(-36px, 26px) scale(1.12); } }
+  @media (max-width: 640px) { .sm-card { padding: 16px 14px 14px; border-radius: 18px; } .sm-tiles { gap: 6px; } .sm-tile { border-radius: 11px; } .sm-tile svg { width: 17px; height: 17px; } .sm-tile small { font-size: 9.5px; } }
+  @media (prefers-reduced-motion: reduce) { .sm-card::before, .sm-tile.is-now, .sm-tile.is-now::after, .sm-tile.is-now .sm-ar { animation: none !important; } .sm-tile { transition: none; } .sm-tile.is-now { transform: none; } }
   .sp-custom-wrap { margin-top: 40px; }
   .sp-custom { min-width: 0; overflow-wrap: anywhere; }
   :where(.sp-custom) img { max-width: 100%; height: auto; }
@@ -125,7 +158,6 @@ import Footer from "../components/Footer.astro";
   .sp-note { margin-top: 44px; padding: 16px 20px; font-size: 13.5px; line-height: 1.6; color: var(--color-mute); background: #fff; border: 1px dashed #d9d0ec; border-radius: 14px; }
   @media (max-width: 760px) {
     .sp-dgs { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-    .sm-card { padding: 18px 14px; border-radius: 18px; } .sm-tiles { gap: 5px; } .sm-tile { min-height: 50px; border-radius: 10px; } .sm-tile svg { width: 17px; height: 17px; }
     .sg { --rb: 2 !important; }
     .sg[data-wide] { --rb: 1 !important; }
     .sg-sec { grid-template-columns: 26px minmax(0, 1fr); }
