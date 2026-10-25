@@ -237,14 +237,27 @@ class SongPages:
             n += 1
             slug = f"{base}-{n}"
 
-    def admin_list(self, search: str = "", page: int = 1, size: int = 25, only_published: bool = False) -> dict:
+    def admin_list(
+        self, search: str = "", page: int = 1, size: int = 25, status: str = "all", since: float = 0.0, until: float = 0.0
+    ) -> dict:
+        """The catalog for the admin. `status` is all, published or unpublished; `since`/`until` (seconds, 0 = open) limit it to
+        songs first chordified in that stretch of time."""
+
         where, params = [], []
         if search:
             where.append("(LOWER(s.title) LIKE ? OR LOWER(s.artist) LIKE ?)")
             like = f"%{search.lower()}%"
             params += [like, like]
-        if only_published:
+        if status == "published":
             where.append("p.video_id IS NOT NULL")
+        elif status == "unpublished":
+            where.append("p.video_id IS NULL")
+        if since > 0:
+            where.append("s.created_at >= ?")
+            params.append(since)
+        if until > 0:
+            where.append("s.created_at < ?")
+            params.append(until)
         clause = ("WHERE " + " AND ".join(where)) if where else ""
         base = f"FROM songs s LEFT JOIN song_pages p ON p.video_id = s.video_id {clause}"
         total, _ = self._db.run(f"SELECT COUNT(*) AS n {base}", tuple(params))

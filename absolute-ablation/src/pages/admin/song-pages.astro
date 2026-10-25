@@ -7,11 +7,25 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
   active="songpages"
   lead="Choose which chordified songs get a public page that search engines can list. Only the songs you publish here are shown on the site's /songs/ pages and sitemap."
 >
+  <div class="sp-filters">
+    <div class="sp-seg" id="status" role="group" aria-label="Show">
+      <button type="button" data-v="all" class="is-on">All</button>
+      <button type="button" data-v="published">Published</button>
+      <button type="button" data-v="unpublished">Not published</button>
+    </div>
+    <div class="sp-seg" id="when" role="group" aria-label="Chordified">
+      <button type="button" data-v="today">Today</button>
+      <button type="button" data-v="yesterday">Yesterday</button>
+      <button type="button" data-v="week">Last 7 days</button>
+      <button type="button" data-v="month">Last 30 days</button>
+      <button type="button" data-v="all" class="is-on">Lifetime</button>
+    </div>
+  </div>
   <div class="adm-row sp-bar">
     <input id="search" type="search" placeholder="Search by song or artist" aria-label="Search songs" autocomplete="off" />
-    <label class="sp-only"><input id="only" type="checkbox" /> Published only</label>
     <span id="count" class="adm-hint" role="status" style="margin:0"></span>
   </div>
+  <p class="adm-hint" style="margin:8px 0 0">The time filter is when a song was first chordified on the site.</p>
 
   <div id="rows" class="sp-list"></div>
   <p id="empty" class="adm-empty" hidden></p>
@@ -26,8 +40,11 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
 
 <style is:global>
   .sp-bar #search { max-width: 360px; }
-  .sp-only { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--color-body); cursor: pointer; }
-  .sp-only input { width: 16px; height: 16px; accent-color: var(--color-violet); }
+  .sp-filters { display: flex; flex-wrap: wrap; gap: 12px 18px; margin-bottom: 14px; }
+  .sp-seg { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; border-radius: 999px; background: var(--color-violet-soft); }
+  .sp-seg button { height: 32px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent; font: 650 13px var(--font-sans); color: var(--color-violet-deep); cursor: pointer; white-space: nowrap; }
+  .sp-seg button:hover { color: var(--color-ink); }
+  .sp-seg button.is-on { background: #fff; color: var(--color-ink); box-shadow: 0 1px 3px rgb(26 5 51 / 0.16); }
   .sp-list { display: grid; gap: 12px; margin-top: 14px; }
   .sp-item { background: #fff; border: 1px solid var(--color-hairline); border-radius: 16px; box-shadow: 0 1px 2px #1a05330a; }
   .sp-line { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 12px 16px 12px 12px; }
@@ -82,7 +99,36 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
   const prev = document.getElementById("prev") as HTMLButtonElement;
   const next = document.getElementById("next") as HTMLButtonElement;
   const search = document.getElementById("search") as HTMLInputElement;
-  const only = document.getElementById("only") as HTMLInputElement;
+  const statusBar = document.getElementById("status")!;
+  const whenBar = document.getElementById("when")!;
+  let status = "all";
+  let when = "all";
+
+  /** The start and end of the chosen stretch, in seconds, in the admin's own time zone (0 = no limit). */
+  function range(): { since: number; until: number } {
+    const midnight = new Date();
+    midnight.setHours(0, 0, 0, 0);
+    const today = midnight.getTime() / 1000;
+    const day = 86400;
+    const now = Date.now() / 1000;
+    if (when === "today") return { since: today, until: 0 };
+    if (when === "yesterday") return { since: today - day, until: today };
+    if (when === "week") return { since: now - 7 * day, until: 0 };
+    if (when === "month") return { since: now - 30 * day, until: 0 };
+    return { since: 0, until: 0 };
+  }
+
+  const label: Record<string, string> = { today: "today", yesterday: "yesterday", week: "in the last 7 days", month: "in the last 30 days" };
+  function bind(bar: HTMLElement, set: (v: string) => void) {
+    bar.querySelectorAll<HTMLButtonElement>("button").forEach((b) =>
+      b.addEventListener("click", () => {
+        bar.querySelectorAll("button").forEach((o) => o.classList.toggle("is-on", o === b));
+        set(b.dataset.v ?? "all");
+        page = 1;
+        load();
+      }),
+    );
+  }
 
   const SIZE = 20;
   let page = 1;
@@ -330,7 +376,7 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
     const mine = ++latest;
     try {
       const data = await adminFetch(
-        `/api/admin/song-pages?search=${encodeURIComponent(query)}&page=${page}&pageSize=${SIZE}&published=${only.checked}`,
+        `/api/admin/song-pages?search=${encodeURIComponent(query)}&page=${page}&pageSize=${SIZE}&status=${status}&since=${range().since}&until=${range().until}`,
       );
       if (mine !== latest) return;
       rows.replaceChildren(...data.songs.map(item));
@@ -342,9 +388,13 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
       empty.hidden = data.songs.length > 0;
       empty.textContent = query
         ? `No song matches “${query}”.`
-        : only.checked
-          ? "Nothing is published yet."
-          : "No song has been chordified yet. Songs appear here once somebody has opened them.";
+        : status === "published"
+          ? `No published song${when === "all" ? " yet" : ` was chordified ${label[when]}`}.`
+          : status === "unpublished"
+            ? `Every song${when === "all" ? "" : ` chordified ${label[when]}`} is published.`
+            : when !== "all"
+              ? `No song was chordified ${label[when]}.`
+              : "No song has been chordified yet. Songs appear here once somebody has opened them.";
     } catch (err) {
       say("msg", err instanceof Error ? err.message : "Could not load the songs.", "bad");
     }
@@ -359,10 +409,8 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
       load();
     }, 250);
   });
-  only.addEventListener("change", () => {
-    page = 1;
-    load();
-  });
+  bind(statusBar, (v) => (status = v));
+  bind(whenBar, (v) => (when = v));
   prev.addEventListener("click", () => {
     page -= 1;
     load();

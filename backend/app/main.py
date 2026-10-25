@@ -1339,9 +1339,13 @@ class SongPageBody(BaseModel):
 
 
 @app.get("/api/admin/song-pages")
-def admin_song_pages(request: Request, search: str = "", page: int = 1, pageSize: int = 25, published: bool = False) -> dict:
+def admin_song_pages(
+    request: Request, search: str = "", page: int = 1, pageSize: int = 25, status: str = "all", since: float = 0, until: float = 0
+) -> dict:
     _require_admin(request)
-    return song_pages.admin_list(search.strip()[:80], max(page, 1), min(max(pageSize, 1), 100), published)
+    if status not in ("all", "published", "unpublished"):
+        status = "all"
+    return song_pages.admin_list(search.strip()[:80], max(page, 1), min(max(pageSize, 1), 100), status, max(since, 0), max(until, 0))
 
 
 @app.put("/api/admin/song-pages/{video_id}")
