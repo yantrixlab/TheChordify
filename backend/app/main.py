@@ -76,7 +76,8 @@ except Exception as exc:
 # 12: bars are as long as the song counts them instead of always four; the result says `beatsPerBar`.
 # 13: five and seven beats a bar are found too.
 # 14: a quick waltz tracked at half its speed is counted at its own (about twice the tempo, three beats a bar).
-ANALYSIS_VERSION = 14
+# 15: a chord written a beat before or after a bar line moves onto it in songs that change chord on the bar line.
+ANALYSIS_VERSION = 15
 
 ALLOWED_UPLOAD_EXTENSIONS ={".mp3", ".wav", ".flac", ".m4a"}
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50MB

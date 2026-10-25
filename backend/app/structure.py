@@ -501,6 +501,10 @@ def place_chords_on_grid(chords: list[dict], beats: np.ndarray, phase: int, dura
     usually changes chord. Two chords that land on the same beat are written on consecutive beats when they
     really are that close; a chord is only skipped when it repeats the chord before it or would have to be
     pushed more than a beat away from where it was heard.
+
+    In a song that changes chord on the first beat of its bars nearly every time, the odd chord written one beat
+    before or after a bar line is a chord heard a beat early or late (the detector works in coarse steps), not a
+    different rhythm: it is moved onto the bar line, when that cell is free.
     """
     out = [dict(c, gridStart=c["start"]) for c in chords]
     if len(beats) < 8 or len(chords) < 3:
@@ -516,6 +520,7 @@ def place_chords_on_grid(chords: list[dict], beats: np.ndarray, phase: int, dura
 
     out_index = 0
     last_beat = -1
+    placed: list[list[int]] = []  # [chord index, beat index] of every chord that got a cell, in order
     for k in range(1, len(chords)):
         chord = chords[k]
         near = nearest(chord["start"])
@@ -538,4 +543,20 @@ def place_chords_on_grid(chords: list[dict], beats: np.ndarray, phase: int, dura
                 continue
         out[k]["gridStart"] = float(beats[j])
         out_index, last_beat = k, j
+        placed.append([k, j])
+
+    # Chords one beat off the bar line, in a song that nearly always changes on the bar line.
+    if bpb >= 3 and len(placed) >= 12:
+        spots = np.bincount([(j - phase) % bpb for _, j in placed], minlength=bpb) / len(placed)
+        if spots[0] >= 0.7:
+            for n, (k, j) in enumerate(placed):
+                pos = (j - phase) % bpb
+                if pos not in (1, bpb - 1) or spots[pos] > 0.12:
+                    continue  # on the bar line already, or a position this song really uses
+                target = j - 1 if pos == 1 else j + 1  # a late chord goes back, an early one forward
+                before = placed[n - 1][1] if n > 0 else -1
+                after = placed[n + 1][1] if n + 1 < len(placed) else len(beats)
+                if before < target < after and target < len(beats) and abs(float(beats[target]) - chords[k]["start"]) <= 1.5 * period:
+                    out[k]["gridStart"] = float(beats[target])
+                    placed[n][1] = target
     return out
