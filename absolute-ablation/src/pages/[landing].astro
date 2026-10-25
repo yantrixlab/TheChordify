@@ -1,0 +1,14 @@
+---
+// The landing pages (/youtube-to-chords/, /guitar-chord-finder/, /chord-detector/, /ukulele-chords/, /mandolin-chords/): one file, each page's words in lib/landing.ts.
+import LandingPage from "../components/LandingPage.astro";
+import { LANDING, landingBySlug } from "../lib/landing";
+
+export function getStaticPaths() {
+  return LANDING.map((page) => ({ params: { landing: page.slug } }));
+}
+
+const { landing } = Astro.params;
+const page = landingBySlug(landing as string)!;
+---
+
+<LandingPage page={page} />

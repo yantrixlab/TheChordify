@@ -4,6 +4,11 @@ import { business } from "../lib/business";
 
 const pages: { path: string; priority: string; changefreq: string }[] = [
   { path: "/", priority: "1.0", changefreq: "weekly" },
+  { path: "/youtube-to-chords/", priority: "0.9", changefreq: "monthly" },
+  { path: "/guitar-chord-finder/", priority: "0.9", changefreq: "monthly" },
+  { path: "/chord-detector/", priority: "0.8", changefreq: "monthly" },
+  { path: "/ukulele-chords/", priority: "0.8", changefreq: "monthly" },
+  { path: "/mandolin-chords/", priority: "0.8", changefreq: "monthly" },
   { path: "/toolkit/", priority: "0.9", changefreq: "monthly" },
   { path: "/toolkit/tuner/", priority: "0.8", changefreq: "monthly" },
   { path: "/toolkit/metronome/", priority: "0.8", changefreq: "monthly" },

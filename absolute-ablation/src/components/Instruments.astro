@@ -2,6 +2,7 @@
 const instruments = [
   {
     id: "guitar",
+    href: "/guitar-chord-finder/",
     name: "Guitar",
     description: "Standard, drop-D, open tunings. Chord shapes for every level from beginner to advanced.",
     features: ["Standard & alternate tunings", "Capo support", "Barre chord diagrams", "Beginner-friendly shapes"],
@@ -16,6 +17,7 @@ const instruments = [
   },
   {
     id: "ukulele",
+    href: "/ukulele-chords/",
     name: "Ukulele",
     description: "Soprano, concert, and baritone tunings. Clean chord grids optimised for 4-string players.",
     features: ["GCEA & ADF#B tunings", "Re-entrant tuning", "Chord inversions", "Easy-first suggestions"],
@@ -23,6 +25,7 @@ const instruments = [
   },
   {
     id: "mandolin",
+    href: "/mandolin-chords/",
     name: "Mandolin",
     description: "The only chord tool with full mandolin support. GDAE tuning with authentic 8-string chord shapes.",
     features: ["GDAE tuning", "Authentic 8-string shapes", "Fiddle-tune keys", "Bluegrass voicings"],
@@ -46,7 +49,7 @@ const instruments = [
         instruments.map((inst) => (
           <article class="hs-card in-card">
             <span class="hs-ico" set:html={inst.icon} />
-            <h3>{inst.name}</h3>
+            <h3>{inst.href ? <a href={inst.href}>{inst.name}</a> : inst.name}</h3>
             <p>{inst.description}</p>
             <ul>
               {inst.features.map((f) => (
@@ -72,6 +75,8 @@ const instruments = [
   .in-card { display: flex; flex-direction: column; padding: 26px; }
   .in-card .hs-ico { margin-bottom: 22px; }
   .in-card h3 { margin: 0 0 8px; font-size: 20px; font-weight: 650; letter-spacing: -0.02em; color: var(--color-ink); }
+  .in-card h3 a { color: inherit; text-decoration: none; }
+  .in-card h3 a:hover { color: var(--color-violet-deep); }
   .in-card p { margin: 0 0 20px; font-size: 14.5px; line-height: 1.6; color: var(--color-body); }
   .in-card ul { display: grid; gap: 10px; margin: auto 0 0; padding: 18px 0 0; border-top: 1px solid #f0ecf7; list-style: none; }
   .in-card li { display: flex; align-items: center; gap: 9px; font-size: 13.5px; color: var(--color-body); }
