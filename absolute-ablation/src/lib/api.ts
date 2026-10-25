@@ -242,6 +242,13 @@ export interface TrendingShelf {
   songs: SongHit[];
 }
 
+/** Songs like the one being played, each with the reason it is there (an empty list if there are none or the server cannot say). */
+export async function getSimilar(sessionId: string): Promise<(SongHit & { why?: string })[]> {
+  const res = await fetchApi(`${API_BASE}/api/similar/${encodeURIComponent(sessionId)}`);
+  if (!res.ok) return [];
+  return (await res.json()).songs ?? [];
+}
+
 /** What is trending, shelf by shelf (an empty list if the server cannot say right now). */
 export async function getTrending(): Promise<TrendingShelf[]> {
   const res = await fetchApi(`${API_BASE}/api/trending`);

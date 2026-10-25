@@ -229,6 +229,25 @@ class SongStore:
             for r in rows
         ]
 
+    def library(self, limit: int = 600) -> list[dict]:
+        """Chordified songs with their key and tempo, the most played and newest first: what "similar songs" picks from."""
+        rows, _ = self._db.run("SELECT * FROM songs ORDER BY jams DESC, updated_at DESC LIMIT ?", (limit,))
+        return [
+            {
+                "videoId": r["video_id"],
+                "title": r["title"],
+                "artist": r["artist"],
+                "album": r["album"],
+                "duration": int(r["duration"]),
+                "thumbnail": r["thumbnail"] or f"https://i.ytimg.com/vi/{r['video_id']}/mqdefault.jpg",
+                "chords": json.loads(r["chords"]),
+                "jams": r["jams"],
+                "key": r["song_key"],
+                "tempo": r["tempo"],
+            }
+            for r in rows
+        ]
+
     # ----- housekeeping ------------------------------------------------------------------------------------------
 
     def summary(self) -> dict:

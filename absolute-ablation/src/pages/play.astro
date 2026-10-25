@@ -1,6 +1,8 @@
 ---
 import Layout from "../layouts/Layout.astro";
 import Nav from "../components/Nav.astro";
+import Footer from "../components/Footer.astro";
+import SimilarSongs from "../components/SimilarSongs.astro";
 ---
 
 <Layout title="Play along — Chord Suno" noindex>
@@ -269,8 +271,10 @@ import Nav from "../components/Nav.astro";
         </aside>
         <audio id="audio-el" class="hidden" preload="metadata"></audio>
       </div>
+      <SimilarSongs />
     </div>
   </main>
+  <Footer />
 </Layout>
 
 <style is:global>

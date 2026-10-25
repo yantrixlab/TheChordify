@@ -26,6 +26,7 @@ from .plans import FREE_CODE, PERIODS, PlanStore
 from .engagement import BADGE_RULES, DEFAULT_CONFIG, REWARD_KINDS, Engagement
 from .jobs import JobQueue
 from .search import RateLimiter, SearchUnavailable, clean_query, search_songs, suggest
+from .similar import similar as similar_songs_for
 from .songpages import SongPages
 from .store import SongStore
 from . import trending as trending_shelves
@@ -1155,6 +1156,54 @@ def trending(response: Response) -> dict:
         out.insert(0, {"id": "popular", "title": "Popular on Chord Suno", "about": "What people are jamming to", "songs": favourites})
     response.headers["Cache-Control"] = "public, max-age=120"
     return {"shelves": out}
+
+
+_similar_limiter = RateLimiter(limit=20, window=60.0)
+_similar_cache: dict[str, tuple[float, list]] = {}
+_SIMILAR_SECONDS = 30 * 60.0
+
+
+@app.get("/api/similar/{session_id}")
+def similar_songs(session_id: str, request: Request, response: Response) -> dict:
+    """Songs like the one in the player, for the shelf under it: songs already chordified that are alike (same artist, key,
+    tempo, chords), then other songs by the artist, then the most played songs. Each says why it is there."""
+    _check_key(session_id)
+    now = time.monotonic()
+    hit = _similar_cache.get(session_id)
+    if hit and now - hit[0] < _SIMILAR_SECONDS:
+        response.headers["Cache-Control"] = "public, max-age=300"
+        return {"songs": hit[1]}
+    result = _load_cached_result(session_id) or _load_saved_result(session_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Unknown session")
+    video_id = result.get("videoId") or (session_id[3:] if session_id.startswith("yt_") else "")
+    current = {
+        "videoId": video_id,
+        "title": result.get("title", ""),
+        "artist": result.get("artist", ""),
+        "key": result.get("key", ""),
+        "tempo": float(result.get("tempo") or 0),
+        "chords": _chord_summary(result.get("chords", [])),
+    }
+    caller = request.client.host if request.client else "unknown"
+
+    def more_by_artist() -> list[dict]:
+        if not _similar_limiter.allow(caller):
+            return []
+        try:
+            found = search_songs(current["artist"].split(",")[0].strip())
+        except SearchUnavailable:
+            return []
+        found = [song for song in found if song.get("kind", "song") == "song"]
+        known = catalog.lookup([song["videoId"] for song in found])
+        return [{**song, **known.get(song["videoId"], {})} for song in found]
+
+    songs = similar_songs_for(current, catalog.library(), more_by_artist, catalog.popular(20))
+    if len(_similar_cache) > 500:
+        _similar_cache.clear()
+    _similar_cache[session_id] = (now, songs)
+    response.headers["Cache-Control"] = "public, max-age=300"
+    return {"songs": songs}
 
 
 @app.get("/api/popular")
