@@ -90,22 +90,45 @@ def _esc(text: object) -> str:
     return html.escape(str(text), quote=True)
 
 
-# ---- the admin's own words for a song page: HTML, kept to a safe set of tags ----------------------------------------------
+# ---- the admin's own words for a song page: their HTML, with its own CSS, kept to what is safe -------------------------------
+#
+# Only admins can write this. It is still cleaned, so a page can carry a full design (headings, tables, FAQs, icons, a <style>
+# block with classes) but never run code: scripts, iframes, forms, event handlers and unsafe addresses are removed, and the
+# page's CSS is fenced into its own block (every rule is prefixed with .sp-custom) so it cannot restyle the site around it.
 
 _ALLOWED_TAGS = {
-    "p", "br", "hr", "h2", "h3", "h4", "ul", "ol", "li", "strong", "b", "em", "i", "u", "s", "a", "blockquote", "code", "pre",
-    "img", "figure", "figcaption", "table", "thead", "tbody", "tr", "th", "td", "span", "div", "details", "summary", "sub", "sup",
+    "p", "br", "hr", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "strong", "b", "em", "i", "u", "s", "a", "blockquote",
+    "code", "pre", "img", "figure", "figcaption", "table", "thead", "tbody", "tfoot", "tr", "th", "td", "caption", "colgroup", "col",
+    "span", "div", "details", "summary", "sub", "sup", "small", "mark", "kbd", "abbr", "cite", "q", "del", "ins", "time", "wbr",
+    "dl", "dt", "dd", "section", "article", "header", "footer", "nav", "aside", "main", "address",
 }
-_VOID_TAGS = {"br", "hr", "img"}
-_DROP_WITH_CONTENT = {"script", "style", "iframe", "object", "embed", "noscript", "template", "svg", "math", "form", "textarea", "select"}
-_ALLOWED_ATTRS = {
-    "a": {"href", "title"},
-    "img": {"src", "alt", "width", "height", "title"},
-    "td": {"colspan", "rowspan"},
-    "th": {"colspan", "rowspan"},
-    "ol": {"start"},
+_SVG_TAGS = {
+    "g", "path", "circle", "rect", "line", "polyline", "polygon", "ellipse", "defs", "lineargradient", "radialgradient", "stop",
+    "title", "text", "tspan",
 }
-_MAX_RICH = 20000
+_VOID_TAGS = {"br", "hr", "img", "wbr", "col"}
+_DROP_WITH_CONTENT = {"script", "iframe", "object", "embed", "noscript", "template", "math", "form", "textarea", "select", "button", "input"}
+_GLOBAL_ATTRS = {"class", "id", "style", "title", "role", "lang", "dir", "itemscope", "itemtype", "itemprop"}
+_TAG_ATTRS = {
+    "a": {"href"},
+    "img": {"src", "alt", "width", "height"},
+    "td": {"colspan", "rowspan", "scope"},
+    "th": {"colspan", "rowspan", "scope"},
+    "ol": {"start", "type"},
+    "col": {"span", "width"},
+    "colgroup": {"span"},
+    "time": {"datetime"},
+    "details": {"open"},
+}
+_SVG_ATTRS = {
+    "viewbox", "width", "height", "fill", "stroke", "stroke-width", "stroke-linecap", "stroke-linejoin", "stroke-opacity",
+    "fill-opacity", "opacity", "d", "cx", "cy", "r", "rx", "ry", "x", "y", "x1", "x2", "y1", "y2", "points", "transform", "offset",
+    "stop-color", "stop-opacity", "fill-rule", "clip-rule", "xmlns", "preserveaspectratio", "font-size", "text-anchor",
+    "font-weight", "gradientunits", "gradienttransform", "stroke-dasharray", "stroke-dashoffset", "dominant-baseline",
+}
+_MAX_RICH = 200000
+_SCOPE = ".sp-custom"
+_BAD_CSS = re.compile(r"expression\s*\(|javascript:|vbscript:|@import|-moz-binding|behavior\s*:", re.I)
 
 
 def _safe_url(value: str, allow_mailto: bool) -> str:
@@ -118,98 +141,242 @@ def _safe_url(value: str, allow_mailto: bool) -> str:
     return ""
 
 
+def _split_top(text: str, sep: str) -> list[str]:
+    """Splits at `sep` outside brackets and quotes."""
+    parts, depth, quote, start = [], 0, "", 0
+    for i, ch in enumerate(text):
+        if quote:
+            if ch == quote:
+                quote = ""
+        elif ch in "\"'":
+            quote = ch
+        elif ch in "([":
+            depth += 1
+        elif ch in ")]":
+            depth = max(depth - 1, 0)
+        elif ch == sep and depth == 0:
+            parts.append(text[start:i])
+            start = i + 1
+    parts.append(text[start:])
+    return parts
+
+
+def _url_ok(raw: str) -> bool:
+    u = raw.strip().strip("'\"").strip()
+    low = re.sub(r"\s+", "", u).lower()
+    return (low.startswith(("https://", "/")) and not low.startswith("//")) or bool(re.match(r"data:image/(png|jpe?g|gif|webp|svg\+xml)[;,]", low))
+
+
+def _clean_decls(text: str) -> str:
+    """CSS declarations without anything that runs code or fetches from an unsafe address."""
+    out = []
+    for decl in _split_top(text, ";"):
+        if ":" not in decl:
+            continue
+        prop, value = decl.split(":", 1)
+        prop, value = prop.strip().lower(), value.strip().replace("<", "").replace(">", "")
+        if not (re.fullmatch(r"-?[a-z][a-z0-9-]*", prop) or re.fullmatch(r"--[\w-]+", prop)):
+            continue
+        if _BAD_CSS.search(prop) or _BAD_CSS.search(value):
+            continue
+        if any(not _url_ok(u) for u in re.findall(r"url\(\s*([^)]*?)\s*\)", value, flags=re.I)):
+            continue
+        if prop == "position" and value.lower().startswith("fixed"):
+            value = "absolute"  # nothing may be pinned over the site's own menu
+        out.append(f"{prop}:{value}")
+    return ";".join(out)
+
+
+def _scope_css(css: str, depth: int = 0) -> str:
+    """The page's own CSS with every rule fenced into .sp-custom (html, body and :root become the block itself)."""
+    css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    css = re.sub(r"@(?:import|charset|namespace)[^;]*;", "", css, flags=re.I)
+    out: list[str] = []
+    i, n = 0, len(css)
+    while i < n:
+        j = css.find("{", i)
+        if j == -1:
+            break
+        head = css[i:j].strip()
+        level, k = 1, j + 1
+        while k < n and level:
+            level += (css[k] == "{") - (css[k] == "}")
+            k += 1
+        body = css[j + 1 : k - 1]
+        i = k
+        if not head:
+            continue
+        low = head.lower()
+        if low.startswith("@"):
+            if re.match(r"@(media|supports|container|layer)\b", low) and depth < 3:
+                inner = _scope_css(body, depth + 1)
+                if inner:
+                    out.append(f"{head}{{{inner}}}")
+            elif re.match(r"@(-webkit-)?keyframes\b", low):
+                out.append(head + "{" + re.sub(r"\{([^{}]*)\}", lambda m: "{" + _clean_decls(m.group(1)) + "}", body) + "}")
+            continue  # @font-face, @page and the rest are not carried over
+        scoped = []
+        for sel in _split_top(head, ","):
+            sel = sel.strip()
+            if not sel or not re.fullmatch(r"[\w\s.#:>+~*\[\]=\"'^$|()\-%,!\\]+", sel):
+                continue
+            root = re.match(r"(?:html|body|:root)(?![\w-])\s*", sel, re.I)
+            if root:
+                rest = sel[root.end() :]
+                scoped.append(_SCOPE + (rest if rest[:1] in (".", ":", "[", "#") else (" " + rest if rest else "")))
+            elif sel == "*":
+                scoped.append(f"{_SCOPE}, {_SCOPE} *")
+            else:
+                scoped.append(f"{_SCOPE} {sel}")
+        decls = _clean_decls(body)
+        if scoped and decls:
+            out.append(f"{', '.join(scoped)}{{{decls}}}")
+    return "".join(out)
+
+
 class _Cleaner(HTMLParser):
     def __init__(self) -> None:
         super().__init__(convert_charrefs=False)
         self.out: list[str] = []
         self.open: list[str] = []
         self.skip = 0  # inside a tag whose content is thrown away
+        self.svg = 0  # inside an inline picture
+        self.css: list[str] = []
+        self.style: Optional[list[str]] = None  # the text of the <style> being read
 
-    def handle_starttag(self, tag: str, attrs: list) -> None:
-        if tag in _DROP_WITH_CONTENT:
-            self.skip += 1
-            return
-        if self.skip or tag not in _ALLOWED_TAGS:
-            return
+    def _attrs(self, tag: str, attrs: list) -> str:
         kept = []
-        href = ""
+        in_svg = self.svg > 0 or tag == "svg"
+        allowed = _GLOBAL_ATTRS | _TAG_ATTRS.get(tag, set()) | (_SVG_ATTRS if in_svg else set())
         for name, value in attrs:
-            if name not in _ALLOWED_ATTRS.get(tag, ()) or value is None:
+            value = "" if value is None else value
+            if name.startswith("aria-"):
+                value = re.sub(r"[<>\"']", "", value)[:200]
+            elif name not in allowed:
                 continue
-            if name == "href":
+            elif name == "href":
                 value = _safe_url(value, True)
                 if not value:
                     continue
-                href = value
+                if value.startswith("#"):
+                    value = "#c-" + re.sub(r"[^\w\-:.]", "", value[1:])  # the ids are prefixed, so the links are too
             elif name == "src":
                 value = _safe_url(value, False)
                 if not value or value.startswith("#"):
                     continue
-            elif name in ("width", "height", "colspan", "rowspan", "start"):
+            elif name == "id":
+                value = "c-" + re.sub(r"[^\w\-:.]", "", value)
+            elif name == "class":
+                value = re.sub(r"[^\w\- ]", "", value)
+            elif name == "style":
+                value = _clean_decls(value)
+                if not value:
+                    continue
+            elif name in ("width", "height", "colspan", "rowspan", "start", "span") and tag not in ("svg", "col") and not in_svg:
                 if not re.fullmatch(r"\d{1,4}", value.strip()):
                     continue
+            elif name in ("open", "itemscope"):
+                value = name
+            elif in_svg and name not in _GLOBAL_ATTRS:
+                if _BAD_CSS.search(value) or "<" in value:
+                    continue
             kept.append(f' {name}="{html.escape(value, quote=True)}"')
+        return "".join(kept)
+
+    def handle_starttag(self, tag: str, attrs: list) -> None:
+        if tag == "style":
+            if not self.skip:
+                self.style = []
+            return
+        if tag in _DROP_WITH_CONTENT or (tag == "title" and self.svg == 0):
+            self.skip += 1
+            return
+        if self.skip or self.style is not None:
+            return
+        if not (tag in _ALLOWED_TAGS or tag == "svg" or (tag in _SVG_TAGS and self.svg > 0)):
+            return
+        extra = ""
         if tag == "a":
-            external = href.lower().startswith(("http://", "https://")) and "chordsuno.com" not in href.lower()
-            kept.append(' rel="noopener nofollow ugc" target="_blank"' if external else ' rel="noopener"')
+            href = next((v for n, v in attrs if n == "href" and v), "")
+            external = href.strip().lower().startswith(("http://", "https://")) and "chordsuno.com" not in href.lower()
+            extra = ' rel="noopener nofollow ugc" target="_blank"' if external else ' rel="noopener"'
+        built = self._attrs(tag, attrs)
         if tag == "img":
-            if not any(k.startswith(" src=") for k in kept):
+            if " src=" not in built:
                 return  # a picture with no safe address is dropped
-            kept.append(' loading="lazy"')
-        self.out.append(f"<{tag}{''.join(kept)}>")
+            extra = ' loading="lazy"'
+        self.out.append(f"<{tag}{built}{extra}>")
         if tag not in _VOID_TAGS:
             self.open.append(tag)
+            if tag == "svg":
+                self.svg += 1
 
     def handle_startendtag(self, tag: str, attrs: list) -> None:
-        if tag in _DROP_WITH_CONTENT:
+        if tag in _DROP_WITH_CONTENT or tag == "style":
             return  # <script/> and the like: nothing to skip
         self.handle_starttag(tag, attrs)
         if tag not in _VOID_TAGS and tag in self.open:
             self.handle_endtag(tag)
 
     def handle_endtag(self, tag: str) -> None:
-        if tag in _DROP_WITH_CONTENT:
+        if tag == "style":
+            if self.style is not None:
+                self.css.append("".join(self.style))
+                self.style = None
+            return
+        if tag in _DROP_WITH_CONTENT or (tag == "title" and self.svg == 0):
             self.skip = max(self.skip - 1, 0)
             return
-        if self.skip or tag not in _ALLOWED_TAGS or tag in _VOID_TAGS or tag not in self.open:
+        if self.skip or tag in _VOID_TAGS or tag not in self.open:
             return
         while self.open:  # close anything left open inside it
             top = self.open.pop()
             self.out.append(f"</{top}>")
+            if top == "svg":
+                self.svg = max(self.svg - 1, 0)
             if top == tag:
                 break
 
     def handle_data(self, data: str) -> None:
-        if not self.skip:
+        if self.style is not None:
+            self.style.append(data)
+        elif not self.skip:
             self.out.append(html.escape(data, quote=False))
 
     def handle_entityref(self, name: str) -> None:
-        if not self.skip:
+        if self.style is None and not self.skip:
             self.out.append(f"&{name};" if re.fullmatch(r"[a-zA-Z0-9]{1,12}", name) else "")
 
     def handle_charref(self, name: str) -> None:
-        if not self.skip:
+        if self.style is None and not self.skip:
             self.out.append(f"&#{name};" if re.fullmatch(r"x?[0-9a-fA-F]{1,6}", name) else "")
 
-    def result(self) -> str:
+    def result(self) -> tuple[str, bool]:
+        if self.style is not None:
+            self.css.append("".join(self.style))
+            self.style = None
         while self.open:
             self.out.append(f"</{self.open.pop()}>")
-        return "".join(self.out)
+        css = _scope_css("\n".join(self.css)) if self.css else ""
+        body = "".join(self.out)
+        return (f"<style>{css}</style>" if css else "") + body, bool(css)
 
 
-def clean_rich(text: str) -> str:
-    """The admin's text as safe HTML: only the tags above, links and pictures only to http(s) addresses, no scripts, no styles,
-    no event handlers. Text with no tags at all (older pages) becomes paragraphs."""
+def render_rich(text: str) -> tuple[str, bool]:
+    """(safe HTML, whether it brings its own styles). Text with no tags at all (older pages) becomes paragraphs."""
     text = (text or "").strip()[:_MAX_RICH]
     if not text:
-        return ""
+        return "", False
     if "<" not in text:
-        return "".join(f"<p>{html.escape(part.strip())}</p>" for part in re.split(r"\n\s*\n", text) if part.strip())
+        return "".join(f"<p>{html.escape(part.strip())}</p>" for part in re.split(r"\n\s*\n", text) if part.strip()), False
     cleaner = _Cleaner()
     cleaner.feed(text)
     cleaner.close()
     return cleaner.result()
 
+
+def clean_rich(text: str) -> str:
+    return render_rich(text)[0]
 
 
 def _chart_html(result: dict) -> str:
@@ -402,7 +569,7 @@ class SongPages:
             ON CONFLICT(video_id) DO UPDATE SET slug = excluded.slug, title = excluded.title, artist = excluded.artist,
                 intro = excluded.intro, updated_at = excluded.updated_at
             """,
-            (video_id, final, title, artist, clean_rich(intro), now, now),
+            (video_id, final, title, artist, intro.strip()[:_MAX_RICH], now, now),
         )
         return {"slug": final, "title": title, "artist": artist}
 
@@ -534,8 +701,10 @@ class SongPages:
             else ""
         )
 
-        intro = clean_rich(row["intro"])
-        if intro:
+        intro, custom = render_rich(row["intro"])
+        if intro and custom:
+            about = ""  # a designed page: shown as it is, with its own headings and no extra text around it
+        elif intro:
             about = f'<div class="sp-rich">{intro}</div>'
         else:
             about = (
@@ -544,10 +713,16 @@ class SongPages:
                 if key and tempo
                 else f"<p>Chords for {_esc(name)}.</p>"
             )
-        about += (
-            f"<p>These chords were worked out automatically from the song's audio, with the chord changes placed on the beat. "
-            f"Open the player to follow {_esc(title)} chord by chord, slow it down, loop a section, transpose it, or see it for "
-            f"piano, ukulele and mandolin. Real recordings differ a little from any chart, so use your ear as the last word.</p>"
+        if not (intro and custom):
+            about += (
+                f"<p>These chords were worked out automatically from the song's audio, with the chord changes placed on the beat. "
+                f"Open the player to follow {_esc(title)} chord by chord, slow it down, loop a section, transpose it, or see it for "
+                f"piano, ukulele and mandolin. Real recordings differ a little from any chart, so use your ear as the last word.</p>"
+            )
+        about_html = (
+            f'<section class="sp-custom-wrap" id="about"><div class="sp-custom">{intro}</div></section>'
+            if intro and custom
+            else f'<section class="sp-block" id="about"><h2>About these chords</h2>{about}</section>'
         )
 
         related_rows = [r for r in self.published(60) if r["slug"] != slug]
@@ -575,7 +750,7 @@ class SongPages:
             f'<section class="sp-block"><h2>Chords used in {_esc(title)}</h2><div class="sp-chips">{chips}</div></section>'
             f"{diagrams_html}"
             f"{chart_html}"
-            f'<section class="sp-block" id="about"><h2>About these chords</h2>{about}</section>'
+            f"{about_html}"
             f"{related_html}"
             '<aside class="sp-note">Chord charts are transcriptions made by software for learning and practice. Chord Suno does not show lyrics.</aside>'
             "</article>"

@@ -75,6 +75,9 @@ import Footer from "../components/Footer.astro";
   .sp-dg-nav[hidden] { display: none; }
   .sp-dg-nav button { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 1px solid #e4dcf3; border-radius: 50%; background: #fff; font-size: 16px; line-height: 1; color: var(--color-violet-deep); cursor: pointer; }
   .sp-dg-nav button:hover { background: #f4f1fb; }
+  .sp-custom-wrap { margin-top: 40px; }
+  .sp-custom { min-width: 0; overflow-wrap: anywhere; }
+  :where(.sp-custom) img { max-width: 100%; height: auto; }
   .sp-rich { font-size: 16px; line-height: 1.75; color: var(--color-body); }
   .sp-rich > *:first-child { margin-top: 0; }
   .sp-rich h2, .sp-rich h3, .sp-rich h4 { margin: 1.6em 0 0.5em; color: var(--color-ink); letter-spacing: -0.02em; line-height: 1.25; }

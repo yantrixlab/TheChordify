@@ -182,7 +182,10 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
     code.spellcheck = false;
     code.setAttribute("aria-label", "About the song, HTML");
     code.hidden = true;
-    visual.innerHTML = asHtml(initial);
+    // A page with its own <style> block is edited as HTML: the visual editor cannot show custom CSS and would drop it.
+    const designed = /<style[\s>]/i.test(initial);
+    visual.innerHTML = designed ? "" : asHtml(initial);
+    code.value = designed ? initial : "";
 
     const run = (command: string, value?: string) => {
       visual.focus();
@@ -227,7 +230,10 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
     let mode: "visual" | "html" = "visual";
     const setMode = (next: "visual" | "html") => {
       if (next === mode) return;
-      if (next === "html") code.value = tidy(visual.innerHTML);
+      if (next === "visual" && /<style[\s>]/i.test(code.value)) {
+        if (!confirm("This page has its own CSS styles. The visual editor cannot show them, and switching removes them. Stay in HTML to keep the design. Switch anyway?")) return;
+      }
+      if (next === "html") code.value = designed && !visual.innerHTML.trim() ? code.value : tidy(visual.innerHTML);
       else visual.innerHTML = asHtml(code.value);
       mode = next;
       visual.hidden = tools.hidden = next === "html";
@@ -238,12 +244,17 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
     };
     visualTab.addEventListener("click", () => setMode("visual"));
     htmlTab.addEventListener("click", () => setMode("html"));
+    if (designed) {
+      mode = "visual";
+      setMode("html");
+    }
 
     return {
       el: wrap,
       /** What to save: the HTML of whichever editor is showing (empty when there is nothing in it). */
       value(): string {
         const html = mode === "html" ? code.value.trim() : tidy(visual.innerHTML).trim();
+        if (mode === "html") return html; // as written: the server keeps the safe parts and the design
         const probe = new DOMParser().parseFromString(html, "text/html").body;
         return probe.textContent?.trim() || probe.querySelector("img, hr") ? html : "";
       },
