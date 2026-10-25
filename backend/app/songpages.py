@@ -211,6 +211,83 @@ def clean_rich(text: str) -> str:
     return cleaner.result()
 
 
+
+def _chart_html(result: dict) -> str:
+    """The whole song as the player's chords grid: sections, rows of bars, one cell per beat with the chord written in the
+    cell where it starts (the cell the analysis chose for it). Plain HTML, so it is text a search engine can read."""
+    bars = result.get("bars") or []
+    chords = result.get("chords") or []
+    if not bars or not chords:
+        return ""
+    per_bar = int(result.get("beatsPerBar") or max((len(b.get("beats") or []) - 1 for b in bars), default=4) or 4)
+    per_bar = min(max(per_bar, 2), 12)
+    duration = float(result.get("duration") or 0)
+    first_sound = next((i for i, c in enumerate(chords) if c.get("chord") != "N"), len(chords))
+    placed = [
+        (c["chord"], float(c["gridStart"] if c.get("gridStart") is not None else c["start"]))
+        for i, c in enumerate(chords)
+        if c.get("gridStart") is not None and not (c.get("chord") == "N" and i < first_sound)
+    ]
+
+    # the chord written in each beat cell: the one whose cell time is nearest, within half a beat
+    written: list[list] = []
+    nxt = 0
+    for bar in bars:
+        beats = list(bar.get("beats") or [])
+        cells = []
+        for k in range(per_bar):
+            t0 = beats[k] if k < len(beats) else None
+            if t0 is None:
+                cells.append(None)
+                continue
+            t1 = next((b for b in beats[k + 1 :] if b is not None), duration or t0 + 0.5)
+            half = max(float(t1) - float(t0), 0.05) / 2
+            while nxt < len(placed) and placed[nxt][1] < float(t0) - half:
+                nxt += 1
+            if nxt < len(placed) and placed[nxt][1] < float(t0) + half:
+                cells.append(placed[nxt][0])
+                nxt += 1
+            else:
+                cells.append("")
+        written.append(cells)
+
+    sections = [s for s in (result.get("sections") or []) if s.get("startBar") is not None]
+    if not sections:
+        sections = [{"label": "", "startBar": 0, "endBar": len(bars) - 1}]
+    per_row = 2 if per_bar >= 6 else 4
+
+    def kind(label: str) -> str:
+        word = (label.split(" ")[0] if label else "").lower()
+        return word if word in ("intro", "verse", "chorus", "bridge", "outro", "instrumental", "break") else "part"
+
+    out = [f'<div class="sg"{" data-wide" if per_bar >= 5 else ""} style="--bpb:{per_bar};--rb:{per_row}">']
+    for si, sec in enumerate(sections):
+        start = 0 if si == 0 else int(sec["startBar"])
+        end = len(bars) - 1 if si == len(sections) - 1 else int(sec.get("endBar") if sec.get("endBar") is not None else sec["startBar"])
+        end = min(end, len(bars) - 1)
+        if end < start:
+            continue
+        label = sec.get("label") or ""
+        out.append(f'<section class="sg-sec is-{kind(label)}">')
+        if label:
+            out.append(f'<h3 class="sg-tag">{_esc(label)}</h3>')
+        out.append('<div class="sg-body">')
+        for row_start in range(start, end + 1, per_row):
+            out.append('<div class="sg-row">')
+            for b in range(row_start, min(row_start + per_row, end + 1)):
+                cells = "".join(
+                    '<span class="sg-c is-empty"></span>'
+                    if c is None
+                    else f'<span class="sg-c{" has" if c else ""}">{_esc("—" if c == "N" else c)}</span>'
+                    for c in written[b]
+                )
+                out.append(f'<div class="sg-bar">{cells}</div>')
+            out.append("</div>")
+        out.append("</div></section>")
+    out.append("</div>")
+    return "".join(out)
+
+
 class SongPages:
     def __init__(self, catalog, template_path: str, analysis_version: int = 0) -> None:
         self._catalog = catalog
@@ -447,22 +524,15 @@ class SongPages:
             else ""
         )
 
-        # the chords of each section, as they follow one another (repeats of the same chord merged)
-        prog_html = ""
-        seen_labels: set[str] = set()
-        for sec in result.get("sections") or []:
-            label = sec.get("label") or ""
-            kind = re.sub(r"\s*\d+$", "", label)
-            if not label or kind in seen_labels or label == "Silence" or len(seen_labels) >= 6:
-                continue
-            chain: list[str] = []
-            for c in segments:
-                if sec["start"] - 0.01 <= c["start"] < sec["end"] and (not chain or chain[-1] != c["chord"]):
-                    chain.append(c["chord"])
-            if len(chain) >= 2:
-                seen_labels.add(kind)
-                prog_html += f"<li><strong>{_esc(label)}</strong><span>{''.join(f'<i>{_esc(c)}</i>' for c in chain[:16])}</span></li>"
-        progression = f'<section class="sp-block" id="progression"><h2>Chord progression</h2><ul class="sp-prog">{prog_html}</ul></section>' if prog_html else ""
+        chart = _chart_html(result)
+        chart_html = (
+            '<section class="sp-block" id="chart"><h2>Chord chart</h2>'
+            f'<p class="sp-sub">The whole of {_esc(title)}, bar by bar and beat by beat. A chord is written on the beat where it starts and carries on until the next one.</p>'
+            f"{chart}"
+            f'<p class="sp-chart-cta"><a class="sp-play" href="/play?session={_esc(row["session_id"])}">▶ Play along with the chords</a></p></section>'
+            if chart
+            else ""
+        )
 
         intro = clean_rich(row["intro"])
         if intro:
@@ -504,7 +574,7 @@ class SongPages:
             f'<dl class="sp-facts">{facts_html}</dl>'
             f'<section class="sp-block"><h2>Chords used in {_esc(title)}</h2><div class="sp-chips">{chips}</div></section>'
             f"{diagrams_html}"
-            f"{progression}"
+            f"{chart_html}"
             f'<section class="sp-block" id="about"><h2>About these chords</h2>{about}</section>'
             f"{related_html}"
             '<aside class="sp-note">Chord charts are transcriptions made by software for learning and practice. Chord Suno does not show lyrics.</aside>'

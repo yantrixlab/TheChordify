@@ -44,6 +44,24 @@ import Footer from "../components/Footer.astro";
   .sp-prog li { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 16px; align-items: baseline; padding: 14px 18px; background: #fff; border: 1px solid #ebe7f3; border-radius: 14px; }
   .sp-prog strong { font-size: 14px; color: var(--color-ink); }
   .sp-prog span { display: flex; flex-wrap: wrap; gap: 6px; }
+  .sp-chart-cta { margin: 22px 0 0; text-align: center; }
+  /* the chord chart: sections as tabs on the left, rows of bars, one cell per beat */
+  .sg { display: grid; gap: 12px; }
+  .sg-sec { display: grid; grid-template-columns: 34px minmax(0, 1fr); overflow: hidden; background: #fff; border: 1px solid #e4dcf3; border-radius: 16px; box-shadow: 0 1px 2px rgb(26 5 51 / 0.04); }
+  .sg-tag { display: grid; place-items: center; margin: 0; padding: 8px 0; background: #ede9fb; color: var(--color-violet-deep); font: 700 12px var(--font-sans); letter-spacing: 0.04em; text-transform: uppercase; writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; }
+  .sg-sec.is-intro .sg-tag, .sg-sec.is-outro .sg-tag, .sg-sec.is-break .sg-tag { background: #eceaf1; color: #5f5875; }
+  .sg-sec.is-chorus .sg-tag { background: #d9d0f7; color: #4a1fa8; }
+  .sg-sec.is-bridge .sg-tag, .sg-sec.is-instrumental .sg-tag { background: #e6def9; color: #5b21b6; }
+  .sg-sec:not(:has(.sg-tag)) { grid-template-columns: minmax(0, 1fr); }
+  .sg-body { display: grid; min-width: 0; }
+  .sg-row { display: grid; grid-template-columns: repeat(var(--rb), minmax(0, 1fr)); border-bottom: 1px solid #efeaf8; }
+  .sg-row:last-child { border-bottom: 0; }
+  .sg-bar { display: grid; grid-template-columns: repeat(var(--bpb), minmax(0, 1fr)); border-left: 2px solid #4b4560; background: #fcfbfe; }
+  .sg-bar:first-child { border-left: 0; }
+  .sg-c { display: grid; align-items: center; min-height: 42px; padding: 0 8px; overflow: hidden; border-left: 1px solid #f1edf8; font: 700 15px var(--font-mono); letter-spacing: -0.02em; color: var(--color-ink); white-space: nowrap; }
+  .sg-c:first-child { border-left: 0; }
+  .sg-c.has { color: var(--color-violet-deep); }
+  .sg-c.is-empty { background: #f4f2f8; }
   .sp-prog i { display: inline-grid; place-items: center; min-width: 40px; height: 30px; padding: 0 9px; border-radius: 8px; background: #f4f1fb; font: 700 14.5px var(--font-mono); font-style: normal; color: var(--color-violet-deep); }
   .sp-dgs { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 16px; }
   .sp-dg { position: relative; margin: 0; padding: 14px 12px 12px; text-align: center; background: #fff; border: 1px solid #ebe7f3; border-radius: 18px; box-shadow: 0 1px 2px rgb(26 5 51 / 0.04); transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s; }
@@ -92,6 +110,10 @@ import Footer from "../components/Footer.astro";
   .sp-note { margin-top: 44px; padding: 16px 20px; font-size: 13.5px; line-height: 1.6; color: var(--color-mute); background: #fff; border: 1px dashed #d9d0ec; border-radius: 14px; }
   @media (max-width: 760px) {
     .sp-dgs { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .sg { --rb: 2 !important; }
+    .sg[data-wide] { --rb: 1 !important; }
+    .sg-sec { grid-template-columns: 26px minmax(0, 1fr); }
+    .sg-c { min-height: 38px; padding: 0 5px; font-size: 13px; }
     .sp-main { padding: 26px 18px 72px; }
     .sp-hero { grid-template-columns: minmax(0, 1fr); gap: 22px; }
     .sp-hero img { max-width: 360px; }
