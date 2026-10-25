@@ -201,10 +201,7 @@ import Nav from "../components/Nav.astro";
                 <h2 id="sm-title">Strumming pattern</h2>
                 <span id="sm-pill" class="sm-pill"></span>
               </div>
-              <div class="sm-seg" role="group" aria-label="Which pattern">
-                <button type="button" id="sm-main" class="is-on" aria-pressed="true">Full pattern</button>
-                <button type="button" id="sm-easy" aria-pressed="false">Easy version</button>
-              </div>
+              <div id="sm-seg" class="sm-seg" role="group" aria-label="Which pattern"></div>
             </div>
             <p id="sm-label" class="sm-label"></p>
             <div id="sm-tiles" class="sm-tiles" role="list" aria-label="Strums in one bar"></div>
@@ -550,7 +547,7 @@ import Nav from "../components/Nav.astro";
 
 <script>
   import { getGuitarShapes, chordNotes, chordKeyLabel, transposeChord, type GuitarShape } from "../lib/chordShapes";
-  import { API_BASE, registerJam, type ExtractResult, type ChordSegment, type Bar, type Section, type StrumPattern } from "../lib/api";
+  import { API_BASE, registerJam, type ExtractResult, type ChordSegment, type Bar, type Section, type StrumPattern, type StrumOne } from "../lib/api";
   import { heartButton, recordPlay } from "../lib/library";
   import { can, loadPlan, nudge } from "../lib/plan";
 
@@ -1824,37 +1821,83 @@ import Nav from "../components/Nav.astro";
   const strumLabel = document.getElementById("sm-label")!;
   const strumText = document.getElementById("sm-text")!;
   const strumNote = document.getElementById("sm-note")!;
-  const strumMain = document.getElementById("sm-main") as HTMLButtonElement;
-  const strumEasy = document.getElementById("sm-easy") as HTMLButtonElement;
+  const strumSeg = document.getElementById("sm-seg")!;
   let strum: StrumPattern | null = null;
+  let strumList: StrumOne[] = [];
+  let strumIdx = 0;
   let strumEasyOn = false;
   let strumTileEls: HTMLElement[] = [];
   let strumLit = -1;
+  let strumSub = 2;
   let strumBar = 0; // the bar the clock was last in (the clock mostly moves forward, so the search starts here)
 
   const ARROW_DOWN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v15M6 13l6 6 6-6"/></svg>';
   const ARROW_UP = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V5M6 11l6-6 6 6"/></svg>';
+  const SUB_NAMES = ["", "", ["", "&"], "", ["", "e", "&", "a"]] as unknown as string[][];
+
+  /** The few words after "Pattern 1": where in the song it is played ("Verse", "Verse and Chorus"). */
+  function whereText(p: StrumOne): string {
+    return p.where.length ? p.where.join(" and ") : "";
+  }
+
+  function buildStrumTabs() {
+    strumSeg.replaceChildren();
+    const make = (text: string, on: boolean, click: () => void) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = text;
+      b.className = on ? "is-on" : "";
+      b.setAttribute("aria-pressed", String(on));
+      b.addEventListener("click", click);
+      strumSeg.append(b);
+    };
+    if (strumList.length > 1) {
+      strumList.forEach((p, i) => make(`Pattern ${i + 1}${p.where.length ? ` · ${whereText(p)}` : ""}`, !strumEasyOn && i === strumIdx, () => {
+        strumIdx = i;
+        strumEasyOn = false;
+        renderStrum();
+      }));
+      make("Easy", strumEasyOn, () => {
+        strumEasyOn = true;
+        renderStrum();
+      });
+    } else {
+      make("Full pattern", !strumEasyOn, () => {
+        strumEasyOn = false;
+        renderStrum();
+      });
+      make("Easy version", strumEasyOn, () => {
+        strumEasyOn = true;
+        renderStrum();
+      });
+    }
+  }
 
   function renderStrum() {
-    strumCard.hidden = !strum;
+    strumCard.hidden = !strum || strumList.length === 0;
     strumTiles.replaceChildren();
     strumTileEls = [];
     strumLit = -1;
-    if (!strum) return;
-    const slots = strumEasyOn ? strum.easy : strum.pattern;
+    if (!strum || strumList.length === 0) return;
+    const cur = strumList[Math.min(strumIdx, strumList.length - 1)];
+    buildStrumTabs();
+    const slots = strumEasyOn ? cur.easy : cur.pattern;
+    strumSub = cur.sub === 4 ? 4 : 2;
     const shown = slots.map((s) => (s === "-" ? "–" : s)).join(" ");
     const pill = document.getElementById("sm-pill")!;
-    const kind = strum.kind ?? (strum.detected ? "heard" : "typical");
+    const kind = cur.kind;
     pill.textContent = kind === "heard" ? "Heard in the song" : kind === "guess" ? "Best guess" : "Suggested";
     pill.classList.toggle("is-heard", kind === "heard");
-    strumLabel.textContent = `${strumEasyOn ? "EASY VERSION" : kind === "heard" ? "MAIN PATTERN" : kind === "guess" ? "BEST GUESS" : "SUGGESTED PATTERN"}  ·  ${shown}`;
+    const where = whereText(cur);
+    strumLabel.textContent = `${strumEasyOn ? "EASY VERSION" : kind === "heard" ? "MAIN PATTERN" : kind === "guess" ? "BEST GUESS" : "SUGGESTED PATTERN"}${where && !strumEasyOn ? ` · ${where.toUpperCase()}` : ""}  ·  ${shown}`;
     strumTiles.style.setProperty("--cols", String(Math.min(slots.length, 8)));
-    slots.forEach((kind, i) => {
-      const tile = el_("div", `sm-tile${kind === "-" ? " is-rest" : kind === "D" ? " is-down" : " is-up"}`);
+    slots.forEach((kindOf, i) => {
+      const tile = el_("div", `sm-tile${kindOf === "-" ? " is-rest" : kindOf === "D" ? " is-down" : " is-up"}`);
       tile.setAttribute("role", "listitem");
-      const count = i % 2 === 0 ? String(i / 2 + 1) : "&";
-      tile.innerHTML = `<span class="sm-ar">${kind === "D" ? ARROW_DOWN : kind === "U" ? ARROW_UP : '<span aria-hidden="true">·</span>'}</span><small>${count}</small>`;
-      tile.setAttribute("aria-label", `${count}: ${kind === "D" ? "down-strum" : kind === "U" ? "up-strum" : "no strum"}`);
+      const within = i % strumSub;
+      const count = within === 0 ? String(i / strumSub + 1) : SUB_NAMES[strumSub][within];
+      tile.innerHTML = `<span class="sm-ar">${kindOf === "D" ? ARROW_DOWN : kindOf === "U" ? ARROW_UP : '<span aria-hidden="true">·</span>'}</span><small>${count}</small>`;
+      tile.setAttribute("aria-label", `${count}: ${kindOf === "D" ? "down-strum" : kindOf === "U" ? "up-strum" : "no strum"}`);
       strumTiles.append(tile);
       strumTileEls.push(tile);
     });
@@ -1862,24 +1905,27 @@ import Nav from "../components/Nav.astro";
     const bpm = Math.round(strum.bpm || tempo);
     const feel = bpm < 80 ? "slow, relaxed" : bpm < 110 ? "easy" : bpm < 140 ? "upbeat" : "fast";
     const beats = Array.from({ length: strum.perBar }, (_, i) => i + 1).join(", ");
+    const several = strumList.length > 1;
     strumText.innerHTML = strumEasyOn
       ? `One down-strum on every beat (${beats}): the simplest way to play this song, at its ${feel} ${bpm} BPM.`
       : kind === "heard"
-        ? `The pattern the recording keeps coming back to, at the song’s ${feel} ${bpm} BPM groove.`
+        ? several
+          ? `${where ? `Played in the ${where}` : "One of the ways this song is played"}, at the song’s ${feel} ${bpm} BPM groove. The song does not strum the same way all through, so switch patterns to see the others.`
+          : `The pattern the recording keeps coming back to, at the song’s ${feel} ${bpm} BPM groove.`
         : kind === "guess"
           ? `The strumming here is not steady enough to be sure, so this is our best guess from the beats that stand out, at the song’s ${feel} ${bpm} BPM feel.`
           : `We could not hear one clear strum, so this is a typical ${strum.perBar}-beat pattern for the song’s ${feel} ${bpm} BPM feel.`;
     const how = document.getElementById("sm-how")!;
     how.innerHTML =
-      "<p>↓ is a down-strum, ↑ an up-strum, and a dim tile is a beat you let ring or skip. Count along: the numbers are the beats and “&” is the half beat between them.</p>" +
-      `<p><b>Just starting out?</b> Play steady down-strums on every beat (${beats}) until the chord changes feel comfortable, then add the up-strums. Strum lightly in the verses and open up for the chorus.</p>`;
+      `<p>↓ is a down-strum, ↑ an up-strum, and a dim tile is a beat you let ring or skip. Count along: the numbers are the beats${strumSub === 4 ? ", “e” and “a” the quick strokes either side of the “&”" : " and “&” is the half beat between them"}.</p>` +
+      `<p><b>Just starting out?</b> Play steady down-strums on every beat (${beats}) until the chord changes feel comfortable, then add the other strokes. Strum lightly in the verses and open up for the chorus.</p>`;
     strumNote.textContent =
       kind === "typical"
         ? "A suggestion for this time signature, not a pattern heard in the song."
-        : `${kind === "guess" ? "A rough reading of the recording. " : "Worked out from the recording. "}Down and up strokes cannot be heard, so hits on the beat are shown as down-strums and hits on the “&” as up-strums.`;
+        : `${kind === "guess" ? "A rough reading of the recording. " : "Worked out from the recording. "}Down and up strokes cannot be heard, so the usual picture is shown: the hand keeps moving down and up, so strokes on the beat are down-strums and strokes on the “&” up-strums. Lighter strokes and muted ones may be missing.`;
   }
 
-  /** Lights the slot (eighth note) that is playing, from the bars the grid is drawn from. */
+  /** Lights the slot (an eighth or sixteenth note) that is playing, from the bars the grid is drawn from. */
   function highlightStrum(t: number) {
     if (strumTileEls.length === 0 || bars.length === 0) return;
     if (strumBar >= bars.length || t < (bars[strumBar].start ?? 0)) strumBar = 0;
@@ -1891,7 +1937,8 @@ import Nav from "../components/Nav.astro";
       for (let i = 0; i < BEAT_CELLS; i++) if (bar.beats[i] !== null && bar.beats[i] !== undefined && (bar.beats[i] as number) <= t) k = i;
       const t0 = bar.beats[k] as number;
       const next = firstNumber(bar.beats.slice(k + 1)) ?? t0 + 0.5;
-      slot = k * 2 + ((t - t0) / Math.max(next - t0, 0.05) >= 0.5 ? 1 : 0);
+      const within = Math.min(Math.floor(((t - t0) / Math.max(next - t0, 0.05)) * strumSub), strumSub - 1);
+      slot = k * strumSub + within;
     }
     const lit = slot % strumTileEls.length;
     if (lit === strumLit) return;
@@ -1905,23 +1952,6 @@ import Nav from "../components/Nav.astro";
     node.className = className;
     return node;
   }
-
-  strumMain.addEventListener("click", () => {
-    strumEasyOn = false;
-    strumMain.classList.add("is-on");
-    strumEasy.classList.remove("is-on");
-    strumMain.setAttribute("aria-pressed", "true");
-    strumEasy.setAttribute("aria-pressed", "false");
-    renderStrum();
-  });
-  strumEasy.addEventListener("click", () => {
-    strumEasyOn = true;
-    strumEasy.classList.add("is-on");
-    strumMain.classList.remove("is-on");
-    strumEasy.setAttribute("aria-pressed", "true");
-    strumMain.setAttribute("aria-pressed", "false");
-    renderStrum();
-  });
 
   function onTimeUpdate(currentTime: number) {
     highlightStrum(currentTime);
@@ -2136,6 +2166,11 @@ import Nav from "../components/Nav.astro";
     renderSummary();
     renderDetails();
     strum = result.strum && (result.strum.v ?? 1) >= 2 && Array.isArray(result.strum.pattern) && result.strum.pattern.length >= 4 ? result.strum : null;
+    strumList = strum
+      ? (strum.patterns && strum.patterns.length
+          ? strum.patterns
+          : [{ pattern: strum.pattern, sub: strum.sub ?? 2, kind: strum.kind ?? (strum.detected ? "heard" : "typical"), confidence: strum.confidence, where: [], bars: 0, label: strum.label, easy: strum.easy }])
+      : [];
     renderStrum();
     updateTransposeLabel();
     syncHeaderSize();

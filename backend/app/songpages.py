@@ -459,53 +459,76 @@ _ARROW_DOWN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v15M6 1
 _ARROW_UP = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V5M6 11l6-6 6 6"/></svg>'
 
 
+def _strum_tiles(pattern: list, sub: int) -> str:
+    names = ["", "&"] if sub == 2 else ["", "e", "&", "a"]
+    out = []
+    for i, kind in enumerate(pattern):
+        within = i % sub
+        count = str(i // sub + 1) if within == 0 else names[within]
+        words = "down-strum" if kind == "D" else "up-strum" if kind == "U" else "no strum"
+        out.append(
+            f'<div class="sm-tile {"is-rest" if kind == "-" else "is-down" if kind == "D" else "is-up"}" role="listitem" aria-label="{count}: {words}">'
+            f'<span class="sm-ar">{_ARROW_DOWN if kind == "D" else _ARROW_UP if kind == "U" else "<span aria-hidden=true>·</span>"}</span>'
+            f'<small>{count.replace("&", "&amp;")}</small></div>'
+        )
+    return "".join(out)
+
+
 def _strum_html(strum: Optional[dict], title: str) -> str:
-    """The strumming pattern as the player shows it (arrows over a count), for a song page."""
-    pattern = (strum or {}).get("pattern") or []
-    if not isinstance(pattern, list) or len(pattern) < 4 or any(c not in ("D", "U", "-") for c in pattern) or int(strum.get("v") or 1) < 2:
+    """The strumming patterns as the player shows them (arrows over a count), for a song page."""
+    if not isinstance(strum, dict) or int(strum.get("v") or 1) < 2:
         return ""
-    kind = strum.get("kind") or ("heard" if strum.get("detected") else "typical")
-    detected = kind == "heard"
-    per_bar = int(strum.get("perBar") or len(pattern) // 2)
+    found = strum.get("patterns") or [
+        {"pattern": strum.get("pattern"), "sub": strum.get("sub") or 2, "kind": strum.get("kind") or ("heard" if strum.get("detected") else "typical"), "where": []}
+    ]
+    per_bar = int(strum.get("perBar") or 4)
     bpm = int(round(float(strum.get("bpm") or 0)))
     feel = "slow, relaxed" if bpm < 80 else "easy" if bpm < 110 else "upbeat" if bpm < 140 else "fast"
-    tiles = "".join(
-        f'<div class="sm-tile {"is-rest" if kind == "-" else "is-down" if kind == "D" else "is-up"}" role="listitem" '
-        f'aria-label="{i // 2 + 1 if i % 2 == 0 else "and"}: {"down-strum" if kind == "D" else "up-strum" if kind == "U" else "no strum"}">'
-        f'<span class="sm-ar">{_ARROW_DOWN if kind == "D" else _ARROW_UP if kind == "U" else "<span aria-hidden=true>·</span>"}</span>'
-        f'<small>{i // 2 + 1 if i % 2 == 0 else "&amp;"}</small></div>'
-        for i, kind in enumerate(pattern)
-    )
     counts = ", ".join(str(i + 1) for i in range(per_bar))
-    shown = " ".join("–" if c == "-" else c for c in pattern)
-    intro = (
-        f"The pattern the recording keeps coming back to, at the song's {feel} {bpm} BPM groove."
-        if detected
-        else (
-            f"The strumming here is not steady enough to be sure, so this is our best guess from the beats that stand out, at the song's {feel} {bpm} BPM feel."
-            if kind == "guess"
-            else f"We could not hear one clear strum, so this is a typical {per_bar}-beat pattern for the song's {feel} {bpm} BPM feel."
+    blocks = []
+    for n, p in enumerate(found[:3]):
+        pattern = p.get("pattern") or []
+        sub = 4 if p.get("sub") == 4 else 2
+        if not isinstance(pattern, list) or len(pattern) < 4 or any(c not in ("D", "U", "-") for c in pattern):
+            continue
+        kind = p.get("kind") or "typical"
+        where = " and ".join(_esc(w) for w in (p.get("where") or []))
+        shown = " ".join("–" if c == "-" else c for c in pattern)
+        word = "MAIN PATTERN" if kind == "heard" else "BEST GUESS" if kind == "guess" else "SUGGESTED PATTERN"
+        if len(found) > 1:
+            word = f"PATTERN {n + 1}"
+        pill = "Heard in the song" if kind == "heard" else "Best guess" if kind == "guess" else "Suggested"
+        intro = (
+            (f"Played in the {where}, at the song's {feel} {bpm} BPM groove." if where else f"The pattern the recording keeps coming back to, at the song's {feel} {bpm} BPM groove.")
+            if kind == "heard"
+            else (
+                f"The strumming here is not steady enough to be sure, so this is our best guess from the beats that stand out, at the song's {feel} {bpm} BPM feel."
+                if kind == "guess"
+                else f"We could not hear one clear strum, so this is a typical {per_bar}-beat pattern for the song's {feel} {bpm} BPM feel."
+            )
         )
-    )
+        blocks.append(
+            f'<div class="sm-one"><div class="sm-ttl"><span class="sm-pill{" is-heard" if kind == "heard" else ""}">{pill}</span></div>'
+            f'<p class="sm-label">{word}{" · " + where.upper() if where else ""}  ·  {_esc(shown)}</p>'
+            f'<div class="sm-tiles" style="--cols:{min(len(pattern), 8)}" role="list" aria-label="Strums in one bar">{_strum_tiles(pattern, sub)}</div>'
+            f'<p class="sm-text">{intro}</p></div>'
+        )
+    if not blocks:
+        return ""
+    kinds = {p.get("kind") for p in found}
     note = (
         "A suggestion for this time signature, not a pattern heard in the song."
-        if kind == "typical"
-        else ("A rough reading of the recording. " if kind == "guess" else "Worked out from the recording. ")
-        + "Down and up strokes cannot be heard, so hits on the beat are shown as down-strums and hits on the &ldquo;&amp;&rdquo; as up-strums."
+        if kinds == {"typical"}
+        else "Worked out from the recording. Down and up strokes cannot be heard, so the usual picture is shown: the hand keeps moving down and up, so strokes on the beat are down-strums and strokes on the &ldquo;&amp;&rdquo; up-strums. Lighter and muted strokes may be missing."
     )
-    heading = "Heard in the song" if detected else "Best guess" if kind == "guess" else "Suggested"
-    label_word = "MAIN PATTERN" if detected else "BEST GUESS" if kind == "guess" else "SUGGESTED PATTERN"
     return (
-        '<section class="sp-block" id="strumming"><h2>Strumming pattern</h2>'
+        '<section class="sp-block" id="strumming"><h2>Strumming pattern' + ("s" if len(blocks) > 1 else "") + "</h2>"
         '<div class="sm-card">'
-        f'<div class="sm-ttl"><span class="sm-pill{" is-heard" if detected else ""}">{heading}</span></div>'
-        f'<p class="sm-label">{label_word}  ·  {_esc(shown)}</p>'
-        f'<div class="sm-tiles" style="--cols:{min(len(pattern), 8)}" role="list" aria-label="Strums in one bar">{tiles}</div>'
-        f'<p class="sm-text">{_esc(intro)}</p>'
-        '<details class="sm-how"><summary>How to play it</summary><div>'
-        "<p>↓ is a down-strum, ↑ an up-strum, and a dim tile is a beat you let ring or skip. Count along: the numbers are the beats and &ldquo;&amp;&rdquo; is the half beat between them.</p>"
-        f"<p><b>Just starting out?</b> Play steady down-strums on every beat ({counts}) until the chord changes of {_esc(title)} feel comfortable, then add the up-strums.</p>"
-        f"</div></details>"
+        + "".join(blocks)
+        + '<details class="sm-how"><summary>How to play it</summary><div>'
+        "<p>↓ is a down-strum, ↑ an up-strum, and a dim tile is a beat you let ring or skip. Count along: the numbers are the beats, &ldquo;&amp;&rdquo; is the half beat between them (and &ldquo;e&rdquo; and &ldquo;a&rdquo; the quick strokes either side of it).</p>"
+        f"<p><b>Just starting out?</b> Play steady down-strums on every beat ({counts}) until the chord changes of {_esc(title)} feel comfortable, then add the other strokes.</p>"
+        "</div></details>"
         f'<p class="sm-note">{note}</p>'
         "</div></section>"
     )

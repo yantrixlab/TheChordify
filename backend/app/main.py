@@ -81,7 +81,8 @@ except Exception as exc:
 # 15: a chord written a beat before or after a bar line moves onto it in songs that change chord on the bar line.
 # 16: the result carries the song's strumming pattern.
 # 17: the strumming pattern is told from the chord's own notes, so drums and vocals no longer make every song look the same.
-ANALYSIS_VERSION = 17
+# 18: a song can have several strumming patterns (one per kind of section), in eighths or sixteenths.
+ANALYSIS_VERSION = 18
 
 ALLOWED_UPLOAD_EXTENSIONS ={".mp3", ".wav", ".flac", ".m4a"}
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50MB

@@ -30,9 +30,22 @@ export interface Section {
   endBar: number | null;
 }
 
+export interface StrumOne {
+  pattern: string[]; // `sub` slots to a beat ("1 & 2 & ..." or "1 e & a ..."): "D" down-strum, "U" up-strum, "-" no strum
+  sub: number; // slots to a beat: 2 (eighths) or 4 (sixteenths)
+  kind: "heard" | "guess" | "typical";
+  confidence: number;
+  where: string[]; // the kinds of section it is played in ("Verse", "Chorus"...); empty when it is the whole song
+  bars: number;
+  label: string;
+  easy: string[]; // the same slots with only a down-strum on each beat
+}
+
 export interface StrumPattern {
   v?: number; // the detector that made it (2 and later are shown)
-  pattern: string[]; // two slots to a beat ("1 & 2 & ..."): "D" down-strum, "U" up-strum, "-" no strum
+  patterns?: StrumOne[]; // one per way the song is played (v3)
+  pattern: string[]; // the first pattern, for older results: two slots to a beat ("1 & 2 & ..."): "D" down-strum, "U" up-strum, "-" no strum
+  sub?: number;
   perBar: number; // beats in the bar the pattern is for
   confidence: number; // 0-1: how clearly the recording shows it
   detected: boolean; // true: the recording clearly shows it
