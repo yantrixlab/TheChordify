@@ -401,7 +401,8 @@ import Nav from "../components/Nav.astro";
   }
 
   /* Page layout: the player on the left, video + current chord + song details on the right */
-  #player-state:not(.hidden) { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; align-items: start; }
+  #player-state:not(.hidden) { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; align-items: start;
+    min-height: calc(100vh + 260px); /* always room to scroll past the point where the header shrinks, however short the song's page is */ }
   .pl-main { min-width: 0; }
   .pl-side { position: sticky; top: 88px; max-height: calc(100vh - 104px); overflow-y: auto; scrollbar-width: thin;
     display: flex; flex-direction: column; gap: 16px; }
@@ -2324,8 +2325,14 @@ import Nav from "../components/Nav.astro";
     }
     setTimeout(() => (btnShare.textContent = "Share"), 1800);
   });
+  // The header shrinks once the page is scrolled. It must not grow back at the same point it shrank at: shrinking makes the page
+  // shorter, which can pull the scroll position back past that point, and the header would grow, shrink, grow... (the whole page
+  // flickering). So it shrinks well down the page and grows only near the top, and the page is always tall enough to scroll that far.
   const syncHeaderSize = () => {
-    headerEl.classList.toggle("is-compact", window.scrollY > 70);
+    const y = window.scrollY;
+    const compact = headerEl.classList.contains("is-compact");
+    if (!compact && y > 100) headerEl.classList.add("is-compact");
+    else if (compact && y < 24) headerEl.classList.remove("is-compact");
     document.documentElement.style.setProperty("--ph-h", `${headerEl.offsetHeight}px`);
   };
   window.addEventListener("scroll", syncHeaderSize, { passive: true });
