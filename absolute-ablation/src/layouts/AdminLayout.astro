@@ -4,7 +4,7 @@ import Logo from "../components/Logo.astro";
 
 interface Props {
   title: string; // the page's name, also its heading
-  active: "overview" | "users" | "plans" | "features" | "subscriptions" | "rewards" | "youtube" | "test";
+  active: "overview" | "users" | "plans" | "features" | "subscriptions" | "rewards" | "songpages" | "youtube" | "test";
   lead?: string; // one line under the heading
 }
 
@@ -17,6 +17,7 @@ const links = [
   { key: "features", label: "Features & limits", href: "/admin/features/", icon: "M4 6h16M4 12h16M4 18h16M8 3v6M16 9v6M10 15v6" },
   { key: "subscriptions", label: "Subscriptions", href: "/admin/subscriptions/", icon: "M12 2v20M17 6.5C17 4.6 14.8 3.5 12 3.5S7 4.6 7 6.5 9.2 9.5 12 10.5s5 1.9 5 4-2.2 3-5 3-5-1.1-5-3" },
   { key: "rewards", label: "Rewards", href: "/admin/rewards/", icon: "M12 15a6 6 0 1 0 0-12 6 6 0 0 0 0 12zM8.5 14l-1.5 7 5-3 5 3-1.5-7" },
+  { key: "songpages", label: "Song pages", href: "/admin/song-pages/", icon: "M9 18V5l11-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM20 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0z" },
   { key: "youtube", label: "YouTube accounts", href: "/admin/youtube/", icon: "M2.5 8a3 3 0 0 1 3-3h13a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3h-13a3 3 0 0 1-3-3zM10 9.5v5l4.5-2.5z" },
   { key: "test", label: "Download test", href: "/admin/youtube-test/", icon: "M12 3v12m0 0-4-4m4 4 4-4M4 19h16" },
 ];

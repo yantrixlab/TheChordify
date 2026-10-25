@@ -1,0 +1,222 @@
+---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+---
+
+<AdminLayout
+  title="Song pages"
+  active="songpages"
+  lead="Choose which chordified songs get a public page that search engines can list. Only the songs you publish here are shown on the site's /songs/ pages and sitemap."
+>
+  <div class="adm-row sp-bar">
+    <input id="search" type="search" placeholder="Search by song or artist" aria-label="Search songs" autocomplete="off" />
+    <label class="sp-only"><input id="only" type="checkbox" /> Published only</label>
+    <span id="count" class="adm-hint" role="status" style="margin:0"></span>
+  </div>
+
+  <div id="rows" class="sp-list"></div>
+  <p id="empty" class="adm-empty" hidden></p>
+
+  <div class="adm-row" style="margin-top:14px;justify-content:space-between">
+    <button id="prev" type="button" class="adm-btn ghost small">← Previous</button>
+    <span id="page" class="adm-hint" style="margin:0"></span>
+    <button id="next" type="button" class="adm-btn ghost small">Next →</button>
+  </div>
+  <p id="msg" class="adm-msg" role="status"></p>
+</AdminLayout>
+
+<style is:global>
+  .sp-bar #search { max-width: 360px; }
+  .sp-only { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--color-body); cursor: pointer; }
+  .sp-only input { width: 16px; height: 16px; accent-color: var(--color-violet); }
+  .sp-list { display: grid; gap: 12px; margin-top: 14px; }
+  .sp-item { background: #fff; border: 1px solid var(--color-hairline); border-radius: 16px; box-shadow: 0 1px 2px #1a05330a; }
+  .sp-line { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 12px 16px 12px 12px; }
+  .sp-line img { display: block; width: 96px; height: 54px; object-fit: cover; border-radius: 10px; background: #f3eeff; }
+  .sp-name strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; color: var(--color-ink); }
+  .sp-name small { display: block; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; color: var(--color-mute); }
+  .sp-name .sp-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; align-items: center; }
+  .sp-name .sp-meta i { padding: 1px 7px; border-radius: 6px; background: #f4f1fb; font: 600 11.5px var(--font-mono); font-style: normal; color: var(--color-violet-deep); }
+  .sp-acts { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+  .sp-edit { display: grid; gap: 12px; padding: 14px 16px 16px; border-top: 1px solid #f1eaf9; }
+  .sp-edit[hidden] { display: none; }
+  .sp-edit label { display: grid; gap: 5px; font: 600 12.5px var(--font-sans); color: var(--color-body); }
+  .sp-edit .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .sp-edit .url { margin-top: -6px; font: 500 12.5px var(--font-mono); color: var(--color-mute); word-break: break-all; }
+  @media (max-width: 680px) {
+    .sp-line { grid-template-columns: 72px minmax(0, 1fr); }
+    .sp-line img { width: 72px; height: 42px; }
+    .sp-acts { grid-column: 1 / -1; justify-content: flex-start; }
+    .sp-edit .two { grid-template-columns: 1fr; }
+  }
+</style>
+
+<script>
+  import { adminReady, adminFetch, el, say, number } from "../../lib/admin";
+
+  const rows = document.getElementById("rows")!;
+  const empty = document.getElementById("empty")!;
+  const countEl = document.getElementById("count")!;
+  const pageEl = document.getElementById("page")!;
+  const prev = document.getElementById("prev") as HTMLButtonElement;
+  const next = document.getElementById("next") as HTMLButtonElement;
+  const search = document.getElementById("search") as HTMLInputElement;
+  const only = document.getElementById("only") as HTMLInputElement;
+
+  const SIZE = 20;
+  let page = 1;
+  let query = "";
+  let latest = 0;
+
+  function field(label: string, input: HTMLElement): HTMLElement {
+    const wrap = el("label", "", label);
+    wrap.append(input);
+    return wrap;
+  }
+
+  function item(song: any): HTMLElement {
+    const box = el("article", "sp-item");
+
+    const img = el("img");
+    img.alt = "";
+    img.loading = "lazy";
+    img.src = song.thumbnail;
+
+    const name = el("div", "sp-name");
+    name.append(
+      el("strong", "", song.published ? song.pageTitle : song.title),
+      el("small", "", (song.published ? song.pageArtist : song.artist) || "Unknown artist"),
+    );
+    const meta = el("div", "sp-meta");
+    meta.append(el("span", `adm-pill ${song.published ? "ok" : ""}`, song.published ? "Published" : "Not published"));
+    if (song.key) meta.append(el("i", "", song.key));
+    if (song.tempo) meta.append(el("i", "", `${Math.round(song.tempo)} BPM`));
+    meta.append(el("i", "", `${number(song.jams)} plays`));
+    for (const chord of song.chords.slice(0, 5)) meta.append(el("i", "", chord));
+    name.append(meta);
+
+    const acts = el("div", "sp-acts");
+    const edit = el("div", "sp-edit");
+    edit.hidden = true;
+
+    const title = el("input");
+    title.type = "text";
+    title.maxLength = 120;
+    title.value = song.published ? song.pageTitle : song.title;
+    const artist = el("input");
+    artist.type = "text";
+    artist.maxLength = 120;
+    artist.value = song.published ? song.pageArtist : song.artist;
+    const slug = el("input");
+    slug.type = "text";
+    slug.maxLength = 100;
+    slug.value = song.published ? song.slug : song.suggestedSlug;
+    const intro = el("textarea");
+    intro.rows = 4;
+    intro.maxLength = 1500;
+    intro.placeholder =
+      "Optional: two or three sentences about the song (its mood, who it suits, how it is played). A page with its own words does better in search.";
+    intro.value = song.intro;
+    const url = el("div", "url", `https://chordsuno.com/songs/${slug.value}/`);
+    slug.addEventListener("input", () => (url.textContent = `https://chordsuno.com/songs/${slug.value || "…"}/`));
+
+    const two = el("div", "two");
+    two.append(field("Song name (as the page should show it)", title), field("Artist", artist));
+    const save = el("button", "adm-btn small", song.published ? "Save changes" : "Publish page");
+    save.type = "button";
+    save.addEventListener("click", async () => {
+      save.disabled = true;
+      try {
+        const done = await adminFetch(`/api/admin/song-pages/${encodeURIComponent(song.videoId)}`, {
+          method: "PUT",
+          body: JSON.stringify({ title: title.value, artist: artist.value, slug: slug.value, intro: intro.value }),
+        });
+        say("msg", `Published at ${done.url}`, "ok");
+        await load();
+      } catch (err) {
+        say("msg", err instanceof Error ? err.message : "Could not publish that.", "bad");
+        save.disabled = false;
+      }
+    });
+    edit.append(two, field("Page address", slug), url, field("About the song (optional)", intro), save);
+
+    const toggle = el("button", `adm-btn small ${song.published ? "ghost" : ""}`, song.published ? "Edit" : "Publish…");
+    toggle.type = "button";
+    toggle.addEventListener("click", () => (edit.hidden = !edit.hidden));
+    acts.append(toggle);
+    if (song.published) {
+      const view = el("a", "adm-btn ghost small", "View page");
+      view.href = `/songs/${song.slug}/`;
+      view.target = "_blank";
+      view.rel = "noopener";
+      view.style.cssText = "display:inline-flex;align-items:center;text-decoration:none";
+      const off = el("button", "adm-btn danger small", "Unpublish");
+      off.type = "button";
+      off.addEventListener("click", async () => {
+        if (!confirm(`Unpublish “${song.pageTitle}”? Its page stops working and leaves the sitemap; search engines drop it over time.`)) return;
+        off.disabled = true;
+        try {
+          await adminFetch(`/api/admin/song-pages/${encodeURIComponent(song.videoId)}`, { method: "DELETE" });
+          say("msg", `“${song.pageTitle}” is unpublished.`, "ok");
+          await load();
+        } catch (err) {
+          say("msg", err instanceof Error ? err.message : "Could not unpublish that.", "bad");
+          off.disabled = false;
+        }
+      });
+      acts.append(view, off);
+    }
+
+    const line = el("div", "sp-line");
+    line.append(img, name, acts);
+    box.append(line, edit);
+    return box;
+  }
+
+  async function load() {
+    const mine = ++latest;
+    try {
+      const data = await adminFetch(
+        `/api/admin/song-pages?search=${encodeURIComponent(query)}&page=${page}&pageSize=${SIZE}&published=${only.checked}`,
+      );
+      if (mine !== latest) return;
+      rows.replaceChildren(...data.songs.map(item));
+      const pages = Math.max(1, Math.ceil(data.total / SIZE));
+      countEl.textContent = `${number(data.total)} song${data.total === 1 ? "" : "s"} · ${number(data.published)} published`;
+      pageEl.textContent = `Page ${page} of ${pages}`;
+      prev.disabled = page <= 1;
+      next.disabled = page >= pages;
+      empty.hidden = data.songs.length > 0;
+      empty.textContent = query
+        ? `No song matches “${query}”.`
+        : only.checked
+          ? "Nothing is published yet."
+          : "No song has been chordified yet. Songs appear here once somebody has opened them.";
+    } catch (err) {
+      say("msg", err instanceof Error ? err.message : "Could not load the songs.", "bad");
+    }
+  }
+
+  let timer: number | undefined;
+  search.addEventListener("input", () => {
+    window.clearTimeout(timer);
+    timer = window.setTimeout(() => {
+      query = search.value.trim();
+      page = 1;
+      load();
+    }, 250);
+  });
+  only.addEventListener("change", () => {
+    page = 1;
+    load();
+  });
+  prev.addEventListener("click", () => {
+    page -= 1;
+    load();
+  });
+  next.addEventListener("click", () => {
+    page += 1;
+    load();
+  });
+
+  adminReady().then(load);
+</script>

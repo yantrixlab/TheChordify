@@ -6,3 +6,4 @@ Disallow: /api/
 Disallow: /media/
 
 Sitemap: https://chordsuno.com/sitemap.xml
+Sitemap: https://chordsuno.com/sitemap-songs.xml

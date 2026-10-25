@@ -14,6 +14,7 @@ from urllib.parse import urlparse
 
 from fastapi import FastAPI, HTTPException, Request, Response, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -25,6 +26,7 @@ from .plans import FREE_CODE, PERIODS, PlanStore
 from .engagement import BADGE_RULES, DEFAULT_CONFIG, REWARD_KINDS, Engagement
 from .jobs import JobQueue
 from .search import RateLimiter, SearchUnavailable, clean_query, search_songs, suggest
+from .songpages import SongPages
 from .store import SongStore
 from . import trending as trending_shelves
 from . import youtube
@@ -1309,8 +1311,77 @@ def get_result(session_id: str) -> dict:
     return _with_pending(session_id, cached)
 
 
+# ---- public song pages (the admin chooses which songs get one) -----------------------------------------------------------
+
+_STATIC_DIR = os.environ.get("STATIC_DIR", os.path.join(os.path.dirname(__file__), "..", "static"))
+song_pages = SongPages(catalog, os.path.join(_STATIC_DIR, "song-template", "index.html"))
+
+
+class SongPageBody(BaseModel):
+    title: str = ""
+    artist: str = ""
+    slug: str = ""
+    intro: str = ""
+
+
+@app.get("/api/admin/song-pages")
+def admin_song_pages(request: Request, search: str = "", page: int = 1, pageSize: int = 25, published: bool = False) -> dict:
+    _require_admin(request)
+    return song_pages.admin_list(search.strip()[:80], max(page, 1), min(max(pageSize, 1), 100), published)
+
+
+@app.put("/api/admin/song-pages/{video_id}")
+def admin_publish_song_page(video_id: str, body: SongPageBody, request: Request) -> dict:
+    _require_admin(request)
+    if not is_video_id(video_id):
+        raise HTTPException(status_code=404, detail="Unknown song")
+    done = song_pages.publish(video_id, title=body.title, artist=body.artist, slug=body.slug, intro=body.intro)
+    if done is None:
+        raise HTTPException(status_code=404, detail="That song is not in the catalog")
+    return {"ok": True, **done, "url": f"/songs/{done['slug']}/"}
+
+
+@app.delete("/api/admin/song-pages/{video_id}")
+def admin_unpublish_song_page(video_id: str, request: Request) -> dict:
+    _require_admin(request)
+    if not is_video_id(video_id):
+        raise HTTPException(status_code=404, detail="Unknown song")
+    return {"ok": song_pages.unpublish(video_id)}
+
+
+_PAGE_HEADERS = {"Cache-Control": "public, max-age=300"}
+
+
+@app.get("/songs/", response_class=HTMLResponse)
+def songs_index() -> HTMLResponse:
+    page = song_pages.render_index()
+    if page is None:
+        raise HTTPException(status_code=404, detail="Not found")
+    return HTMLResponse(page, headers=_PAGE_HEADERS)
+
+
+@app.get("/songs/{slug}/", response_class=HTMLResponse)
+def song_page(slug: str) -> HTMLResponse:
+    page = song_pages.render_song(slug) if re.fullmatch(r"[a-z0-9-]{1,100}", slug) else None
+    if page is None:
+        missing = song_pages.not_found()
+        if missing is None:
+            raise HTTPException(status_code=404, detail="Not found")
+        return HTMLResponse(missing, status_code=404)
+    return HTMLResponse(page, headers=_PAGE_HEADERS)
+
+
+@app.get("/songs/{slug}")
+def song_page_slash(slug: str) -> RedirectResponse:
+    return RedirectResponse(f"/songs/{slug}/", status_code=301)
+
+
+@app.get("/sitemap-songs.xml")
+def sitemap_songs() -> Response:
+    return Response(song_pages.sitemap(), media_type="application/xml", headers=_PAGE_HEADERS)
+
+
 # Serve the built Astro site from the same origin (the Docker image copies it to STATIC_DIR).
 # Mounted last so /api and /media routes win; absent in local dev, where Astro runs its own server.
-_STATIC_DIR = os.environ.get("STATIC_DIR", os.path.join(os.path.dirname(__file__), "..", "static"))
 if os.path.isdir(_STATIC_DIR):
     app.mount("/", StaticFiles(directory=_STATIC_DIR, html=True), name="site")
