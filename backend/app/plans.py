@@ -33,7 +33,7 @@ KINDS = ("flag", "limit")
 _MONTHS = {"daily": 1 / 30, "weekly": 12 / 52, "monthly": 1, "quarterly": 3, "yearly": 12}
 
 # Features the product itself checks today. The rest still show on the pricing page, but switching them changes nothing in the app.
-ENFORCED = {"songs_per_day", "favorites_max", "chord_detail", "chord_voicings", "transpose_capo", "upload_song", "metronome", "tuner", "practice_chords", "chord_detector", "pdf_export", "midi_export"}
+ENFORCED = {"songs_per_day", "favorites_max", "chord_detail", "chord_voicings", "transpose_capo", "upload_song", "metronome", "tuner", "practice_chords", "chord_detector", "pdf_export", "midi_export", "instruments_more"}
 
 # (key, label, description, kind, unit, group, status)
 _DEFAULT_FEATURES = [
@@ -42,7 +42,9 @@ _DEFAULT_FEATURES = [
     ("chord_voicings", "Alternative chord shapes", "Switch any chord to other ways of playing it on the guitar neck.", "flag", "", "Songs & chords", "live"),
     ("transpose_capo", "Transpose and capo", "Change the key of a song and see the shapes with a capo.", "flag", "", "Songs & chords", "live"),
     ("upload_song", "Upload your own song", "Analyse an audio file from your device (MP3, WAV, FLAC and more), not only songs from YouTube.", "flag", "", "Songs & chords", "live"),
-    ("instruments_more", "Piano, ukulele and mandolin diagrams", "Chord diagrams for more instruments than the guitar.", "flag", "", "Songs & chords", "soon"),
+    ("instruments_more", "Ukulele chord diagrams", "Chord diagrams for the ukulele, next to the guitar's.", "flag", "", "Songs & chords", "live"),
+    ("piano_diagrams", "Piano chord diagrams", "Chord diagrams for the piano.", "flag", "", "Songs & chords", "soon"),
+    ("mandolin_diagrams", "Mandolin chord diagrams", "Chord diagrams for the mandolin.", "flag", "", "Songs & chords", "soon"),
     ("tempo_loop", "Slow-down and loop", "Slow a song down and loop a section while you practise.", "flag", "", "Playing", "live"),
     ("no_ads", "No ads", "Chord Suno shows no advertising.", "flag", "", "Playing", "live"),
     ("favorites_max", "Favourite songs", "How many songs you can keep as favourites.", "limit", "songs", "Library", "live"),
@@ -64,7 +66,7 @@ _DEFAULT_FEATURES = [
 
 # What each starting plan includes: key -> True (on), a number (limit), None (a limit that is unlimited). Anything missing is off.
 _FREE_ON = {"songs_per_day": None, "upload_song": True, "practice_chords": True, "chord_detail": True, "chord_voicings": True, "transpose_capo": True, "tempo_loop": True, "no_ads": True, "favorites_max": 25, "library_history": True, "xp_levels": True}
-_PREMIUM_ON = {**_FREE_ON, "favorites_max": None, "instruments_more": True, "pdf_export": True, "midi_export": True, "lyrics": True, "tuner": True, "metronome": True, "chord_detector": True, "offline_mode": True, "priority_processing": True}
+_PREMIUM_ON = {**_FREE_ON, "favorites_max": None, "instruments_more": True, "piano_diagrams": True, "mandolin_diagrams": True, "pdf_export": True, "midi_export": True, "lyrics": True, "tuner": True, "metronome": True, "chord_detector": True, "offline_mode": True, "priority_processing": True}
 _PRO_ON = {**_PREMIUM_ON, "priority_support": True, "team_seats": 5, "api_access": True}
 _DEFAULT_MATRIX = {"free": _FREE_ON, "premium": _PREMIUM_ON, "pro": _PRO_ON}
 
@@ -235,6 +237,7 @@ class PlanStore:
         self._add_new_features()
         self._toolkit_live()
         self._exports_live()
+        self._ukulele_live()
         # The starting grid, for a starting plan that has no rules at all yet.
         for code, ons in _DEFAULT_MATRIX.items():
             plan, _ = self._db.run("SELECT id FROM plans WHERE code = ?", (code,))
@@ -258,6 +261,8 @@ class PlanStore:
             "upload_song": {"free": True, "premium": True, "pro": True},
             "practice_chords": {"free": True, "premium": True, "pro": True},
             "chord_detector": {"free": False, "premium": True, "pro": True},
+            "piano_diagrams": {"free": False, "premium": True, "pro": True},
+            "mandolin_diagrams": {"free": False, "premium": True, "pro": True},
         }
         for key in defaults:
             exists, _ = self._db.run("SELECT key FROM features WHERE key = ?", (key,))
@@ -293,6 +298,15 @@ class PlanStore:
             return
         self._db.run("UPDATE features SET status = 'live' WHERE key IN ('pdf_export', 'midi_export')")
         self._set_flag("exports_live")
+
+    def _ukulele_live(self) -> None:
+        """The ukulele diagrams are built, so the old "piano, ukulele and mandolin" feature becomes the ukulele's alone (once); piano
+        and mandolin get features of their own, still coming soon. Whatever plans the admin gave it stays as it is."""
+        if self._flag("ukulele_live"):
+            return
+        _, label, description, _, _, group, status = next(f for f in _DEFAULT_FEATURES if f[0] == "instruments_more")
+        self._db.run("UPDATE features SET label = ?, description = ?, grp = ?, status = ? WHERE key = 'instruments_more'", (label, description, group, status))
+        self._set_flag("ukulele_live")
 
     def _ensure_free_plan(self) -> None:
         rows, _ = self._db.run("SELECT id FROM plans WHERE code = ?", (FREE_CODE,))

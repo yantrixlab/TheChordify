@@ -395,3 +395,152 @@ export function getAllGuitarShapes(chord: string, max = 8): GuitarShape[] {
   allCache.set(key, out);
   return out;
 }
+
+// --- Ukulele shapes ----------------------------------------------------------------
+// Standard tuning, G C E A (the G is the high one). Every shape is four fretted-or-open strings, so a diagram is the same
+// GuitarShape with four entries, in the order [G, C, E, A].
+
+const UKE_OPEN = [7, 0, 4, 9]; // G C E A as pitch classes
+const UKE_PITCH = [67, 60, 64, 69]; // G4 C4 E4 A4: the lowest sounding string is the C, not the G
+const UKE_MAX_FRET = 12;
+
+/** The usual shapes everybody learns first: majors, minors and the dominant 7ths for all twelve notes. */
+const UKE_USUAL: Record<string, number[]> = {
+  C: [0, 0, 0, 3], "C#": [1, 1, 1, 4], D: [2, 2, 2, 0], "D#": [0, 3, 3, 1], E: [4, 4, 4, 2], F: [2, 0, 1, 0],
+  "F#": [3, 1, 2, 1], G: [0, 2, 3, 2], "G#": [5, 3, 4, 3], A: [2, 1, 0, 0], "A#": [3, 2, 1, 1], B: [4, 3, 2, 2],
+  Cm: [0, 3, 3, 3], "C#m": [1, 1, 0, 4], Dm: [2, 2, 1, 0], "D#m": [3, 3, 2, 1], Em: [0, 4, 3, 2], Fm: [1, 0, 1, 3],
+  "F#m": [2, 1, 2, 0], Gm: [0, 2, 3, 1], "G#m": [1, 3, 4, 2], Am: [2, 0, 0, 0], "A#m": [3, 1, 1, 1], Bm: [4, 2, 2, 2],
+  C7: [0, 0, 0, 1], "C#7": [1, 1, 1, 2], D7: [2, 2, 2, 3], "D#7": [3, 3, 3, 4], E7: [1, 2, 0, 2], F7: [2, 3, 1, 3],
+  "F#7": [3, 4, 2, 4], G7: [0, 2, 1, 2], "G#7": [1, 3, 2, 3], A7: [0, 1, 0, 0], "A#7": [1, 2, 1, 1], B7: [2, 3, 2, 2],
+  Cmaj7: [0, 0, 0, 2], Dmaj7: [2, 2, 2, 4], Emaj7: [1, 3, 0, 2], Fmaj7: [2, 4, 1, 3], Gmaj7: [0, 2, 2, 2], Amaj7: [1, 1, 0, 0], Bmaj7: [3, 3, 2, 2],
+  Cm7: [3, 3, 3, 3], Dm7: [2, 2, 1, 3], Em7: [0, 2, 0, 2], Fm7: [1, 3, 1, 3], Gm7: [0, 2, 1, 1], Am7: [0, 0, 0, 0], Bm7: [2, 2, 2, 2],
+};
+
+/** Fingers for four strings: one finger lays across every string pressed on the lowest fret when there are two or more of them. */
+function ukeFingers(frets: number[]): string[] | null {
+  const fingers = frets.map(() => "");
+  const pressed = frets.map((f, s) => ({ f, s })).filter((p) => p.f > 0);
+  if (pressed.length === 0) return fingers;
+  const lowest = Math.min(...pressed.map((p) => p.f));
+  const low = pressed.filter((p) => p.f === lowest);
+  let rest = pressed;
+  if (low.length >= 2) {
+    const from = Math.min(...low.map((p) => p.s));
+    const to = Math.max(...low.map((p) => p.s));
+    let underBar = false; // a string between them that is open or on another fret: no one finger lies across, each gets its own
+    for (let s = from + 1; s < to; s++) if (frets[s] !== lowest) underBar = true;
+    if (!underBar) {
+      low.forEach((p) => (fingers[p.s] = "1"));
+      rest = pressed.filter((p) => p.f !== lowest);
+      rest.sort((a, b) => a.f - b.f || a.s - b.s).forEach((p, i) => (fingers[p.s] = String(i + 2)));
+      if (rest.length > 3) return null;
+    } else {
+      rest.sort((a, b) => a.f - b.f || a.s - b.s).forEach((p, i) => (fingers[p.s] = String(i + 1)));
+    }
+  } else {
+    rest.sort((a, b) => a.f - b.f || a.s - b.s).forEach((p, i) => (fingers[p.s] = String(i + 1)));
+  }
+  return fingers;
+}
+
+function ukeShapeOf(frets: number[]): GuitarShape | null {
+  const fingers = ukeFingers(frets);
+  if (!fingers) return null;
+  const pressed = frets.filter((f) => f > 0);
+  const highest = pressed.length ? Math.max(...pressed) : 0;
+  const lowest = pressed.length ? Math.min(...pressed) : 0;
+  const baseFret = highest > FRET_ROWS ? lowest : 1;
+  return { frets: frets.map(String), fingers, ...(baseFret > 1 ? { baseFret } : {}) };
+}
+
+/** Every way of playing the chord on four strings within four frets, with how easy each is (lower is easier). */
+function ukuleleVoicings(parsed: ParsedChord): { frets: number[]; score: number }[] {
+  const { root, quality, bass } = parsed;
+  const tones = new Set(quality.intervals.map((i) => (root + i) % 12));
+  const required = new Set(quality.intervals.filter((i) => !(i === 7 && quality.intervals.length > 3)).map((i) => (root + i) % 12));
+  const slash = bass !== root;
+  const out: { frets: number[]; score: number }[] = [];
+  const frets: number[] = [];
+
+  const evaluate = () => {
+    const played = new Set(frets.map((f, s) => (UKE_OPEN[s] + f) % 12));
+    for (const pc of required) if (!played.has(pc)) return;
+    // A slash chord has its bass note in the shape; it is better still when that note is the lowest one that sounds.
+    let bassPenalty = 0;
+    if (slash) {
+      if (!played.has(bass)) return;
+      let low = 0;
+      frets.forEach((f, s) => {
+        if (UKE_PITCH[s] + f < UKE_PITCH[low] + frets[low]) low = s;
+      });
+      if ((UKE_OPEN[low] + frets[low]) % 12 !== bass) bassPenalty = 2.5;
+    }
+    const fingers = ukeFingers(frets);
+    if (!fingers) return;
+    const pressed = frets.filter((f) => f > 0);
+    const lowest = pressed.length ? Math.min(...pressed) : 0;
+    const highest = pressed.length ? Math.max(...pressed) : 0;
+    const open = frets.filter((f) => f === 0).length;
+    let stretch = 0;
+    for (let i = 1; i < frets.length; i++) if (frets[i] > 0 && frets[i - 1] > 0) stretch += Math.max(0, Math.abs(frets[i] - frets[i - 1]) - 2);
+    const bar = fingers.filter((f) => f === "1").length > 1;
+    const score = lowest * 0.8 + (highest - lowest) * 0.5 + stretch * 1.5 + pressed.length * 0.3 - open * 1.2 + (bar ? 1.5 : 0) + bassPenalty;
+    out.push({ frets: [...frets], score });
+  };
+
+  const search = (string: number, lo: number, hi: number) => {
+    if (string === UKE_OPEN.length) return evaluate();
+    for (let fret = 0; fret <= UKE_MAX_FRET; fret++) {
+      if (!tones.has((UKE_OPEN[string] + fret) % 12)) continue;
+      let nextLo = lo;
+      let nextHi = hi;
+      if (fret > 0) {
+        nextLo = Math.min(lo, fret);
+        nextHi = Math.max(hi, fret);
+        if (nextHi - nextLo >= FRET_ROWS) continue;
+      }
+      frets.push(fret);
+      search(string + 1, nextLo, nextHi);
+      frets.pop();
+    }
+  };
+  search(0, Infinity, 0);
+  return out;
+}
+
+const ukeCache = new Map<string, GuitarShape[]>();
+
+/**
+ * The ukulele fingerings of a chord: the usual one first (the shape everybody learns, where there is one, else the easiest the
+ * search finds), then up to two other ways of playing it further up the neck, in order up the neck.
+ */
+export function getUkuleleShapes(chord: string): GuitarShape[] {
+  const cached = ukeCache.get(chord);
+  if (cached) return cached;
+  const parsed = parseChord(chord);
+  if (!parsed) return [];
+  const found = ukuleleVoicings(parsed).sort((a, b) => a.score - b.score);
+  if (found.length === 0) {
+    ukeCache.set(chord, []);
+    return [];
+  }
+  const slash = parsed.bass !== parsed.root;
+  const known = slash ? undefined : UKE_USUAL[chord];
+  const usualFrets = known ?? found[0].frets;
+  const usual = ukeShapeOf(usualFrets);
+  if (!usual) return [];
+  const lowestOf = (frets: number[]) => Math.min(...frets.filter((f) => f > 0), 99);
+  const picked: { shape: GuitarShape; at: number }[] = [];
+  for (const option of found) {
+    if (picked.length >= MAX_VOICINGS - 1) break;
+    const at = lowestOf(option.frets);
+    if (at > MAX_ALTERNATIVE_FRET || option.frets.join() === usualFrets.join()) continue;
+    // alternatives must sit somewhere new on the neck (at least two frets from the usual one and from each other)
+    if (Math.abs(at - lowestOf(usualFrets)) < 2 || picked.some((p) => Math.abs(p.at - at) < 2)) continue;
+    const shape = ukeShapeOf(option.frets);
+    if (shape) picked.push({ shape, at });
+  }
+  const choices = [usual, ...picked.sort((a, b) => a.at - b.at).map((p) => p.shape)];
+  ukeCache.set(chord, choices);
+  return choices;
+}

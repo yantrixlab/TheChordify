@@ -231,15 +231,16 @@ import Nav from "../components/Nav.astro";
             <div class="flex items-center justify-center gap-2 flex-wrap" role="group" aria-label="Instrument">
               {
                 [
-                  { id: "guitar", label: "Guitar", icon: "🎸" },
-                  { id: "piano", label: "Piano", icon: "🎹" },
-                  { id: "ukulele", label: "Ukulele", icon: "🪗" },
-                  { id: "mandolin", label: "Mandolin", icon: "🎵" },
+                  { id: "guitar", label: "Guitar", icon: "🎸", soon: false },
+                  { id: "piano", label: "Piano", icon: "🎹", soon: true },
+                  { id: "ukulele", label: "Ukulele", icon: "🪗", soon: false },
+                  { id: "mandolin", label: "Mandolin", icon: "🎵", soon: true },
                 ].map((inst, i) => (
                   <button
                     type="button"
                     class="instrument-tab rounded-full font-medium"
                     data-inst={inst.id}
+                    data-soon={inst.soon ? "true" : undefined}
                     aria-pressed={i === 0 ? "true" : "false"}
                     style={`
                       height:32px;padding:0 14px;font-size:13px;cursor:pointer;
@@ -249,6 +250,7 @@ import Nav from "../components/Nav.astro";
                     `}
                   >
                     <span aria-hidden="true">{inst.icon}</span> {inst.label}
+                    {inst.soon && <span class="inst-soon">soon</span>}
                   </button>
                 ))
               }
@@ -445,6 +447,7 @@ import Nav from "../components/Nav.astro";
   .ph-share { flex: 0 0 auto; height: 32px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--color-violet-soft);
     color: var(--color-violet-deep); font-size: 13px; font-weight: 600; cursor: pointer; }
   .ph-share:hover { background: #ddd2fb; }
+  .inst-soon { margin-left: 4px; padding: 1px 6px; border-radius: 999px; background: #ffffff14; font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; color: #a89cc8; }
   .ph-export { position: relative; }
   .ph-menu { position: absolute; right: 0; top: calc(100% + 8px); z-index: 40; display: grid; gap: 2px; min-width: 210px; padding: 6px;
     border-radius: 12px; background: var(--color-canvas); border: 1px solid var(--color-hairline); box-shadow: 0 18px 40px -14px rgba(13, 0, 31, 0.5); }
@@ -565,10 +568,11 @@ import Nav from "../components/Nav.astro";
 </style>
 
 <script>
-  import { getGuitarShapes, chordNotes, chordKeyLabel, transposeChord, type GuitarShape } from "../lib/chordShapes";
+  import { getGuitarShapes, getUkuleleShapes, chordNotes, chordKeyLabel, transposeChord, type GuitarShape } from "../lib/chordShapes";
   import { API_BASE, registerJam, type ExtractResult, type ChordSegment, type Bar, type Section, type StrumPattern, type StrumOne } from "../lib/api";
   import { heartButton, recordPlay } from "../lib/library";
   import { can, loadPlan, nudge } from "../lib/plan";
+  import { toast } from "../lib/toast";
   import { downloadMidi, downloadPdf, type ExportSong } from "../lib/exportSong";
 
   const params = new URLSearchParams(window.location.search);
@@ -614,6 +618,7 @@ import Nav from "../components/Nav.astro";
   const LOCKS: [selector: string, key: string, label: string][] = [
     ["#capo-down, #capo-up, #transpose-down, #transpose-up", "transpose_capo", "Transpose and capo"],
     ["#detail-toggle", "chord_detail", "Full chord detail"],
+    [".instrument-tab[data-inst='ukulele']", "instruments_more", "The ukulele view"],
     ["#export-pdf", "pdf_export", "The chord sheet PDF"],
     ["#export-midi, #export-midi-strum", "midi_export", "The chords as a MIDI file"],
   ];
@@ -642,7 +647,9 @@ import Nav from "../components/Nav.astro";
   }
   window.addEventListener("plan-change", () => {
     applyLocks();
-    if (!can("chord_voicings")) refreshViews(); // draw the diagrams again, without the arrows
+    const fellBack = activeInstrument === "ukulele" && !can("instruments_more"); // a plan without ukulele diagrams
+    if (fellBack) chooseInstrument("guitar");
+    if (fellBack || !can("chord_voicings")) refreshViews(); // draw the diagrams again, for the guitar or without the arrows
   });
   void loadPlan();
 
@@ -695,10 +702,17 @@ import Nav from "../components/Nav.astro";
   }
 
   /** The shape to show for a chord, which of its alternatives that is, and how many there are. */
+  /** The fingerings of a chord on the instrument being shown (the guitar's, or the ukulele's). */
+  function shapesFor(fChord: string): GuitarShape[] {
+    return activeInstrument === "ukulele" ? getUkuleleShapes(fChord) : getGuitarShapes(fChord);
+  }
+  /** What a chosen way of playing is remembered under: the ukulele's choices are kept apart from the guitar's. */
+  const pickKey = (fChord: string) => (activeInstrument === "ukulele" ? `u:${fChord}` : fChord);
+
   function shapeChoice(fChord: string): { shape: GuitarShape; index: number; count: number } | undefined {
-    const shapes = getGuitarShapes(fChord);
+    const shapes = shapesFor(fChord);
     if (shapes.length === 0) return undefined;
-    const index = Math.min(Math.max(Number(voicingPick[fChord]) || 0, 0), shapes.length - 1);
+    const index = Math.min(Math.max(Number(voicingPick[pickKey(fChord)]) || 0, 0), shapes.length - 1);
     return { shape: shapes[index], index, count: shapes.length };
   }
 
@@ -714,11 +728,11 @@ import Nav from "../components/Nav.astro";
 
   /** Moves a chord to its next (or previous) way of playing, everywhere it appears. */
   function stepVoicing(fChord: string, delta: number) {
-    const count = getGuitarShapes(fChord).length;
+    const count = shapesFor(fChord).length;
     if (count < 2) return;
-    const next = ((Number(voicingPick[fChord]) || 0) + delta + count) % count;
-    if (next === 0) delete voicingPick[fChord];
-    else voicingPick[fChord] = next;
+    const next = ((Number(voicingPick[pickKey(fChord)]) || 0) + delta + count) % count;
+    if (next === 0) delete voicingPick[pickKey(fChord)];
+    else voicingPick[pickKey(fChord)] = next;
     try {
       localStorage.setItem(VOICING_KEY, JSON.stringify(voicingPick));
     } catch {
@@ -1507,7 +1521,8 @@ import Nav from "../components/Nav.astro";
     const W = 90 * scale;
     const GRID_H = 100 * scale;
     const ROWS = 4;
-    const colX = (i: number) => (W * i) / 5;
+    const strings = shape.frets.length; // 6 on the guitar, 4 on the ukulele
+    const colX = (i: number) => (W * i) / (strings - 1);
     const rowY = (r: number) => (GRID_H * r) / ROWS;
 
     const wrap = document.createElement("div");
@@ -1571,7 +1586,7 @@ import Nav from "../components/Nav.astro";
     grid.appendChild(nut);
 
     // String (vertical) lines.
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < strings; i++) {
       const line = document.createElement("div");
       line.style.position = "absolute";
       line.style.left = `${colX(i)}px`;
@@ -2222,7 +2237,7 @@ import Nav from "../components/Nav.astro";
     if (result.sectionsPending) watchForBetterSections();
   }
 
-  // Instrument tabs only keep the choice for now (the diagrams are guitar diagrams until the others are built).
+  // Instrument tabs: the guitar and the ukulele have chord diagrams. Piano and mandolin are not built yet, so they say so.
   const instrumentTabs = document.querySelectorAll<HTMLButtonElement>(".instrument-tab");
   function chooseInstrument(id: string) {
     activeInstrument = id;
@@ -2236,7 +2251,13 @@ import Nav from "../components/Nav.astro";
   }
   instrumentTabs.forEach((btn) => {
     btn.addEventListener("click", () => {
+      if (btn.dataset.soon) {
+        toast({ icon: "🛠️", title: `${btn.textContent?.replace(/soon/i, "").trim()} diagrams are on the way`, text: "Guitar and ukulele diagrams are ready now.", ms: 4500 });
+        return;
+      }
+      if (btn.dataset.inst === activeInstrument) return;
       chooseInstrument(btn.dataset.inst || "guitar");
+      refreshViews(); // draw every diagram again, for this instrument
       try {
         localStorage.setItem("chordsuno-instrument", activeInstrument);
       } catch {
@@ -2246,7 +2267,7 @@ import Nav from "../components/Nav.astro";
   });
   try {
     const saved = localStorage.getItem("chordsuno-instrument");
-    if (saved && [...instrumentTabs].some((b) => b.dataset.inst === saved)) chooseInstrument(saved);
+    if (saved && [...instrumentTabs].some((b) => b.dataset.inst === saved && !b.dataset.soon)) chooseInstrument(saved);
   } catch {
     // no storage: stay on guitar
   }
