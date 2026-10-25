@@ -27,6 +27,7 @@ from scipy.ndimage import uniform_filter1d
 
 from .chord_detection import NOTE_NAMES, estimate_beats
 from .meter import beat_signals, estimate_meter, fast_triple_grid
+from .strum import estimate_strum
 from .pulse import estimate_pulse_grid
 from .sections_ai import SectionsJob
 from .structure import (
@@ -614,6 +615,8 @@ def detect_chords_ai(audio_path: str, on_progress: Optional[ProgressFn] = None) 
         "beatsPerBar": bpb,
         "bars": structure["bars"],
         "sections": structure["sections"],
+        # the main strumming pattern read from where the playing hits inside the bars (None if it could not be worked out)
+        "strum": estimate_strum(y, SAMPLE_RATE, structure["bars"], bpb, features.bpm),
         # Better sections from the structure model, for the caller to wait for (and strip before saving), or None.
         "sectionsUpgrade": upgrade_sections if sections_job.enabled else None,
     }

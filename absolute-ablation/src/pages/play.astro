@@ -194,6 +194,21 @@ import Nav from "../components/Nav.astro";
             </div>
           </div>
 
+          <!-- The strumming pattern of the song, with the playing slot lit as the music goes -->
+          <section id="strum-card" class="sm-card" hidden aria-labelledby="sm-title">
+            <div class="sm-head">
+              <h2 id="sm-title">Strumming pattern</h2>
+              <div class="sm-seg" role="group" aria-label="Which pattern">
+                <button type="button" id="sm-main" class="is-on" aria-pressed="true">Full pattern</button>
+                <button type="button" id="sm-easy" aria-pressed="false">Easy version</button>
+              </div>
+            </div>
+            <p id="sm-label" class="sm-label"></p>
+            <div id="sm-tiles" class="sm-tiles" role="list" aria-label="Strums in one bar"></div>
+            <p id="sm-text" class="sm-text"></p>
+            <p id="sm-note" class="sm-note"></p>
+          </section>
+
         </div>
 
         <aside class="pl-side" aria-label="Video and song details">
@@ -243,6 +258,27 @@ import Nav from "../components/Nav.astro";
 </Layout>
 
 <style is:global>
+  /* the strumming pattern card */
+  .sm-card { margin-top: 18px; padding: 24px 24px 22px; border-radius: 22px; background: linear-gradient(180deg, #170b33, #120726); border: 1px solid #ffffff14; box-shadow: 0 24px 50px -28px #000a; color: #e4dcf5; }
+  .sm-card[hidden] { display: none; }
+  .sm-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .sm-head h2 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: #fff; }
+  .sm-seg { display: inline-flex; padding: 3px; border-radius: 999px; background: #ffffff12; }
+  .sm-seg button { height: 30px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent; font: 650 12.5px var(--font-sans); color: #c9bbf0; cursor: pointer; }
+  .sm-seg button.is-on { background: #fff; color: #1a0d33; }
+  .sm-label { margin: 0 0 14px; font-size: 16px; font-weight: 700; color: #fff; }
+  .sm-tiles { display: grid; grid-template-columns: repeat(var(--cols, 8), minmax(0, 1fr)); gap: 8px; }
+  .sm-tile { display: grid; place-items: center; align-content: center; gap: 6px; aspect-ratio: 1 / 1.08; min-height: 62px; border-radius: 14px; background: linear-gradient(180deg, #7b3df0, #5b21b6); border: 1px solid #ffffff22; color: #fff; transition: transform 0.12s, box-shadow 0.12s, background-color 0.12s; }
+  .sm-tile svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+  .sm-tile small { font: 600 11px var(--font-mono); color: #ffffffa6; }
+  .sm-tile.is-rest { background: #1f1440; border-color: #ffffff10; color: #6f5fa3; }
+  .sm-tile.is-rest small { color: #6f5fa3; }
+  .sm-tile.is-now { transform: translateY(-3px) scale(1.04); box-shadow: 0 0 0 2px #fcd34d, 0 14px 26px -10px #f59e0b99; }
+  .sm-tile.is-rest.is-now { box-shadow: 0 0 0 2px #fcd34d66; }
+  .sm-text { margin: 16px 0 0; font-size: 15px; line-height: 1.7; color: #d6cbef; }
+  .sm-text b { color: #fff; }
+  .sm-note { margin: 10px 0 0; font-size: 12.5px; color: #9a8cc2; }
+  @media (max-width: 640px) { .sm-card { padding: 18px 14px; border-radius: 18px; } .sm-tiles { gap: 5px; } .sm-tile { min-height: 50px; border-radius: 10px; } .sm-tile svg { width: 17px; height: 17px; } .sm-tile small { font-size: 10px; } }
   .tl-card { background: var(--color-canvas); border: 1px solid var(--color-hairline); overflow: clip;
     box-shadow: 0 1px 2px rgba(13, 0, 31, 0.04), 0 12px 32px -12px rgba(91, 33, 182, 0.18); }
   /* The view switch floats over the top-left of the content and stays put, just under the sticky header. */
@@ -483,7 +519,7 @@ import Nav from "../components/Nav.astro";
 
 <script>
   import { getGuitarShapes, chordNotes, chordKeyLabel, transposeChord, type GuitarShape } from "../lib/chordShapes";
-  import { API_BASE, registerJam, type ExtractResult, type ChordSegment, type Bar, type Section } from "../lib/api";
+  import { API_BASE, registerJam, type ExtractResult, type ChordSegment, type Bar, type Section, type StrumPattern } from "../lib/api";
   import { heartButton, recordPlay } from "../lib/library";
   import { can, loadPlan, nudge } from "../lib/plan";
 
@@ -1751,7 +1787,103 @@ import Nav from "../components/Nav.astro";
     setTimeout(check, 6000);
   }
 
+  // ---- Strumming pattern: the song's pattern as arrows, with the slot that is playing lit -----------------------------------
+  const strumCard = document.getElementById("strum-card")!;
+  const strumTiles = document.getElementById("sm-tiles")!;
+  const strumLabel = document.getElementById("sm-label")!;
+  const strumText = document.getElementById("sm-text")!;
+  const strumNote = document.getElementById("sm-note")!;
+  const strumMain = document.getElementById("sm-main") as HTMLButtonElement;
+  const strumEasy = document.getElementById("sm-easy") as HTMLButtonElement;
+  let strum: StrumPattern | null = null;
+  let strumEasyOn = false;
+  let strumTileEls: HTMLElement[] = [];
+  let strumLit = -1;
+  let strumBar = 0; // the bar the clock was last in (the clock mostly moves forward, so the search starts here)
+
+  const ARROW_DOWN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v15M6 13l6 6 6-6"/></svg>';
+  const ARROW_UP = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V5M6 11l6-6 6 6"/></svg>';
+
+  function renderStrum() {
+    strumCard.hidden = !strum;
+    strumTiles.replaceChildren();
+    strumTileEls = [];
+    strumLit = -1;
+    if (!strum) return;
+    const slots = strumEasyOn ? strum.easy : strum.pattern;
+    const shown = slots.map((s) => (s === "-" ? "–" : s)).join(" ");
+    strumLabel.textContent = `${strumEasyOn ? "Easy version" : strum.detected ? "Main pattern" : "Suggested pattern"} · ${shown}`;
+    strumTiles.style.setProperty("--cols", String(Math.min(slots.length, 8)));
+    slots.forEach((kind, i) => {
+      const tile = el_("div", `sm-tile${kind === "-" ? " is-rest" : ""}`);
+      tile.setAttribute("role", "listitem");
+      const count = i % 2 === 0 ? String(i / 2 + 1) : "&";
+      tile.innerHTML = `${kind === "D" ? ARROW_DOWN : kind === "U" ? ARROW_UP : '<span aria-hidden="true">·</span>'}<small>${count}</small>`;
+      tile.setAttribute("aria-label", `${count}: ${kind === "D" ? "down-strum" : kind === "U" ? "up-strum" : "no strum"}`);
+      strumTiles.append(tile);
+      strumTileEls.push(tile);
+    });
+
+    const bpm = Math.round(strum.bpm || tempo);
+    const feel = bpm < 80 ? "slow, relaxed" : bpm < 110 ? "easy" : bpm < 140 ? "upbeat" : "fast";
+    const beats = Array.from({ length: strum.perBar }, (_, i) => i + 1).join(", ");
+    const how = "↓ is a down-strum, ↑ an up-strum, and a dim tile is a beat you let ring or skip. Count along: the numbers are the beats and “&” is the half beat between them.";
+    strumText.innerHTML = strumEasyOn
+      ? `One down-strum on every beat (${beats}) is the easiest way to play this song. Keep it even and light until the chord changes feel comfortable, then move on to the full pattern. ${how}`
+      : strum.detected
+        ? `This is the pattern the recording keeps coming back to, at the song’s ${feel} ${bpm} BPM groove. ${how} <b>Just starting out?</b> Play four steady down-strums per chord (${beats}) first, then switch to the full pattern. Strum lightly in the verses and open up for the chorus.`
+        : `We could not hear one clear strum in this recording, so this is a typical ${strum.perBar}-beat pattern that suits the song’s ${feel} ${bpm} BPM feel. ${how} <b>Just starting out?</b> Try the easy version first.`;
+    strumNote.textContent = strum.detected
+      ? "Worked out from the recording. Down and up strokes cannot be heard, so hits on the beat are shown as down-strums and hits on the “&” as up-strums."
+      : "A suggestion for this time signature, not a pattern heard in the song.";
+  }
+
+  /** Lights the slot (eighth note) that is playing, from the bars the grid is drawn from. */
+  function highlightStrum(t: number) {
+    if (strumTileEls.length === 0 || bars.length === 0) return;
+    if (strumBar >= bars.length || t < (bars[strumBar].start ?? 0)) strumBar = 0;
+    while (strumBar + 1 < bars.length && t >= (bars[strumBar + 1].start ?? Infinity)) strumBar++;
+    const bar = bars[strumBar];
+    let slot = 0;
+    if (t >= (bar.start ?? 0)) {
+      let k = 0;
+      for (let i = 0; i < BEAT_CELLS; i++) if (bar.beats[i] !== null && bar.beats[i] !== undefined && (bar.beats[i] as number) <= t) k = i;
+      const t0 = bar.beats[k] as number;
+      const next = firstNumber(bar.beats.slice(k + 1)) ?? t0 + 0.5;
+      slot = k * 2 + ((t - t0) / Math.max(next - t0, 0.05) >= 0.5 ? 1 : 0);
+    }
+    const lit = slot % strumTileEls.length;
+    if (lit === strumLit) return;
+    strumTileEls[strumLit]?.classList.remove("is-now");
+    strumTileEls[lit].classList.add("is-now");
+    strumLit = lit;
+  }
+
+  function el_(tag: string, className: string): HTMLElement {
+    const node = document.createElement(tag);
+    node.className = className;
+    return node;
+  }
+
+  strumMain.addEventListener("click", () => {
+    strumEasyOn = false;
+    strumMain.classList.add("is-on");
+    strumEasy.classList.remove("is-on");
+    strumMain.setAttribute("aria-pressed", "true");
+    strumEasy.setAttribute("aria-pressed", "false");
+    renderStrum();
+  });
+  strumEasy.addEventListener("click", () => {
+    strumEasyOn = true;
+    strumEasy.classList.add("is-on");
+    strumMain.classList.remove("is-on");
+    strumEasy.setAttribute("aria-pressed", "true");
+    strumMain.setAttribute("aria-pressed", "false");
+    renderStrum();
+  });
+
   function onTimeUpdate(currentTime: number) {
+    highlightStrum(currentTime);
     updateDiagrams(currentTime);
     highlightChordGrid(currentTime);
     updateTransport(currentTime);
@@ -1962,6 +2094,8 @@ import Nav from "../components/Nav.astro";
     renderChordGrid();
     renderSummary();
     renderDetails();
+    strum = result.strum && Array.isArray(result.strum.pattern) && result.strum.pattern.length >= 4 ? result.strum : null;
+    renderStrum();
     updateTransposeLabel();
     syncHeaderSize();
     layoutDiagrams(); // the diagrams are the visible view, so they can be measured now

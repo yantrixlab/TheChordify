@@ -79,7 +79,8 @@ except Exception as exc:
 # 13: five and seven beats a bar are found too.
 # 14: a quick waltz tracked at half its speed is counted at its own (about twice the tempo, three beats a bar).
 # 15: a chord written a beat before or after a bar line moves onto it in songs that change chord on the bar line.
-ANALYSIS_VERSION = 15
+# 16: the result carries the song's strumming pattern.
+ANALYSIS_VERSION = 16
 
 ALLOWED_UPLOAD_EXTENSIONS ={".mp3", ".wav", ".flac", ".m4a"}
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50MB
@@ -267,6 +268,7 @@ def _run_youtube_job(session_id: str, url: str, meta: dict) -> None:
             "tempo": analysis["tempo"],
             "beatTimes": analysis["beatTimes"],
             "beatsPerBar": analysis.get("beatsPerBar", 4),
+            "strum": analysis.get("strum"),
             "bars": analysis["bars"],
             "engine": analysis["engine"],
             "chordsDetailed": analysis.get("chordsDetailed", analysis["chords"]),
@@ -321,6 +323,7 @@ def _run_analysis_job(
             "tempo": analysis["tempo"],
             "beatTimes": analysis["beatTimes"],
             "beatsPerBar": analysis.get("beatsPerBar", 4),
+            "strum": analysis.get("strum"),
             "bars": analysis["bars"],
             "engine": analysis["engine"],
             "chordsDetailed": analysis.get("chordsDetailed", analysis["chords"]),

@@ -455,6 +455,47 @@ def _chart_html(result: dict) -> str:
     return "".join(out)
 
 
+_ARROW_DOWN = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v15M6 13l6 6 6-6"/></svg>'
+_ARROW_UP = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V5M6 11l6-6 6 6"/></svg>'
+
+
+def _strum_html(strum: Optional[dict], title: str) -> str:
+    """The strumming pattern as the player shows it (arrows over a count), for a song page."""
+    pattern = (strum or {}).get("pattern") or []
+    if not isinstance(pattern, list) or len(pattern) < 4 or any(c not in ("D", "U", "-") for c in pattern):
+        return ""
+    detected = bool(strum.get("detected"))
+    per_bar = int(strum.get("perBar") or len(pattern) // 2)
+    bpm = int(round(float(strum.get("bpm") or 0)))
+    feel = "slow, relaxed" if bpm < 80 else "easy" if bpm < 110 else "upbeat" if bpm < 140 else "fast"
+    tiles = "".join(
+        f'<div class="sm-tile{" is-rest" if kind == "-" else ""}" role="listitem" aria-label="{i // 2 + 1 if i % 2 == 0 else "and"}: '
+        f'{"down-strum" if kind == "D" else "up-strum" if kind == "U" else "no strum"}">'
+        f'{_ARROW_DOWN if kind == "D" else _ARROW_UP if kind == "U" else "<span aria-hidden=true>·</span>"}'
+        f'<small>{i // 2 + 1 if i % 2 == 0 else "&amp;"}</small></div>'
+        for i, kind in enumerate(pattern)
+    )
+    counts = ", ".join(str(i + 1) for i in range(per_bar))
+    shown = " ".join("–" if c == "-" else c for c in pattern)
+    intro = (
+        f"This is the pattern the recording keeps coming back to, at the song's {feel} {bpm} BPM groove."
+        if detected
+        else f"We could not hear one clear strum in this recording, so this is a typical {per_bar}-beat pattern that suits the song's {feel} {bpm} BPM feel."
+    )
+    return (
+        '<section class="sp-block" id="strumming"><h2>Strumming pattern</h2>'
+        '<div class="sm-card">'
+        f'<p class="sm-label">{"Main pattern" if detected else "Suggested pattern"} · {_esc(shown)}</p>'
+        f'<div class="sm-tiles" style="--cols:{min(len(pattern), 8)}" role="list" aria-label="Strums in one bar">{tiles}</div>'
+        f'<p class="sm-text">{_esc(intro)} ↓ is a down-strum, ↑ an up-strum, and a dim tile is a beat you let ring or skip. '
+        f"Count along: the numbers are the beats and &ldquo;&amp;&rdquo; is the half beat between them. "
+        f"<b>Just starting out?</b> Play steady down-strums on every beat ({counts}) until the chord changes of {_esc(title)} feel comfortable, "
+        "then add the up-strums.</p>"
+        f'<p class="sm-note">{"Worked out from the recording. Down and up strokes cannot be heard, so hits on the beat are shown as down-strums and hits on the &ldquo;&amp;&rdquo; as up-strums." if detected else "A suggestion for this time signature, not a pattern heard in the song."}</p>'
+        "</div></section>"
+    )
+
+
 class SongPages:
     def __init__(self, catalog, template_path: str, analysis_version: int = 0) -> None:
         self._catalog = catalog
@@ -701,6 +742,7 @@ class SongPages:
             else ""
         )
 
+        strum_html = _strum_html(result.get("strum"), title)
         intro, custom = render_rich(row["intro"])
         if intro and custom:
             about = ""  # a designed page: shown as it is, with its own headings and no extra text around it
@@ -750,6 +792,7 @@ class SongPages:
             f'<section class="sp-block"><h2>Chords used in {_esc(title)}</h2><div class="sp-chips">{chips}</div></section>'
             f"{diagrams_html}"
             f"{chart_html}"
+            f"{strum_html}"
             f"{about_html}"
             f"{related_html}"
             '<aside class="sp-note">Chord charts are transcriptions made by software for learning and practice. Chord Suno does not show lyrics.</aside>'

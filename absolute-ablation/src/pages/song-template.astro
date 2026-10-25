@@ -75,6 +75,18 @@ import Footer from "../components/Footer.astro";
   .sp-dg-nav[hidden] { display: none; }
   .sp-dg-nav button { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 1px solid #e4dcf3; border-radius: 50%; background: #fff; font-size: 16px; line-height: 1; color: var(--color-violet-deep); cursor: pointer; }
   .sp-dg-nav button:hover { background: #f4f1fb; }
+  /* the strumming pattern */
+  .sm-card { padding: 24px 24px 22px; border-radius: 22px; background: linear-gradient(180deg, #170b33, #120726); border: 1px solid #ffffff14; box-shadow: 0 24px 50px -28px #000a; color: #e4dcf5; }
+  .sm-label { margin: 0 0 14px !important; font-size: 16px; font-weight: 700; color: #fff !important; }
+  .sm-tiles { display: grid; grid-template-columns: repeat(var(--cols, 8), minmax(0, 1fr)); gap: 8px; }
+  .sm-tile { display: grid; place-items: center; align-content: center; gap: 6px; aspect-ratio: 1 / 1.08; min-height: 62px; border-radius: 14px; background: linear-gradient(180deg, #7b3df0, #5b21b6); border: 1px solid #ffffff22; color: #fff; }
+  .sm-tile svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+  .sm-tile small { font: 600 11px var(--font-mono); color: #ffffffa6; }
+  .sm-tile.is-rest { background: #1f1440; border-color: #ffffff10; color: #6f5fa3; }
+  .sm-tile.is-rest small { color: #6f5fa3; }
+  .sp-block .sm-text { margin: 16px 0 0; font-size: 15px; line-height: 1.7; color: #d6cbef; }
+  .sm-text b { color: #fff; }
+  .sp-block .sm-note { margin: 10px 0 0; font-size: 12.5px; color: #9a8cc2; }
   .sp-custom-wrap { margin-top: 40px; }
   .sp-custom { min-width: 0; overflow-wrap: anywhere; }
   :where(.sp-custom) img { max-width: 100%; height: auto; }
@@ -113,6 +125,7 @@ import Footer from "../components/Footer.astro";
   .sp-note { margin-top: 44px; padding: 16px 20px; font-size: 13.5px; line-height: 1.6; color: var(--color-mute); background: #fff; border: 1px dashed #d9d0ec; border-radius: 14px; }
   @media (max-width: 760px) {
     .sp-dgs { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .sm-card { padding: 18px 14px; border-radius: 18px; } .sm-tiles { gap: 5px; } .sm-tile { min-height: 50px; border-radius: 10px; } .sm-tile svg { width: 17px; height: 17px; }
     .sg { --rb: 2 !important; }
     .sg[data-wide] { --rb: 1 !important; }
     .sg-sec { grid-template-columns: 26px minmax(0, 1fr); }

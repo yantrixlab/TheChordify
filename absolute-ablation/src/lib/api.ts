@@ -30,6 +30,16 @@ export interface Section {
   endBar: number | null;
 }
 
+export interface StrumPattern {
+  pattern: string[]; // two slots to a beat ("1 & 2 & ..."): "D" down-strum, "U" up-strum, "-" no strum
+  perBar: number; // beats in the bar the pattern is for
+  confidence: number; // 0-1: how clearly the recording shows it
+  detected: boolean; // false: a typical pattern for the time signature, not one heard in the song
+  label: string;
+  easy: string[]; // the same slots with only a down-strum on each beat
+  bpm: number;
+}
+
 export interface ExtractResult {
   sessionId: string;
   source: "youtube" | "upload";
@@ -45,6 +55,7 @@ export interface ExtractResult {
   videoId?: string; // YouTube songs: the video, so a jam session can be counted
   tempo: number;
   beatTimes: number[];
+  strum?: StrumPattern | null; // the song's main strumming pattern (songs analysed before this was added have none)
   beatsPerBar?: number; // how many beats the song counts to a bar (3, 4 or 6); songs analysed before this was measured are all 4
   bars: Bar[];
   audioUrl: string;
