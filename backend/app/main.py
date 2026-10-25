@@ -80,7 +80,8 @@ except Exception as exc:
 # 14: a quick waltz tracked at half its speed is counted at its own (about twice the tempo, three beats a bar).
 # 15: a chord written a beat before or after a bar line moves onto it in songs that change chord on the bar line.
 # 16: the result carries the song's strumming pattern.
-ANALYSIS_VERSION = 16
+# 17: the strumming pattern is told from the chord's own notes, so drums and vocals no longer make every song look the same.
+ANALYSIS_VERSION = 17
 
 ALLOWED_UPLOAD_EXTENSIONS ={".mp3", ".wav", ".flac", ".m4a"}
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50MB

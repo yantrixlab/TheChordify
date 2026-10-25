@@ -616,7 +616,7 @@ def detect_chords_ai(audio_path: str, on_progress: Optional[ProgressFn] = None) 
         "bars": structure["bars"],
         "sections": structure["sections"],
         # the main strumming pattern read from where the playing hits inside the bars (None if it could not be worked out)
-        "strum": estimate_strum(y, SAMPLE_RATE, structure["bars"], bpb, features.bpm),
+        "strum": estimate_strum(y, SAMPLE_RATE, structure["bars"], bpb, features.bpm, simple),
         # Better sections from the structure model, for the caller to wait for (and strip before saving), or None.
         "sectionsUpgrade": upgrade_sections if sections_job.enabled else None,
     }

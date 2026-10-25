@@ -31,10 +31,12 @@ export interface Section {
 }
 
 export interface StrumPattern {
+  v?: number; // the detector that made it (2 and later are shown)
   pattern: string[]; // two slots to a beat ("1 & 2 & ..."): "D" down-strum, "U" up-strum, "-" no strum
   perBar: number; // beats in the bar the pattern is for
   confidence: number; // 0-1: how clearly the recording shows it
-  detected: boolean; // false: a typical pattern for the time signature, not one heard in the song
+  detected: boolean; // true: the recording clearly shows it
+  kind?: "heard" | "guess" | "typical"; // heard: clearly in the recording; guess: faintly; typical: a usual pattern for the time signature
   label: string;
   easy: string[]; // the same slots with only a down-strum on each beat
   bpm: number;

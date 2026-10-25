@@ -1844,9 +1844,10 @@ import Nav from "../components/Nav.astro";
     const slots = strumEasyOn ? strum.easy : strum.pattern;
     const shown = slots.map((s) => (s === "-" ? "–" : s)).join(" ");
     const pill = document.getElementById("sm-pill")!;
-    pill.textContent = strum.detected ? "Heard in the song" : "Suggested";
-    pill.classList.toggle("is-heard", strum.detected);
-    strumLabel.textContent = `${strumEasyOn ? "EASY VERSION" : strum.detected ? "MAIN PATTERN" : "SUGGESTED PATTERN"}  ·  ${shown}`;
+    const kind = strum.kind ?? (strum.detected ? "heard" : "typical");
+    pill.textContent = kind === "heard" ? "Heard in the song" : kind === "guess" ? "Best guess" : "Suggested";
+    pill.classList.toggle("is-heard", kind === "heard");
+    strumLabel.textContent = `${strumEasyOn ? "EASY VERSION" : kind === "heard" ? "MAIN PATTERN" : kind === "guess" ? "BEST GUESS" : "SUGGESTED PATTERN"}  ·  ${shown}`;
     strumTiles.style.setProperty("--cols", String(Math.min(slots.length, 8)));
     slots.forEach((kind, i) => {
       const tile = el_("div", `sm-tile${kind === "-" ? " is-rest" : kind === "D" ? " is-down" : " is-up"}`);
@@ -1863,16 +1864,19 @@ import Nav from "../components/Nav.astro";
     const beats = Array.from({ length: strum.perBar }, (_, i) => i + 1).join(", ");
     strumText.innerHTML = strumEasyOn
       ? `One down-strum on every beat (${beats}): the simplest way to play this song, at its ${feel} ${bpm} BPM.`
-      : strum.detected
+      : kind === "heard"
         ? `The pattern the recording keeps coming back to, at the song’s ${feel} ${bpm} BPM groove.`
-        : `We could not hear one clear strum, so this is a typical ${strum.perBar}-beat pattern for the song’s ${feel} ${bpm} BPM feel.`;
+        : kind === "guess"
+          ? `The strumming here is not steady enough to be sure, so this is our best guess from the beats that stand out, at the song’s ${feel} ${bpm} BPM feel.`
+          : `We could not hear one clear strum, so this is a typical ${strum.perBar}-beat pattern for the song’s ${feel} ${bpm} BPM feel.`;
     const how = document.getElementById("sm-how")!;
     how.innerHTML =
       "<p>↓ is a down-strum, ↑ an up-strum, and a dim tile is a beat you let ring or skip. Count along: the numbers are the beats and “&” is the half beat between them.</p>" +
       `<p><b>Just starting out?</b> Play steady down-strums on every beat (${beats}) until the chord changes feel comfortable, then add the up-strums. Strum lightly in the verses and open up for the chorus.</p>`;
-    strumNote.textContent = strum.detected
-      ? "Worked out from the recording. Down and up strokes cannot be heard, so hits on the beat are shown as down-strums and hits on the “&” as up-strums."
-      : "A suggestion for this time signature, not a pattern heard in the song.";
+    strumNote.textContent =
+      kind === "typical"
+        ? "A suggestion for this time signature, not a pattern heard in the song."
+        : `${kind === "guess" ? "A rough reading of the recording. " : "Worked out from the recording. "}Down and up strokes cannot be heard, so hits on the beat are shown as down-strums and hits on the “&” as up-strums.`;
   }
 
   /** Lights the slot (eighth note) that is playing, from the bars the grid is drawn from. */
@@ -2131,7 +2135,7 @@ import Nav from "../components/Nav.astro";
     renderChordGrid();
     renderSummary();
     renderDetails();
-    strum = result.strum && Array.isArray(result.strum.pattern) && result.strum.pattern.length >= 4 ? result.strum : null;
+    strum = result.strum && (result.strum.v ?? 1) >= 2 && Array.isArray(result.strum.pattern) && result.strum.pattern.length >= 4 ? result.strum : null;
     renderStrum();
     updateTransposeLabel();
     syncHeaderSize();
