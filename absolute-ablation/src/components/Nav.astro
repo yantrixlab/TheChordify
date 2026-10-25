@@ -73,7 +73,6 @@ const navLinks = [
             autocapitalize="off"
             spellcheck="false"
           />
-          <kbd class="ns-key" aria-hidden="true">/</kbd>
           <button id="ns-submit" type="submit" class="ns-submit" aria-label="Search">
             <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><circle cx="9" cy="9" r="5.8" stroke="currentColor" stroke-width="1.8" /><path d="m13.5 13.5 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
           </button>
@@ -293,8 +292,6 @@ const navLinks = [
   .ns-submit:focus-visible { outline: 2px solid var(--color-violet); outline-offset: 2px; }
   .ns-form input { flex: 1; min-width: 0; height: 100%; padding: 0 0 0 16px; border: 0; outline: 0; background: transparent; font: 500 14.5px var(--font-sans); color: var(--color-ink); }
   .ns-form input::placeholder { color: #9a8fb5; }
-  .ns-key { display: grid; place-items: center; flex: none; width: 22px; height: 22px; margin-right: 6px; border-radius: 6px; border: 1px solid var(--color-hairline-strong); background: #fff; font: 600 12px var(--font-mono); color: var(--color-mute); }
-  .ns.is-focus .ns-key { display: none; }
   .ns-close, .ns-open { display: none; }
   .ns-panel { position: absolute; right: 0; top: calc(100% + 10px); z-index: 70; width: 440px; max-width: calc(100vw - 24px); max-height: min(560px, calc(100vh - 100px)); overflow-y: auto; padding: 8px; border-radius: 20px; background: #fff; border: 1px solid var(--color-hairline); box-shadow: 0 30px 60px -24px #1a053388, 0 6px 16px #1a05331a; overscroll-behavior: contain; animation: ns-in 0.16s ease-out; }
   .ns-panel[hidden] { display: none; }
@@ -340,7 +337,6 @@ const navLinks = [
     .ns.is-sheet { position: fixed; z-index: 90; left: 0; right: 0; top: 0; display: block; padding: 10px 12px; background: #fff; box-shadow: 0 8px 24px -12px #1a053366; }
     .ns.is-sheet .ns-form { width: 100%; height: 46px; background: var(--color-canvas-soft-2); }
     .ns.is-sheet .ns-form input { font-size: 16px; } /* 16px keeps phones from zooming into the field */
-    .ns.is-sheet .ns-key { display: none; }
     .ns.is-sheet .ns-close { display: block; flex: none; padding: 0 14px; border: 0; background: none; font: 700 14px var(--font-sans); color: var(--color-violet-deep); cursor: pointer; }
     .ns-panel { position: fixed; left: 8px; right: 8px; top: 64px; width: auto; max-width: none; max-height: calc(100vh - 76px); max-height: calc(100dvh - 76px); }
     .ns-go { display: none; }
