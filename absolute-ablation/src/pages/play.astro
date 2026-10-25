@@ -3,6 +3,7 @@ import Layout from "../layouts/Layout.astro";
 import Nav from "../components/Nav.astro";
 import Footer from "../components/Footer.astro";
 import SimilarSongs from "../components/SimilarSongs.astro";
+import SongRating from "../components/SongRating.astro";
 ---
 
 <Layout title="Play along — Chord Suno" noindex>
@@ -262,12 +263,14 @@ import SimilarSongs from "../components/SimilarSongs.astro";
           <div class="side-card details-card">
             <h2 class="sd-title">Song details</h2>
             <dl class="sd-list">
+              <div><dt>Rating</dt><dd id="sd-rating">—</dd></div>
               <div><dt>Chords</dt><dd id="sd-chords" class="sd-chips"></dd></div>
               <div><dt>Key</dt><dd id="sd-key">—</dd></div>
               <div><dt>Tempo</dt><dd id="sd-tempo">—</dd></div>
               <div><dt>Sections</dt><dd id="sd-sections">—</dd></div>
               <div><dt>Transcription</dt><dd>Chord Suno (automatic)</dd></div>
             </dl>
+            <SongRating />
           </div>
         </aside>
         <audio id="audio-el" class="hidden" preload="metadata"></audio>

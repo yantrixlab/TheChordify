@@ -44,6 +44,20 @@ _SCHEMA = [
     """,
     "CREATE INDEX IF NOT EXISTS songs_popular ON songs (jams DESC, updated_at DESC)",
     """
+    CREATE TABLE IF NOT EXISTS ratings (
+        session_id   TEXT NOT NULL,
+        voter        TEXT NOT NULL,
+        stars        INTEGER NOT NULL,
+        comment      TEXT NOT NULL DEFAULT '',
+        title        TEXT NOT NULL DEFAULT '',
+        artist       TEXT NOT NULL DEFAULT '',
+        created_at   DOUBLE PRECISION NOT NULL,
+        updated_at   DOUBLE PRECISION NOT NULL,
+        PRIMARY KEY (session_id, voter)
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS ratings_recent ON ratings (updated_at DESC)",
+    """
     CREATE TABLE IF NOT EXISTS results (
         key          TEXT PRIMARY KEY,
         data         TEXT NOT NULL,
@@ -247,6 +261,82 @@ class SongStore:
             }
             for r in rows
         ]
+
+    # ----- ratings: how good people say a song's chords are --------------------------------------------------------
+
+    def rate(self, session_id: str, voter: str, stars: int, comment: str, title: str = "", artist: str = "") -> None:
+        """Saves a person's rating of a song (1 to 5 stars, and what they had to say). A second one from the same person
+        replaces the first."""
+        now = time.time()
+        self._db.run(
+            """
+            INSERT INTO ratings (session_id, voter, stars, comment, title, artist, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(session_id, voter) DO UPDATE SET
+                stars = excluded.stars, comment = excluded.comment, updated_at = excluded.updated_at,
+                title = CASE WHEN excluded.title != '' THEN excluded.title ELSE ratings.title END,
+                artist = CASE WHEN excluded.artist != '' THEN excluded.artist ELSE ratings.artist END
+            """,
+            (session_id, voter, stars, comment, title, artist, now, now),
+        )
+
+    def rating_summary(self, session_id: str, voter: str = "") -> dict:
+        """{"count", "average", "mine": {"stars", "comment"} or None} for one song."""
+        rows, _ = self._db.run("SELECT COUNT(*) AS n, AVG(stars) AS mean FROM ratings WHERE session_id = ?", (session_id,))
+        count = int(rows[0]["n"])
+        mine = None
+        if voter:
+            own, _ = self._db.run("SELECT stars, comment FROM ratings WHERE session_id = ? AND voter = ?", (session_id, voter))
+            if own:
+                mine = {"stars": int(own[0]["stars"]), "comment": own[0]["comment"]}
+        return {"count": count, "average": round(float(rows[0]["mean"]), 2) if count else 0, "mine": mine}
+
+    def list_ratings(self, limit: int = 25, offset: int = 0, stars: int = 0, only_comments: bool = False) -> tuple[list[dict], int]:
+        """The ratings, newest first, for the admin: with the song, the stars and what was said."""
+        where, params = [], []
+        if stars:
+            where.append("stars = ?")
+            params.append(stars)
+        if only_comments:
+            where.append("comment != ''")
+        clause = f"WHERE {' AND '.join(where)}" if where else ""
+        total, _ = self._db.run(f"SELECT COUNT(*) AS n FROM ratings {clause}", tuple(params))
+        rows, _ = self._db.run(
+            f"SELECT session_id, voter, stars, comment, title, artist, updated_at FROM ratings {clause} ORDER BY updated_at DESC LIMIT ? OFFSET ?",
+            (*params, limit, offset),
+        )
+        return (
+            [
+                {
+                    "sessionId": r["session_id"], "who": "Signed in" if r["voter"].startswith("u:") else "Visitor", "stars": int(r["stars"]),
+                    "comment": r["comment"], "title": r["title"], "artist": r["artist"], "at": r["updated_at"],
+                }
+                for r in rows
+            ],
+            int(total[0]["n"]),
+        )
+
+    def rating_overview(self) -> dict:
+        """All ratings at a glance: how many, the average, how many of each star, and the songs rated lowest."""
+        totals, _ = self._db.run("SELECT COUNT(*) AS n, AVG(stars) AS mean FROM ratings")
+        count = int(totals[0]["n"])
+        by_star, _ = self._db.run("SELECT stars, COUNT(*) AS n FROM ratings GROUP BY stars")
+        counts = {int(r["stars"]): int(r["n"]) for r in by_star}
+        songs, _ = self._db.run(
+            """
+            SELECT session_id, MAX(title) AS title, MAX(artist) AS artist, COUNT(*) AS n, AVG(stars) AS mean
+            FROM ratings GROUP BY session_id ORDER BY AVG(stars) ASC, COUNT(*) DESC LIMIT 8
+            """
+        )
+        return {
+            "count": count,
+            "average": round(float(totals[0]["mean"]), 2) if count else 0,
+            "byStars": [counts.get(i, 0) for i in range(1, 6)],
+            "lowest": [
+                {"sessionId": r["session_id"], "title": r["title"], "artist": r["artist"], "count": int(r["n"]), "average": round(float(r["mean"]), 2)}
+                for r in songs
+            ],
+        }
 
     # ----- housekeeping ------------------------------------------------------------------------------------------
 

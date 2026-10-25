@@ -1,0 +1,167 @@
+---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+---
+
+<AdminLayout title="Ratings" active="ratings" lead="What people think of the chords of each song: the stars they gave and what they wrote, newest first.">
+  <div id="tiles" class="ov-tiles"></div>
+
+  <div class="adm-row" style="margin-bottom:14px;flex-wrap:wrap">
+    <label class="adm-hint" style="margin:0" for="f-stars">Show</label>
+    <select id="f-stars" class="adm-input" style="width:auto">
+      <option value="0">All ratings</option>
+      <option value="1">1 star</option>
+      <option value="2">2 stars</option>
+      <option value="3">3 stars</option>
+      <option value="4">4 stars</option>
+      <option value="5">5 stars</option>
+    </select>
+    <label class="adm-hint" style="margin:0;display:flex;gap:6px;align-items:center"><input id="f-comments" type="checkbox" /> only with a comment</label>
+  </div>
+
+  <div class="adm-table-wrap">
+    <table class="adm-table">
+      <thead>
+        <tr>
+          <th>Song</th>
+          <th>Stars</th>
+          <th>What they said</th>
+          <th>From</th>
+          <th>When</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <p id="empty" class="adm-empty" hidden>No ratings yet.</p>
+  </div>
+  <div class="adm-row" style="margin-top:14px;justify-content:space-between">
+    <button id="prev" type="button" class="adm-btn ghost small">← Newer</button>
+    <span id="page" class="adm-hint" style="margin:0"></span>
+    <button id="next" type="button" class="adm-btn ghost small">Older →</button>
+  </div>
+
+  <h2 class="rt-h">Lowest rated songs</h2>
+  <div class="adm-table-wrap">
+    <table class="adm-table">
+      <thead>
+        <tr><th>Song</th><th>Average</th><th class="num">Ratings</th></tr>
+      </thead>
+      <tbody id="lowest"></tbody>
+    </table>
+  </div>
+  <p id="msg" class="adm-msg" role="status"></p>
+</AdminLayout>
+
+<style is:global>
+  .ov-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; margin-bottom: 18px; }
+  .ov-tile { padding: 18px 20px; border-radius: 18px; background: #fff; border: 1px solid var(--color-hairline); box-shadow: 0 1px 2px #1a05330a; }
+  .ov-tile small { display: block; font: 700 11px var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-mute); }
+  .ov-tile strong { display: block; margin: 8px 0 4px; font-size: 32px; font-weight: 800; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; color: var(--color-ink); }
+  .ov-tile span { font-size: 13px; color: var(--color-body); }
+  .rt-h { margin: 30px 0 12px; font-size: 17px; font-weight: 750; letter-spacing: -0.02em; color: var(--color-ink); }
+  .rt-bars { display: grid; gap: 5px; margin-top: 10px; }
+  .rt-bars div { display: grid; grid-template-columns: 14px 1fr 28px; align-items: center; gap: 8px; font: 600 11.5px var(--font-mono); color: var(--color-body); }
+  .rt-bars i { display: block; height: 7px; border-radius: 99px; background: #7c3aed; }
+  .rt-stars-txt { color: #f59e0b; letter-spacing: 1px; white-space: nowrap; }
+  .rt-quote { max-width: 420px; white-space: pre-wrap; overflow-wrap: anywhere; }
+</style>
+
+<script>
+  import { adminReady, adminFetch, el, say, when, number, $ } from "../../lib/admin";
+
+  const SIZE = 25;
+  let page = 1;
+
+  const starsText = (n: number) => "★".repeat(n) + "☆".repeat(5 - n);
+
+  async function load() {
+    const stars = Number(($("f-stars") as HTMLSelectElement).value);
+    const comments = ($("f-comments") as HTMLInputElement).checked;
+    try {
+      const data = await adminFetch(`/api/admin/ratings?page=${page}&pageSize=${SIZE}&stars=${stars}&comments=${comments}`);
+      const o = data.overview;
+      const best = Math.max(1, ...o.byStars);
+
+      const average = el("div", "ov-tile");
+      average.append(el("small", "", "Average rating"), el("strong", "", o.count ? o.average.toFixed(2) : "—"), el("span", "", `out of 5, from ${number(o.count)} ratings`));
+      const spread = el("div", "ov-tile");
+      const bars = el("div", "rt-bars");
+      [5, 4, 3, 2, 1].forEach((n) => {
+        const row = el("div");
+        const bar = el("i");
+        bar.style.width = `${(100 * o.byStars[n - 1]) / best}%`;
+        const track = el("span");
+        track.style.cssText = "display:block;height:7px;border-radius:99px;background:#f1eff5";
+        track.append(bar);
+        row.append(el("span", "", String(n)), track, el("span", "", String(o.byStars[n - 1])));
+        bars.append(row);
+      });
+      spread.append(el("small", "", "How they split"), bars);
+      const withWords = el("div", "ov-tile");
+      withWords.append(el("small", "", "Showing"), el("strong", "", number(data.total)), el("span", "", stars || comments ? "ratings that match" : "ratings in all"));
+      $("tiles").replaceChildren(average, spread, withWords);
+
+      $("rows").replaceChildren(
+        ...data.ratings.map((r: Record<string, any>) => {
+          const tr = el("tr");
+          const cell = (...nodes: (Node | string)[]) => {
+            const td = el("td");
+            td.append(...nodes);
+            return td;
+          };
+          const song = el("div");
+          song.style.cssText = "display:grid;line-height:1.35";
+          const link = el("a", "", r.title || r.sessionId);
+          link.setAttribute("href", `/play/?session=${encodeURIComponent(r.sessionId)}`);
+          link.setAttribute("target", "_blank");
+          link.setAttribute("rel", "noopener");
+          const by = el("small", "", r.artist || "");
+          by.style.cssText = "color:var(--color-mute);font-size:12.5px";
+          song.append(link, by);
+          tr.append(cell(song), cell(el("span", "rt-stars-txt", starsText(r.stars))), cell(el("div", "rt-quote", r.comment || "—")), cell(r.who), cell(when(r.at)));
+          return tr;
+        }),
+      );
+      $("empty").hidden = data.ratings.length > 0;
+
+      $("lowest").replaceChildren(
+        ...o.lowest.map((s: Record<string, any>) => {
+          const tr = el("tr");
+          const td = (text: string, className = "") => {
+            const cell = el("td", className, text);
+            return cell;
+          };
+          const name = el("td");
+          const link = el("a", "", s.title || s.sessionId);
+          link.setAttribute("href", `/play/?session=${encodeURIComponent(s.sessionId)}`);
+          link.setAttribute("target", "_blank");
+          link.setAttribute("rel", "noopener");
+          name.append(link, el("small", "", s.artist ? `  ${s.artist}` : ""));
+          tr.append(name, td(`${s.average.toFixed(1)} ★`), td(String(s.count), "num"));
+          return tr;
+        }),
+      );
+
+      const pages = Math.max(1, Math.ceil(data.total / SIZE));
+      $("page").textContent = `Page ${page} of ${pages}`;
+      ($("prev") as HTMLButtonElement).disabled = page <= 1;
+      ($("next") as HTMLButtonElement).disabled = page >= pages;
+    } catch (err) {
+      say("msg", err instanceof Error ? err.message : "Could not load the ratings.", "bad");
+    }
+  }
+
+  $("prev").addEventListener("click", () => {
+    page -= 1;
+    void load();
+  });
+  $("next").addEventListener("click", () => {
+    page += 1;
+    void load();
+  });
+  for (const id of ["f-stars", "f-comments"])
+    $(id).addEventListener("change", () => {
+      page = 1;
+      void load();
+    });
+  adminReady().then(load);
+</script>

@@ -1,0 +1,200 @@
+---
+// "How good are these chords?": five stars under the song details, and, once somebody has rated, room for a few words. The
+// ratings are kept on the server per song (lib/ratings.ts) and the average shows in the song details above. The admin reads them.
+---
+
+<section id="rate" class="rt" aria-labelledby="rt-q" hidden>
+  <p id="rt-q" class="rt-q">What do you think of the quality of these chords? Let us know!</p>
+  <div id="rt-stars" class="rt-stars" role="radiogroup" aria-labelledby="rt-q">
+    {
+      [1, 2, 3, 4, 5].map((n) => (
+        <button type="button" class="rt-star" role="radio" aria-checked="false" data-stars={n} aria-label={`${n} out of 5`} tabindex={n === 1 ? 0 : -1}>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3.2 2.7 5.6 6.1.8-4.5 4.2 1.1 6-5.4-3-5.4 3 1.1-6L3.2 9.6l6.1-.8z" /></svg>
+        </button>
+      ))
+    }
+  </div>
+  <p id="rt-label" class="rt-label" aria-live="polite">Choose your rating</p>
+
+  <form id="rt-more" class="rt-more" hidden>
+    <label for="rt-comment" class="rt-ask">Anything wrong with the chords? <span>(optional)</span></label>
+    <textarea id="rt-comment" rows="3" maxlength="500" placeholder="For example: the bridge is in a different key, or a chord is missing."></textarea>
+    <div class="rt-row">
+      <span id="rt-count" class="rt-count">0 / 500</span>
+      <button id="rt-send" type="submit" class="rt-send">Send</button>
+    </div>
+  </form>
+  <p id="rt-error" class="rt-error" role="alert" hidden></p>
+</section>
+
+<style is:global>
+  .rt { margin-top: 16px; padding: 14px 16px 12px; border-radius: 12px; background: #f1eff5; color: var(--color-ink); }
+  .rt[hidden] { display: none; }
+  .rt-q { margin: 0 0 10px; font-size: 14px; font-weight: 500; line-height: 1.45; }
+  .rt-stars { display: flex; gap: 6px; }
+  .rt-star { display: grid; place-items: center; flex: 1 1 0; max-width: 44px; aspect-ratio: 1; padding: 0; border: 0; border-radius: 7px; background: #dddae3; cursor: pointer;
+    transition: background-color 0.12s, transform 0.12s; }
+  .rt-star svg { width: 62%; height: 62%; fill: #fff; stroke: #fff; stroke-width: 1.2; stroke-linejoin: round; }
+  .rt-star:hover { transform: translateY(-1px); }
+  .rt-star:focus-visible { outline: 2px solid var(--color-violet); outline-offset: 2px; }
+  .rt-star[data-on="1"] { background: #ef4444; }
+  .rt-star[data-on="2"] { background: #f97316; }
+  .rt-star[data-on="3"] { background: #eab308; }
+  .rt-star[data-on="4"] { background: #84cc16; }
+  .rt-star[data-on="5"] { background: #22c55e; }
+  .rt-stars.is-busy { opacity: 0.6; pointer-events: none; }
+  .rt-label { margin: 9px 0 0; font-size: 13.5px; font-weight: 650; color: var(--color-body); }
+  .rt-more { margin-top: 12px; padding-top: 12px; border-top: 1px solid #dddae3; }
+  .rt-more[hidden] { display: none; }
+  .rt-ask { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 600; }
+  .rt-ask span { font-weight: 500; color: var(--color-mute); }
+  .rt-more textarea { box-sizing: border-box; width: 100%; padding: 9px 11px; border: 1px solid #cfcad9; border-radius: 8px; background: #fff; font: 400 13.5px/1.45 var(--font-sans); color: var(--color-ink); resize: vertical; }
+  .rt-more textarea:focus { outline: 2px solid var(--color-violet); outline-offset: 1px; border-color: transparent; }
+  .rt-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; }
+  .rt-count { font: 500 11.5px var(--font-mono); color: var(--color-mute); }
+  .rt-send { height: 32px; padding: 0 16px; border: 0; border-radius: 999px; background: var(--color-violet); color: #fff; font: 650 13px var(--font-sans); cursor: pointer; }
+  .rt-send:hover { background: var(--color-violet-deep); }
+  .rt-send:disabled { opacity: 0.6; cursor: default; }
+  .rt-error { margin: 8px 0 0; font-size: 13px; color: var(--color-error); }
+  .rt-error[hidden] { display: none; }
+  .sd-rate { display: inline-flex; align-items: baseline; gap: 5px; }
+  .sd-rate b { font-weight: 800; }
+  .sd-rate i { font-style: normal; color: #f59e0b; }
+  .sd-rate span { font-weight: 500; font-size: 13px; color: var(--color-mute); }
+  .sd-rate.is-none { font-weight: 500; color: var(--color-mute); }
+  @media (prefers-reduced-motion: reduce) { .rt-star { transition: none; } .rt-star:hover { transform: none; } }
+</style>
+
+<script>
+  import { getRating, saveRating } from "../lib/ratings";
+  import type { RatingSummary } from "../lib/ratings";
+  import { getApiErrorMessage } from "../lib/api";
+
+  const session = new URLSearchParams(window.location.search).get("session");
+  const box = document.getElementById("rate") as HTMLElement;
+  const stars = [...box.querySelectorAll<HTMLButtonElement>(".rt-star")];
+  const group = document.getElementById("rt-stars") as HTMLElement;
+  const label = document.getElementById("rt-label") as HTMLElement;
+  const more = document.getElementById("rt-more") as HTMLFormElement;
+  const comment = document.getElementById("rt-comment") as HTMLTextAreaElement;
+  const count = document.getElementById("rt-count") as HTMLElement;
+  const send = document.getElementById("rt-send") as HTMLButtonElement;
+  const error = document.getElementById("rt-error") as HTMLElement;
+  const summary = document.getElementById("sd-rating");
+
+  const WORDS = ["Poor", "Not so good", "Okay", "Good", "Excellent!"];
+  let mine = 0; // the stars this person gave (0: none yet)
+  let sentComment = "";
+
+  /** Colours the first `n` stars (the colour follows the number of stars), the rest grey. */
+  function paint(n: number) {
+    stars.forEach((star, i) => {
+      if (i < n) star.dataset.on = String(n);
+      else delete star.dataset.on;
+    });
+  }
+
+  function settle() {
+    paint(mine);
+    stars.forEach((star, i) => {
+      star.setAttribute("aria-checked", String(i + 1 === mine));
+      star.tabIndex = i + 1 === mine || (mine === 0 && i === 0) ? 0 : -1;
+    });
+    label.textContent = mine ? WORDS[mine - 1] : "Choose your rating";
+    more.hidden = mine === 0;
+  }
+
+  function showSummary(data: RatingSummary) {
+    if (!summary) return;
+    summary.replaceChildren();
+    const wrap = document.createElement("span");
+    if (data.count === 0) {
+      wrap.className = "sd-rate is-none";
+      wrap.textContent = "Not rated yet";
+    } else {
+      wrap.className = "sd-rate";
+      const value = document.createElement("b");
+      value.textContent = data.average.toFixed(1);
+      const star = document.createElement("i");
+      star.textContent = "★";
+      const total = document.createElement("span");
+      total.textContent = `(${data.count} ${data.count === 1 ? "rating" : "ratings"})`;
+      wrap.append(value, star, total);
+    }
+    summary.append(wrap);
+  }
+
+  function apply(data: RatingSummary) {
+    mine = data.mine?.stars ?? 0;
+    sentComment = data.mine?.comment ?? "";
+    if (document.activeElement !== comment) comment.value = sentComment;
+    count.textContent = `${comment.value.length} / 500`;
+    showSummary(data);
+    settle();
+  }
+
+  async function submit(chosen: number, words: string) {
+    if (!session) return;
+    error.hidden = true;
+    group.classList.add("is-busy");
+    send.disabled = true;
+    try {
+      apply(await saveRating(session, chosen, words));
+      label.textContent = `${WORDS[chosen - 1]}: thank you!`;
+    } catch (err) {
+      error.textContent = getApiErrorMessage(err, "Could not save your rating. Please try again.");
+      error.hidden = false;
+      settle();
+    } finally {
+      group.classList.remove("is-busy");
+      send.disabled = false;
+    }
+  }
+
+  stars.forEach((star, i) => {
+    const n = i + 1;
+    star.addEventListener("mouseenter", () => {
+      paint(n);
+      label.textContent = WORDS[i];
+    });
+    star.addEventListener("focus", () => {
+      paint(n);
+      label.textContent = WORDS[i];
+    });
+    star.addEventListener("click", () => void submit(n, comment.value));
+    star.addEventListener("keydown", (event) => {
+      const step = event.key === "ArrowRight" || event.key === "ArrowUp" ? 1 : event.key === "ArrowLeft" || event.key === "ArrowDown" ? -1 : 0;
+      if (!step) return;
+      event.preventDefault();
+      stars[Math.min(Math.max(i + step, 0), 4)].focus();
+    });
+  });
+  group.addEventListener("mouseleave", settle);
+  group.addEventListener("focusout", () => setTimeout(() => !group.contains(document.activeElement) && settle(), 0));
+  comment.addEventListener("input", () => (count.textContent = `${comment.value.length} / 500`));
+  more.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (mine) void submit(mine, comment.value).then(() => (label.textContent = "Thanks for the feedback!"));
+  });
+
+  async function load() {
+    if (!session) return;
+    const data = await getRating(session);
+    if (!data) return; // the server could not say: no rating box is better than a broken one
+    box.hidden = false;
+    apply(data);
+  }
+
+  // Wait until the song itself has loaded, as the shelf of similar songs does.
+  const player = document.getElementById("player-state");
+  if (player && !player.classList.contains("hidden")) void load();
+  else if (player) {
+    const watcher = new MutationObserver(() => {
+      if (!player.classList.contains("hidden")) {
+        watcher.disconnect();
+        void load();
+      }
+    });
+    watcher.observe(player, { attributes: true, attributeFilter: ["class"] });
+  }
+</script>

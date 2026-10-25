@@ -1207,6 +1207,63 @@ def similar_songs(session_id: str, request: Request, response: Response) -> dict
     return {"songs": songs}
 
 
+# ---- ratings: how good people say the chords of a song are ------------------------------------------------------------------
+
+_rating_limiter = RateLimiter(limit=30, window=10 * 60.0)
+_VISITOR = re.compile(r"^[A-Za-z0-9_-]{8,64}$")
+
+
+class RatingBody(BaseModel):
+    stars: int
+    comment: str = ""
+    visitor: str = ""
+
+
+def _voter(request: Request, visitor: str) -> str:
+    """Who is rating: the signed-in person, else the browser's own random id (so one browser rates a song once, and can change it)."""
+    user = _session_user(request)
+    if user:
+        return f"u:{user['id']}"
+    return f"v:{visitor}" if _VISITOR.match(visitor or "") else ""
+
+
+@app.get("/api/songs/{session_id}/rating")
+def get_rating(session_id: str, request: Request, response: Response, v: str = "") -> dict:
+    """What people think of the chords of a song: how many ratings and the average, and this person's own."""
+    _check_key(session_id)
+    response.headers["Cache-Control"] = "no-store"
+    return catalog.rating_summary(session_id, _voter(request, v))
+
+
+@app.post("/api/songs/{session_id}/rating")
+def rate_song(session_id: str, body: RatingBody, request: Request) -> dict:
+    _check_key(session_id)
+    if not _origin_ok(request):
+        raise HTTPException(status_code=403, detail="Not allowed from this page")
+    if not 1 <= body.stars <= 5:
+        raise HTTPException(status_code=400, detail="Choose between 1 and 5 stars.")
+    voter = _voter(request, body.visitor)
+    if not voter:
+        raise HTTPException(status_code=400, detail="Could not tell who is rating. Reload the page and try again.")
+    if not _rating_limiter.allow(request.client.host if request.client else "unknown"):
+        raise HTTPException(status_code=429, detail="That is a lot of ratings. Please wait a few minutes.")
+    result = _load_cached_result(session_id) or _load_saved_result(session_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Unknown song")
+    comment = re.sub(r"\s+", " ", body.comment or "").strip()[:500]
+    catalog.rate(session_id, voter, body.stars, comment, str(result.get("title") or "")[:200], str(result.get("artist") or "")[:200])
+    return catalog.rating_summary(session_id, voter)
+
+
+@app.get("/api/admin/ratings")
+def admin_ratings(request: Request, page: int = 1, pageSize: int = 25, stars: int = 0, comments: bool = False) -> dict:
+    _require_admin(request)
+    size = min(max(pageSize, 1), 100)
+    page = max(page, 1)
+    items, total = catalog.list_ratings(limit=size, offset=(page - 1) * size, stars=stars if 1 <= stars <= 5 else 0, only_comments=comments)
+    return {"ratings": items, "total": total, "page": page, "pageSize": size, "overview": catalog.rating_overview()}
+
+
 @app.get("/api/popular")
 def popular() -> dict:
     """The most-jammed songs on the site, for the search page before anything is typed."""
