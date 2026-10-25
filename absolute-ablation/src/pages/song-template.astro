@@ -37,14 +37,14 @@ import Footer from "../components/Footer.astro";
   .sp-facts dd { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: var(--color-ink); }
   .sp-block { margin-top: 40px; }
   .sp-block h2 { margin: 0 0 16px; font-size: 22px; font-weight: 700; letter-spacing: -0.025em; color: var(--color-ink); }
-  .sp-block p { max-width: 720px; margin: 0 0 14px; font-size: 16px; line-height: 1.7; color: var(--color-body); }
+  .sp-block p { margin: 0 0 14px; font-size: 16px; line-height: 1.7; color: var(--color-body); }
   .sp-chips { display: flex; flex-wrap: wrap; gap: 10px; }
   .sp-chips span { display: inline-grid; place-items: center; min-width: 54px; height: 44px; padding: 0 14px; border-radius: 12px; background: #fff; border: 1px solid #e4dcf3; font: 700 17px var(--font-mono); color: var(--color-violet-deep); box-shadow: 0 1px 2px rgb(26 5 51 / 0.04); }
   .sp-prog { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
   .sp-prog li { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 16px; align-items: baseline; padding: 14px 18px; background: #fff; border: 1px solid #ebe7f3; border-radius: 14px; }
   .sp-prog strong { font-size: 14px; color: var(--color-ink); }
   .sp-prog span { display: flex; flex-wrap: wrap; gap: 6px; }
-  .sp-chart-cta { margin: 22px 0 0; text-align: center; }
+  .sp-block p.sp-chart-cta { max-width: none; margin: 26px 0 0; text-align: center; }
   /* the chord chart: sections as tabs on the left, rows of bars, one cell per beat */
   .sg { display: grid; gap: 12px; }
   .sg-sec { display: grid; grid-template-columns: 34px minmax(0, 1fr); overflow: hidden; background: #fff; border: 1px solid #e4dcf3; border-radius: 16px; box-shadow: 0 1px 2px rgb(26 5 51 / 0.04); }
@@ -75,7 +75,7 @@ import Footer from "../components/Footer.astro";
   .sp-dg-nav[hidden] { display: none; }
   .sp-dg-nav button { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 1px solid #e4dcf3; border-radius: 50%; background: #fff; font-size: 16px; line-height: 1; color: var(--color-violet-deep); cursor: pointer; }
   .sp-dg-nav button:hover { background: #f4f1fb; }
-  .sp-rich { max-width: 720px; font-size: 16px; line-height: 1.75; color: var(--color-body); }
+  .sp-rich { font-size: 16px; line-height: 1.75; color: var(--color-body); }
   .sp-rich > *:first-child { margin-top: 0; }
   .sp-rich h2, .sp-rich h3, .sp-rich h4 { margin: 1.6em 0 0.5em; color: var(--color-ink); letter-spacing: -0.02em; line-height: 1.25; }
   .sp-rich h2 { font-size: 21px; } .sp-rich h3 { font-size: 18px; } .sp-rich h4 { font-size: 16px; }
