@@ -263,6 +263,7 @@ const drawn = new WeakMap<HTMLElement, { id: string; update: (user: AuthUser) =>
 
 function render(user: AuthUser | null) {
   document.querySelectorAll<HTMLElement>("[data-auth-guest]").forEach((node) => (node.hidden = !!user));
+  document.querySelectorAll<HTMLElement>("[data-auth-user]").forEach((node) => (node.hidden = !user));
   document.querySelectorAll<HTMLElement>("[data-auth-slot]").forEach((slot) => {
     if (!user) {
       slot.replaceChildren();

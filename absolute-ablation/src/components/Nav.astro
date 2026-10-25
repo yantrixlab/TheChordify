@@ -7,6 +7,7 @@ const navLinks = [
   { label: "Instruments", href: "#instruments" },
   { label: "Toolkit", href: "/toolkit/" },
   { label: "Pricing", href: "/pricing/" },
+  { label: "My library", href: "/library/", signedIn: true }, // only for someone who is signed in (the phone menu has its own link)
 ];
 ---
 
@@ -35,6 +36,8 @@ const navLinks = [
             href={link.href}
             role="listitem"
             class="rounded-full"
+            data-auth-user={link.signedIn ? "" : undefined}
+            hidden={link.signedIn}
             style="
               padding: var(--space-xs) var(--space-sm);
               font-size: 14px;
@@ -158,7 +161,7 @@ const navLinks = [
 <!-- Mobile menu overlay -->
 <div id="mobile-menu" role="dialog" aria-label="Mobile navigation" aria-modal="true">
   {
-    navLinks.map((link) => (
+    navLinks.filter((link) => !link.signedIn).map((link) => (
       <a
         href={link.href}
         class="mobile-nav-link rounded-lg"
@@ -242,7 +245,7 @@ const navLinks = [
 </script>
 
 <style is:global>
-  [data-auth-guest][hidden] { display: none !important; }
+  [data-auth-guest][hidden], [data-auth-user][hidden] { display: none !important; }
   nav button[data-auth] { white-space: nowrap; }
   @media (max-width: 420px) { nav[aria-label="Main navigation"] > div { padding-left: 14px !important; padding-right: 14px !important; } }
   nav button[data-auth], #mobile-menu button[data-auth] { border: 1px solid transparent; font-family: inherit; cursor: pointer; }
