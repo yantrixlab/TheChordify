@@ -131,7 +131,12 @@ export function loadFavourites(): Promise<void> {
   return loaded;
 }
 
-window.addEventListener("auth-change", () => {
+// Another person (signing in or out) has other favourites. The same person earning XP keeps theirs.
+let favouritesFor: string | null | undefined;
+window.addEventListener("auth-change", (event) => {
+  const id = (event as CustomEvent<{ id: string } | null>).detail?.id ?? null;
+  if (id === favouritesFor) return;
+  favouritesFor = id;
   favourites = new Set();
   loaded = null;
   if (cachedUser()) loadFavourites();

@@ -401,22 +401,29 @@ import Footer from "../components/Footer.astro";
     $("gate").hidden = false;
   }
 
+  let starting = false; // the page is loading: asking again (the menu hears from the server too) would load everything twice
   async function start() {
-    const user = await getMe();
-    if (!user) return showGate();
-    shownFor = user.id;
-    $("gate").hidden = true;
-    $("app").hidden = false;
+    if (starting) return;
+    starting = true;
     try {
-      profile = await getProfile();
-      drawProfile(profile);
-    } catch (err) {
-      return handleError(err);
+      const user = await getMe();
+      if (!user) return showGate();
+      shownFor = user.id;
+      $("gate").hidden = true;
+      $("app").hidden = false;
+      try {
+        profile = await getProfile();
+        drawProfile(profile);
+      } catch (err) {
+        return handleError(err);
+      }
+      const wanted = location.hash.slice(1) as typeof tab;
+      select(["favorites", "badges", "rewards"].includes(wanted) ? wanted : "history");
+      // the other count, so the tab shows it before it is opened
+      getLibrary(tab === "history" ? "favorites" : "history", 0, 1).then((d) => ($(tab === "history" ? "n-favorites" : "n-history").textContent = String(d.total))).catch(() => {});
+    } finally {
+      starting = false;
     }
-    const wanted = location.hash.slice(1) as typeof tab;
-    select(["favorites", "badges", "rewards"].includes(wanted) ? wanted : "history");
-    // the other count, so the tab shows it before it is opened
-    getLibrary(tab === "history" ? "favorites" : "history", 0, 1).then((d) => ($(tab === "history" ? "n-favorites" : "n-history").textContent = String(d.total))).catch(() => {});
   }
 
   document.querySelectorAll<HTMLButtonElement>(".lb-tabs button").forEach((b) => b.addEventListener("click", () => select(b.dataset.tab as typeof tab)));

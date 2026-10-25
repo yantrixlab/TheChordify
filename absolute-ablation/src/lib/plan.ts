@@ -65,4 +65,11 @@ export function nudge(feature: string) {
   toast({ icon: "🔒", title: `${feature} is on a paid plan`, text: "See what each plan includes.", href: "/pricing/", ms: 6000 });
 }
 
-window.addEventListener("auth-change", () => void loadPlan(true));
+// A different person (signing in or out) has a different plan. The same person earning XP does not.
+let planFor: string | null | undefined;
+window.addEventListener("auth-change", (event) => {
+  const id = (event as CustomEvent<{ id: string } | null>).detail?.id ?? null;
+  if (id === planFor) return;
+  planFor = id;
+  void loadPlan(true);
+});

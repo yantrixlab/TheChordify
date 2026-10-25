@@ -50,12 +50,23 @@ export function cachedUser(): AuthUser | null {
 }
 
 function remember(user: AuthUser | null) {
+  // Everything that listens to "auth-change" reloads its data (the plan, the favourites, the library...), so it is only said when
+  // something changed: asking the server again and getting the same person back changes nothing.
+  let before = "";
   try {
-    if (user) localStorage.setItem(HINT_KEY, JSON.stringify(user));
+    before = localStorage.getItem(HINT_KEY) ?? "";
+  } catch {
+    // no storage: every answer counts as news
+  }
+  const after = user ? JSON.stringify(user) : "";
+  try {
+    if (user) localStorage.setItem(HINT_KEY, after);
     else localStorage.removeItem(HINT_KEY);
   } catch {
     // no storage: the menu just waits for the server
   }
+  if (before === after && before !== "") return;
+  if (!before && !user) return; // signed out before, signed out now
   window.dispatchEvent(new CustomEvent<AuthUser | null>("auth-change", { detail: user }));
 }
 
@@ -65,17 +76,24 @@ export function updateUser(patch: Partial<AuthUser>) {
   if (user) remember({ ...user, ...patch });
 }
 
-/** The signed-in person, or null. Also refreshes the cached hint. */
-export async function getMe(): Promise<AuthUser | null> {
-  try {
-    const res = await fetch(`${API_BASE}/api/auth/me`, { credentials: "include" });
-    if (!res.ok) return cachedUser(); // the server is having a moment: keep showing what we knew
-    const user: AuthUser | null = (await res.json()).user ?? null;
-    remember(user);
-    return user;
-  } catch {
-    return cachedUser();
-  }
+let meInFlight: Promise<AuthUser | null> | null = null;
+
+/** The signed-in person, or null. Also refreshes the cached hint. The menu and the page both ask: they share one request. */
+export function getMe(): Promise<AuthUser | null> {
+  meInFlight ??= (async () => {
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/me`, { credentials: "include" });
+      if (!res.ok) return cachedUser(); // the server is having a moment: keep showing what we knew
+      const user: AuthUser | null = (await res.json()).user ?? null;
+      remember(user);
+      return user;
+    } catch {
+      return cachedUser();
+    }
+  })().finally(() => {
+    meInFlight = null;
+  });
+  return meInFlight;
 }
 
 export async function signOut(): Promise<void> {
