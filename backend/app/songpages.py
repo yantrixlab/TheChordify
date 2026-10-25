@@ -714,7 +714,7 @@ class SongPages:
         return self._fill(
             template,
             title="Chords for Popular Songs — Guitar, Piano & Ukulele | Chord Suno",
-            description="Browse chord charts for popular songs: the key, tempo and every chord, ready to play along with on guitar, piano, ukulele or mandolin.",
+            description="Browse chord charts for popular songs: the key, tempo and every chord, ready to play along with on guitar, ukulele, piano or mandolin.",
             path="/songs/",
             image=f"{SITE}/og-image.png",
             body=body,
@@ -796,8 +796,8 @@ class SongPages:
         if not (intro and custom):
             about += (
                 f"<p>These chords were worked out automatically from the song's audio, with the chord changes placed on the beat. "
-                f"Open the player to follow {_esc(title)} chord by chord, slow it down, loop a section, transpose it, or see it for "
-                f"piano, ukulele and mandolin. Real recordings differ a little from any chart, so use your ear as the last word.</p>"
+                f"Open the player to follow {_esc(title)} chord by chord, slow it down, loop a section, transpose it, or add a capo. "
+                f"Real recordings differ a little from any chart, so use your ear as the last word.</p>"
             )
         about_html = (
             f'<section class="sp-custom-wrap" id="about"><div class="sp-custom">{intro}</div></section>'
@@ -825,7 +825,7 @@ class SongPages:
             f'{f"<p class=sp-by>{_esc(artist)}</p>" if artist else ""}'
             f'<div class="sp-cta"><a class="sp-play" href="/play?session={_esc(row["session_id"])}">▶ Play along with the chords</a>'
             f'{"<a class=sp-ghost href=#diagrams>Chord diagrams</a>" if used else ""}</div>'
-            "<small>Synced to the beat · chord diagrams for guitar, piano, ukulele &amp; mandolin</small></div></header>"
+            "<small>Synced to the beat · guitar chord diagrams and the song's strumming pattern</small></div></header>"
             f'<dl class="sp-facts">{facts_html}</dl>'
             f'<section class="sp-block"><h2>Chords used in {_esc(title)}</h2><div class="sp-chips">{chips}</div></section>'
             f"{diagrams_html}"
@@ -841,7 +841,7 @@ class SongPages:
             f"Chords for {name}: {', '.join(used[:6])}. Key of {key}, {tempo} BPM, {_time_signature(per_bar)}. "
             "Play along with the chords synced to the beat."
             if key and tempo and used
-            else f"Chords for {name}, synced to the beat. Play along on guitar, piano, ukulele or mandolin."
+            else f"Chords for {name}, synced to the beat, with guitar chord diagrams. Play along on any instrument."
         )
         ld = [
             {
