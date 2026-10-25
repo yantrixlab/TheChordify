@@ -25,8 +25,8 @@ from .billing import Razorpay, RazorpayError, entity_summary
 from .plans import FREE_CODE, PERIODS, PlanStore
 from .engagement import BADGE_RULES, DEFAULT_CONFIG, REWARD_KINDS, Engagement
 from .jobs import JobQueue
-from .search import RateLimiter, SearchUnavailable, clean_query, search_songs, suggest
-from .similar import similar as similar_songs_for
+from .search import RateLimiter, SearchUnavailable, clean_query, find_video, radio, search_songs, suggest
+from .similar import shelf as similar_shelf
 from .songpages import SongPages
 from .store import SongStore
 from . import trending as trending_shelves
@@ -1165,8 +1165,9 @@ _SIMILAR_SECONDS = 30 * 60.0
 
 @app.get("/api/similar/{session_id}")
 def similar_songs(session_id: str, request: Request, response: Response) -> dict:
-    """Songs like the one in the player, for the shelf under it: songs already chordified that are alike (same artist, key,
-    tempo, chords), then other songs by the artist, then the most played songs. Each says why it is there."""
+    """Songs like the one in the player, for the shelf under it: YouTube Music's "songs like this" (the same movie or album first,
+    then the same language, mood and style), chordified or not, each with the reason it is there and, when the song has been
+    chordified here, its main chords."""
     _check_key(session_id)
     now = time.monotonic()
     hit = _similar_cache.get(session_id)
@@ -1181,28 +1182,28 @@ def similar_songs(session_id: str, request: Request, response: Response) -> dict
         "videoId": video_id,
         "title": result.get("title", ""),
         "artist": result.get("artist", ""),
-        "key": result.get("key", ""),
-        "tempo": float(result.get("tempo") or 0),
-        "chords": _chord_summary(result.get("chords", [])),
+        "album": "",
     }
-    caller = request.client.host if request.client else "unknown"
-
-    def more_by_artist() -> list[dict]:
-        if not _similar_limiter.allow(caller):
-            return []
+    related: list[dict] = []
+    if _similar_limiter.allow(request.client.host if request.client else "unknown"):
         try:
-            found = search_songs(current["artist"].split(",")[0].strip())
-        except SearchUnavailable:
-            return []
-        found = [song for song in found if song.get("kind", "song") == "song"]
-        known = catalog.lookup([song["videoId"] for song in found])
-        return [{**song, **known.get(song["videoId"], {})} for song in found]
-
-    songs = similar_songs_for(current, catalog.library(), more_by_artist, catalog.popular(20))
-    if len(_similar_cache) > 500:
-        _similar_cache.clear()
-    _similar_cache[session_id] = (now, songs)
-    response.headers["Cache-Control"] = "public, max-age=300"
+            if not video_id:  # an uploaded song: look for the same song on YouTube Music
+                video_id = find_video(current["title"], current["artist"])
+            if video_id:
+                seed, related = radio(video_id)
+                current["album"] = seed.get("album", "")
+                current["videoId"] = current["videoId"] or video_id
+            if len(related) < 5 and current["artist"]:  # no radio for it: other songs by the artist
+                related += [s for s in search_songs(current["artist"].split(",")[0].strip()) if s.get("kind", "song") == "song"]
+        except SearchUnavailable as exc:
+            log.warning("Similar songs unavailable: %s", exc)
+    known = catalog.lookup([song["videoId"] for song in related])
+    songs = similar_shelf(current, related, known, catalog.library())
+    if songs:  # an empty answer is not kept: the next visit asks again
+        if len(_similar_cache) > 500:
+            _similar_cache.clear()
+        _similar_cache[session_id] = (now, songs)
+    response.headers["Cache-Control"] = "public, max-age=300" if songs else "no-store"
     return {"songs": songs}
 
 

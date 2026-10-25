@@ -238,6 +238,74 @@ def suggest(query: str, songs_limit: int = 6, queries_limit: int = 4) -> dict:
     return result
 
 
+def _length(text: str) -> int:
+    """'4:08' -> 248 seconds; '1:02:03' -> 3723; anything else -> 0."""
+    parts = [int(p) for p in re.findall(r"\d+", text or "")]
+    seconds = 0
+    for part in parts[-3:]:
+        seconds = seconds * 60 + part
+    return seconds if len(parts) >= 2 else 0
+
+
+_radio_cache: dict[str, tuple[float, tuple[dict, list[dict]]]] = {}
+RADIO_SECONDS = 6 * 3600
+
+
+def radio(video_id: str, limit: int = 30) -> tuple[dict, list[dict]]:
+    """YouTube Music's own "songs like this" for a track: the same movie or album first, then songs with the same language,
+    mood and style, whether or not anybody has chordified them. Returns the song itself (its album and artists, for comparing)
+    and the songs like it. Raises SearchUnavailable when YouTube Music does not answer."""
+    now = time.monotonic()
+    with _cache_lock:
+        hit = _radio_cache.get(video_id)
+        if hit and now - hit[0] < RADIO_SECONDS:
+            return hit[1][0], hit[1][1][:limit]
+    try:
+        tracks = _ytmusic().get_watch_playlist(videoId=video_id, radio=True, limit=limit)["tracks"]
+    except Exception as exc:
+        raise SearchUnavailable("YouTube Music did not answer") from exc
+    seed: dict = {}
+    out: list[dict] = []
+    for item in tracks:
+        seconds = _length(item.get("length", ""))
+        title = (item.get("title") or "").strip()
+        if not item.get("videoId") or not title:
+            continue
+        album = item.get("album") or {}
+        song = {
+            "videoId": item["videoId"],
+            "kind": "song",
+            "title": title,
+            "artist": ", ".join(a.get("name", "") for a in item.get("artists") or [] if a.get("name")),
+            "album": album.get("name", "") if isinstance(album, dict) else "",
+            "duration": seconds,
+            "thumbnail": _thumbnail(item.get("thumbnail") or item.get("thumbnails") or []),
+        }
+        if item["videoId"] == video_id:
+            seed = song
+        elif seconds <= MAX_SONG_SECONDS:
+            out.append(song)
+    with _cache_lock:
+        if len(_radio_cache) > 500:
+            _radio_cache.clear()
+        _radio_cache[video_id] = (now, (seed, out))
+    return seed, out[:limit]
+
+
+def find_video(title: str, artist: str = "") -> str:
+    """The id of the official track that matches a title and artist, '' when there is none (for songs that were uploaded, not found
+    on YouTube, so the same radio can be asked for them)."""
+    query = clean_query(f"{title} {artist.split(',')[0]}")
+    if len(query) < 2:
+        return ""
+    try:
+        found = [_song(item, "song") for item in _ytmusic().search(query, filter="songs", limit=3, ignore_spelling=False)]
+    except Exception as exc:
+        raise SearchUnavailable("YouTube Music did not answer") from exc
+    found = [x for x in found if x]
+    return found[0]["videoId"] if found else ""
+
+
 class RateLimiter:
     """At most `limit` searches per `window` seconds for each caller, so the endpoint cannot be used to hammer YouTube."""
 

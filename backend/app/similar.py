@@ -1,122 +1,73 @@
 """Songs like the one being played, for the shelf under the player.
 
-Songs people have already chordified come first, ranked by how alike they are: the same artist, the same key (or its
-relative), a close tempo and the chords they share. When the catalog is too small to fill the shelf, the rest are other songs
-by the same artist and, last, the most played songs on the site. Every song says why it is there.
+The songs come from YouTube Music's own "songs like this" for the track (search.radio): the same movie or album first, then songs
+with the same language, mood and style. They do not have to have been chordified: a song nobody has opened yet is still a good
+suggestion, and opening it gets its chords. Songs that have been chordified come with their main chords. Every song says why it is
+there. Nothing is picked from the catalog by chords or key alone: that mixed Hindi, English and Bengali songs on one shelf.
 """
 from __future__ import annotations
 
-import math
 import re
-from typing import Iterable
-
-NOTES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
-FLATS = {"Db": "C#", "Eb": "D#", "Gb": "F#", "Ab": "G#", "Bb": "A#"}
 
 SHELF = 15  # songs on the shelf at most
-WANTED = 10  # fewer than this and the shelf is topped up
-
-
-def parse_key(key: str) -> tuple[int, bool] | None:
-    """(pitch class of the tonic, is minor) from "G", "F#m", "G major", "B minor"; None when it cannot be read."""
-    m = re.match(r"^\s*([A-G][#b]?)\s*(m|min|minor|major|maj)?\b", key or "", re.I)
-    if not m:
-        return None
-    tonic = m.group(1)[0].upper() + m.group(1)[1:]
-    tonic = FLATS.get(tonic, tonic)
-    if tonic not in NOTES:
-        return None
-    minor = (m.group(2) or "").lower() in ("m", "min", "minor")
-    return NOTES.index(tonic), minor
-
-
-def key_closeness(a: str, b: str) -> float:
-    """1 for the same key, 0.6 for a relative major/minor pair, 0 otherwise."""
-    ka, kb = parse_key(a), parse_key(b)
-    if not ka or not kb:
-        return 0.0
-    if ka == kb:
-        return 1.0
-    (ta, ma), (tb, mb) = ka, kb
-    if ma != mb:
-        minor_tonic, major_tonic = (ta, tb) if ma else (tb, ta)
-        if (minor_tonic + 3) % 12 == major_tonic:
-            return 0.6
-    return 0.0
+WANTED = 8  # fewer than this and the shelf is topped up with other songs by the same artist
+FIRST_MATCHES = 6  # songs of the same album or artist that go first
 
 
 def normal(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", "", (text or "").lower())
 
 
+def _names(artists: str) -> set[str]:
+    return {normal(x) for x in re.split(r",|&| and | feat\.? | ft\.? | x ", artists or "") if normal(x)}
+
+
 def same_artist(a: str, b: str) -> bool:
-    """Artists match when one name holds the other ("Eagles" and "Eagles, Don Henley"); credits are split on commas and "&"."""
-    names_a = {normal(x) for x in re.split(r",|&| and | feat\.? | ft\.? ", a or "") if normal(x)}
-    names_b = {normal(x) for x in re.split(r",|&| and | feat\.? | ft\.? ", b or "") if normal(x)}
-    return bool(names_a & names_b)
+    """Artists match when they share a name ("Sharman Joshi, Suraj Jagan" and "Suraj Jagan")."""
+    return bool(_names(a) & _names(b))
+
+
+def _title(song: dict) -> str:
+    return normal(re.sub(r"[\(\[].*?[\)\]]", "", song.get("title", "")))
 
 
 def same_song(a: dict, b: dict) -> bool:
-    ta, tb = normal(re.sub(r"[\(\[].*?[\)\]]", "", a.get("title", ""))), normal(re.sub(r"[\(\[].*?[\)\]]", "", b.get("title", "")))
-    return bool(ta) and (ta == tb or (len(ta) > 5 and ta in tb) or (len(tb) > 5 and tb in ta))
+    """The same song under another upload or version: equal titles, or one holding the other."""
+    ta, tb = _title(a), _title(b)
+    return bool(ta) and bool(tb) and (ta == tb or (len(ta) > 5 and ta in tb) or (len(tb) > 5 and tb in ta))
 
 
-def chord_overlap(a: Iterable[str], b: Iterable[str]) -> float:
-    sa, sb = set(a), set(b)
-    return len(sa & sb) / len(sa | sb) if sa and sb else 0.0
-
-
-def score(current: dict, song: dict) -> tuple[float, str]:
-    """How alike two songs are, and the main reason (what to tell the player)."""
-    parts: list[tuple[float, str]] = []
-    if same_artist(current.get("artist", ""), song.get("artist", "")):
-        parts.append((5.0, "Same artist"))
-    key = key_closeness(current.get("key", ""), song.get("key", ""))
-    if key:
-        parts.append((2.4 * key, "Same key" if key == 1.0 else "Related key"))
-    overlap = chord_overlap(current.get("chords", []), song.get("chords", []))
-    if overlap >= 0.34:
-        parts.append((4.0 * overlap, "Similar chords"))
-    tempo_a, tempo_b = float(current.get("tempo") or 0), float(song.get("tempo") or 0)
-    if tempo_a > 0 and tempo_b > 0:
-        gap = abs(tempo_a - tempo_b) / tempo_a
-        if gap <= 0.12:
-            parts.append((1.5 * (1 - gap / 0.12), "Similar tempo"))
-    total = sum(p for p, _ in parts) + min(math.log1p(song.get("jams", 0)) * 0.15, 0.6)
-    reason = max(parts, key=lambda p: p[0])[1] if parts else ""
-    return total, reason
-
-
-def similar(current: dict, catalog_songs: list[dict], more_by_artist, popular: list[dict]) -> list[dict]:
-    """The shelf. `current` has title, artist, key, tempo, chords and videoId; `more_by_artist` is a function that returns other
-    songs by the artist (it may be slow or fail, so it is only called when the catalog cannot fill the shelf)."""
+def shelf(current: dict, related: list[dict], known: dict[str, dict], same_artist_catalog: list[dict] | None = None) -> list[dict]:
+    """The shelf. `current` has title, artist, album and videoId; `related` is YouTube Music's list of songs like it, best first;
+    `known` is what the catalog holds (chords, jam count) for the ones that have been chordified."""
     out: list[dict] = []
     taken: list[dict] = [current]
 
     def add(song: dict, reason: str) -> None:
         if len(out) >= SHELF or song.get("videoId") == current.get("videoId"):
             return
-        if any(same_song(song, other) or song.get("videoId") == other.get("videoId") for other in taken):
+        if any(song.get("videoId") == other.get("videoId") or same_song(song, other) for other in taken):
             return
         taken.append(song)
-        out.append({**song, "why": reason})
+        out.append({**song, **known.get(song["videoId"], {}), "why": reason})
 
-    ranked = sorted(((score(current, song), song) for song in catalog_songs), key=lambda item: -item[0][0])
-    for (points, reason), song in ranked:
-        if points < 1.5:
-            break
-        add(song, reason)
+    def why(song: dict) -> str:
+        album = normal(song.get("album", ""))
+        if album and album == normal(current.get("album", "")):
+            return "Same album"
+        if same_artist(current.get("artist", ""), song.get("artist", "")):
+            return "Same artist"
+        return "Similar vibe"
 
-    if len(out) < WANTED and current.get("artist"):
-        try:
-            for song in more_by_artist():
-                if same_artist(current.get("artist", ""), song.get("artist", "")):
-                    add(song, "More by " + current["artist"].split(",")[0].strip())
-        except Exception:  # the search may be down; the shelf is made from what there is
-            pass
+    # The same movie or album, or the same artist, first (in the order YouTube Music gave them), then the rest as they came.
+    close = [song for song in related if why(song) != "Similar vibe"][:FIRST_MATCHES]
+    for song in close:
+        add(song, why(song))
+    for song in related:
+        add(song, why(song))
 
-    for song in popular:
-        if len(out) >= WANTED:
-            break
-        add(song, "Popular on Chord Suno")
+    if len(out) < WANTED:
+        for song in same_artist_catalog or []:
+            if same_artist(current.get("artist", ""), song.get("artist", "")):
+                add(song, "Same artist")
     return out
