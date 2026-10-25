@@ -28,7 +28,16 @@ import Nav from "../components/Nav.astro";
                 </div>
                 <div id="song-sub" class="ph-sub"><span class="ph-sub-main">Transcription by Chord Suno</span><span id="song-note" class="ph-note" hidden>Refining the sections…</span></div>
               </div>
-              <div class="ph-actions" id="ph-actions"><button id="btn-share" type="button" class="ph-share">Share</button></div>
+              <div class="ph-actions" id="ph-actions">
+                <div class="ph-export" id="ph-export">
+                  <button id="btn-export" type="button" class="ph-share" aria-haspopup="true" aria-expanded="false">Export</button>
+                  <div id="export-menu" class="ph-menu" role="menu" hidden>
+                    <button id="export-pdf" type="button" role="menuitem"><b>Chord sheet</b><span>Printable PDF</span></button>
+                    <button id="export-midi" type="button" role="menuitem"><b>Chords as MIDI</b><span>For your music software</span></button>
+                  </div>
+                </div>
+                <button id="btn-share" type="button" class="ph-share">Share</button>
+              </div>
             </div>
             <div class="ph-controls">
               <button id="btn-restart" type="button" class="ph-btn" aria-label="Back to the start">
@@ -435,6 +444,14 @@ import Nav from "../components/Nav.astro";
   .ph-share { flex: 0 0 auto; height: 32px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--color-violet-soft);
     color: var(--color-violet-deep); font-size: 13px; font-weight: 600; cursor: pointer; }
   .ph-share:hover { background: #ddd2fb; }
+  .ph-export { position: relative; }
+  .ph-menu { position: absolute; right: 0; top: calc(100% + 8px); z-index: 40; display: grid; gap: 2px; min-width: 210px; padding: 6px;
+    border-radius: 12px; background: var(--color-canvas); border: 1px solid var(--color-hairline); box-shadow: 0 18px 40px -14px rgba(13, 0, 31, 0.5); }
+  .ph-menu[hidden] { display: none; }
+  .ph-menu button { display: grid; gap: 1px; padding: 9px 12px; border: 0; border-radius: 8px; background: none; text-align: left; cursor: pointer; color: var(--color-ink); }
+  .ph-menu button:hover { background: var(--color-violet-soft); }
+  .ph-menu b { font-size: 13.5px; font-weight: 650; }
+  .ph-menu span { font-size: 12px; color: var(--color-mute); }
   .ph.is-compact { padding-top: 10px; }
   .ph.is-compact .ph-sub { display: none; }
   .ph.is-compact .ph-title h1 { font-size: 17px; }
@@ -551,6 +568,7 @@ import Nav from "../components/Nav.astro";
   import { API_BASE, registerJam, type ExtractResult, type ChordSegment, type Bar, type Section, type StrumPattern, type StrumOne } from "../lib/api";
   import { heartButton, recordPlay } from "../lib/library";
   import { can, loadPlan, nudge } from "../lib/plan";
+  import { downloadMidi, downloadPdf, type ExportSong } from "../lib/exportSong";
 
   const params = new URLSearchParams(window.location.search);
   const sessionId = params.get("session");
@@ -595,6 +613,8 @@ import Nav from "../components/Nav.astro";
   const LOCKS: [selector: string, key: string, label: string][] = [
     ["#capo-down, #capo-up, #transpose-down, #transpose-up", "transpose_capo", "Transpose and capo"],
     ["#detail-toggle", "chord_detail", "Full chord detail"],
+    ["#export-pdf", "pdf_export", "The chord sheet PDF"],
+    ["#export-midi", "midi_export", "The chords as a MIDI file"],
   ];
   document.addEventListener(
     "click",
@@ -2325,6 +2345,68 @@ import Nav from "../components/Nav.astro";
     }
     setTimeout(() => (btnShare.textContent = "Share"), 1800);
   });
+  // Export: the chord sheet (PDF) and the chords as a MIDI file, made from what is on screen (key, capo and bar length included).
+  const exportButton = document.getElementById("btn-export") as HTMLButtonElement;
+  const exportMenu = document.getElementById("export-menu")!;
+  function setExportMenu(open: boolean) {
+    exportMenu.hidden = !open;
+    exportButton.setAttribute("aria-expanded", String(open));
+  }
+  exportButton.addEventListener("click", () => setExportMenu(exportMenu.hidden));
+  document.addEventListener("click", (event) => {
+    if (!exportMenu.hidden && !(event.target as Element | null)?.closest("#ph-export")) setExportMenu(false);
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !exportMenu.hidden) {
+      setExportMenu(false);
+      exportButton.focus();
+    }
+  });
+
+  /** The song as the player shows it now, ready to write out. */
+  function songForExport(): ExportSong {
+    const written = placeChordsOnBeats();
+    const rows = (from: number, to: number) =>
+      written.slice(from, to + 1).map((bar, i) =>
+        bar.map((chord, k) => (bars[from + i].beats[k] === null ? null : chord === "N" ? "—" : chord ? displayChord(chord) : "")),
+      );
+    const real = sections.filter((sec) => sec.startBar !== null);
+    const blocks =
+      real.length === 0
+        ? [{ label: "", bars: rows(0, bars.length - 1) }]
+        : real.map((sec, i) => ({
+            label: sec.label,
+            // bars before the first section (a pickup) and after the last belong to those sections
+            bars: rows(i === 0 ? 0 : (sec.startBar as number), i === real.length - 1 ? bars.length - 1 : (sec.endBar as number)),
+          }));
+    const beatTimes: number[] = [];
+    for (const bar of bars) for (let k = 0; k < BEAT_CELLS; k++) if (bar.beats[k] !== null && bar.beats[k] !== undefined) beatTimes.push(bar.beats[k] as number);
+    const pickup = bars.length ? Math.max(0, bars[0].beats.slice(0, BEAT_CELLS).findIndex((t) => t !== null)) : 0;
+    return {
+      title: songTitleEl.textContent || "Your song",
+      artist: (songArtistEl.textContent || "").replace(/^by /, ""),
+      key: songKey ? chordKeyLabel(transposeChord(songKey, transposeSteps)) : "",
+      tempo,
+      perBar: BEAT_CELLS,
+      capo,
+      transposed: ((transposeSteps + 6) % 12 + 12) % 12 - 6,
+      blocks,
+      beatTimes,
+      pickup,
+      chords: chords.map((seg) => ({ start: seg.start, end: seg.end, chord: seg.chord === "N" ? "N" : displayChord(seg.chord) })),
+    };
+  }
+  document.getElementById("export-pdf")!.addEventListener("click", () => {
+    if (!can("pdf_export") || bars.length === 0) return;
+    setExportMenu(false);
+    downloadPdf(songForExport());
+  });
+  document.getElementById("export-midi")!.addEventListener("click", () => {
+    if (!can("midi_export") || chords.length === 0) return;
+    setExportMenu(false);
+    downloadMidi(songForExport());
+  });
+
   // The header shrinks once the page is scrolled. It must not grow back at the same point it shrank at: shrinking makes the page
   // shorter, which can pull the scroll position back past that point, and the header would grow, shrink, grow... (the whole page
   // flickering). So it shrinks well down the page and grows only near the top, and the page is always tall enough to scroll that far.

@@ -33,7 +33,7 @@ KINDS = ("flag", "limit")
 _MONTHS = {"daily": 1 / 30, "weekly": 12 / 52, "monthly": 1, "quarterly": 3, "yearly": 12}
 
 # Features the product itself checks today. The rest still show on the pricing page, but switching them changes nothing in the app.
-ENFORCED = {"songs_per_day", "favorites_max", "chord_detail", "chord_voicings", "transpose_capo", "upload_song", "metronome", "tuner", "practice_chords", "chord_detector"}
+ENFORCED = {"songs_per_day", "favorites_max", "chord_detail", "chord_voicings", "transpose_capo", "upload_song", "metronome", "tuner", "practice_chords", "chord_detector", "pdf_export", "midi_export"}
 
 # (key, label, description, kind, unit, group, status)
 _DEFAULT_FEATURES = [
@@ -48,8 +48,8 @@ _DEFAULT_FEATURES = [
     ("favorites_max", "Favourite songs", "How many songs you can keep as favourites.", "limit", "songs", "Library", "live"),
     ("library_history", "Play history", "Every song you play is kept so you can pick it up again.", "flag", "", "Library", "live"),
     ("xp_levels", "XP, levels and badges", "Earn XP, level up and win badges as you play.", "flag", "", "Library", "live"),
-    ("pdf_export", "Chord sheet PDF", "Download a song's chords as a printable PDF.", "flag", "", "Export & tools", "soon"),
-    ("midi_export", "Chord MIDI files", "Download a song's chords as MIDI.", "flag", "", "Export & tools", "soon"),
+    ("pdf_export", "Chord sheet PDF", "Download a song's chords as a printable PDF.", "flag", "", "Export & tools", "live"),
+    ("midi_export", "Chord MIDI files", "Download a song's chords as MIDI.", "flag", "", "Export & tools", "live"),
     ("lyrics", "Lyrics", "Read the lyrics with the chords.", "flag", "", "Export & tools", "soon"),
     ("offline_mode", "Offline mode", "Open your songs without a connection.", "flag", "", "Export & tools", "soon"),
     ("metronome", "Metronome", "Tap tempo, time signatures, subdivisions, accents and a speed trainer, in the Toolkit.", "flag", "", "Toolkit", "live"),
@@ -234,6 +234,7 @@ class PlanStore:
                 )
         self._add_new_features()
         self._toolkit_live()
+        self._exports_live()
         # The starting grid, for a starting plan that has no rules at all yet.
         for code, ons in _DEFAULT_MATRIX.items():
             plan, _ = self._db.run("SELECT id FROM plans WHERE code = ?", (code,))
@@ -284,6 +285,14 @@ class PlanStore:
             _, label, description, kind, unit, group, status = next(f for f in _DEFAULT_FEATURES if f[0] == key)
             self._db.run("UPDATE features SET description = ?, grp = ?, status = ? WHERE key = ?", (description, group, status, key))
         self._set_flag("toolkit_live")
+
+    def _exports_live(self) -> None:
+        """The chord sheet PDF and the MIDI download are built, so they stop being listed as coming soon (once). Whatever plans
+        the admin gave them stays as it is."""
+        if self._flag("exports_live"):
+            return
+        self._db.run("UPDATE features SET status = 'live' WHERE key IN ('pdf_export', 'midi_export')")
+        self._set_flag("exports_live")
 
     def _ensure_free_plan(self) -> None:
         rows, _ = self._db.run("SELECT id FROM plans WHERE code = ?", (FREE_CODE,))
