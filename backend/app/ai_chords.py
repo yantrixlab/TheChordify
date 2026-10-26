@@ -509,6 +509,109 @@ def _absorb_slivers(segs: list[list], min_len: float) -> list[list]:
     return segs
 
 
+_CLASS_OF: dict[str, int] = {}
+for _cls in range(_UNKNOWN_IDX):
+    _root, _quality = _class_to_parts(_cls)
+    _CLASS_OF.setdefault(_label(_root, _quality), _cls)
+
+
+def _chord_template(cls: Optional[int]) -> Optional[np.ndarray]:
+    """Unit pitch-class vector of a chord class (the root counts a little more), None for no chord."""
+    parts = _class_to_parts(cls) if cls is not None else None
+    if parts is None:
+        return None
+    root, quality = parts
+    vec = np.zeros(12)
+    for interval in _QUALITY_INTERVALS[quality]:
+        vec[(root + interval) % 12] = 1.0
+    vec[root] = 1.3
+    return vec / np.linalg.norm(vec)
+
+
+_LOOP_MIN_REPEATS = 4  # a pair of chords has to occur this often before its usual beat is trusted
+_LOOP_MIN_SHARE = 0.4  # ...and at least this share of the occurrences have to agree on it
+_LOOP_LEAD = 1.4  # ...and it has to be this many times as common as the next beat (the audio decides which occurrences move)
+_LOOP_EARLIER = 2.5  # beats a chord may move earlier (the model is slow to hear a change) to join its loop
+_LOOP_LATER = 1.5  # ...and later
+
+
+def regularize_loops(f: Features, chords: list[dict], phase: int, bpb: int) -> list[dict]:
+    """Writes a repeated chord change on the same beat of the bar every time.
+
+    Chord loops come round again and again (Gm, B-flat, F, C...), yet a change sometimes lands one or two beats off the beat it takes
+    everywhere else: the model hears it late while the old chord is still ringing (in Paradise the B-flat after the first Gm came 2 beats
+    late, so the rows of one loop did not line up). For every pair "this chord after that chord" the beat of the bar it usually falls on is
+    counted over the song; a change that falls elsewhere moves to that beat when the beat is close to where it was heard and the notes
+    in the audio do not contradict it (they fit the old chord before the beat and the new one after it at least nearly as well).
+    Only the cell a chord is written in moves, and its start time when it was heard clearly late."""
+    beats = f.beats
+    if beats is None or len(beats) < 16 or len(chords) < _LOOP_MIN_REPEATS + 2:
+        return chords
+    period = float(np.median(np.diff(beats)))
+    placed = [(k, int(np.argmin(np.abs(beats - c["gridStart"])))) for k, c in enumerate(chords) if c.get("gridStart") is not None]
+    if len(placed) < _LOOP_MIN_REPEATS + 2:
+        return chords
+
+    groups: dict[tuple[str, str], list[int]] = {}  # (chord before, chord) -> indexes into `placed`
+    for n in range(1, len(placed)):
+        before, now = chords[placed[n - 1][0]]["chord"], chords[placed[n][0]]["chord"]
+        if before != now and "N" not in (before, now):
+            groups.setdefault((before, now), []).append(n)
+
+    chroma = f.chroma
+    unit = chroma / (np.linalg.norm(chroma, axis=0, keepdims=True) + 1e-9)
+
+    def evidence(n: int, j: int) -> float:
+        """How well a change to chord n at beat j fits the notes in the audio (higher is better)."""
+        t_old, t_new = _chord_template(_CLASS_OF.get(chords[placed[n - 1][0]]["chord"])), _chord_template(_CLASS_OF.get(chords[placed[n][0]]["chord"]))
+        if t_old is None or t_new is None:
+            return 0.0
+        a, b = int(max(beats[j] - 3 * period, 0) * FRAMES_PER_SECOND), int((beats[j] + 3 * period) * FRAMES_PER_SECOND)
+        a, b = max(a, 0), min(b, chroma.shape[1])
+        if b - a < 3:
+            return 0.0
+        diff = t_new @ unit[:, a:b] - t_old @ unit[:, a:b]
+        edge = (np.arange(a, b) + 0.5) / FRAMES_PER_SECOND
+        return float(np.sum(np.where(edge >= beats[j], diff, -diff)))
+
+    moved = 0
+    out = [dict(c) for c in chords]
+    for pair, members in groups.items():
+        if len(members) < _LOOP_MIN_REPEATS:
+            continue
+        counts = np.bincount([(placed[n][1] - phase) % bpb for n in members], minlength=bpb)
+        usual = int(counts.argmax())
+        runner_up = int(np.sort(counts)[-2])
+        if counts[usual] < 3 or counts[usual] / len(members) < _LOOP_MIN_SHARE or counts[usual] < _LOOP_LEAD * runner_up:
+            continue
+        for n in members:
+            k, j = placed[n]
+            if (j - phase) % bpb == usual:
+                continue
+            heard = chords[k]["start"]
+            lo = placed[n - 1][1]
+            hi = placed[n + 1][1] if n + 1 < len(placed) else len(beats)
+            options = [
+                c for c in range(j - 3, j + 4)
+                if lo < c < hi and 0 <= c < len(beats) and (c - phase) % bpb == usual
+                and -_LOOP_EARLIER <= (beats[c] - heard) / period <= _LOOP_LATER
+            ]
+            if not options:
+                continue
+            target = min(options, key=lambda c: abs(beats[c] - heard))
+            gain = evidence(n, target) - evidence(n, j)
+            if gain < -0.1:
+                continue  # the audio says the change is where it was written
+            out[k]["gridStart"] = float(beats[target])
+            if gain >= 0.2 and (heard - beats[target]) / period >= 0.75:
+                out[k]["start"] = float(beats[target])  # heard clearly late: the chord really starts here
+                if k > 0:
+                    out[k - 1]["end"] = float(beats[target])
+            moved += 1
+    return out if moved else chords
+
+
+
 def decode(f: Features, opts: Optional[DecodeOptions] = None) -> list[dict]:
     """Chord segments (start, end, chord, confidence) from analysed features."""
     opts = opts or DecodeOptions()
@@ -586,6 +689,8 @@ def detect_chords_ai(audio_path: str, on_progress: Optional[ProgressFn] = None) 
     phase = downbeat_phase(features.beats, simple, bpb)
     simple = place_chords_on_grid(simple, features.beats, phase, features.duration, bpb)
     detailed = place_chords_on_grid(detailed, features.beats, phase, features.duration, bpb)
+    simple = regularize_loops(features, simple, phase, bpb)
+    detailed = regularize_loops(features, detailed, phase, bpb)
     structure_inputs = (
         features.beats, features.duration, features.chroma, features.mfcc, features.rms,
         features.audible_start, phase, features.texture,
