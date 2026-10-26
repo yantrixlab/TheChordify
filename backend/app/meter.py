@@ -80,30 +80,41 @@ FAST_MIN_BPM, FAST_MAX_BPM = 125.0, 240.0
 
 def fast_triple_grid(
     env: np.ndarray, env_fps: float, hop: int, chroma: np.ndarray, chroma_fps: float, start: float, duration: float,
-    slow_scores: dict,
+    slow_scores: dict, slow_bpm: float = 0.0,
 ) -> Optional[tuple[np.ndarray, float]]:
     """(beats, bpm) at the quicker pulse when the music is clearly counted in threes at that speed, else None.
 
     The tracker's own tempo (without the usual halving of anything above 140) is tried as the beat. It is taken only
-    when three beats to a bar fits it far better than any other length (and at least as well as six), and the slower
-    grid in use shows no sign of four. Songs in four, and waltzes already tracked at their own speed, keep their grid.
+    when three beats to a bar fits it far better than any other length (and at least as well as six), and clearly
+    better than any bar length fits the grid in use. That grid can be a pulse of its own that counts in fours (a quick
+    waltz at 172 BPM has a pulse at 115, every beat and a half, and four of those look like a bar of four); the three
+    beats a bar are heard at the quicker pulse. Songs in four, and waltzes already tracked at their own speed, keep their grid.
     """
     from .structure import fit_beat_grid  # imported here: structure does not depend on this module
 
-    if slow_scores.get(4, 0.0) > 6.0:
-        return None
     sr = int(round(env_fps * hop))
     tempo, frames = librosa.beat.beat_track(onset_envelope=env, sr=sr, hop_length=hop)
     bpm = float(np.atleast_1d(tempo)[0])
     if not FAST_MIN_BPM <= bpm <= FAST_MAX_BPM or len(frames) < MIN_BEATS:
         return None
+    if slow_bpm > 0 and not 1.35 <= bpm / slow_bpm <= 2.2:
+        return None  # the same pulse as the grid in use (or an unlikely relation): nothing to gain
     beats = fit_beat_grid(librosa.frames_to_time(frames, sr=sr, hop_length=hop), start, duration)
     if len(beats) < MIN_BEATS:
         return None
     accent, change = beat_signals(beats, env, env_fps, chroma, chroma_fps)
     s = {m: max(v, 0.0) for m, v in meter_scores(accent, change).items()}
-    if s[3] > 8.0 and s[3] > 2.0 * s[4] + 3.0 and s[3] >= s[6]:
-        return beats, 60.0 / float(np.median(np.diff(beats)))
+    slow_best = max(slow_scores.values(), default=0.0)
+    if s[3] > 8.0 and s[3] > 2.0 * s[4] + 3.0 and s[3] >= s[6] and s[3] >= slow_best + 2.0:
+        period = float(np.median(np.diff(beats)))
+        # the tracker's beats sit on a fixed tempo; played music drifts, so the grid follows the pulse where there is one
+        from .pulse import follow_grid
+
+        followed = follow_grid(env, env_fps, period, start, duration)
+        if followed is not None and abs(float(np.median(np.diff(followed))) / period - 1.0) < 0.04:
+            beats = followed
+            period = float(np.median(np.diff(beats)))
+        return beats, 60.0 / period
     return None
 
 

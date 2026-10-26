@@ -88,7 +88,8 @@ except Exception as exc:
 # 21: a repeated chord change is written on the same beat of the bar every time (loops line up row after row), when the audio agrees.
 # 22: chords written a beat late (or a short chord missed) are put where their notes come in, so a loop reads the way it is played.
 # 23: the bass line decides where a chord begins and what it is (an F that the B-flat chord holds, G minor over a B-flat bass), and a chord is only added where the bass plays it.
-ANALYSIS_VERSION = 23
+# 24: a song counted in threes at a quick pulse (a waltz at 173 BPM) is counted so again, now that the pulse finder found a pulse of its own at two thirds of that speed: the quick grid, followed through the song, wins when its bars of three fit clearly better.
+ANALYSIS_VERSION = 24
 
 ALLOWED_UPLOAD_EXTENSIONS ={".mp3", ".wav", ".flac", ".m4a"}
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50MB

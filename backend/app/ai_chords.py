@@ -411,7 +411,7 @@ def extract_features(y: np.ndarray, progress: Optional[ProgressFn] = None, tta: 
             # A quick waltz is often tracked at half its speed: when it is clearly counted in threes at the quicker
             # pulse, that pulse is the grid (about twice the tempo, three beats a bar).
             quick = fast_triple_grid(
-                env, SAMPLE_RATE / 512, 512, chroma, FRAMES_PER_SECOND, sound_starts, duration, evidence.get("scores", {})
+                env, SAMPLE_RATE / 512, 512, chroma, FRAMES_PER_SECOND, sound_starts, duration, evidence.get("scores", {}), bpm
             )
             if quick is not None:
                 beat_times, bpm = np.asarray(quick[0], dtype=float), quick[1]

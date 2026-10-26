@@ -118,6 +118,14 @@ def _follow_pulse(env: np.ndarray, fps: float, period0: float, score0: float, st
     return grid if len(grid) >= 16 else None
 
 
+def follow_grid(env: np.ndarray, fps: float, period: float, start: float, duration: float) -> Optional[np.ndarray]:
+    """The beats of a pulse about `period` seconds apart that follows the music through the song (see _follow_pulse), for a grid the
+    caller has already chosen (the tracker's own, which is rounded to 23 ms and a fixed tempo). None when the music has no such pulse."""
+    z = (env - env.mean()) / (env.std() + 1e-9)
+    # (a pulse that drifts scores low over the whole song at any one tempo, so the stretches are judged on their own)
+    return _follow_pulse(z, fps, period, 0.5, start, duration)
+
+
 def estimate_pulse_grid(y: np.ndarray, sr: int, duration: float, start: float) -> Optional[tuple[np.ndarray, float]]:
     """(beat times covering the song, bpm) for steady music, or None when there is no clear steady pulse."""
     env = librosa.onset.onset_strength(y=y, sr=sr, hop_length=HOP)
