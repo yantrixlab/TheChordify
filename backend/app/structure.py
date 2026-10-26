@@ -31,6 +31,7 @@ FRAMES_PER_SECOND = 22050 / 2048
 BEATS_PER_BAR = 4  # the usual bar; every function below takes the song's own `bpb` and defaults to this
 PHRASE = 4  # bars per phrase: sections start and end on this grid
 MAX_MERGED_BARS = 16  # neighbouring look-alike sections are merged only up to this many bars
+MAX_NAMED_BARS = 32  # neighbouring sections the structure model gave the same name are one section up to this many bars (a 24-bar intro is one intro)
 MAX_SECTION_BARS = 20  # a section longer than this is split at its strongest internal change...
 MIN_SPLIT_BARS = 8  # ...but never closer than this to either end
 MAX_SHIFT_BARS = 4  # a section start moves on past at most this many bars that have no chord change
@@ -137,7 +138,7 @@ def _learned_segments(
 
     The model's boundary times are only good to about a bar, so each one moves to whichever of the nearest bars
     shows the biggest change in the audio itself (preferring whole 4-bar phrases from the previous boundary).
-    Neighbouring sections with the same name are one section, as long as they stay under MAX_SECTION_BARS.
+    Neighbouring sections with the same name are one section, as long as they stay under MAX_NAMED_BARS.
     """
     bar_starts = np.array([bars[i]["start"] for i in full])
     bar_len = float(np.median(np.diff(bar_starts)))
@@ -159,7 +160,7 @@ def _learned_segments(
 
     merged: list[list] = []
     for (a, b), name in zip(segments, names):
-        if merged and merged[-1][2] == name and b - merged[-1][0] <= MAX_SECTION_BARS:
+        if merged and merged[-1][2] == name and b - merged[-1][0] <= MAX_NAMED_BARS:
             merged[-1][1] = b
         elif merged and b - a < 2:  # a stub: fold it into the section before it
             merged[-1][1] = b

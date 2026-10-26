@@ -25,7 +25,7 @@ import numpy as np
 from scipy.interpolate import interp1d
 from scipy.ndimage import uniform_filter1d
 
-from .chord_detection import NOTE_NAMES, estimate_beats
+from .chord_detection import NOTE_NAMES, estimate_beat_times
 from .meter import beat_signals, estimate_meter, fast_triple_grid
 from .strum import estimate_strum
 from .pulse import estimate_pulse_grid
@@ -367,15 +367,15 @@ def extract_features(y: np.ndarray, progress: Optional[ProgressFn] = None, tta: 
     # Loudness tells when sound begins; a soft intro must still get its own bars.
     rms = librosa.feature.rms(y=y, hop_length=HOP_LENGTH)[0]
     sound_starts = audible_start(rms)
-    bpm, beat_frames = estimate_beats(y, SAMPLE_RATE, HOP_LENGTH)
+    bpm, tracked = estimate_beat_times(y, SAMPLE_RATE)
     pulse = estimate_pulse_grid(y, SAMPLE_RATE, duration, sound_starts)
     if pulse is not None:
         # Steady music: the grid found from the onsets themselves (the tracker can be several % off tempo).
         beat_times, bpm = pulse
-    elif len(beat_frames) >= 2:
-        beat_times = fit_beat_grid(
-            librosa.frames_to_time(beat_frames, sr=SAMPLE_RATE, hop_length=HOP_LENGTH), sound_starts, duration
-        )
+    elif len(tracked) >= 2:
+        beat_times = fit_beat_grid(tracked, sound_starts, duration)
+        if len(beat_times) >= 2:
+            bpm = 60.0 / float(np.median(np.diff(beat_times)))  # the tempo of the grid in use, not the tracker's rounded one
     else:
         bpm = 120.0
         beat_times = np.arange(0.0, duration, 60.0 / bpm)

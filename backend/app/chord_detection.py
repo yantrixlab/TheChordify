@@ -122,6 +122,25 @@ def estimate_beats(y: np.ndarray, sr: int, hop_length: int = 2048) -> tuple[floa
     return bpm, beat_frames
 
 
+def estimate_beat_times(y: np.ndarray, sr: int) -> tuple[float, np.ndarray]:
+    """(bpm, beat times in seconds) from the tracker run on a fine onset envelope (23 ms steps). The same tracker on the coarse
+    chord frames (93 ms) can only pick a whole number of frames to a beat, so every song was pushed to a tempo such as 129.2 BPM
+    (5 frames) and its beats were rounded to 93 ms; on the fine envelope the beats land on the music (Chalisa and Sita Ram:
+    the beats sit on the onsets three to four times as strongly). Anything above 140 BPM is halved, as before."""
+    hop = 512
+    try:
+        env = librosa.onset.onset_strength(y=y, sr=sr, hop_length=hop)
+        tempo, frames = librosa.beat.beat_track(onset_envelope=env, sr=sr, hop_length=hop)
+    except Exception:
+        return 120.0, np.array([], dtype=float)
+    bpm = float(np.atleast_1d(tempo)[0]) if len(np.atleast_1d(tempo)) else 120.0
+    times = librosa.frames_to_time(frames, sr=sr, hop_length=hop)
+    while bpm > 140 and len(times) >= 8:
+        bpm /= 2
+        times = times[::2]
+    return bpm, times
+
+
 def build_bars(beat_times: list[float]) -> list[dict]:
     """Group beats into 4/4 bars so the UI can render a musical timeline.
 
