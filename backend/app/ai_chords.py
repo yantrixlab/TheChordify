@@ -611,6 +611,9 @@ def regularize_loops(f: Features, chords: list[dict], phase: int, bpb: int) -> l
     return out if moved else chords
 
 
+_BASS_RELABEL = os.environ.get("CHORD_BASS_RELABEL", "1") == "1"
+_BASS_ONSET = os.environ.get("CHORD_BASS_ONSET", "1") == "1"
+_BASS_INSERT = os.environ.get("CHORD_BASS_INSERT", "1") == "1"
 _RARE_BEAT = 0.12  # a beat of the bar that holds fewer than this share of a song's chord changes is an unlikely place for one
 _USUAL_BEAT = 0.25  # ...and one that holds more than this share is a likely place
 _ONSET_JUMP = 0.2  # how much a chord's notes must rise from one beat to the next for the chord to begin there
@@ -621,8 +624,12 @@ def refine_chord_beats(f: Features, chords: list[dict], phase: int, bpb: int) ->
 
     The chord model hears a change late when the new chord shares notes with the old one (Dm to F, F to C), and a short chord between two
     longer ones can disappear altogether: in Paradise the F of a loop came a beat late, and the C two beats after it was missing from
-    most rows, so the loops did not match what is played. Three corrections, each only on clear evidence, then the loops are lined up
-    (regularize_loops):
+    most rows, so the loops did not match what is played. The bass line is the best witness of where a chord begins: a chord changes where
+    the bass lands on its root. So, first, the bass decides (0); then three corrections on the notes, each only on clear evidence; then the
+    loops are lined up (regularize_loops):
+      0. a chord whose root the bass plays a beat or two away from where it was written moves to where the bass lands on it (in Paradise's
+         instrumental the F came two beats early, because the B-flat chord holds the same F note), and a chord whose bass is the root of its
+         relative major or minor (G minor over a B-flat bass) is renamed;
       1. a change on a beat where this song hardly ever changes chord moves one beat earlier, onto a beat where it often does, when the new
          chord's notes are already clearly there on that earlier beat;
       2. a change written a beat early moves one beat later when the notes fit it clearly better there;
@@ -656,6 +663,32 @@ def refine_chord_beats(f: Features, chords: list[dict], phase: int, bpb: int) ->
             fit[name] = beat_chroma @ template
     unit = f.chroma / (np.linalg.norm(f.chroma, axis=0, keepdims=True) + 1e-9)
 
+    # the bass note of each beat
+    bass_beat = np.array([f.bass_chroma[:, a:b].mean(axis=1) for a, b in zip(lo_f, hi_f)])
+    bass_beat = bass_beat / (bass_beat.sum(axis=1, keepdims=True) + 1e-9)
+
+    def root_of(name: str) -> Optional[int]:
+        cls = _CLASS_OF.get(name)
+        parts = _class_to_parts(cls) if cls is not None else None
+        return None if parts is None else parts[0]
+
+    def bass_is(c: int, root: Optional[int], share_min: float = 0.25) -> bool:
+        """The bass plays this note on this beat (it is the strongest low note, and clearly there)."""
+        return root is not None and 0 <= c < len(beats) and int(bass_beat[c].argmax()) == root and bass_beat[c][root] >= share_min
+
+    def relative_of(name: str) -> Optional[str]:
+        """The chord with the same notes but one: G minor and B-flat, D minor and F (what the model mixes up)."""
+        root = root_of(name)
+        if root is None:
+            return None
+        cls = _CLASS_OF.get(name)
+        parts = _class_to_parts(cls)
+        if parts is None or parts[1] not in ("min", "maj"):
+            return None
+        minor = parts[1] == "min"
+        other = (root + 3) % 12 if minor else (root + 9) % 12
+        return NOTE_NAMES[other] + ("" if minor else "m")
+
     def evidence(old: str, new: str, j: int) -> float:
         t_old, t_new = _chord_template(_CLASS_OF.get(old)), _chord_template(_CLASS_OF.get(new))
         if t_old is None or t_new is None:
@@ -667,11 +700,63 @@ def refine_chord_beats(f: Features, chords: list[dict], phase: int, bpb: int) ->
         edge = (np.arange(a, b) + 0.5) / FRAMES_PER_SECOND
         return float(np.sum(np.where(edge >= beats[j], diff, -diff)))
 
+    # 0: the bass line. First a chord whose bass is its relative chord's root is renamed, then a change moves to where the bass lands.
+    for n in range(len(placed)):
+        k, j = placed[n]
+        name = out[k]["chord"]
+        root = root_of(name)
+        if root is None or name not in fit:
+            continue
+        top = int(bass_beat[j].argmax())
+        other = relative_of(name)
+        if _BASS_RELABEL and other is not None and top != root and bass_beat[j][top] >= 0.25 and bass_beat[j][root] < 0.15 and root_of(other) == top:
+            if other not in fit:
+                template = _chord_template(_CLASS_OF.get(other))
+                if template is not None:
+                    fit[other] = beat_chroma @ template
+            if other in fit and fit[other][j] >= fit[name][j] - 0.1:
+                out[k]["chord"] = other
+    # Where the bass lands on a chord's root, a beat or two from where the chord was written, is a candidate move. It is made only when the
+    # same move (this chord after that chord, this many beats) turns up at least twice: the bass line of a loop repeats with the loop,
+    # while a chance bass note does not (solo guitars, walking basses and inversions gave a stray move now and then, and cost accuracy).
+    candidates: list[tuple[int, int, int, tuple[str, str, int]]] = []  # (placed index, new beat, shift, kind)
+    for n in range(1, len(placed)):
+        k, j = placed[n]
+        old, new = out[placed[n - 1][0]]["chord"], out[k]["chord"]
+        root, old_root = root_of(new), root_of(old)
+        if not _BASS_ONSET or root is None or root == old_root or bass_is(j, root):
+            continue
+        lo = placed[n - 1][1]
+        hi = placed[n + 1][1] if n + 1 < len(placed) else len(beats)
+        heard = out[k]["start"]
+        onsets = [
+            c for c in range(j - 2, j + 4)
+            if lo < c < hi and c != j + 1 and bass_is(c, root) and not bass_is(c - 1, root)  # a bass a beat after the cell is a late bass, not a late chord
+            and -2.5 <= (beats[c] - heard) / period <= 3.0
+        ]
+        if onsets:
+            c = min(onsets, key=lambda cand: abs(cand - j))
+            candidates.append((n, c, c - j, (old, new, c - j)))
+    kinds: dict[tuple[str, str, int], int] = {}
+    for _n, _c, _shift, kind in candidates:
+        kinds[kind] = kinds.get(kind, 0) + 1
+    for n, c, _shift, kind in candidates:
+        if kinds[kind] < 2:
+            continue
+        k, j = placed[n]
+        heard = out[k]["start"]
+        out[k]["gridStart"] = float(beats[c])
+        out[k]["_locked"] = True
+        if abs(beats[c] - heard) / period >= 0.75:
+            out[k]["start"] = float(beats[c])
+            out[placed[n - 1][0]]["end"] = float(beats[c])
+        placed[n] = (k, c)
+
     # 1 and 2: move a change by one beat
     for n in range(1, len(placed)):
         k, j = placed[n]
         old, new = out[placed[n - 1][0]]["chord"], out[k]["chord"]
-        if old == new or "N" in (old, new) or old not in fit or new not in fit:
+        if out[k].get("_locked") or old == new or "N" in (old, new) or old not in fit or new not in fit:
             continue
         lo = placed[n - 1][1]
         hi = placed[n + 1][1] if n + 1 < len(placed) else len(beats)
@@ -725,7 +810,10 @@ def refine_chord_beats(f: Features, chords: list[dict], phase: int, bpb: int) ->
             if best is None:
                 continue
             rise = fit[best][c] - fit[best][c - 1]
-            if rise >= _ONSET_JUMP and fit[best][c] >= fit[name][c] - 0.08 and fit[best][c + 1 if c + 1 < len(beats) else c] >= fit[best][c] - 0.1:
+            if (
+                rise >= _ONSET_JUMP and fit[best][c] >= fit[name][c] - 0.08 and fit[best][c + 1 if c + 1 < len(beats) else c] >= fit[best][c] - 0.1
+                and (not _BASS_INSERT or bass_is(c, root_of(best), 0.2) or bass_is(c + 1, root_of(best), 0.2))  # and the bass plays it
+            ):
                 additions.append((k + 1, {
                     "start": float(beats[c]), "end": float(beats[j_next]), "chord": best,
                     "confidence": 0.3, "gridStart": float(beats[c]), "_locked": True,
