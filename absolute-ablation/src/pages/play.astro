@@ -834,6 +834,10 @@ import SongRating from "../components/SongRating.astro";
       countJamOnce();
       recordMyPlayOnce();
       lastFollowedRow = null; // re-centre the grid on the playing row as soon as playback starts
+      if (gridActive >= 0) {
+        gridCells[gridActive].el.classList.remove("is-active"); // the lit cell is forgotten, so it must go dark too
+        gridCells[gridActive].bar.classList.remove("is-current");
+      }
       gridActive = -1;
     }
     if (playing) {
@@ -957,6 +961,34 @@ import SongRating from "../components/SongRating.astro";
         const half = Math.max(t1 - t0, 0.05) / 2;
         while (next < placed.length && placed[next].start < t0 - half) next++;
         return next < placed.length && placed[next].start < t0 + half ? placed[next++].chord : null;
+      }),
+    );
+  }
+
+  /** The chords on the beats, with the rest sign ("N") on every beat of a pause, not just the first: after a rest the blank cells are
+   *  silence, not a chord ringing on. A long silence (a fade-out, a break) is shown for two bars at most. */
+  function placeChordsWithRests(): (string | null)[][] {
+    const written = placeChordsOnBeats();
+    let resting = 0; // beats of silence still to mark
+    const limit = BEAT_CELLS * 2;
+    let run = 0;
+    return written.map((beats, b) =>
+      beats.map((chord, k) => {
+        if (bars[b]?.beats[k] === null || bars[b]?.beats[k] === undefined) return chord; // no beat here (a pickup, a short last bar)
+        if (chord === "N") {
+          resting = 1;
+          run = 1;
+          return chord;
+        }
+        if (chord) {
+          resting = 0;
+          return chord;
+        }
+        if (resting && run < limit) {
+          run++;
+          return "N";
+        }
+        return chord;
       }),
     );
   }
@@ -1180,7 +1212,7 @@ import SongRating from "../components/SongRating.astro";
     stripActive = -1;
     if (bars.length === 0) return;
 
-    const written = placeChordsOnBeats();
+    const written = placeChordsWithRests();
     // `start` is when the cell plays (cells without one never light up); `seek` is where a click on it goes.
     const addCell = (chord: string | null, kind: string, start: number | null, seek: number | null = start) => {
       const cell = document.createElement("div");
@@ -1326,6 +1358,7 @@ import SongRating from "../components/SongRating.astro";
         hi = mid - 1;
       }
     }
+    while (found > 0 && stripTimed[found].start - stripTimed[found - 1].start < 1e-3) found--; // see highlightChordGrid
     const cell = found >= 0 ? stripTimed[found].cell : FIRST_CELL;
 
     if (cell !== stripActive) {
@@ -1380,7 +1413,7 @@ import SongRating from "../components/SongRating.astro";
       if (sec.startBar !== null) lastReal = i;
     });
 
-    const written = placeChordsOnBeats();
+    const written = placeChordsWithRests();
     const makeCell = (label: string, kind: string): HTMLButtonElement => {
       const cell = document.createElement("button");
       cell.type = "button";
@@ -1451,7 +1484,7 @@ import SongRating from "../components/SongRating.astro";
               continue;
             }
             const chord = written[b][k];
-            const cell = chord === "N" ? makeCell("—", "is-rest") : makeCell(chord ? displayChord(chord) : "", "");
+            const cell = chord === "N" ? makeCell("𝄽", "is-rest is-silence") : makeCell(chord ? displayChord(chord) : "", "");
             cell.addEventListener("click", () => seekTo(t0));
             bar.appendChild(cell);
             gridCells.push({ el: cell, start: t0, bar, row });
@@ -1501,6 +1534,9 @@ import SongRating from "../components/SongRating.astro";
       }
     }
     if (index < 0) index = 0; // before the first beat the first cell is already the one to play
+    // The pickup beats before the first real beat all sit at the very start (a beat cannot be earlier than 0:00): the song begins
+    // on the first of those cells, not the last.
+    while (index > 0 && gridCells[index].start - gridCells[index - 1].start < 1e-3) index--;
     if (index === gridActive) return;
     if (gridActive >= 0) {
       gridCells[gridActive].el.classList.remove("is-active");
