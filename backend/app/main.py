@@ -86,7 +86,8 @@ except Exception as exc:
 # 19: strikes are found as sudden rises of the chord's own notes and tested against chance, so strokes that follow close on another are not lost.
 # 20: the beat grid follows a tempo that drifts and is tracked on a fine envelope (a song of 140 BPM was gridded at 129.2), so bars, sections and chords stay aligned all the way through.
 # 21: a repeated chord change is written on the same beat of the bar every time (loops line up row after row), when the audio agrees.
-ANALYSIS_VERSION = 21
+# 22: chords written a beat late (or a short chord missed) are put where their notes come in, so a loop reads the way it is played.
+ANALYSIS_VERSION = 22
 
 ALLOWED_UPLOAD_EXTENSIONS ={".mp3", ".wav", ".flac", ".m4a"}
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50MB

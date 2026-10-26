@@ -586,7 +586,7 @@ def regularize_loops(f: Features, chords: list[dict], phase: int, bpb: int) -> l
             continue
         for n in members:
             k, j = placed[n]
-            if (j - phase) % bpb == usual:
+            if (j - phase) % bpb == usual or chords[k].get("_locked"):
                 continue
             heard = chords[k]["start"]
             lo = placed[n - 1][1]
@@ -609,6 +609,133 @@ def regularize_loops(f: Features, chords: list[dict], phase: int, bpb: int) -> l
                     out[k - 1]["end"] = float(beats[target])
             moved += 1
     return out if moved else chords
+
+
+_RARE_BEAT = 0.12  # a beat of the bar that holds fewer than this share of a song's chord changes is an unlikely place for one
+_USUAL_BEAT = 0.25  # ...and one that holds more than this share is a likely place
+_ONSET_JUMP = 0.2  # how much a chord's notes must rise from one beat to the next for the chord to begin there
+
+
+def refine_chord_beats(f: Features, chords: list[dict], phase: int, bpb: int) -> list[dict]:
+    """Corrects the beats chords are written on, from the notes in the audio and from where this song puts its chord changes.
+
+    The chord model hears a change late when the new chord shares notes with the old one (Dm to F, F to C), and a short chord between two
+    longer ones can disappear altogether: in Paradise the F of a loop came a beat late, and the C two beats after it was missing from
+    most rows, so the loops did not match what is played. Three corrections, each only on clear evidence, then the loops are lined up
+    (regularize_loops):
+      1. a change on a beat where this song hardly ever changes chord moves one beat earlier, onto a beat where it often does, when the new
+         chord's notes are already clearly there on that earlier beat;
+      2. a change written a beat early moves one beat later when the notes fit it clearly better there;
+      3. inside a long chord, a short chord whose notes clearly come in on a beat (a sharp rise, and as strong as the chord that is
+         playing) is added from that beat."""
+    beats = f.beats
+    if beats is None or len(beats) < 16 or len(chords) < 6:
+        return chords
+    period = float(np.median(np.diff(beats)))
+    out = [dict(c) for c in chords]
+
+    def placed_of(items: list[dict]) -> list[tuple[int, int]]:
+        return [(k, int(np.argmin(np.abs(beats - c["gridStart"])))) for k, c in enumerate(items) if c.get("gridStart") is not None]
+
+    placed = placed_of(out)
+    if len(placed) < 6:
+        return chords
+    counts = np.bincount([(j - phase) % bpb for _, j in placed], minlength=bpb)
+    share = counts / counts.sum()
+
+    # the chroma of each beat, and how well each chord of the song fits it
+    edges = np.append(beats, f.duration)
+    lo_f = np.clip((edges[:-1] * FRAMES_PER_SECOND).astype(int), 0, f.chroma.shape[1] - 1)
+    hi_f = np.clip((edges[1:] * FRAMES_PER_SECOND).astype(int), lo_f + 1, f.chroma.shape[1])
+    beat_chroma = np.array([f.chroma[:, a:b].mean(axis=1) for a, b in zip(lo_f, hi_f)])
+    beat_chroma = beat_chroma / (np.linalg.norm(beat_chroma, axis=1, keepdims=True) + 1e-9)
+    fit: dict[str, np.ndarray] = {}
+    for name in {c["chord"] for c in out}:
+        template = _chord_template(_CLASS_OF.get(name))
+        if template is not None:
+            fit[name] = beat_chroma @ template
+    unit = f.chroma / (np.linalg.norm(f.chroma, axis=0, keepdims=True) + 1e-9)
+
+    def evidence(old: str, new: str, j: int) -> float:
+        t_old, t_new = _chord_template(_CLASS_OF.get(old)), _chord_template(_CLASS_OF.get(new))
+        if t_old is None or t_new is None:
+            return 0.0
+        a, b = max(int(max(beats[j] - 3 * period, 0) * FRAMES_PER_SECOND), 0), min(int((beats[j] + 3 * period) * FRAMES_PER_SECOND), f.chroma.shape[1])
+        if b - a < 3:
+            return 0.0
+        diff = t_new @ unit[:, a:b] - t_old @ unit[:, a:b]
+        edge = (np.arange(a, b) + 0.5) / FRAMES_PER_SECOND
+        return float(np.sum(np.where(edge >= beats[j], diff, -diff)))
+
+    # 1 and 2: move a change by one beat
+    for n in range(1, len(placed)):
+        k, j = placed[n]
+        old, new = out[placed[n - 1][0]]["chord"], out[k]["chord"]
+        if old == new or "N" in (old, new) or old not in fit or new not in fit:
+            continue
+        lo = placed[n - 1][1]
+        hi = placed[n + 1][1] if n + 1 < len(placed) else len(beats)
+        here = (j - phase) % bpb
+        heard = out[k]["start"]
+        if share[here] < _RARE_BEAT and lo < j - 1:
+            options = [
+                c for c in (j - 1, j - 2)
+                if c > lo and share[(c - phase) % bpb] >= _USUAL_BEAT and fit[new][c] >= 0.6 and fit[new][c] >= fit[old][c] - 0.2
+                and (heard - beats[c]) / period <= 2.3
+            ]
+            if options:
+                c = max(options, key=lambda cand: evidence(old, new, cand))  # of the likely beats, where the notes fit best
+                out[k]["gridStart"] = float(beats[c])
+                out[k]["_locked"] = True
+                if (heard - beats[c]) / period >= 0.75:
+                    out[k]["start"] = float(beats[c])
+                    out[placed[n - 1][0]]["end"] = float(beats[c])
+                placed[n] = (k, c)
+                continue
+        if lo < j - 1 and j - 2 >= 0:
+            c = j - 1
+            if fit[new][c] - fit[new][c - 1] >= _ONSET_JUMP and fit[new][c] >= fit[old][c] - 0.08 and (heard - beats[c]) / period <= 1.3:
+                out[k]["gridStart"] = float(beats[c])
+                out[k]["_locked"] = True  # the notes say it begins here: the loops are not to move it back
+                if (heard - beats[c]) / period >= 0.75:
+                    out[k]["start"] = float(beats[c])
+                    out[placed[n - 1][0]]["end"] = float(beats[c])
+                placed[n] = (k, c)
+                continue
+        if j + 1 < hi and share[(j + 1 - phase) % bpb] >= share[here] and evidence(old, new, j + 1) - evidence(old, new, j) >= 3.0:
+            c = j + 1
+            out[k]["gridStart"] = float(beats[c])
+            out[k]["_locked"] = True
+            placed[n] = (k, c)
+
+    # 3: a short chord inside a long one
+    additions: list[tuple[int, dict]] = []  # (index to insert before, chord)
+    for n in range(len(placed) - 1):
+        k, j = placed[n]
+        j_next = placed[n + 1][1]
+        name, following = out[k]["chord"], out[placed[n + 1][0]]["chord"]
+        if name not in fit or j_next - j < 4:
+            continue
+        for c in range(j + 2, j_next - 1):  # the added chord lasts two beats at least
+            best = max(
+                (z for z in fit if z not in (name, following)),
+                key=lambda z: fit[z][c] - fit[z][c - 1],
+                default=None,
+            )
+            if best is None:
+                continue
+            rise = fit[best][c] - fit[best][c - 1]
+            if rise >= _ONSET_JUMP and fit[best][c] >= fit[name][c] - 0.08 and fit[best][c + 1 if c + 1 < len(beats) else c] >= fit[best][c] - 0.1:
+                additions.append((k + 1, {
+                    "start": float(beats[c]), "end": float(beats[j_next]), "chord": best,
+                    "confidence": 0.3, "gridStart": float(beats[c]), "_locked": True,
+                }))
+                out[k]["end"] = float(beats[c])
+                break
+    for index, chord in sorted(additions, key=lambda item: -item[0]):
+        out.insert(index, chord)
+    final = regularize_loops(f, out, phase, bpb)
+    return [{key: value for key, value in c.items() if key != "_locked"} for c in final]
 
 
 
@@ -689,8 +816,8 @@ def detect_chords_ai(audio_path: str, on_progress: Optional[ProgressFn] = None) 
     phase = downbeat_phase(features.beats, simple, bpb)
     simple = place_chords_on_grid(simple, features.beats, phase, features.duration, bpb)
     detailed = place_chords_on_grid(detailed, features.beats, phase, features.duration, bpb)
-    simple = regularize_loops(features, simple, phase, bpb)
-    detailed = regularize_loops(features, detailed, phase, bpb)
+    simple = refine_chord_beats(features, simple, phase, bpb)
+    detailed = refine_chord_beats(features, detailed, phase, bpb)
     structure_inputs = (
         features.beats, features.duration, features.chroma, features.mfcc, features.rms,
         features.audible_start, phase, features.texture,
