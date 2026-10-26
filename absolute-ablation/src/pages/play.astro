@@ -943,6 +943,24 @@ import SongRating from "../components/SongRating.astro";
     return null;
   }
 
+  /** A song that starts part-way through a bar has beats that come before the music: the analysis fills them in backwards from the
+   *  first beat, and a beat cannot be earlier than 0:00, so several of them pile up at 0:00. They are not beats of the song, so those
+   *  cells are left empty (as a lead-in is on a chord chart) and the song starts on the first cell that has a beat: the first one lit,
+   *  and the first one to hold the first chord, with no jump over cells that were never played. */
+  function trimPickup(all: Bar[]): Bar[] {
+    if (all.length === 0) return all;
+    const first = all[0].beats.slice();
+    let trimmed = 0;
+    // The pile-up sits at exactly 0:00 (the fill-in is clamped there); a real beat is never at exactly 0.
+    while (trimmed < first.length - 1 && first[trimmed] !== null && (first[trimmed] as number) <= 1e-9 && Math.max(0, ...first.slice(trimmed + 1).map((t) => t ?? 0)) > 1e-9) {
+      first[trimmed] = null;
+      trimmed++;
+    }
+    if (trimmed === 0) return all; // no beats before the music: nothing to do
+    const start = firstNumber(first) ?? all[0].start;
+    return [{ ...all[0], start, beats: first }, ...all.slice(1)];
+  }
+
   /** The chord written in each beat cell, as [bar][beat]: a chord name, "N" for a rest, or null while the previous chord
    *  keeps ringing (and for the empty cells of a pickup bar). Chords go in the cell the analysis chose for them
    *  (gridStart), not necessarily the one nearest their detected time: that keeps a syncopated or slightly-early
@@ -953,13 +971,15 @@ import SongRating from "../components/SongRating.astro";
       .filter((seg, i) => seg.gridStart !== null && !(seg.chord === "N" && i < firstSound)) // nothing sounds before the song starts
       .map((seg) => ({ chord: seg.chord, start: meter.pulse === 1 ? (seg.gridStart ?? seg.start) : seg.start }));
     let next = 0; // next chord not yet written; cells and chords are both in time order
+    let seenBeat = false; // the first cell with a beat is where the song starts: a chord heard before it belongs to it
     return bars.map((bar) =>
       Array.from({ length: BEAT_CELLS }, (_, k) => {
         const t0 = bar.beats[k];
         if (t0 === null) return null;
         const t1 = firstNumber(bar.beats.slice(k + 1)) ?? duration;
         const half = Math.max(t1 - t0, 0.05) / 2;
-        while (next < placed.length && placed[next].start < t0 - half) next++;
+        if (seenBeat) while (next < placed.length && placed[next].start < t0 - half) next++;
+        seenBeat = true;
         return next < placed.length && placed[next].start < t0 + half ? placed[next++].chord : null;
       }),
     );
@@ -1359,7 +1379,7 @@ import SongRating from "../components/SongRating.astro";
       }
     }
     while (found > 0 && stripTimed[found].start - stripTimed[found - 1].start < 1e-3) found--; // see highlightChordGrid
-    const cell = found >= 0 ? stripTimed[found].cell : FIRST_CELL;
+    const cell = found >= 0 ? stripTimed[found].cell : (stripTimed[0]?.cell ?? FIRST_CELL); // before the first beat: the first cell that has one
 
     if (cell !== stripActive) {
       const far = jump || stripActive < 0 || Math.abs(cell - stripActive) > 2; // a seek, not the next beat
@@ -2207,7 +2227,7 @@ import SongRating from "../components/SongRating.astro";
     chords = chordsSimple;
     songKey = result.key ?? "";
     duration = result.duration;
-    baseBars = result.bars;
+    baseBars = trimPickup(result.bars);
     baseSections = result.sections ?? [];
     baseBeatsPerBar = result.beatsPerBar ?? (baseBars[0]?.beats.length ? baseBars[0].beats.length - 1 : 4);
     baseTempo = result.tempo || 120;
