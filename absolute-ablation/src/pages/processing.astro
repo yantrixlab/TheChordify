@@ -97,7 +97,8 @@ import Nav from "../components/Nav.astro";
 
       if (job.status === "done") {
         setProgress(100, "Done");
-        window.location.href = `/play?session=${sessionId}`;
+        // replace, not go to: the waiting screen leaves the history, so Back from the song returns to the page the song was picked on
+        window.location.replace(`/play?session=${sessionId}`);
         return;
       }
 
