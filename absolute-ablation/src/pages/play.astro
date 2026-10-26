@@ -283,7 +283,8 @@ import SongRating from "../components/SongRating.astro";
 <style is:global>
   /* the strumming pattern: a compact row of square tiles that light up with the music */
   .sm-card { position: relative; overflow: hidden; padding: 20px 22px 18px; border-radius: 20px; background: radial-gradient(120% 150% at 0% 0%, #2b1264 0%, #170b33 46%, #0f0623 100%); border: 1px solid #ffffff17; box-shadow: 0 30px 60px -34px #000c, inset 0 1px 0 #ffffff14; color: #e4dcf5; }
-  .sm-card::before { content: ""; position: absolute; top: -170px; right: -110px; width: 360px; height: 360px; border-radius: 50%; background: radial-gradient(circle, #7c3aed4d, transparent 66%); pointer-events: none; animation: sm-drift 10s ease-in-out infinite alternate; }
+  .sm-card::before { content: ""; position: absolute; top: -170px; right: -110px; width: 360px; height: 360px; border-radius: 50%; background: radial-gradient(circle, #7c3aed4d, transparent 66%); pointer-events: none; will-change: transform; }
+  .sm-card.is-live::before { animation: sm-drift 10s ease-in-out infinite alternate; }
   .sm-card > * { position: relative; }
   .sm-card[hidden] { display: none; }
   .sm-head { display: flex; align-items: center; justify-content: space-between; gap: 10px 14px; flex-wrap: wrap; }
@@ -297,16 +298,17 @@ import SongRating from "../components/SongRating.astro";
   .sm-seg button.is-on { background: #fff; color: #1a0d33; }
   .sm-label { margin: 14px 0 0 !important; font: 600 12.5px var(--font-mono) !important; letter-spacing: 0.06em; color: #b9a8e8 !important; }
   .sm-tiles { display: grid; grid-template-columns: repeat(var(--cols, 8), minmax(0, 60px)); gap: 8px; justify-content: start; margin: 12px 0 16px; padding: 4px 0 8px; }
-  .sm-tile { position: relative; overflow: hidden; aspect-ratio: 1 / 1; display: grid; place-items: center; align-content: center; gap: 4px; border-radius: 14px; background: linear-gradient(160deg, #7e3ff1 0%, #5421b8 100%); border: 1px solid #ffffff2b; box-shadow: inset 0 1px 0 #ffffff3d, 0 8px 16px -10px #5b21b6; color: #fff; transition: transform 0.28s cubic-bezier(0.3, 1.6, 0.5, 1), box-shadow 0.28s ease, filter 0.28s ease; }
+  .sm-tile { position: relative; overflow: hidden; aspect-ratio: 1 / 1; display: grid; place-items: center; align-content: center; gap: 4px; border-radius: 14px; background: linear-gradient(160deg, #7e3ff1 0%, #5421b8 100%); border: 1px solid #ffffff2b; box-shadow: inset 0 1px 0 #ffffff3d, 0 8px 16px -10px #5b21b6; color: #fff; transition: transform 0.24s cubic-bezier(0.3, 1.6, 0.5, 1); }
+  .sm-tile::before { content: ""; position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
   .sm-tile .sm-ar { display: grid; place-items: center; line-height: 0; }
   .sm-tile svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
   .sm-tile small { font: 600 10.5px/1 var(--font-mono); color: #ffffffb3; }
   .sm-tile.is-rest { background: #1a1037; border: 1px dashed #ffffff1f; box-shadow: none; color: #6f5fa8; }
   .sm-tile.is-rest small { color: #6f5fa8; }
-  .sm-tile.is-now { z-index: 1; transform: translateY(-3px) scale(1.08); filter: brightness(1.2); box-shadow: 0 0 0 2px #fcd34d, 0 0 26px #f59e0b99, 0 16px 22px -10px #000; animation: sm-hit 0.45s ease-out; }
-  .sm-tile.is-now::after { content: ""; position: absolute; inset: 0; background: linear-gradient(115deg, transparent 30%, #ffffff66 50%, transparent 70%); transform: translateX(-130%); animation: sm-shine 0.55s ease-out forwards; }
-  .sm-tile.is-rest.is-now { filter: none; box-shadow: 0 0 0 2px #fcd34d66, 0 0 18px #f59e0b33; }
-  .sm-tile.is-rest.is-now::after { display: none; }
+  .sm-tile.is-now { z-index: 1; transform: translateY(-3px) scale(1.08); box-shadow: 0 0 0 2px #fcd34d, 0 0 14px #f59e0b88; }
+  .sm-tile.is-now::before { animation: sm-flash 0.3s ease-out; }
+  .sm-tile.is-rest.is-now { box-shadow: 0 0 0 2px #fcd34d66; }
+  .sm-tile.is-rest.is-now::before { display: none; }
   .sm-tile.is-now.is-down .sm-ar { animation: sm-down 0.45s ease-out; }
   .sm-tile.is-now.is-up .sm-ar { animation: sm-up 0.45s ease-out; }
   .sm-text { margin: 0 !important; font-size: 14.5px !important; line-height: 1.65 !important; color: #d6cbef !important; }
@@ -319,13 +321,19 @@ import SongRating from "../components/SongRating.astro";
   .sm-how > div { margin-top: 8px; font-size: 14px; line-height: 1.7; color: #cbbfe8; }
   .sm-how > div p { margin: 0 0 8px !important; font-size: 14px !important; line-height: 1.7 !important; color: #cbbfe8 !important; }
   .sm-note { margin: 12px 0 0 !important; font-size: 12px !important; line-height: 1.5; color: #8f81b8 !important; }
-  @keyframes sm-hit { 0% { box-shadow: 0 0 0 0 #fcd34dcc, 0 0 0 2px #fcd34d, 0 0 26px #f59e0b99, 0 16px 22px -10px #000; } 100% { box-shadow: 0 0 0 14px #fcd34d00, 0 0 0 2px #fcd34d, 0 0 26px #f59e0b99, 0 16px 22px -10px #000; } }
-  @keyframes sm-shine { to { transform: translateX(130%); } }
+  @keyframes sm-flash { from { opacity: 0.38; } to { opacity: 0; } }
   @keyframes sm-down { 0% { transform: translateY(-6px); } 45% { transform: translateY(4px); } 100% { transform: translateY(0); } }
   @keyframes sm-up { 0% { transform: translateY(6px); } 45% { transform: translateY(-4px); } 100% { transform: translateY(0); } }
   @keyframes sm-drift { to { transform: translate(-36px, 26px) scale(1.12); } }
   @media (max-width: 640px) { .sm-card { padding: 16px 14px 14px; border-radius: 18px; } .sm-tiles { gap: 6px; } .sm-tile { border-radius: 11px; } .sm-tile svg { width: 17px; height: 17px; } .sm-tile small { font-size: 9.5px; } }
-  @media (prefers-reduced-motion: reduce) { .sm-card::before, .sm-tile.is-now, .sm-tile.is-now::after, .sm-tile.is-now .sm-ar { animation: none !important; } .sm-tile { transition: none; } .sm-tile.is-now { transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .sm-card::before, .sm-tile.is-now, .sm-tile.is-now::before, .sm-tile.is-now .sm-ar { animation: none !important; } .sm-tile { transition: none; } .sm-tile.is-now { transform: none; } }
+  /* A slow phone (see setLite): the decoration goes, the moving parts stay, and nothing but a transform or an opacity ever animates. */
+  html.perf-lite .sm-card::before, html.perf-lite .sm-tile.is-now::before, html.perf-lite .sm-tile.is-now .sm-ar { animation: none !important; }
+  html.perf-lite .sm-tile { transition: none; }
+  html.perf-lite .sm-tile.is-now { box-shadow: 0 0 0 2px #fcd34d; transform: none; }
+  html.perf-lite .cr-track { transition-duration: 0.2s; }
+  html.perf-lite .cr-card { transition: none; }
+  html.perf-lite .ph { box-shadow: 0 2px 6px rgba(13, 0, 31, 0.25); }
   .tl-card { background: var(--color-canvas); border: 1px solid var(--color-hairline); overflow: clip;
     box-shadow: 0 1px 2px rgba(13, 0, 31, 0.04), 0 12px 32px -12px rgba(91, 33, 182, 0.18); }
   /* The view switch floats over the top-left of the content and stays put, just under the sticky header. */
@@ -379,11 +387,8 @@ import SongRating from "../components/SongRating.astro";
   .cr-track { display: flex; align-items: center; width: max-content; will-change: transform;
     transition: transform 0.32s cubic-bezier(0.3, 0.6, 0.2, 1); }
   /* every diagram gets its own margin left and right, so neighbours (and their fret numbers) never touch */
-  .cr-item { flex: 0 0 auto; display: flex; justify-content: center; align-items: center; padding: 0 16px; cursor: pointer;
-    transition: padding 0.32s cubic-bezier(0.3, 0.6, 0.2, 1); }
+  .cr-item { flex: 0 0 auto; display: flex; justify-content: center; align-items: center; padding: 0 28px; cursor: pointer; } /* room for the playing chord, drawn 1.3x */
   .cr-item.is-rest { padding: 0 18px; font-size: 38px; color: var(--color-ink); }
-  .cr-item.is-current { padding: 0 36px; } /* the playing chord is drawn 1.3x, so its slot is wider */
-  .cr-item.is-rest.is-current { padding: 0 18px; }
   .cr-card { transition: transform 0.32s cubic-bezier(0.3, 0.6, 0.2, 1); transform-origin: center; }
   .cr-item.is-current .cr-card { transform: scale(1.3); }
   .is-locked { opacity: 0.4 !important; cursor: not-allowed !important; }
@@ -412,8 +417,7 @@ import SongRating from "../components/SongRating.astro";
     .bs-cell[data-len="3"], .bs-marker[data-len="3"] { font-size: 13px; }
     .bs-cell[data-len="4"], .bs-marker[data-len="4"] { font-size: 11px; }
     .bs-cell[data-len="5"], .bs-marker[data-len="5"] { font-size: 9.5px; }
-    .cr-item { padding: 0 12px; }
-    .cr-item.is-current { padding: 0 30px; }
+    .cr-item { padding: 0 20px; }
   }
   @media (prefers-reduced-motion: reduce) {
     .cr-track, .cr-item, .cr-card, .tl-tab { transition: none; }
@@ -491,7 +495,7 @@ import SongRating from "../components/SongRating.astro";
   .pb { display: flex; align-items: center; gap: 3px; height: 14px; cursor: pointer; touch-action: none; }
   .pb-seg { position: relative; height: 6px; border-radius: 3px; background: var(--color-hairline); overflow: hidden; transition: height 0.12s; }
   .pb:hover .pb-seg, .pb:focus-visible .pb-seg { height: 10px; }
-  .pb-fill { position: absolute; inset: 0 auto 0 0; width: 0; background: linear-gradient(90deg, var(--color-violet), var(--color-violet-deep)); }
+  .pb-fill { position: absolute; inset: 0; transform: scaleX(0); transform-origin: left center; will-change: transform; background: linear-gradient(90deg, var(--color-violet), var(--color-violet-deep)); }
   .ph-total { font: 600 13px var(--font-mono); color: var(--color-mute); }
 
   /* Chords grid: flat cells, dark bar lines, the playing beat filled in, sections as slim coloured tabs */
@@ -809,7 +813,7 @@ import SongRating from "../components/SongRating.astro";
   // ---- Player header: title, play/pause and a progress bar that is split into the song's sections --------
   const ICON_PLAY = '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M8 5v14l11-7z" fill="currentColor"/></svg>';
   const ICON_PAUSE = '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z" fill="currentColor"/></svg>';
-  let progressSegs: { fill: HTMLElement; start: number; end: number }[] = [];
+  let progressSegs: { fill: HTMLElement; start: number; end: number; shown: number }[] = [];
   let currentSectionIdx = -1;
 
   // A "jam session" is counted once per visit, when playback first starts (YouTube songs only).
@@ -846,6 +850,7 @@ import SongRating from "../components/SongRating.astro";
     }
     btnPlay.innerHTML = playing ? ICON_PAUSE : ICON_PLAY;
     btnPlay.setAttribute("aria-label", playing ? "Pause" : "Play");
+    strumCard.classList.toggle("is-live", playing && !liteMode);
   }
 
   /** One progress segment (and one "jump to" option) per section; a single one when there are none. */
@@ -854,6 +859,8 @@ import SongRating from "../components/SongRating.astro";
     sectionSelect.innerHTML = "";
     progressSegs = [];
     currentSectionIdx = -1;
+    lastClock = "";
+    lastSecond = -1;
     const parts = sections.length > 0 ? sections : [{ label: "Song", start: 0, end: duration }];
 
     parts.forEach((part, i) => {
@@ -865,7 +872,7 @@ import SongRating from "../components/SongRating.astro";
       fill.className = "pb-fill";
       seg.appendChild(fill);
       progressEl.appendChild(seg);
-      progressSegs.push({ fill, start: part.start, end: part.end });
+      progressSegs.push({ fill, start: part.start, end: part.end, shown: -1 });
 
       const option = document.createElement("option");
       option.value = String(i);
@@ -877,16 +884,31 @@ import SongRating from "../components/SongRating.astro";
     timeTotalEl.textContent = formatClock(duration);
   }
 
-  /** Time label, progress fills and the section picker. Cheap enough to run every frame. */
+  /** Time label, progress fills and the section picker. Runs every frame, so it writes to the page only what has changed. */
+  let lastClock = "";
+  let lastSecond = -1;
   function updateTransport(t: number) {
-    timeNowEl.textContent = formatClock(t);
-    progressEl.setAttribute("aria-valuenow", String(Math.round(t)));
+    const clock = formatClock(t);
+    if (clock !== lastClock) {
+      lastClock = clock;
+      timeNowEl.textContent = clock;
+    }
+    const whole = Math.round(t);
+    if (whole !== lastSecond) {
+      lastSecond = whole;
+      progressEl.setAttribute("aria-valuenow", String(whole));
+    }
     let current = -1;
-    progressSegs.forEach((seg, i) => {
-      const fraction = Math.min(1, Math.max(0, (t - seg.start) / Math.max(seg.end - seg.start, 0.001)));
-      seg.fill.style.width = `${fraction * 100}%`;
+    for (let i = 0; i < progressSegs.length; i++) {
+      const seg = progressSegs[i];
       if (t >= seg.start && t < seg.end) current = i;
-    });
+      const fraction = t >= seg.end ? 1 : t <= seg.start ? 0 : (t - seg.start) / Math.max(seg.end - seg.start, 0.001);
+      const shown = Math.round(fraction * 300) / 300; // a third of a percent: finer than a pixel on any phone
+      if (shown !== seg.shown) {
+        seg.shown = shown;
+        seg.fill.style.transform = `scaleX(${shown})`; // a transform: no layout while the bar grows
+      }
+    }
     if (current !== -1 && current !== currentSectionIdx) {
       currentSectionIdx = current;
       sectionSelect.value = String(current);
@@ -1018,6 +1040,27 @@ import SongRating from "../components/SongRating.astro";
   // strip steps one beat at a time, the diagrams slide one chord at a time with the playing chord enlarged.
   const ANCHOR = 0.28; // where the playing beat / chord sits, as a share of the width
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches; // scroll without animating
+  // Slow phones: when the page cannot keep up (many slow frames in a row), or the phone is known to be modest, the decoration is dropped
+  // (glows, drifting light, flashes) and the strip jumps a beat instead of gliding. It is remembered for the next visit.
+  let liteMode = false;
+  function setLite(on: boolean, remember = false) {
+    liteMode = on;
+    document.documentElement.classList.toggle("perf-lite", on);
+    if (on) document.getElementById("strum-card")?.classList.remove("is-live");
+    if (on && remember) {
+      try {
+        localStorage.setItem("chordsuno-lite", "1");
+      } catch {
+        // not remembered
+      }
+    }
+  }
+  try {
+    const modest = (navigator.hardwareConcurrency || 8) <= 4 || ((navigator as any).deviceMemory ?? 8) <= 3;
+    if (modest || localStorage.getItem("chordsuno-lite") === "1") setLite(true);
+  } catch {
+    // no storage: only the first check applies
+  }
   const LEAD_CELLS = 8; // empty cells before the silent bar, so the playing beat can sit a quarter in from the very start
   let SILENT_CELLS = 4; // the silent bar before the song: blank cells and a rest sign, one bar long
   const TAIL_CELLS = 30; // empty cells after the last beat, so the strip can scroll the last beat into place
@@ -1295,25 +1338,17 @@ import SongRating from "../components/SongRating.astro";
     measureCarousel();
   }
 
-  /** Item widths come from the stylesheet (they differ on a phone), so read them back once laid out. */
+  /** Item widths come from the stylesheet (they differ on a phone), so read them back once laid out. Every slot is the same width whether
+   *  or not its chord is playing (the playing one is only scaled up), so this is one pass of reads with nothing written in between. */
   function measureCarousel() {
     if (carouselItems.length === 0 || carouselEl.clientWidth === 0) return;
-    let offset = 0;
     carouselGrowth = 0;
-    carouselItems.forEach((item, i) => {
-      const wasCurrent = item.el.classList.contains("is-current");
-      item.el.style.transition = "none"; // measure the real widths, not a step of the width animation
-      item.el.classList.remove("is-current");
-      item.width = item.el.getBoundingClientRect().width;
-      if (!carouselGrowth && !item.el.classList.contains("is-rest")) {
-        item.el.classList.add("is-current");
-        carouselGrowth = item.el.getBoundingClientRect().width - item.width;
-        item.el.classList.remove("is-current");
-      }
-      if (wasCurrent) item.el.classList.add("is-current");
-      item.el.style.transition = "";
+    const widths = carouselItems.map((item) => item.el.getBoundingClientRect().width);
+    let offset = 0;
+    widths.forEach((width, i) => {
+      carouselItems[i].width = width;
       carouselOffsets[i] = offset;
-      offset += item.width;
+      offset += width;
     });
   }
 
@@ -1337,7 +1372,7 @@ import SongRating from "../components/SongRating.astro";
     stripOursUntil = performance.now() + 600;
     stripScrollEl.scrollTo({
       left: stripCells[stripActive].offsetLeft - stripMarkerX,
-      behavior: smooth && !reducedMotion ? "smooth" : "auto",
+      behavior: smooth && !reducedMotion && !liteMode ? "smooth" : "auto",
     });
   }
 
@@ -1407,8 +1442,15 @@ import SongRating from "../components/SongRating.astro";
     }
   }
 
+  let resizeWidth = window.innerWidth;
+  let resizeTimer = 0;
   window.addEventListener("resize", () => {
-    if (activeView === "diagrams") layoutDiagrams();
+    if (window.innerWidth === resizeWidth) return;
+    resizeWidth = window.innerWidth;
+    window.clearTimeout(resizeTimer);
+    resizeTimer = window.setTimeout(() => {
+      if (activeView === "diagrams") layoutDiagrams();
+    }, 120);
   });
 
   /** Sections as colour-coded blocks; each row is four bars (two when a bar has six beats), each bar one cell per beat. A chord is written in the
@@ -1539,8 +1581,11 @@ import SongRating from "../components/SongRating.astro";
   });
 
   /** Fills in the beat cell that is playing. */
+  let gridFrom = 1; // the lit cell holds from this time...
+  let gridUntil = 0; // ...to this one
   function highlightChordGrid(t: number) {
     if (gridCells.length === 0) return;
+    if (gridActive >= 0 && t >= gridFrom && t < gridUntil) return;
     let lo = 0;
     let hi = gridCells.length - 1;
     let index = -1;
@@ -1553,6 +1598,8 @@ import SongRating from "../components/SongRating.astro";
         hi = mid - 1;
       }
     }
+    gridFrom = index < 0 ? -Infinity : gridCells[index].start;
+    gridUntil = index + 1 < gridCells.length ? gridCells[index + 1].start : Infinity;
     if (index < 0) index = 0; // before the first beat the first cell is already the one to play
     // The pickup beats before the first real beat all sit at the very start (a beat cannot be earlier than 0:00): the song begins
     // on the first of those cells, not the last.
@@ -1978,6 +2025,8 @@ import SongRating from "../components/SongRating.astro";
     strumTiles.replaceChildren();
     strumTileEls = [];
     strumLit = -1;
+    strumFrom = 1;
+    strumUntil = 0;
     if (!strum || strumList.length === 0) return;
     const cur = strumList[Math.min(strumIdx, strumList.length - 1)];
     buildStrumTabs();
@@ -2026,7 +2075,10 @@ import SongRating from "../components/SongRating.astro";
   }
 
   /** Lights the slot (an eighth or sixteenth note) that is playing, from the bars the grid is drawn from. */
+  let strumFrom = 1; // the lit slot holds from this time...
+  let strumUntil = 0; // ...to this one
   function highlightStrum(t: number) {
+    if (t >= strumFrom && t < strumUntil) return;
     if (strumTileEls.length === 0 || bars.length === 0) return;
     if (strumBar >= bars.length || t < (bars[strumBar].start ?? 0)) strumBar = 0;
     while (strumBar + 1 < bars.length && t >= (bars[strumBar + 1].start ?? Infinity)) strumBar++;
@@ -2036,9 +2088,22 @@ import SongRating from "../components/SongRating.astro";
       let k = 0;
       for (let i = 0; i < BEAT_CELLS; i++) if (bar.beats[i] !== null && bar.beats[i] !== undefined && (bar.beats[i] as number) <= t) k = i;
       const t0 = bar.beats[k] as number;
-      const next = firstNumber(bar.beats.slice(k + 1)) ?? t0 + 0.5;
-      const within = Math.min(Math.floor(((t - t0) / Math.max(next - t0, 0.05)) * strumSub), strumSub - 1);
+      let next = t0 + 0.5;
+      for (let i = k + 1; i < bar.beats.length; i++) {
+        const value = bar.beats[i];
+        if (value !== null && value !== undefined) {
+          next = value;
+          break;
+        }
+      }
+      const span = Math.max(next - t0, 0.05);
+      const within = Math.min(Math.floor(((t - t0) / span) * strumSub), strumSub - 1);
       slot = k * strumSub + within;
+      strumFrom = t0 + (within * span) / strumSub;
+      strumUntil = strumFrom + span / strumSub;
+    } else {
+      strumFrom = 1;
+      strumUntil = 0;
     }
     const lit = slot % strumTileEls.length;
     if (lit === strumLit) return;
@@ -2073,7 +2138,21 @@ import SongRating from "../components/SongRating.astro";
   let syncFrame = 0;
   function startSyncLoop() {
     if (syncFrame) return;
-    const tick = () => {
+    let before = 0;
+    let frames = 0;
+    let slow = 0;
+    const tick = (now: number) => {
+      // Frames longer than 34 ms (under 30 a second) in 90 of them: the phone cannot keep up, so go light.
+      if (before && !liteMode && document.visibilityState === "visible") {
+        frames++;
+        if (now - before > 34 && now - before < 500) slow++; // (a pause of half a second or more is the tab being away, not slowness)
+        if (frames >= 90) {
+          if (slow >= 27) setLite(true, true);
+          frames = 0;
+          slow = 0;
+        }
+      }
+      before = now;
       onTimeUpdate(playerTime());
       syncFrame = requestAnimationFrame(tick);
     };
