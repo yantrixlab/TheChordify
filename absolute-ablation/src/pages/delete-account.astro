@@ -1,0 +1,110 @@
+---
+import LegalLayout from "../layouts/LegalLayout.astro";
+import { business } from "../lib/business";
+---
+
+<LegalLayout title="Delete your account" description="How to delete your Chord Suno account and the data that goes with it, in the app or on the website." eyebrow="Your data" updated={business.privacyUpdated}>
+  <p>
+    You can delete your {business.product} account and your data yourself, at any time, in the app or on the website. This page is where to do it. Deleting is permanent.
+  </p>
+
+  <div id="da-box" class="da-box" aria-live="polite">
+    <p id="da-state" class="da-state">Checking who is signed in…</p>
+    <div id="da-out" hidden>
+      <p>Sign in with the Google account you use for {business.product} to delete it.</p>
+      <button id="da-signin" type="button" class="da-btn">Sign in</button>
+    </div>
+    <div id="da-in" hidden>
+      <p>You are signed in as <strong id="da-who"></strong>.</p>
+      <label class="da-check"><input id="da-sure" type="checkbox" /> <span>I understand that my account and my data will be deleted for good, and that a paid plan is cancelled at once, without a refund.</span></label>
+      <button id="da-delete" type="button" class="da-btn is-danger" disabled>Delete my account</button>
+    </div>
+    <p id="da-error" class="da-error" role="alert" hidden></p>
+  </div>
+
+  <h2>What is deleted</h2>
+  <ul>
+    <li>Your account: your name, email address, profile picture and Google account identifier, and every place you are signed in.</li>
+    <li>Your library: the songs you played and favourited, and your history.</li>
+    <li>Your progress: XP, level, streak and badges.</li>
+    <li>Your ratings and any comments you wrote about songs.</li>
+    <li>The count of new songs you started each day.</li>
+    <li>Audio files you uploaded, and the chords worked out from them, unless somebody else uploaded the same file and still has it.</li>
+    <li>A paid plan is cancelled the moment you delete the account, and no further payment is taken.</li>
+  </ul>
+
+  <h2>What is kept</h2>
+  <ul>
+    <li>
+      <strong>Records of payments</strong> (the plan, the dates and amounts, and the identifiers Razorpay gave them) are kept for as long as accounting, tax and the law require. They no longer have your name or email
+      on them.
+    </li>
+    <li>The chords worked out for a YouTube song stay, because they belong to the song, not to you. They hold nothing about you.</li>
+    <li>Short-term server logs, until they are cleared in the normal course. They are not linked to your account once it is gone.</li>
+  </ul>
+
+  <h2>If you cannot sign in</h2>
+  <p>
+    Write to <a href={`mailto:${business.email}`}>{business.email}</a> from the email address of your account, with "Delete my account" in the subject. We will delete your account and reply to confirm, within 30 days. If you
+    never created an account, we hold no personal data about you apart from short-term server logs.
+  </p>
+  <p>More about the data we hold is in our <a href="/privacy/">Privacy Policy</a>.</p>
+</LegalLayout>
+
+<style is:global>
+  .da-box { margin: 22px 0 8px; padding: 22px 24px; border-radius: 18px; background: #fff; border: 1px solid var(--color-hairline); box-shadow: 0 1px 2px #1a05330a; }
+  .da-box p { margin: 0 0 14px; }
+  .da-state { color: var(--color-mute); }
+  .da-check { display: flex; align-items: flex-start; gap: 10px; margin: 0 0 16px; font-size: 15px; line-height: 1.5; cursor: pointer; }
+  .da-check input { flex: none; width: 18px; height: 18px; margin-top: 2px; accent-color: var(--color-violet); }
+  .da-btn { height: 44px; padding: 0 22px; border: 0; border-radius: 999px; background: var(--color-violet); color: #fff; font: 650 15px var(--font-sans); cursor: pointer; }
+  .da-btn:hover:not(:disabled) { background: var(--color-violet-deep); }
+  .da-btn.is-danger { background: #dc2626; }
+  .da-btn.is-danger:hover:not(:disabled) { background: #b91c1c; }
+  .da-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .da-error { margin: 14px 0 0 !important; padding: 10px 14px; border-radius: 12px; background: #fef2f2; color: var(--color-error); font-size: 14.5px; }
+  .da-box [hidden] { display: none; }
+</style>
+
+<script>
+  import { getMe, deleteAccount } from "../lib/auth";
+  import { openSignIn } from "../lib/authUi";
+
+  const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+  const state = $("da-state");
+  const signedOut = $("da-out");
+  const signedIn = $("da-in");
+  const sure = $<HTMLInputElement>("da-sure");
+  const button = $<HTMLButtonElement>("da-delete");
+  const error = $("da-error");
+
+  function show(user: { email: string; name: string } | null) {
+    state.hidden = true;
+    signedOut.hidden = user !== null;
+    signedIn.hidden = user === null;
+    if (user) $("da-who").textContent = user.email;
+  }
+
+  getMe().then(show);
+  window.addEventListener("auth-change", (event) => show((event as CustomEvent<{ email: string; name: string } | null>).detail));
+  $("da-signin").addEventListener("click", () => void openSignIn());
+  sure.addEventListener("change", () => (button.disabled = !sure.checked));
+  button.addEventListener("click", async () => {
+    if (!sure.checked) return;
+    error.hidden = true;
+    button.disabled = true;
+    button.textContent = "Deleting…";
+    try {
+      await deleteAccount();
+      signedIn.hidden = true;
+      state.hidden = false;
+      state.textContent = "Your account and your data have been deleted. Thank you for using Chord Suno. Taking you to the home page…";
+      setTimeout(() => (window.location.href = "/"), 3500);
+    } catch (err) {
+      error.textContent = err instanceof Error ? err.message : "We could not delete the account. Please try again, or write to us.";
+      error.hidden = false;
+      button.textContent = "Delete my account";
+      button.disabled = !sure.checked;
+    }
+  });
+</script>

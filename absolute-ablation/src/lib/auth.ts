@@ -105,6 +105,26 @@ export async function signOut(): Promise<void> {
   remember(null);
 }
 
+/** Deletes the signed-in person's account and data (the server cancels a paid plan first). Throws an Error with a sentence to show. */
+export async function deleteAccount(): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}/api/me`, { method: "DELETE", credentials: "include" });
+  } catch {
+    throw new Error("Could not reach the server. Check your connection and try again.");
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(typeof body.detail === "string" ? body.detail : "We could not delete the account. Please try again, or write to us.");
+  }
+  try {
+    for (const key of ["chordsuno-visitor", "chordsuno-lite", "cs-user"]) localStorage.removeItem(key);
+  } catch {
+    // nothing kept here to remove
+  }
+  remember(null);
+}
+
 // ---- Google's button -------------------------------------------------------------------------------------------------
 
 let googleReady: Promise<void> | null = null;

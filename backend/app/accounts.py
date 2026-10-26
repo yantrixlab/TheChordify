@@ -167,6 +167,12 @@ class AccountStore:
         )
         return _user(rows[0]) if rows else None
 
+    def delete_user(self, user_id: str) -> bool:
+        """Removes a person: their sign-ins and their account (name, email, picture, Google id). True when there was one."""
+        self._db.run("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+        _, removed = self._db.run("DELETE FROM users WHERE id = ?", (user_id,))
+        return removed > 0
+
     def end_session(self, token: str) -> None:
         if token:
             self._db.run("DELETE FROM sessions WHERE token_hash = ?", (_hash(token),))

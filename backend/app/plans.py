@@ -683,6 +683,10 @@ class PlanStore:
         rows, _ = self._db.run("SELECT n FROM usage WHERE user_key = ? AND day = ? AND name = ?", (user_key, day, name))
         return rows[0]["n"] if rows else 0
 
+    def delete_usage(self, user_key: str) -> None:
+        """Forgets the day-by-day counts kept for a person (new songs per day)."""
+        self._db.run("DELETE FROM usage WHERE user_key = ?", (user_key,))
+
     def add_usage(self, user_key: str, day: int, name: str, amount: int = 1) -> None:
         self._db.run(
             """

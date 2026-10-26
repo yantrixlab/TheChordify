@@ -216,6 +216,9 @@ function userMenu(user: AuthUser) {
   const billing = el("a", "au-item", "Plans & billing");
   billing.href = "/pricing/";
   billing.setAttribute("role", "menuitem");
+  const remove = el("a", "au-item", "Delete account");
+  remove.href = "/delete-account/";
+  remove.setAttribute("role", "menuitem");
   panel.append(library, billing);
   if (user.isAdmin) {
     const admin = el("a", "au-item", "Admin");
@@ -231,7 +234,7 @@ function userMenu(user: AuthUser) {
     await signOut();
     if (location.pathname.startsWith("/admin")) location.reload();
   });
-  panel.append(out);
+  panel.append(out, remove);
 
   const setOpen = (open: boolean) => {
     panel.hidden = !open;
@@ -298,6 +301,9 @@ function render(user: AuthUser | null) {
     out.type = "button";
     out.addEventListener("click", () => signOut());
     node.append(out);
+    const remove = el("a", "au-mobile-link", "Delete account");
+    remove.href = "/delete-account/";
+    node.append(remove);
     drawn.set(node, { id: user.id, update: card.update });
   });
 }

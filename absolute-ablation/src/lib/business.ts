@@ -13,6 +13,10 @@ export const business = {
   country: "India",
   /** Google Analytics 4 measurement id (from Admin > Data streams in Google Analytics). Empty turns analytics off. */
   analyticsId: "G-V9JWJZNYZ0",
+  /** The person who answers privacy complaints (India's rules ask for a named Grievance Officer). Leave empty to leave the name out. */
+  grievanceOfficer: "",
   /** Shown as "Last updated" on each page. */
   updated: "24 October 2026",
+  /** When the Privacy Policy last changed (and the page about deleting an account). */
+  privacyUpdated: "27 October 2026",
 };

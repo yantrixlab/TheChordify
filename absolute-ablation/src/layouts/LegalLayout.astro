@@ -8,13 +8,15 @@ interface Props {
   title: string;
   description: string;
   eyebrow?: string;
+  updated?: string; // when this page last changed, if not the date the other legal pages show
 }
 
-const { title, description, eyebrow = "Legal" } = Astro.props;
+const { title, description, eyebrow = "Legal", updated = business.updated } = Astro.props;
 const pages = [
   { href: "/terms/", label: "Terms of Service" },
   { href: "/privacy/", label: "Privacy Policy" },
   { href: "/refunds/", label: "Refund & Cancellation" },
+  { href: "/delete-account/", label: "Delete your account" },
   { href: "/contact/", label: "Contact us" },
 ];
 const here = Astro.url.pathname.replace(/\/?$/, "/");
@@ -26,7 +28,7 @@ const here = Astro.url.pathname.replace(/\/?$/, "/");
     <article class="lg-wrap">
       <p class="lg-eyebrow">{eyebrow}</p>
       <h1>{title}</h1>
-      <p class="lg-meta">Last updated {business.updated}</p>
+      <p class="lg-meta">Last updated {updated}</p>
       <div class="lg-body">
         <slot />
       </div>

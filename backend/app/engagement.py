@@ -458,6 +458,20 @@ class Engagement:
             "previousLevel": before["level"], **after,
         }
 
+    def delete_user(self, user_id: str) -> list[str]:
+        """Removes a person's library, favourites, XP, streak and badges. Returns the songs they uploaded that nobody else has in a
+        library, whose audio and results can go with them."""
+        rows, _ = self._db.run("SELECT session_id, video_id FROM library_items WHERE user_id = ?", (user_id,))
+        uploads = [r["session_id"] for r in rows if not r["video_id"]]
+        for table in ("library_items", "user_progress", "user_badges"):
+            self._db.run(f"DELETE FROM {table} WHERE user_id = ?", (user_id,))
+        alone = []
+        for session_id in uploads:
+            held, _ = self._db.run("SELECT COUNT(*) AS n FROM library_items WHERE session_id = ?", (session_id,))
+            if int(held[0]["n"]) == 0:
+                alone.append(session_id)
+        return alone
+
     def record_play(self, user_id: str, session_id: str, meta: dict) -> dict:
         """A person pressed play on a song. Counts it (unless it is the same song again too soon) and pays out XP."""
         cfg, rules = self.config(), self.config()["xp"]

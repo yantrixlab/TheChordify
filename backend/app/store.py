@@ -280,6 +280,14 @@ class SongStore:
             (session_id, voter, stars, comment, title, artist, now, now),
         )
 
+    def delete_ratings_of(self, voter: str) -> None:
+        """Removes every rating (and comment) a person left."""
+        self._db.run("DELETE FROM ratings WHERE voter = ?", (voter,))
+
+    def delete_result(self, key: str) -> None:
+        """Removes a song's saved analysis."""
+        self._db.run("DELETE FROM results WHERE key = ?", (key,))
+
     def rating_summary(self, session_id: str, voter: str = "") -> dict:
         """{"count", "average", "mine": {"stars", "comment"} or None} for one song."""
         rows, _ = self._db.run("SELECT COUNT(*) AS n, AVG(stars) AS mean FROM ratings WHERE session_id = ?", (session_id,))

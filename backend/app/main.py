@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import json
 import logging
+import glob
 import os
 import re
 import tempfile
@@ -669,6 +670,36 @@ def billing_verify(body: VerifyBody, request: Request) -> dict:
     plans.apply_razorpay({**entity, "status": entity["status"] if entity["status"] in ("active", "authenticated", "pending") else "active"})
     plan, sub = plans.effective(user["id"])
     return {"plan": {"code": plan["code"], "name": plan["name"]}, "subscription": _subscription_view(sub)}
+
+
+@app.delete("/api/me")
+def delete_my_account(request: Request, response: Response) -> dict:
+    """Deletes the signed-in person's account and what hangs on it: their sign-ins, library, favourites, XP and badges, ratings and
+    comments, daily counts, and the audio they uploaded (when nobody else has it). A subscription is cancelled on the spot. The records
+    of payments stay without a name or email on them, as accounting rules require."""
+    user = _require_user(request, changes=True)
+    if user["email"] in _ADMIN_EMAILS:
+        raise HTTPException(status_code=400, detail="An administrator's account is removed by taking it off the admin list first.")
+    _plan, sub = plans.effective(user["id"])
+    if sub:
+        try:
+            razorpay.cancel_subscription(sub["razorpaySubscriptionId"], at_cycle_end=False)
+            plans.mark_cancelling(sub["razorpaySubscriptionId"])
+        except RazorpayError as exc:
+            log.warning("Could not cancel the subscription of a deleted account: %s", exc)
+            raise HTTPException(status_code=502, detail="We could not cancel your subscription just now, so the account was not deleted. Please try again, or write to us.")
+    uploads = engagement.delete_user(user["id"])
+    catalog.delete_ratings_of(f"u:{user['id']}")
+    plans.delete_usage(user["id"])
+    for session_id in uploads:
+        if _SAFE_KEY.match(session_id):
+            for path in glob.glob(os.path.join(UPLOAD_DIR, f"{session_id}.*")):
+                _remove(path)
+            catalog.delete_result(session_id)
+    accounts.delete_user(user["id"])
+    response.delete_cookie(_SESSION_COOKIE, path="/")
+    log.info("Account %s deleted at the person's request", user["id"])
+    return {"deleted": True}
 
 
 @app.post("/api/billing/cancel")

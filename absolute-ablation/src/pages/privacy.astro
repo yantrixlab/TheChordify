@@ -3,118 +3,195 @@ import LegalLayout from "../layouts/LegalLayout.astro";
 import { business } from "../lib/business";
 ---
 
-<LegalLayout title="Privacy Policy" description="What Chord Suno collects, why, who it is shared with, and the choices you have.">
+<LegalLayout
+  title="Privacy Policy"
+  description="What Chord Suno collects on the website and in the Android and iOS apps, why, who it is shared with, how long it is kept, and how to delete it."
+  updated={business.privacyUpdated}
+>
   <p>
-    This policy explains what {business.name} ("we") collects when you use {business.product} at <a href={business.site}>{business.site}</a>, what we do with it, and your choices. We
-    aim to collect only what the service needs.
+    This policy explains what {business.name} ("we", "us") collects when you use {business.product}: the website at <a href={business.site}>{business.site}</a> and our Android and iOS apps
+    (together, "the service"). It says what we do with your information, who it goes to, how long we keep it, and the choices you have, including how to
+    <a href="/delete-account/">delete your account</a>. We collect only what the service needs. We do not sell your personal information and we do not show advertising.
   </p>
+  <p>
+    <strong>Who is responsible:</strong> {business.name}{business.address ? `, ${business.address}` : ""}, {business.country}. <strong>Contact:</strong>
+    <a href={`mailto:${business.email}`}>{business.email}</a>.
+  </p>
+
+  <h2>At a glance</h2>
+  <table>
+    <thead><tr><th>Information</th><th>Collected?</th><th>Why</th></tr></thead>
+    <tbody>
+      <tr><td>Name, email address, profile picture, Google account id</td><td>Yes, if you sign in with Google</td><td>Your account</td></tr>
+      <tr><td>Songs you play and favourite, XP, level, streak, badges, ratings and comments</td><td>Yes, if you are signed in</td><td>Your library and progress</td></tr>
+      <tr><td>YouTube songs you pick, and audio files you upload</td><td>Yes</td><td>To work out the chords</td></tr>
+      <tr><td>Microphone audio</td><td>Not collected. Used on your device only, and only when you use the tuner or the live chord detector</td><td>To show the note or chord you are playing</td></tr>
+      <tr><td>Payment details (card, UPI, bank)</td><td>Not collected by us. Razorpay handles them</td><td>Taking payments</td></tr>
+      <tr><td>Pages and features used, approximate location, browser or device details, app version</td><td>Yes</td><td>To count visits and fix problems</td></tr>
+      <tr><td>IP address</td><td>Yes, in server logs</td><td>Fair-use limits, security</td></tr>
+      <tr><td>Precise location, contacts, photos, camera, messages</td><td>No</td><td>Never asked for</td></tr>
+    </tbody>
+  </table>
 
   <h2>1. What we collect</h2>
   <h3>When you sign in with Google</h3>
   <p>
-    Your name, email address, profile picture and Google's account identifier, which Google gives us when you choose "Continue with Google". We never receive your Google password.
-    We also record when you sign in.
+    Your name, email address, profile picture and Google's account identifier, which Google gives us when you choose "Continue with Google". We never receive your Google password. We also record
+    when you sign in. You do not need an account to look up chords, but some features, such as a library and favourites, need one.
   </p>
-  <h3>What you do on the site</h3>
+  <h3>What you do in the service</h3>
   <ul>
     <li>The songs you play and favourite (your library and history).</li>
     <li>Your progress: XP, level, streak and badges.</li>
+    <li>The ratings and the comments you leave about the chords of a song. A rating is tied to your account, or, if you are not signed in, to a random code your browser or app makes for itself.</li>
     <li>The number of new songs you start each day, so that your plan's limits can be applied.</li>
-    <li>Songs you pick from YouTube, and audio files you upload, with the chords and other results we work out from them.</li>
+    <li>Songs you pick from YouTube (we keep the video's id, title, artist and cover picture), audio files you upload, and the chords and other results we work out from them.</li>
   </ul>
+  <h3>Microphone (the tuner and the live chord detector)</h3>
+  <p>
+    The Toolkit's tuner and live chord detector listen through your microphone. In the apps we ask for the microphone permission only when you open one of them, and you can say no: everything else
+    works without it. The sound is analysed <strong>on your device, as you play</strong>. It is not recorded, stored, uploaded or shared, and we never receive it.
+  </p>
+  <h3>Audio files you upload</h3>
+  <p>
+    When you upload a song, the file is sent to our servers so that its chords can be worked out, and kept so that you can play along with it later. In the apps, we see only the file you choose through the
+    system's file picker. We do not look through your other files or media.
+  </p>
   <h3>When you subscribe</h3>
   <p>
-    Payments are handled by Razorpay. We receive the plan you chose, the status and dates of your subscription, and the identifiers Razorpay gives it. We <strong>do not</strong> receive
-    or store your card, UPI or bank details. Those go only to Razorpay.
+    Payments are handled by Razorpay. We receive the plan you chose, the status and dates of your subscription, and the identifiers Razorpay gives it. We <strong>do not</strong> receive or store your card,
+    UPI or bank details. Those go only to Razorpay. If you subscribe through Google Play or the App Store, that store takes the payment and tells us the plan and its status.
   </p>
-  <h3>Visit statistics</h3>
+  <h3>Visit and usage statistics</h3>
   <p>
-    We use Google Analytics to count visits and see which pages and features are used: for example how many people search, open a song or reach the pricing page. It receives
-    your visit and device details (such as the pages you open, your browser and an approximate location from your IP address) and those events. We do not send it your name, email address
-    or any account details. The admin pages are not counted.
+    We use Google Analytics to count visits and see which pages and features are used: for example how many people search, open a song or reach the pricing page. It receives your visit and device details
+    (the pages or screens you open, your browser or device model and version, the app version, and an approximate location worked out from your IP address) and those events. We do not send it your name,
+    email address or any account details. The admin pages are not counted.
   </p>
   <h3>Technical information</h3>
   <p>
-    Like most websites, our servers see your IP address and browser details when you visit. We use your IP address to apply fair-use limits and to keep the service safe. We also keep
-    short-term logs to find and fix problems.
+    Like most services, our servers see your IP address and your browser or app details when you connect. We use your IP address to apply fair-use limits and to keep the service safe. We also keep
+    short-term logs, including error reports, to find and fix problems.
   </p>
+  <h3>When you write to us</h3>
+  <p>The messages you send us and your email address, so that we can reply.</p>
 
-  <h2>2. Why we use it</h2>
-  <ul>
-    <li>To sign you in and keep you signed in.</li>
-    <li>To analyse the songs you choose and show you the results.</li>
-    <li>To keep your library, favourites, XP and badges, and to apply your plan.</li>
-    <li>To take payments, manage subscriptions and answer questions about them.</li>
-    <li>To protect the service from abuse, and to keep it working and improve it.</li>
-    <li>To reply when you contact us.</li>
-  </ul>
-  <p>We do not sell your personal information, and we do not use it to show you advertising.</p>
+  <h2>2. Why we use it, and our legal basis</h2>
+  <table>
+    <thead><tr><th>What we do</th><th>Basis (where the GDPR applies)</th></tr></thead>
+    <tbody>
+      <tr><td>Sign you in and keep you signed in; analyse the songs you choose; keep your library, favourites, XP and badges; apply your plan</td><td>To provide the service you asked for (contract)</td></tr>
+      <tr><td>Take payments, manage subscriptions, keep accounting records, answer questions about them</td><td>Contract, and legal obligations</td></tr>
+      <tr><td>Protect the service from abuse, keep it working, count visits and improve it</td><td>Our legitimate interests in a safe, working, improving service, and your consent where the law asks for it</td></tr>
+      <tr><td>Use your microphone for the tuner and chord detector</td><td>Your permission, given when you start the feature, which you can withdraw in your device settings</td></tr>
+      <tr><td>Reply when you contact us</td><td>Legitimate interests, and contract</td></tr>
+    </tbody>
+  </table>
+  <p>We do not use your personal information to show advertising, we do not build advertising profiles, and we do not make decisions about you by automated means that have legal or similar effects.</p>
 
   <h2>3. Who we share it with</h2>
-  <p>We use a few services to run {business.product}. They receive only what they need:</p>
+  <p>We use a few services to run {business.product}. They receive only what they need to do their job:</p>
   <table>
     <thead><tr><th>Service</th><th>What for</th></tr></thead>
     <tbody>
-      <tr><td>Google</td><td>Signing in with Google, the fonts used on the site, and Google Analytics (see below), which shows us how many people visit and which pages and features they use.</td></tr>
-      <tr><td>Razorpay</td><td>Taking payments and managing subscriptions.</td></tr>
-      <tr><td>YouTube</td><td>Fetching the audio of a song you choose, and the video player on the play page. YouTube has its own privacy policy and may set its own cookies.</td></tr>
-      <tr><td>Our hosting provider</td><td>Running the servers and database where your data is kept.</td></tr>
+      <tr><td>Google</td><td>Signing in with Google, the fonts used in the service, and Google Analytics (see above).</td></tr>
+      <tr><td>Razorpay</td><td>Taking payments and managing subscriptions on the website.</td></tr>
+      <tr><td>Google Play and the App Store</td><td>Distributing the apps and, where you subscribe through them, taking the payment.</td></tr>
+      <tr><td>YouTube</td><td>Fetching the audio of a song you choose, and the video player on the song page. The player is YouTube's: by using it you also agree to the <a href="https://www.youtube.com/t/terms" rel="noopener">YouTube Terms of Service</a>, and Google handles what it collects under the <a href="https://policies.google.com/privacy" rel="noopener">Google Privacy Policy</a>.</td></tr>
+      <tr><td>Our hosting provider</td><td>Running the servers and the database where your data is kept.</td></tr>
     </tbody>
   </table>
   <p>
-    We may also share information if the law requires it, or to protect our rights, our users or the service. If the business were ever sold or merged, your information could move with
-    it, under this policy.
+    <strong>We do not sell your personal information</strong>, and we do not share it for advertising. We may disclose information if the law requires it, or to protect our rights, our users or the service. If
+    the business were ever sold or merged, your information could move with it, under this policy.
+  </p>
+  <p>
+    <strong>Google user data.</strong> {business.product} asks Google only for your name, email address and profile picture (the basic sign-in scopes). We use them only to sign you in and run your account. Our
+    use and transfer of information received from Google APIs adheres to the
+    <a href="https://developers.google.com/terms/api-services-user-data-policy" rel="noopener">Google API Services User Data Policy</a>, including its Limited Use requirements.
   </p>
 
-  <h2>4. Cookies and storage in your browser</h2>
+  <h2>4. Cookies and storage on your device</h2>
   <table>
     <thead><tr><th>Name</th><th>What it does</th></tr></thead>
     <tbody>
-      <tr><td><code>cs_session</code> (cookie)</td><td>Keeps you signed in. It is set when you sign in, and cannot be read by scripts on the page.</td></tr>
-      <tr><td><code>_ga</code>, <code>_ga_*</code> (cookies)</td><td>Set by Google Analytics to tell visits apart and count them. They hold a random identifier, not your name or email. You can stop them by blocking cookies, using Google's <a href="https://tools.google.com/dlpage/gaoptout" rel="noopener">opt-out add-on</a>, or a content blocker.</td></tr>
-      <tr><td>Browser storage</td><td>Remembers things on your device only: recent searches, your chosen instrument and chord shapes, your sign-in details for the menu, and an admin token if you are an admin. It is never sent to us for tracking.</td></tr>
+      <tr><td><code>cs_session</code> (cookie)</td><td>Keeps you signed in, for up to 30 days. It is set when you sign in and cannot be read by scripts on the page.</td></tr>
+      <tr><td><code>_ga</code>, <code>_ga_*</code> (cookies, or the same identifiers inside an app)</td><td>Set by Google Analytics to tell visits apart and count them. They hold a random identifier, not your name or email. You can stop them by blocking cookies, using Google's <a href="https://tools.google.com/dlpage/gaoptout" rel="noopener">opt-out add-on</a>, or a content blocker.</td></tr>
+      <tr><td>Browser or app storage</td><td>Remembers things on your device only: recent searches, your chosen instrument and chord shapes, the random code used for ratings when you are not signed in, a note that the page should run lightly on a slow device, and your sign-in details for the menu. None of it is sent to us for tracking.</td></tr>
     </tbody>
   </table>
-  <p>You can clear cookies and site data in your browser at any time. You will be signed out, and these settings will reset.</p>
+  <p>You can clear cookies and site data in your browser, or the app's storage in your device settings, at any time. You will be signed out, and these settings will reset.</p>
 
   <h2>5. How long we keep it</h2>
-  <p>
-    We keep your account information, library and progress while your account exists. Subscription records are kept as long as we need them for accounting and legal reasons. The chords
-    worked out for a YouTube song are kept so that the next person who opens it does not have to wait. Uploaded audio is kept so that you can play along, and we may delete it from time
-    to time. You can ask us to delete your account and data at any time (see below).
-  </p>
+  <table>
+    <thead><tr><th>Information</th><th>How long</th></tr></thead>
+    <tbody>
+      <tr><td>Your account, library, favourites, progress, ratings and comments</td><td>While your account exists. Deleted when you delete the account.</td></tr>
+      <tr><td>Sign-in sessions</td><td>30 days, or until you sign out.</td></tr>
+      <tr><td>Audio files you upload, and their results</td><td>Until you delete your account (if the song is in your library). We may also remove old uploads from time to time.</td></tr>
+      <tr><td>Chords worked out for a YouTube song</td><td>Kept so that the next person who opens the song does not have to wait. They hold nothing about you.</td></tr>
+      <tr><td>Records of payments and subscriptions</td><td>As long as accounting, tax and the law require. They carry no name or email once your account is deleted.</td></tr>
+      <tr><td>Server logs and error reports</td><td>A short time, then cleared. They are not linked to your account.</td></tr>
+      <tr><td>Messages you send us</td><td>As long as needed to deal with them and for our records.</td></tr>
+    </tbody>
+  </table>
 
-  <h2>6. Your choices and rights</h2>
-  <p>Under Indian law, including the Digital Personal Data Protection Act, 2023, you can ask us to:</p>
+  <h2>6. Deleting your data and your other rights</h2>
+  <p>
+    <strong>You can delete your account yourself, in the app or on the website, at any time.</strong> Open the account menu and choose "Delete account", or go to
+    <a href="/delete-account/">{business.site.replace("https://", "")}/delete-account/</a>. It removes your account, library, favourites, XP and badges, ratings and comments, and the audio you uploaded. A
+    paid plan is cancelled at once. If you cannot sign in, write to <a href={`mailto:${business.email}`}>{business.email}</a> from your account's email address and we will delete it within 30 days.
+  </p>
+  <p>Depending on where you live, you may also ask us to:</p>
   <ul>
     <li>tell you what personal data we hold about you, and give you a copy;</li>
     <li>correct data that is wrong or out of date;</li>
-    <li>delete your account and personal data; and</li>
+    <li>restrict or stop how we use it, or object to it;</li>
+    <li>move it to someone else, where the law gives you that right; and</li>
     <li>deal with a complaint about how we have handled your data.</li>
   </ul>
   <p>
-    Write to <a href={`mailto:${business.email}`}>{business.email}</a> from the email address on your account. We will reply and act within a reasonable time. You can also stop using the
-    service, and withdraw Chord Suno's access to your Google account in your <a href="https://myaccount.google.com/permissions" rel="noopener">Google account settings</a>.
+    <strong>India.</strong> Under the Digital Personal Data Protection Act, 2023, you can ask to access, correct and erase your personal data, and to have a grievance dealt with. <strong>EU, EEA and UK.</strong> You
+    have the rights above under the GDPR, and you can complain to your local data protection authority. <strong>California.</strong> You can ask what we collect, to delete it and to correct it, and we will not
+    treat you differently for asking. We do not sell personal information or share it for cross-context behavioural advertising.
+  </p>
+  <p>
+    Write to <a href={`mailto:${business.email}`}>{business.email}</a> from the email address on your account. We reply and act within 30 days. You can also withdraw {business.product}'s access to your Google
+    account in your <a href="https://myaccount.google.com/permissions" rel="noopener">Google account settings</a>, and turn off the microphone permission in your device settings.
   </p>
 
-  <h2>7. Security</h2>
+  <h2>7. The mobile apps</h2>
   <p>
-    We use sensible measures to protect your data: sign-in is through Google, sessions are stored as a hash on our server, the connection to the site is encrypted, and payment details never
-    reach us. No system is perfectly secure, so we cannot promise absolute security.
+    The Android and iOS apps use the same account and collect the same information as the website, described above. The permissions they ask for are the internet (to work at all) and, only if you use the tuner
+    or live chord detector, the microphone. They do not use your location, contacts, camera or photos, and they do not read other apps' files. Where an app asks for a file, you pick it with the system's file picker.
+    The apps contain no advertising.
   </p>
 
-  <h2>8. Children</h2>
+  <h2>8. Where your data goes</h2>
   <p>
-    {business.product} is meant for people aged 18 and over, or younger people using it with a parent or guardian's permission. We do not knowingly collect personal data from children
-    without that permission. If you think we have, write to us and we will delete it.
+    We serve people around the world, and your data is processed on servers run for us by our hosting provider, which can be in India or in other countries. When it moves between countries, we rely on our providers'
+    contractual and security commitments, and on safeguards the law allows.
   </p>
 
-  <h2>9. Changes to this policy</h2>
-  <p>We may update this policy. The date at the top shows when it last changed, and we will tell you about important changes on the site or by email.</p>
-
-  <h2>10. Contact and complaints</h2>
+  <h2>9. Security</h2>
   <p>
-    {business.name}{business.address ? `, ${business.address}` : ""}. Email: <a href={`mailto:${business.email}`}>{business.email}</a>. For privacy requests and complaints, write to that address with
-    "Privacy" in the subject. More on our <a href="/contact/">contact page</a>.
+    We use sensible measures to protect your data: sign-in is through Google, sessions are stored as a hash on our server, the connection to the service is encrypted, access to our systems is limited to the people who need
+    it, and payment details never reach us. No system is perfectly secure, so we cannot promise absolute security. If we learn of a breach that affects you, we will tell you and the authorities as the law requires.
+  </p>
+
+  <h2>10. Children</h2>
+  <p>
+    {business.product} is not directed at children under 13, and we do not knowingly collect personal data from them. People under 18 (or under the age of digital consent where they live, which can be up to 16)
+    may use it only with a parent or guardian's permission, as our <a href="/terms/">Terms</a> say. If you think a child has given us personal data without that permission, write to us and we will delete it.
+  </p>
+
+  <h2>11. Changes to this policy</h2>
+  <p>We may update this policy. The date at the top shows when it last changed, and we will tell you about important changes in the service or by email.</p>
+
+  <h2>12. Contact and complaints</h2>
+  <p>
+    {business.name}{business.address ? `, ${business.address}` : ""}, {business.country}. Email: <a href={`mailto:${business.email}`}>{business.email}</a>. For privacy requests and complaints, write to that address with
+    "Privacy" in the subject.
+    {business.grievanceOfficer ? ` Grievance Officer: ${business.grievanceOfficer}.` : ""} More on our <a href="/contact/">contact page</a>.
   </p>
 </LegalLayout>

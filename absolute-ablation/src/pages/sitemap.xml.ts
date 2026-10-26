@@ -19,6 +19,7 @@ const pages: { path: string; priority: string; changefreq: string }[] = [
   { path: "/terms/", priority: "0.3", changefreq: "yearly" },
   { path: "/privacy/", priority: "0.3", changefreq: "yearly" },
   { path: "/refunds/", priority: "0.3", changefreq: "yearly" },
+  { path: "/delete-account/", priority: "0.3", changefreq: "yearly" },
 ];
 
 export const GET: APIRoute = () => {
