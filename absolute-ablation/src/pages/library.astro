@@ -166,6 +166,7 @@ import Footer from "../components/Footer.astro";
   import { openSignIn } from "../lib/authUi";
   import { levelRing } from "../lib/levelRing";
   import { clock } from "../lib/format";
+  import { goToProcessing } from "../lib/backNav";
   import { getLibrary, getProfile, heartButton, LibraryError } from "../lib/library";
   import type { LibraryItem, Profile } from "../lib/library";
 
@@ -250,7 +251,7 @@ import Footer from "../components/Footer.astro";
         thumbnail: item.thumbnail,
         duration: item.duration,
       });
-      window.location.href = `/processing?session=${sessionId}`;
+      goToProcessing(sessionId);
     } catch (err) {
       card.removeAttribute("aria-busy");
       if (label) label.textContent = original;

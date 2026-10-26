@@ -106,6 +106,7 @@
   import { clock, jamLabel } from "../lib/format";
   import { heartButton, sessionIdOfVideo } from "../lib/library";
   import { rememberSong } from "../lib/recent";
+  import { goToProcessing } from "../lib/backNav";
 
   const section = document.getElementById("trending") as HTMLElement;
   const shelves = document.getElementById("tr-shelves") as HTMLElement;
@@ -208,7 +209,7 @@
         thumbnail: song.thumbnail,
         duration: song.duration,
       });
-      window.location.href = `/processing?session=${sessionId}`;
+      goToProcessing(sessionId);
     } catch (err) {
       shelves.querySelectorAll<HTMLButtonElement>(".tc").forEach((b) => {
         b.disabled = false;

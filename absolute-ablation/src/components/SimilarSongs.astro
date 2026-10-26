@@ -58,6 +58,7 @@
   import type { SongHit } from "../lib/api";
   import { clock } from "../lib/format";
   import { rememberSong } from "../lib/recent";
+  import { goToProcessing } from "../lib/backNav";
 
   const section = document.getElementById("similar") as HTMLElement;
   const grid = document.getElementById("ss-grid") as HTMLElement;
@@ -124,7 +125,7 @@
         thumbnail: song.thumbnail,
         duration: song.duration,
       });
-      window.location.href = `/processing?session=${sessionId}`;
+      goToProcessing(sessionId);
     } catch (err) {
       grid.querySelectorAll<HTMLButtonElement>(".ss-card").forEach((b) => {
         b.disabled = false;

@@ -7,6 +7,7 @@ import type { SongHit } from "./api";
 import { jamLabel } from "./format";
 import { clearRecents, forget, getRecents, rememberQuery, rememberSong } from "./recent";
 import type { Recent } from "./recent";
+import { goToProcessing } from "./backNav";
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] => {
   const node = document.createElement(tag);
@@ -288,7 +289,7 @@ export function initNavSearch() {
         thumbnail: song.thumbnail,
         duration: song.duration,
       });
-      window.location.href = `/processing?session=${sessionId}`;
+      goToProcessing(sessionId);
     } catch (err) {
       row.classList.remove("is-busy");
       panel!.prepend(el("p", "ns-error", getApiErrorMessage(err, "Could not start that song. Please try again.")));

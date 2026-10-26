@@ -120,6 +120,7 @@ import Footer from "../components/Footer.astro";
   import { heartButton, sessionIdOfVideo } from "../lib/library";
   import { rememberQuery, rememberSong } from "../lib/recent";
   import { track } from "../lib/analytics";
+  import { goToProcessing } from "../lib/backNav";
 
   // Searches people can try with one tap (shown before anything is typed, and when nothing matches).
   const examples = ["Perfect Ed Sheeran", "Tum Hi Ho", "Wonderwall", "Let It Be", "Kal Ho Naa Ho"];
@@ -210,7 +211,7 @@ import Footer from "../components/Footer.astro";
         thumbnail: song.thumbnail,
         duration: song.duration,
       });
-      window.location.href = `/processing?session=${sessionId}`;
+      goToProcessing(sessionId);
     } catch (err) {
       document.querySelectorAll(".pick").forEach((b) => {
         b.disabled = false;

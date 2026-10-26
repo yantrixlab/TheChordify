@@ -382,6 +382,7 @@ const sparkles = [
 <script>
   import { startExtractFromUpload, getApiErrorMessage } from "../lib/api";
   import { can, loadPlan, nudge } from "../lib/plan";
+  import { goToProcessing } from "../lib/backNav";
 
   // Tab switching (the look follows aria-selected)
   const tabSearch = document.getElementById("tab-search") as HTMLButtonElement;
@@ -478,7 +479,7 @@ const sparkles = [
 
     try {
       const { sessionId } = await startExtractFromUpload(file);
-      window.location.href = `/processing?session=${sessionId}`;
+      goToProcessing(sessionId);
     } catch (err) {
       uploadIcon.classList.remove("hidden");
       uploadSpinner.classList.add("hidden");
