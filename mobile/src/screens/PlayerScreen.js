@@ -7,12 +7,14 @@ import { addFavorite, errorMessage, getFavoriteKeys, getResult, recordPlayed, re
 import { useAuth } from '../auth/AuthContext';
 import { DiagramsView, SummaryView } from '../components/DiagramsView';
 import { GridView } from '../components/GridView';
+import { StrumView, strumPatterns } from '../components/StrumView';
 import { ControlPanel, Toolbar } from '../components/PlayerBars';
 import { MenuRow, Segmented, Sheet, Stepper } from '../components/Sheet';
 import { AppBar, Button, Centered, Note } from '../components/Ui';
 import { SITE } from '../config';
 import { transposeChord } from '../lib/diagrams';
-import { buildChart, cellAt, clock } from '../lib/grid';
+import { buildChart, cellAt, clock, trimPickup } from '../lib/grid';
+import { METER_MAX, METER_MIN, isOwn, loadMeter, ownMeter, saveMeter } from '../lib/meter';
 import { getJson, setJson } from '../lib/storage';
 import { colors, radius } from '../theme';
 
@@ -20,6 +22,7 @@ const VIEWS = [
   { id: 'diagrams', label: 'Diagrams' },
   { id: 'summary', label: 'Summary' },
   { id: 'grid', label: 'Grid' },
+  { id: 'strum', label: 'Strum' },
 ];
 const INSTRUMENTS = [
   { id: 'guitar', label: 'Guitar', feature: null },
@@ -50,12 +53,16 @@ export default function PlayerScreen({ route, navigation }) {
   const [loopMode, setLoopMode] = useState('off');
   const [countIn, setCountIn] = useState(false);
   const [counting, setCounting] = useState(0); // 3, 2, 1 while the count-in runs, else 0
-  const [sheet, setSheet] = useState(null); // 'view' | 'transpose' | 'capo' | 'tempo' | 'volume' | 'more' | 'details'
+  const [meter, setMeter] = useState(null); // beats per bar, pulse and bar start, as this player set them for this song (null: the song's own)
+  const [strumTime, setStrumTime] = useState(0); // the playing time, kept only while the Strum view is shown
+  const [sheet, setSheet] = useState(null); // 'view' | 'transpose' | 'capo' | 'tempo' | 'volume' | 'more' | 'details' | 'bars'
   const player = useRef(null);
   const counted = useRef(false);
   const loopSection = useRef(null);
   const timeRef = useRef(0);
   const countTimer = useRef(null);
+  const viewRef = useRef(view);
+  viewRef.current = view;
 
   useEffect(() => {
     if (result) return;
@@ -70,10 +77,17 @@ export default function PlayerScreen({ route, navigation }) {
   useEffect(() => () => clearTimeout(countTimer.current), []);
 
   const hasDetail = !!(result && result.chordsDetailed && result.chordsDetailed !== result.chords && result.chordsDetailed.length > 0);
-  const chart = useMemo(() => (result ? buildChart(result, detailed && hasDetail) : null), [result, detailed, hasDetail]);
+  // The bar length saved for this song, found once its beats are known.
+  useEffect(() => {
+    if (!result) return;
+    setMeter(loadMeter(sessionId, ownMeter(trimPickup(result.bars || []), result)));
+  }, [result, sessionId]);
+
+  const chart = useMemo(() => (result ? buildChart(result, detailed && hasDetail, meter) : null), [result, detailed, hasDetail, meter]);
+  const strumList = useMemo(() => strumPatterns(result), [result]);
   const ukuleleOk = can('instruments_more');
   const shownInstrument = instrument === 'ukulele' && !ukuleleOk ? 'guitar' : instrument;
-  const sections = useMemo(() => ((result && result.sections) || []).filter((s) => s.end > s.start && s.startBar !== null), [result]);
+  const sections = useMemo(() => (chart ? chart.sections : []).filter((s) => s.end > s.start && s.startBar !== null && s.startBar !== undefined), [chart]);
 
   // Where the video is: asked about six times a second while it plays; only a change of beat re-draws anything.
   useEffect(() => {
@@ -91,6 +105,7 @@ export default function PlayerScreen({ route, navigation }) {
         }
         const i = cellAt(chart.cells, t);
         setActive((before) => (before === i ? before : i));
+        if (viewRef.current === 'strum') setStrumTime(t);
       } catch {
         // the player is not ready yet
       }
@@ -138,7 +153,7 @@ export default function PlayerScreen({ route, navigation }) {
       setPlaying(true);
       return;
     }
-    const beat = 60000 / ((result.tempo || 100) * (tempoPct / 100));
+    const beat = 60000 / ((chart ? chart.tempo : result.tempo || 100) * (tempoPct / 100));
     let n = 3;
     const step = () => {
       setCounting(n);
@@ -153,7 +168,7 @@ export default function PlayerScreen({ route, navigation }) {
       }, beat);
     };
     step();
-  }, [counting, playing, countIn, result, tempoPct]);
+  }, [counting, playing, countIn, result, chart, tempoPct]);
 
   const restart = useCallback(() => {
     clearTimeout(countTimer.current);
@@ -210,6 +225,18 @@ export default function PlayerScreen({ route, navigation }) {
     }
     setInstrument(item.id);
     setJson('instrument', item.id);
+  };
+
+  // Regroup the beats into bars again; the choice is kept for this song.
+  const changeMeter = (next) => {
+    if (!chart) return;
+    const own = chart.own;
+    const before = meter || own;
+    const merged = { ...before, ...next };
+    if (merged.perBar !== before.perBar || merged.pulse !== before.pulse) merged.shift = next.shift === undefined ? null : next.shift; // the old pickup no longer fits
+    setMeter(merged);
+    saveMeter(sessionId, merged, own);
+    setActive(-1);
   };
 
   const share = () => {
@@ -295,6 +322,8 @@ export default function PlayerScreen({ route, navigation }) {
           )
         ) : view === 'diagrams' ? (
           <DiagramsView chart={chart} active={active} instrument={shownInstrument} transpose={transpose} capo={capo} arrows={arrows} />
+        ) : view === 'strum' && strumList.length > 0 ? (
+          <StrumView result={result} chart={chart} time={strumTime} bottomInset={0} />
         ) : view === 'summary' ? (
           <SummaryView chart={chart} instrument={shownInstrument} transpose={transpose} capo={capo} arrows={arrows} bottomInset={0} />
         ) : (
@@ -321,7 +350,7 @@ export default function PlayerScreen({ route, navigation }) {
       ) : null}
 
       <Sheet visible={sheet === 'view'} title="Pick your view" onClose={() => setSheet(null)}>
-        <Segmented options={VIEWS} value={view} onChange={chooseView} />
+        <Segmented options={VIEWS.filter((v) => v.id !== 'strum' || strumList.length > 0)} value={view} onChange={chooseView} />
         <View style={styles.tiles}>
           {INSTRUMENTS.map((item) => {
             const locked = item.feature && !can(item.feature);
@@ -365,11 +394,44 @@ export default function PlayerScreen({ route, navigation }) {
       <Sheet visible={sheet === 'more'} title={title} onClose={() => setSheet(null)}>
         <MenuRow icon="share" title="Share this song" hint="Send a link" onPress={share} />
         <MenuRow icon="library" title="Song details" hint="Key, tempo and the chords used" onPress={() => setSheet('details')} />
+        <MenuRow icon="timer" title="Bar length" hint="Beats per bar, pulse and where bars start" onPress={() => setSheet('bars')} />
+      </Sheet>
+
+      <Sheet visible={sheet === 'bars'} title="Bar length" onClose={() => setSheet(null)}>
+        {chart ? <BarSheet chart={chart} meter={meter || chart.own} onChange={changeMeter} onReset={() => changeMeter({ ...chart.own })} own={isOwn(meter || chart.own, chart.own)} /> : null}
       </Sheet>
 
       <Sheet visible={sheet === 'details'} title="Song details" onClose={() => setSheet(null)} scroll>
         {result ? <Details result={result} transpose={transpose} chart={chart} sections={sections} /> : null}
       </Sheet>
+    </View>
+  );
+}
+
+/** Beats per bar, a beat in between each beat (pulse x2) and the beat a bar starts on: for a song the analysis counted wrong. */
+function BarSheet({ chart, meter, onChange, onReset, own }) {
+  return (
+    <View>
+      <Text style={styles.sheetHint}>If the bars in the chart look wrong, regroup the beats. The choice is kept for this song.</Text>
+      <Text style={styles.barLabel}>Beats per bar</Text>
+      <Stepper label="Beats per bar" value={String(meter.perBar)} onMinus={() => onChange({ perBar: meter.perBar - 1 })} onPlus={() => onChange({ perBar: meter.perBar + 1 })} minusDisabled={meter.perBar <= METER_MIN} plusDisabled={meter.perBar >= METER_MAX} />
+      <Text style={styles.barLabel}>Pulse</Text>
+      <Segmented
+        options={[
+          { id: '1', label: '×1' },
+          { id: '2', label: '×2' },
+        ]}
+        value={String(meter.pulse)}
+        onChange={(id) => onChange({ pulse: Number(id) })}
+      />
+      <Text style={styles.barLabel}>Bar starts on</Text>
+      <Stepper
+        label="Bar start"
+        value={meter.shift === null ? 'auto' : meter.shift === 0 ? '0' : `+${meter.shift}`}
+        onMinus={() => onChange({ shift: meter.shift === null ? chart.perBar - 1 : meter.shift === 0 ? null : meter.shift - 1 })}
+        onPlus={() => onChange({ shift: meter.shift === null ? 0 : meter.shift + 1 >= meter.perBar ? null : meter.shift + 1 })}
+      />
+      <Button title="Back to the song's own" kind="quiet" onPress={onReset} disabled={own} style={styles.sheetButton} />
     </View>
   );
 }
@@ -419,6 +481,7 @@ const styles = StyleSheet.create({
   sheetHint: { color: colors.mute, fontSize: 14.5, lineHeight: 21, marginBottom: 6 },
   sheetSub: { color: colors.mute, fontSize: 14, textAlign: 'center', marginBottom: 8 },
   sheetButton: { marginTop: 8 },
+  barLabel: { color: colors.ink, fontSize: 15, fontWeight: '800', marginTop: 12 },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line },
   detailKey: { color: colors.mute, fontSize: 15 },
   detailValue: { color: colors.ink, fontSize: 15, fontWeight: '700' },

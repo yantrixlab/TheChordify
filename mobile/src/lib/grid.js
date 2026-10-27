@@ -1,5 +1,6 @@
 // The chord chart: bars of beat cells with a chord written in each cell where it changes. This is the website player's logic
 // (play.astro: trimPickup, placeChordsOnBeats, placeChordsWithRests) so a song reads the same on both.
+import { applyMeter, ownMeter } from './meter';
 
 export function clock(seconds) {
   const s = Math.max(0, Math.round(seconds || 0));
@@ -12,7 +13,7 @@ function firstNumber(values) {
 }
 
 /** A song that starts part-way through a bar has beats that come before the music; they pile up at 0:00 and are left empty. */
-function trimPickup(all) {
+export function trimPickup(all) {
   if (all.length === 0) return all;
   const first = all[0].beats.slice();
   let trimmed = 0;
@@ -31,11 +32,11 @@ function trimPickup(all) {
 }
 
 /** The chord written in each beat cell as [bar][beat]: a name, "N" for a rest, or null while the last chord keeps ringing. */
-function placeChordsOnBeats(chords, bars, perBar, duration) {
+function placeChordsOnBeats(chords, bars, perBar, duration, pulse) {
   const firstSound = chords.findIndex((seg) => seg.chord !== 'N');
   const placed = chords
     .filter((seg, i) => seg.gridStart !== null && !(seg.chord === 'N' && i < firstSound))
-    .map((seg) => ({ chord: seg.chord, start: seg.gridStart ?? seg.start }));
+    .map((seg) => ({ chord: seg.chord, start: pulse === 1 ? (seg.gridStart ?? seg.start) : seg.start }));
   let next = 0;
   let seenBeat = false;
   return bars.map((bar) =>
@@ -52,8 +53,8 @@ function placeChordsOnBeats(chords, bars, perBar, duration) {
 }
 
 /** The same with the rest sign on every beat of a pause (a long silence shows for two bars at most). */
-function placeChordsWithRests(chords, bars, perBar, duration) {
-  const written = placeChordsOnBeats(chords, bars, perBar, duration);
+function placeChordsWithRests(chords, bars, perBar, duration, pulse) {
+  const written = placeChordsOnBeats(chords, bars, perBar, duration, pulse);
   let resting = false;
   let run = 0;
   const limit = perBar * 2;
@@ -85,14 +86,25 @@ function placeChordsWithRests(chords, bars, perBar, duration) {
  *   cells    every cell that has a beat, in time order: { t, row, k }: what the playing position is looked up in
  *   perBar   beats to a bar
  */
-export function buildChart(result, detailed = false) {
-  const perBar = result.beatsPerBar || 4;
-  const bars = trimPickup(result.bars || []);
+export function buildChart(result, detailed = false, meter = null) {
+  const baseBars = trimPickup(result.bars || []);
+  const own = ownMeter(baseBars, result);
+  const duration = result.duration || 0;
+  // the beats as the song counts them, or regrouped with the bar length the player set
+  const { bars, sections, perBar, tempo, shift } = applyMeter({
+    baseBars,
+    baseSections: result.sections || [],
+    own,
+    meter: meter || own,
+    duration,
+    simpleChords: result.chords || [],
+    baseTempo: result.tempo || 120,
+  });
   // the simple chords (major and minor), or every kind the detector heard (7ths, sus, slash chords)
   const chords = (detailed && result.chordsDetailed) || result.chords || [];
-  const written = placeChordsWithRests(chords, bars, perBar, result.duration || 0);
+  const written = placeChordsWithRests(chords, bars, perBar, duration, (meter || own).pulse);
   const labelAt = new Map();
-  for (const section of result.sections || []) {
+  for (const section of sections) {
     if (section.startBar !== null && section.startBar !== undefined && !labelAt.has(section.startBar)) labelAt.set(section.startBar, section.label);
   }
   const rows = bars.map((bar, i) => ({
@@ -108,7 +120,7 @@ export function buildChart(result, detailed = false) {
       if (t !== null) cells.push({ t, row: r, k });
     }),
   );
-  return { rows, cells, perBar };
+  return { rows, cells, perBar, own, tempo, shift, sections };
 }
 
 /** The index in `cells` playing at `time`: the last cell whose beat has started. -1 before the first. */
