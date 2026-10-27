@@ -54,6 +54,13 @@ export function startExtract(song) {
   });
 }
 
+/** Starts the chords of an audio file from the phone ({ uri, name, type }); returns { sessionId }. */
+export function startExtractUpload(file) {
+  const form = new FormData();
+  form.append('file', { uri: file.uri, name: file.name || 'song', type: file.type || 'audio/mpeg' });
+  return request('/api/extract/upload', { method: 'POST', form, timeout: 120000 });
+}
+
 export const getJob = (sessionId) => request(`/api/job/${sessionId}`);
 export const getResult = (sessionId) => request(`/api/result/${sessionId}`);
 

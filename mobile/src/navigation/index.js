@@ -10,7 +10,11 @@ import PremiumScreen from '../screens/PremiumScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import ProcessingScreen from '../screens/ProcessingScreen';
 import PlayerScreen from '../screens/PlayerScreen';
-import ComingSoonScreen from '../screens/ComingSoonScreen';
+import UploadScreen from '../screens/UploadScreen';
+import TunerScreen from '../screens/TunerScreen';
+import MetronomeScreen from '../screens/MetronomeScreen';
+import PracticeScreen from '../screens/PracticeScreen';
+import ChordDetectorScreen from '../screens/ChordDetectorScreen';
 import { colors } from '../theme';
 
 const Stack = createNativeStackNavigator();
@@ -64,12 +68,12 @@ export default function Navigation() {
         <Stack.Screen name="Settings" component={SettingsScreen} />
         <Stack.Screen name="Processing" component={ProcessingScreen} />
         <Stack.Screen name="Player" component={PlayerScreen} />
-        {/* the Toolkit's tools; each replaces its placeholder as it is built */}
-        <Stack.Screen name="tuner" component={ComingSoonScreen} />
-        <Stack.Screen name="metronome" component={ComingSoonScreen} />
-        <Stack.Screen name="practice" component={ComingSoonScreen} />
-        <Stack.Screen name="chord-detector" component={ComingSoonScreen} />
-        <Stack.Screen name="upload" component={ComingSoonScreen} />
+        {/* the Toolkit's tools and importing a song */}
+        <Stack.Screen name="tuner" component={TunerScreen} />
+        <Stack.Screen name="metronome" component={MetronomeScreen} />
+        <Stack.Screen name="practice" component={PracticeScreen} />
+        <Stack.Screen name="chord-detector" component={ChordDetectorScreen} />
+        <Stack.Screen name="upload" component={UploadScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

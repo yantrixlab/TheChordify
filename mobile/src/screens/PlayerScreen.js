@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Linking, Share, StyleSheet, Text, useWindowDimensions, Vibration, View } from 'react-native';
+import { Linking, Share, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Video from 'react-native-video';
 import YoutubePlayer from 'react-native-youtube-iframe';
 import { chordKeyLabel } from 'chordsuno-shared/chordShapes';
 import { addFavorite, errorMessage, getFavoriteKeys, getResult, recordPlayed, removeFavorite } from '../api';
@@ -9,12 +10,15 @@ import { DiagramsView, SummaryView } from '../components/DiagramsView';
 import { GridView } from '../components/GridView';
 import { StrumView, strumPatterns } from '../components/StrumView';
 import { ControlPanel, Toolbar } from '../components/PlayerBars';
+import { Icon } from '../components/Icons';
 import { MenuRow, Segmented, Sheet, Stepper } from '../components/Sheet';
 import { RateSheet, SimilarSheet } from '../components/SongSheets';
 import { AppBar, Button, Centered, Note } from '../components/Ui';
-import { SITE } from '../config';
+import { API_BASE, SITE } from '../config';
+import { shareMidi, sharePdf, songForExport } from '../lib/exporter';
 import { useOpenSong } from '../lib/useOpenSong';
 import { transposeChord } from '../lib/diagrams';
+import { buzz } from '../lib/buzz';
 import { buildChart, cellAt, clock, trimPickup } from '../lib/grid';
 import { METER_MAX, METER_MIN, isOwn, loadMeter, ownMeter, saveMeter } from '../lib/meter';
 import { getJson, setJson } from '../lib/storage';
@@ -60,6 +64,8 @@ export default function PlayerScreen({ route, navigation }) {
   const [sheet, setSheet] = useState(null); // 'view' | 'transpose' | 'capo' | 'tempo' | 'volume' | 'more' | 'details' | 'bars'
   const openSong = useOpenSong();
   const player = useRef(null);
+  const video = useRef(null); // the audio of an uploaded song
+  const mediaTime = useRef(0);
   const counted = useRef(false);
   const loopSection = useRef(null);
   const timeRef = useRef(0);
@@ -88,22 +94,37 @@ export default function PlayerScreen({ route, navigation }) {
 
   const chart = useMemo(() => (result ? buildChart(result, detailed && hasDetail, meter) : null), [result, detailed, hasDetail, meter]);
   const strumList = useMemo(() => strumPatterns(result), [result]);
+  const videoId = result?.videoId || song?.videoId || (sessionId.startsWith('yt_') ? sessionId.slice(3) : '');
+  const audioUrl = !videoId && result && result.audioUrl ? `${API_BASE}${result.audioUrl}` : ''; // a song somebody uploaded plays from its file
   const ukuleleOk = can('instruments_more');
   const shownInstrument = instrument === 'ukulele' && !ukuleleOk ? 'guitar' : instrument;
   const sections = useMemo(() => (chart ? chart.sections : []).filter((s) => s.end > s.start && s.startBar !== null && s.startBar !== undefined), [chart]);
+
+  // Move the song (the YouTube video, or the file of an uploaded song) to a time.
+  const seekMedia = useCallback(
+    (t) => {
+      if (videoId) {
+        if (player.current) player.current.seekTo(t, true);
+      } else if (video.current) {
+        video.current.seek(t);
+        mediaTime.current = t;
+      }
+    },
+    [videoId],
+  );
 
   // Where the video is: asked about six times a second while it plays; only a change of beat re-draws anything.
   useEffect(() => {
     if (!playing || !chart) return undefined;
     let stop = false;
     const id = setInterval(async () => {
-      if (stop || !player.current) return;
+      if (stop || (videoId && !player.current)) return;
       try {
-        const t = await player.current.getCurrentTime();
+        const t = videoId ? await player.current.getCurrentTime() : mediaTime.current;
         timeRef.current = t;
         const section = loopSection.current;
         if (section && t >= section.end - 0.04) {
-          player.current.seekTo(section.start, true); // loop the section
+          seekMedia(section.start); // loop the section
           return;
         }
         const i = cellAt(chart.cells, t);
@@ -117,7 +138,7 @@ export default function PlayerScreen({ route, navigation }) {
       stop = true;
       clearInterval(id);
     };
-  }, [playing, chart]);
+  }, [playing, chart, videoId, seekMedia]);
 
   const onState = useCallback(
     (state) => {
@@ -129,21 +150,24 @@ export default function PlayerScreen({ route, navigation }) {
         }
       } else if (state === 'paused') setPlaying(false);
       else if (state === 'ended') {
-        if (loopMode === 'song' && player.current) {
-          player.current.seekTo(0, true);
+        if (loopMode === 'song') {
+          seekMedia(0);
           setPlaying(true);
         } else setPlaying(false);
       }
     },
-    [user, sessionId, loopMode],
+    [user, sessionId, loopMode, seekMedia],
   );
 
-  const seek = useCallback((t) => {
-    if (player.current && t !== null) {
-      player.current.seekTo(Math.max(0, t - 0.05), true);
-      setPlaying(true);
-    }
-  }, []);
+  const seek = useCallback(
+    (t) => {
+      if (t !== null) {
+        seekMedia(Math.max(0, t - 0.05));
+        setPlaying(true);
+      }
+    },
+    [seekMedia],
+  );
 
   // Play, with the count-in first when it is on: three beats at the song's own speed, a tick on each.
   const togglePlay = useCallback(() => {
@@ -160,7 +184,7 @@ export default function PlayerScreen({ route, navigation }) {
     let n = 3;
     const step = () => {
       setCounting(n);
-      Vibration.vibrate(n === 3 ? 40 : 20);
+      buzz(n === 3 ? 40 : 20);
       countTimer.current = setTimeout(() => {
         n -= 1;
         if (n > 0) step();
@@ -176,11 +200,11 @@ export default function PlayerScreen({ route, navigation }) {
   const restart = useCallback(() => {
     clearTimeout(countTimer.current);
     setCounting(0);
-    if (player.current) player.current.seekTo(0, true);
+    seekMedia(0);
     setActive(-1);
     timeRef.current = 0;
     setPlaying(true);
-  }, []);
+  }, [seekMedia]);
 
   // Loop: off, then the whole song, then the section that was playing when it was switched on.
   const cycleLoop = useCallback(() => {
@@ -242,12 +266,28 @@ export default function PlayerScreen({ route, navigation }) {
     setActive(-1);
   };
 
+  // The chord sheet or a MIDI file, made from what is on screen (key, capo and bar length included).
+  const doExport = async (kind) => {
+    setSheet(null);
+    const feature = kind === 'pdf' ? 'pdf_export' : 'midi_export';
+    if (!can(feature)) {
+      needsPlan();
+      return;
+    }
+    try {
+      const exported = songForExport({ result, chart, transpose, capo, strumList });
+      if (kind === 'pdf') await sharePdf(exported);
+      else await shareMidi(exported, kind === 'midi-strum');
+    } catch (err) {
+      setError(errorMessage(err, 'Could not make that file.'));
+    }
+  };
+
   const share = () => {
     setSheet(null);
     Share.share({ message: `${title}${artist ? ` by ${artist}` : ''}: chords on Chord Suno\n${SITE}/play?session=${encodeURIComponent(sessionId)}` }).catch(() => {});
   };
 
-  const videoId = result?.videoId || song?.videoId || (sessionId.startsWith('yt_') ? sessionId.slice(3) : '');
   const title = result?.title || song?.title || 'Song';
   const artist = result?.artist || song?.artist || '';
   const videoHeight = Math.round((width * 9) / 16);
@@ -295,9 +335,25 @@ export default function PlayerScreen({ route, navigation }) {
 
       {chart ? <Toolbar items={toolbar} /> : null}
 
-      {result && !videoId ? (
-        <View style={styles.pad}>
-          <Note tone="info">Songs you uploaded on the website play there; here you can read their chords.</Note>
+      {audioUrl ? (
+        <View style={styles.audio}>
+          <Icon name="upload" size={30} color="#c4b5fd" />
+          <Text style={styles.audioText}>Playing your file</Text>
+          <Video
+            ref={video}
+            source={{ uri: audioUrl }}
+            paused={!(playing && !counting)}
+            rate={tempoPct / 100}
+            volume={volume / 100}
+            progressUpdateInterval={100}
+            onProgress={(e) => {
+              mediaTime.current = e.currentTime;
+            }}
+            onEnd={() => onState('ended')}
+            onError={() => setPlayerError('This file cannot be played here.')}
+            playInBackground={false}
+            style={styles.hiddenVideo}
+          />
         </View>
       ) : null}
       {playerError && videoId ? (
@@ -397,6 +453,13 @@ export default function PlayerScreen({ route, navigation }) {
       <Sheet visible={sheet === 'more'} title={title} onClose={() => setSheet(null)}>
         <MenuRow icon="share" title="Share this song" hint="Send a link" onPress={share} />
         <MenuRow icon="library" title="Song details" hint="Key, tempo and the chords used" onPress={() => setSheet('details')} />
+ {chart ? (
+          <>
+            <MenuRow icon="upload" title="Chord sheet (PDF)" hint="Print it or send it" locked={!can('pdf_export')} onPress={() => doExport('pdf')} />
+            <MenuRow icon="upload" title="Chords as MIDI" hint="Open it in a music app" locked={!can('midi_export')} onPress={() => doExport('midi')} />
+            {strumList.length > 0 ? <MenuRow icon="upload" title="MIDI with the strumming" hint="The chords played with the song's pattern" locked={!can('midi_export')} onPress={() => doExport('midi-strum')} /> : null}
+          </>
+        ) : null}
         <MenuRow icon="star" title="Rate these chords" hint="Stars and a few words" onPress={() => setSheet('rate')} />
         <MenuRow icon="discover" title="Songs like this" hint="More to play next" onPress={() => setSheet('similar')} />
         <MenuRow icon="timer" title="Bar length" hint="Beats per bar, pulse and where bars start" onPress={() => setSheet('bars')} />
@@ -490,6 +553,9 @@ const styles = StyleSheet.create({
   pad: { paddingHorizontal: 16 },
   body: { flex: 1 },
   by: { color: colors.mute, fontSize: 14 },
+  audio: { height: 100, backgroundColor: '#1a0533', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  audioText: { color: '#c4b5fd', fontSize: 14, fontWeight: '700' },
+  hiddenVideo: { width: 0, height: 0 },
   tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginVertical: 16 },
   tile: { width: '47%', paddingVertical: 20, textAlign: 'center', borderRadius: radius.card, backgroundColor: colors.soft, color: colors.ink, fontSize: 17, fontWeight: '700', overflow: 'hidden', lineHeight: 24 },
   tileOn: { backgroundColor: colors.violet, color: '#fff' },

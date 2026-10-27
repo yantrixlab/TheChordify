@@ -102,7 +102,7 @@ Ready in `mobile/store/`:
 | **News app / COVID / health / financial / government** | No to all. |
 | **Account deletion** | Yes. In-app: Account → *Delete my account*. Web URL for the form: `https://chordsuno.com/delete-account/`. |
 | **Advertising ID** | Not used (declare "No"). If Firebase/Google Analytics is added to the app later, this and the Data safety form change. |
-| **Permissions** | Only `INTERNET` today. The microphone permission arrives with the Toolkit (tuner); declare it then. |
+| **Permissions** | `INTERNET`, and `RECORD_AUDIO` (the tuner, the live chord detector and chord practice listen to the instrument). The permission is asked for when one of those is opened, never at start-up. In the Play Console's permissions declaration, say the microphone is used only while a tool is running, analysed on the device, and never recorded, stored or sent. |
 | **Foreground service / background location / SMS / call log** | None. |
 
 ### Data safety form
@@ -122,7 +122,7 @@ Matches the Privacy Policy and what the app does now (no analytics SDK, no ads, 
 
 "Shared": the YouTube player is Google's own embed and loads inside the app; list it as a **service provider** processing, not a sale. Declare nothing as "shared for advertising".
 
-If you later add the tuner: microphone audio is processed on the device and not sent anywhere, so it is *not* "collected".
+The tuner, chord detector and chord practice use the microphone: its sound is analysed on the device as it arrives and is not stored or sent anywhere, so it is *not* "collected" or "shared" (this matches the Privacy Policy). Say so in the form's microphone/audio answers.
 
 ## 7. YouTube rules the app must keep
 
@@ -150,5 +150,5 @@ The app uses the YouTube embedded player under the YouTube API Services Terms. K
 
 - No in-app purchases. The ukulele diagrams are a Premium feature on the website, so a free account sees a lock. Do not add a link or button there that sends people to the website's checkout: Google Play does not allow steering people to outside payments for digital features. Subscriptions inside the app are a later release (Play Billing).
 - Songs people uploaded on the website show their chords but do not play in the app.
-- No tuner, exports or offline mode yet.
+- The Toolkit's tuner, metronome, chord practice and chord detector are in the app (the tuner, metronome and chord detector need a Premium plan and chord practice is free, as on the website). Importing a song, exports and offline mode are not yet.
 - No crash reporting or analytics in the app. Consider adding crash reporting before wide release (and update the Data safety form and the Privacy Policy when you do).

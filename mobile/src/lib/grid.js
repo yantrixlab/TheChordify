@@ -102,7 +102,9 @@ export function buildChart(result, detailed = false, meter = null) {
   });
   // the simple chords (major and minor), or every kind the detector heard (7ths, sus, slash chords)
   const chords = (detailed && result.chordsDetailed) || result.chords || [];
-  const written = placeChordsWithRests(chords, bars, perBar, duration, (meter || own).pulse);
+  const pulse = (meter || own).pulse;
+  const written = placeChordsWithRests(chords, bars, perBar, duration, pulse);
+  const plain = placeChordsOnBeats(chords, bars, perBar, duration, pulse); // without the rest sign on every beat of a pause: what the exports write
   const labelAt = new Map();
   for (const section of sections) {
     if (section.startBar !== null && section.startBar !== undefined && !labelAt.has(section.startBar)) labelAt.set(section.startBar, section.label);
@@ -120,7 +122,7 @@ export function buildChart(result, detailed = false, meter = null) {
       if (t !== null) cells.push({ t, row: r, k });
     }),
   );
-  return { rows, cells, perBar, own, tempo, shift, sections };
+  return { rows, cells, perBar, own, tempo, shift, sections, bars, plain, chords };
 }
 
 /** The index in `cells` playing at `time`: the last cell whose beat has started. -1 before the first. */

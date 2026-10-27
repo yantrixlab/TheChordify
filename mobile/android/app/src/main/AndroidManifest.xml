@@ -1,6 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- the Toolkit's tuner, chord detector and chord practice listen to the instrument; asked for when one is opened -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- a short buzz when a string is in tune and on the count-in beats -->
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <application
       android:name=".MainApplication"

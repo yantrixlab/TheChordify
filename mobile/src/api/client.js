@@ -24,20 +24,20 @@ export class ApiError extends Error {
 
 const UNREACHABLE = 'Could not reach Chord Suno. Please check your connection and try again.';
 
-export async function request(path, { method = 'GET', body, signal, timeout = 20000 } = {}) {
+export async function request(path, { method = 'GET', body, form, signal, timeout = 20000 } = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeout);
   const abandon = () => controller.abort();
   if (signal) signal.addEventListener('abort', abandon);
   const headers = { Accept: 'application/json' };
   if (token) headers.Authorization = `Bearer ${token}`;
-  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  if (body !== undefined && !form) headers['Content-Type'] = 'application/json';
   let res;
   try {
     res = await fetch(`${API_BASE}${path}`, {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: form || (body === undefined ? undefined : JSON.stringify(body)),
       signal: controller.signal,
     });
   } catch (err) {

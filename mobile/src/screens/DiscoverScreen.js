@@ -12,6 +12,9 @@ import { colors, radius, shadow } from '../theme';
 
 const Gap = () => <View style={styles.gap} />;
 
+// The tools and, last, importing a song from the phone.
+const TILES = [...TOOLS, { id: 'upload', name: 'Import music', cover: ['#f29a9a', '#ef6f6f'] }];
+
 /** The artists behind the songs this person played, most played first: [{ name, thumbnail }]. */
 function topArtists(items) {
   const found = new Map();
@@ -93,7 +96,7 @@ export default function DiscoverScreen({ navigation }) {
           <SectionHeader title="Toolkit" onMore={() => navigation.navigate('Toolkit')} />
           <FlatList
             horizontal
-            data={TOOLS}
+            data={TILES}
             keyExtractor={(tool) => tool.id}
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.rowPad}
