@@ -10,8 +10,10 @@ import { GridView } from '../components/GridView';
 import { StrumView, strumPatterns } from '../components/StrumView';
 import { ControlPanel, Toolbar } from '../components/PlayerBars';
 import { MenuRow, Segmented, Sheet, Stepper } from '../components/Sheet';
+import { RateSheet, SimilarSheet } from '../components/SongSheets';
 import { AppBar, Button, Centered, Note } from '../components/Ui';
 import { SITE } from '../config';
+import { useOpenSong } from '../lib/useOpenSong';
 import { transposeChord } from '../lib/diagrams';
 import { buildChart, cellAt, clock, trimPickup } from '../lib/grid';
 import { METER_MAX, METER_MIN, isOwn, loadMeter, ownMeter, saveMeter } from '../lib/meter';
@@ -56,6 +58,7 @@ export default function PlayerScreen({ route, navigation }) {
   const [meter, setMeter] = useState(null); // beats per bar, pulse and bar start, as this player set them for this song (null: the song's own)
   const [strumTime, setStrumTime] = useState(0); // the playing time, kept only while the Strum view is shown
   const [sheet, setSheet] = useState(null); // 'view' | 'transpose' | 'capo' | 'tempo' | 'volume' | 'more' | 'details' | 'bars'
+  const openSong = useOpenSong();
   const player = useRef(null);
   const counted = useRef(false);
   const loopSection = useRef(null);
@@ -394,8 +397,21 @@ export default function PlayerScreen({ route, navigation }) {
       <Sheet visible={sheet === 'more'} title={title} onClose={() => setSheet(null)}>
         <MenuRow icon="share" title="Share this song" hint="Send a link" onPress={share} />
         <MenuRow icon="library" title="Song details" hint="Key, tempo and the chords used" onPress={() => setSheet('details')} />
+        <MenuRow icon="star" title="Rate these chords" hint="Stars and a few words" onPress={() => setSheet('rate')} />
+        <MenuRow icon="discover" title="Songs like this" hint="More to play next" onPress={() => setSheet('similar')} />
         <MenuRow icon="timer" title="Bar length" hint="Beats per bar, pulse and where bars start" onPress={() => setSheet('bars')} />
       </Sheet>
+
+      <RateSheet visible={sheet === 'rate'} sessionId={sessionId} onClose={() => setSheet(null)} />
+      <SimilarSheet
+        visible={sheet === 'similar'}
+        sessionId={sessionId}
+        onClose={() => setSheet(null)}
+        onPick={(picked) => {
+          setSheet(null);
+          openSong(picked);
+        }}
+      />
 
       <Sheet visible={sheet === 'bars'} title="Bar length" onClose={() => setSheet(null)}>
         {chart ? <BarSheet chart={chart} meter={meter || chart.own} onChange={changeMeter} onReset={() => changeMeter({ ...chart.own })} own={isOwn(meter || chart.own, chart.own)} /> : null}

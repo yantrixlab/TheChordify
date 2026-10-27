@@ -1,3 +1,4 @@
+import { getJson, setJson } from '../lib/storage';
 import { request } from './client';
 
 export { ApiError, errorMessage, setToken, setSignedOutHandler } from './client';
@@ -85,3 +86,18 @@ export const recordPlayed = (sessionId) => request('/api/me/played', { method: '
 // ---- the app ---------------------------------------------------------------------------------------------------------
 
 export const getAppConfig = () => request('/api/app/config', { timeout: 8000 });
+
+// ---- what people think of a song's chords -------------------------------------------------------------------------------
+// A signed-in person rates under their account; anybody else under a random id this phone makes for itself.
+function visitor() {
+  const saved = getJson('visitor', '');
+  if (typeof saved === 'string' && /^[A-Za-z0-9_-]{8,64}$/.test(saved)) return saved;
+  let id = '';
+  for (let i = 0; i < 24; i++) id += Math.floor(Math.random() * 36).toString(36);
+  setJson('visitor', id);
+  return id;
+}
+
+export const getRating = (sessionId) => request(`/api/songs/${encodeURIComponent(sessionId)}/rating?v=${visitor()}`).catch(() => null);
+export const saveRating = (sessionId, stars, comment = '') =>
+  request(`/api/songs/${encodeURIComponent(sessionId)}/rating`, { method: 'POST', body: { stars, comment, visitor: visitor() } });
