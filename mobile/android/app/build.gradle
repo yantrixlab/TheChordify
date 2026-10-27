@@ -57,7 +57,7 @@ react {
 /**
  * Set this to true to Run Proguard on Release builds to minify the Java bytecode.
  */
-def enableProguardInReleaseBuilds = false
+def enableProguardInReleaseBuilds = true
 
 /**
  * The preferred build flavor of JavaScriptCore (JSC)
@@ -82,8 +82,9 @@ android {
         applicationId "com.yantrixlab.chordsuno"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
+        // Every upload to Google Play needs a higher versionCode. Keep versionName and src/config.js (VERSION_CODE, VERSION_NAME) in step.
         versionCode 1
-        versionName "1.0"
+        versionName "1.0.0"
     }
     signingConfigs {
         debug {
@@ -92,18 +93,31 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        // The upload key. Its file and passwords are not in the repository: they are CHORDSUNO_UPLOAD_* in ~/.gradle/gradle.properties.
+        if (project.hasProperty('CHORDSUNO_UPLOAD_STORE_FILE')) {
+            release {
+                storeFile file(project.property('CHORDSUNO_UPLOAD_STORE_FILE'))
+                storePassword project.property('CHORDSUNO_UPLOAD_STORE_PASSWORD')
+                keyAlias project.property('CHORDSUNO_UPLOAD_KEY_ALIAS')
+                keyPassword project.property('CHORDSUNO_UPLOAD_KEY_PASSWORD')
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            // Without the upload key (another computer) a release build is signed with the debug key, which Google Play refuses.
+            signingConfig signingConfigs.findByName('release') ?: signingConfigs.debug
             minifyEnabled enableProguardInReleaseBuilds
+            shrinkResources enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
         }
+    }
+    // The Play Store builds one small download per phone from the bundle; only the bundle is uploaded.
+    bundle {
+        language { enableSplit = false } // the app is in one language, so keep every language's strings with it
     }
 }
 

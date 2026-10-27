@@ -13,7 +13,26 @@ export function AuthProvider({ children }) {
   const [ready, setReady] = useState(false);
   const [user, setUser] = useState(getJson('user'));
   const [config, setConfig] = useState(null);
+  const [plan, setPlan] = useState(null); // { plan: { code, name, isFree }, entitlements: { key: { enabled, value } }, subscription }
   const googleReady = useRef(false);
+
+  // What the person's plan includes. A different person (signing in or out) has a different plan.
+  const refreshPlan = useCallback(() => api.getMyPlan().then(setPlan, () => {}), []);
+  const userId = user ? user.id : null;
+  useEffect(() => {
+    if (ready) refreshPlan();
+  }, [ready, userId, refreshPlan]);
+
+  // The same rules as the website: a feature the plan has no rule for is allowed, and until the answer arrives nothing is locked.
+  const can = useCallback((key) => {
+    const rule = plan && plan.entitlements ? plan.entitlements[key] : undefined;
+    return rule === undefined ? true : !!rule.enabled;
+  }, [plan]);
+  const limitOf = useCallback((key) => {
+    const rule = plan && plan.entitlements ? plan.entitlements[key] : undefined;
+    if (rule === undefined) return null;
+    return rule.enabled ? rule.value : 0;
+  }, [plan]);
 
   const remember = useCallback(async (nextUser, token) => {
     setUser(nextUser);
@@ -112,8 +131,8 @@ export function AuthProvider({ children }) {
   }, [forget]);
 
   const value = useMemo(
-    () => ({ ready, user, config, signInWithGoogle, signInAsReviewer, signOut, deleteAccount }),
-    [ready, user, config, signInWithGoogle, signInAsReviewer, signOut, deleteAccount],
+    () => ({ ready, user, config, plan, can, limitOf, refreshPlan, signInWithGoogle, signInAsReviewer, signOut, deleteAccount }),
+    [ready, user, config, plan, can, limitOf, refreshPlan, signInWithGoogle, signInAsReviewer, signOut, deleteAccount],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

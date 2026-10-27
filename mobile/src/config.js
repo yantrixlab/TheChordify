@@ -7,7 +7,9 @@ export const LINKS = {
   privacy: `${SITE}/privacy/`,
   terms: `${SITE}/terms/`,
   deleteAccount: `${SITE}/delete-account/`,
-  support: 'mailto:support@chordsuno.com',
+  support: 'mailto:yantrixlab@gmail.com',
+  youtubeTerms: 'https://www.youtube.com/t/terms',
+  googlePrivacy: 'https://policies.google.com/privacy',
 };
 
 // The version the store listing carries; the server's /api/app/config can ask older ones to update.

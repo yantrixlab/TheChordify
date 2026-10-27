@@ -8,3 +8,10 @@
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
 # Add any project specific keep options here:
+# Native-module classes the C++ side finds by name (JNI), which R8 would otherwise rename or remove.
+-keep class com.margelo.nitro.** { *; }
+-keep class com.facebook.jni.** { *; }
+-keep class com.reactnativecommunity.webview.** { *; }
+-keep class com.oblador.keychain.** { *; }
+-keep class com.reactnativegooglesignin.** { *; }
+-dontwarn com.google.android.gms.**

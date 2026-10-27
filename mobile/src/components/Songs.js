@@ -12,10 +12,10 @@ export const SongRow = memo(function SongRow({ song, onPress, trailing }) {
       accessibilityRole="button"
       accessibilityLabel={`${song.title}${song.artist ? ` by ${song.artist}` : ''}`}
       onPress={() => onPress(song)}
-      android_ripple={{ color: '#ffffff22' }}
+      android_ripple={{ color: '#7c3aed22' }}
       style={styles.row}
     >
-      <Art song={song} size={104} />
+      <Art song={song} size={112} />
       <View style={styles.body}>
         <Text style={styles.title} numberOfLines={2}>
           {song.title}
@@ -39,16 +39,16 @@ export const SongRow = memo(function SongRow({ song, onPress, trailing }) {
 });
 
 /** A song as a card for a shelf that scrolls sideways. */
-export const SongCard = memo(function SongCard({ song, onPress }) {
+export const SongCard = memo(function SongCard({ song, onPress, width = 168 }) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${song.title}${song.artist ? ` by ${song.artist}` : ''}`}
       onPress={() => onPress(song)}
-      android_ripple={{ color: '#ffffff22' }}
-      style={styles.card}
+      android_ripple={{ color: '#7c3aed22' }}
+      style={{ width }}
     >
-      <Art song={song} size={156} />
+      <Art song={song} size={width} style={styles.cardArt} />
       <Text style={styles.cardTitle} numberOfLines={2}>
         {song.title}
       </Text>
@@ -62,10 +62,10 @@ export const SongCard = memo(function SongCard({ song, onPress }) {
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8, paddingHorizontal: 16 },
   body: { flex: 1, gap: 3 },
-  title: { color: colors.text, fontSize: 15, fontWeight: '700', lineHeight: 20 },
-  by: { color: colors.mute, fontSize: 13 },
+  title: { color: colors.ink, fontSize: 15.5, fontWeight: '700', lineHeight: 20 },
+  by: { color: colors.mute, fontSize: 13.5 },
   chips: { flexDirection: 'row', gap: 5, marginTop: 4 },
-  chip: { overflow: 'hidden', paddingHorizontal: 7, paddingVertical: 1, borderRadius: 6, backgroundColor: '#ffffff14', color: '#e4dcf5', fontSize: 11.5, fontWeight: '700' },
-  card: { width: 156, gap: 5 },
-  cardTitle: { color: colors.text, fontSize: 13.5, fontWeight: '700', lineHeight: 18, marginTop: 4, minHeight: 36 },
+  chip: { overflow: 'hidden', paddingHorizontal: 8, paddingVertical: 1, borderRadius: 6, backgroundColor: colors.violetSoft, color: colors.violetDeep, fontSize: 12, fontWeight: '700' },
+  cardArt: { borderRadius: 12 },
+  cardTitle: { color: colors.ink, fontSize: 14.5, fontWeight: '700', lineHeight: 19, marginTop: 8, minHeight: 38 },
 });

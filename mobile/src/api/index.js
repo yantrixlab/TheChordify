@@ -60,7 +60,10 @@ export const getResult = (sessionId) => request(`/api/result/${sessionId}`);
 
 /** What the person's plan includes: { entitlements: { instruments_more: true, ... } } (Free for somebody signed out). */
 export const getMyPlan = () => request('/api/me/plan');
-export const getAuthConfig =() => request('/api/auth/config');
+/** Every plan on sale, its prices and what it includes. */
+export const getPricing = () => request('/api/pricing');
+export const getAuthConfig = () => request('/api/auth/config');
+export const getProfile = () => request('/api/me/profile');
 export const getMe = () => request('/api/auth/me');
 export const signInWithGoogle = (credential) => request('/api/auth/google', { method: 'POST', body: { credential, mobile: true } });
 export const signInAsReviewer = (email, password) => request('/api/auth/reviewer', { method: 'POST', body: { email, password, mobile: true } });

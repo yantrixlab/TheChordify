@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
 import { errorMessage, getLibrary } from '../api';
 import { useAuth } from '../auth/AuthContext';
-import { Button, Centered, Note } from '../components/Ui';
+import { AppBar, Button, Centered, Note } from '../components/Ui';
 import { SongRow } from '../components/Songs';
 import { useOpenSong } from '../lib/useOpenSong';
 import { colors, radius } from '../theme';
@@ -44,13 +44,13 @@ export default function LibraryScreen({ navigation }) {
   );
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top + 12 }]}>
-      <Text style={styles.heading}>Library</Text>
+    <View style={styles.screen}>
+      <AppBar title="My Library" actions={[{ icon: 'settings', label: 'Settings', onPress: () => navigation.navigate('Settings') }]} />
       {!user ? (
         <Centered>
           <Text style={styles.big}>Keep your songs</Text>
           <Text style={styles.sub}>Sign in to see the songs you played and the ones you favourited, on any device.</Text>
-          <Button title="Sign in" onPress={() => navigation.navigate('Account')} style={{ marginTop: 20 }} />
+          <Button title="Sign in" onPress={() => navigation.navigate('Settings')} style={styles.signIn} />
         </Centered>
       ) : (
         <>
@@ -66,21 +66,19 @@ export default function LibraryScreen({ navigation }) {
                 accessibilityRole="tab"
                 accessibilityState={{ selected: tab === t.id }}
               >
-                <Text style={[styles.tabText, tab === t.id && { color: '#fff' }]}>{t.label}</Text>
+                <Text style={[styles.tabText, tab === t.id && styles.tabTextOn]}>{t.label}</Text>
               </Pressable>
             ))}
           </View>
           <Note>{error}</Note>
           {items === null && !error ? (
-            <ActivityIndicator color={colors.violetSoft} style={{ marginTop: 40 }} />
+            <ActivityIndicator color={colors.violet} style={styles.loading} />
           ) : (
             <FlashList
               data={items || []}
               keyExtractor={(item) => item.sessionId}
               renderItem={({ item }) => <SongRow song={item} onPress={openSong} />}
-              ListEmptyComponent={
-                <Text style={styles.empty}>{tab === 'favorites' ? 'Tap the heart in a song to keep it here.' : 'Songs you play will show up here.'}</Text>
-              }
+              ListEmptyComponent={<Text style={styles.empty}>{tab === 'favorites' ? 'Tap the heart in a song to keep it here.' : 'Songs you play will show up here.'}</Text>}
               contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
             />
           )}
@@ -92,12 +90,14 @@ export default function LibraryScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  heading: { color: colors.text, fontSize: 26, fontWeight: '800', letterSpacing: -0.5, paddingHorizontal: 16 },
   tabs: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 14 },
-  tab: { paddingHorizontal: 18, height: 38, borderRadius: radius.pill, backgroundColor: colors.card, justifyContent: 'center' },
+  tab: { paddingHorizontal: 18, height: 38, borderRadius: radius.pill, backgroundColor: colors.soft, justifyContent: 'center' },
   tabOn: { backgroundColor: colors.violet },
-  tabText: { color: colors.mute, fontSize: 14.5, fontWeight: '700' },
-  big: { color: colors.text, fontSize: 22, fontWeight: '800' },
+  tabText: { color: colors.violetDeep, fontSize: 14.5, fontWeight: '700' },
+  tabTextOn: { color: '#fff' },
+  big: { color: colors.ink, fontSize: 22, fontWeight: '800' },
   sub: { color: colors.mute, fontSize: 15, lineHeight: 22, textAlign: 'center', marginTop: 8 },
+  signIn: { marginTop: 20 },
+  loading: { marginTop: 40 },
   empty: { color: colors.mute, fontSize: 15, textAlign: 'center', marginTop: 48, paddingHorizontal: 32 },
 });

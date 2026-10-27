@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- What shows from the moment the app is tapped until the first screen is drawn (Android 11 and older; newer ones use the system splash in values-v31). -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/splash_background" />
+    <item android:width="160dp" android:height="160dp" android:gravity="center">
+        <bitmap android:src="@drawable/splash_icon" android:gravity="fill" />
+    </item>
+</layer-list>

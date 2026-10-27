@@ -1,18 +1,22 @@
+// Chord Suno's colours: the website's light look (white cards on a soft lavender page, deep violet bars), not a dark theme.
 export const colors = {
-  bg: '#12041f',
-  bgSoft: '#1a0533',
-  card: '#ffffff0f',
-  cardStrong: '#ffffff1a',
-  line: '#ffffff1f',
+  bg: '#f6f3fb', // the page
+  surface: '#ffffff', // cards and sheets
+  ink: '#1a0533', // text
+  text: '#1a0533',
+  mute: '#6b5f86', // second-line text
+  faint: '#9a8fb3', // hints, inactive icons
+  line: '#e6e0f0', // dividers and borders
+  soft: '#efe9fb', // a quiet fill (a button at rest, an empty cell)
   violet: '#7c3aed',
-  violetSoft: '#b9a1ff',
   violetDeep: '#5b21b6',
-  text: '#ffffff',
-  mute: '#b7acd0',
-  faint: '#8b7fa8',
-  error: '#fecaca',
-  errorBg: '#3b0a1a',
+  violetSoft: '#ede4ff',
+  bar: '#5b21b6', // the top bar
+  onBar: '#ffffff',
+  error: '#b91c1c',
+  errorBg: '#fee2e2',
   danger: '#dc2626',
+  gold: '#f59e0b',
   // the colour of a song part, the same as on the website
   parts: {
     silence: '#e5e7eb',
@@ -35,4 +39,6 @@ export function sectionColor(label) {
   return colors.partCycle[((letter % n) + n) % n];
 }
 
-export const radius = { card: 16, pill: 999 };
+export const radius = { card: 16, pill: 999, tile: 18 };
+
+export const shadow = { shadowColor: '#1a0533', shadowOpacity: 0.08, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 };
