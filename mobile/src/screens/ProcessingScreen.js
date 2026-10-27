@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { errorMessage, getJob } from '../api';
-import { Art, Button, Note } from '../components/Ui';
+import { AppBar, Art, Button, Note } from '../components/Ui';
 import { colors } from '../theme';
 
 const STAGES = { queued: 'Waiting for a turn…', downloading: 'Fetching the song…', analyzing: 'Listening for the chords…' };
@@ -63,7 +63,9 @@ export default function ProcessingScreen({ route, navigation }) {
   }, [sessionId, song, navigation, show, attempt]);
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}>
+    <View style={styles.screen}>
+      <AppBar title="Chord Suno" backIcon="close" onBack={() => navigation.goBack()} />
+      <View style={[styles.content, { paddingBottom: insets.bottom + 24 }]}>
       {song ? <Art song={song} size={260} style={styles.art} /> : null}
       <Text style={styles.title} numberOfLines={2}>
         {song && song.title ? song.title : 'Your song'}
@@ -84,19 +86,21 @@ export default function ProcessingScreen({ route, navigation }) {
           <Text style={styles.hint}>A new song takes about a minute. Songs others have played open at once.</Text>
         </View>
       )}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', paddingHorizontal: 24 },
+  screen: { flex: 1, backgroundColor: colors.bg },
+  content: { flex: 1, alignItems: 'center', paddingTop: 28, paddingHorizontal: 24 },
   art: { marginBottom: 22, borderRadius: 16 },
-  title: { color: colors.text, fontSize: 20, fontWeight: '800', textAlign: 'center' },
+  title: { color: colors.ink, fontSize: 20, fontWeight: '800', textAlign: 'center' },
   by: { color: colors.mute, fontSize: 15, marginTop: 4 },
   wait: { width: '100%', marginTop: 32, alignItems: 'center' },
-  track: { width: '100%', height: 6, borderRadius: 3, backgroundColor: colors.line, overflow: 'hidden' },
+  track: { width: '100%', height: 6, borderRadius: 3, backgroundColor: colors.soft, overflow: 'hidden' },
   fill: { height: 6, width: '100%', backgroundColor: colors.violet, transformOrigin: 'left' },
-  stage: { color: colors.violetSoft, fontSize: 15, fontWeight: '600', marginTop: 16 },
+  stage: { color: colors.violetDeep, fontSize: 15, fontWeight: '600', marginTop: 16 },
   hint: { color: colors.faint, fontSize: 13, textAlign: 'center', marginTop: 8 },
   fail: { width: '100%', marginTop: 28 },
 });

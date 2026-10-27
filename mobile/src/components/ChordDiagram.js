@@ -16,7 +16,7 @@ const LINE = '#c9bfe0';
  * string and ○ for an open one, and the fret number where a shape sits up the neck. `shape` is { frets, fingers, baseFret }.
  * It is memoised, so only the diagrams whose chord changed are ever drawn again.
  */
-function ChordDiagram({ shape, label, scale = 1, active = false }) {
+function ChordDiagram({ shape, label, notes, scale = 1, active = false }) {
   const strings = shape ? shape.frets.length : 6;
   const colX = (i) => LEFT + (W * i) / (strings - 1);
   const rowY = (r) => TOP + (GRID_H * r) / ROWS;
@@ -89,14 +89,14 @@ function ChordDiagram({ shape, label, scale = 1, active = false }) {
         </Svg>
       ) : (
         <View style={[styles.none, { width, height }]}>
-          <Text style={styles.noneText}>no shape</Text>
+          <Text style={styles.noneText}>{notes && notes.length ? notes.join('  ') : '—'}</Text>
         </View>
       )}
     </View>
   );
 }
 
-export default memo(ChordDiagram, (a, b) => a.shape === b.shape && a.label === b.label && a.scale === b.scale && a.active === b.active);
+export default memo(ChordDiagram, (a, b) => a.shape === b.shape && a.label === b.label && a.scale === b.scale && a.active === b.active && a.notes === b.notes);
 
 export const DIAGRAM_WIDTH = LEFT + W + 14;
 
@@ -106,5 +106,5 @@ const styles = StyleSheet.create({
   label: { color: INK, fontSize: 17, fontWeight: '800' },
   labelActive: { color: colors.violetDeep },
   none: { alignItems: 'center', justifyContent: 'center' },
-  noneText: { color: '#8b7fa8', fontSize: 12 },
+  noneText: { color: '#6b5f86', fontSize: 18, fontWeight: '700' },
 });

@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
   barRow: { flexDirection: 'row', alignItems: 'center', minHeight: 60, paddingLeft: 8, paddingRight: 6 },
   barButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   barTitleBox: { flex: 1, paddingHorizontal: 10 },
-  barTitle: { color: colors.onBar, fontSize: 21, fontWeight: '600' },
+  barTitle: { color: colors.onBar, fontSize: 20, fontWeight: "600" },
   barSub: { color: '#ffffffb3', fontSize: 13, marginTop: 1 },
   button: { height: 48, paddingHorizontal: 22, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   buttonRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },

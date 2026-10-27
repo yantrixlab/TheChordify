@@ -53,7 +53,7 @@ function Tabs() {
 
 const linking = {
   prefixes: ['chordsuno://'],
-  config: { screens: { Tabs: '', Player: 'song/:sessionId' } },
+  config: { initialRouteName: 'Tabs', screens: { Tabs: '', Player: 'song/:sessionId' } }, // a song opened from a link has Discover under it
 };
 
 export default function Navigation() {

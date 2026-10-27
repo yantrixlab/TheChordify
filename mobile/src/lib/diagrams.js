@@ -1,21 +1,63 @@
-import { getGuitarShapes, getUkuleleShapes } from 'chordsuno-shared/chordShapes';
+import { useSyncExternalStore } from 'react';
+import { getGuitarShapes, getUkuleleShapes, transposeChord } from 'chordsuno-shared/chordShapes';
+import { getJson, setJson } from './storage';
 
-const cache = new Map();
+export { transposeChord };
 
-/** The usual fingering of a chord on the guitar or the ukulele (null for a rest or a name with no shape). The same code as the website. */
-export function shapeFor(instrument, chord) {
-  if (!chord || chord === 'N') return null;
+const shapeCache = new Map();
+
+/** Every way of fingering a chord on the guitar or the ukulele (the usual one first). The same code as the website. */
+export function shapesFor(instrument, chord) {
+  if (!chord || chord === 'N') return [];
   const key = `${instrument}:${chord}`;
-  if (cache.has(key)) return cache.get(key);
-  let shape = null;
+  if (shapeCache.has(key)) return shapeCache.get(key);
+  let list = [];
   try {
-    const list = instrument === 'ukulele' ? getUkuleleShapes(chord) : getGuitarShapes(chord);
-    shape = list[0] || null;
+    list = (instrument === 'ukulele' ? getUkuleleShapes(chord) : getGuitarShapes(chord)) || [];
   } catch {
-    shape = null;
+    list = [];
   }
-  cache.set(key, shape);
-  return shape;
+  shapeCache.set(key, list);
+  return list;
+}
+
+// The way a player picks to play a chord (0 = the usual one) is used for that chord everywhere, and kept for next time.
+// The ukulele's choices are kept apart from the guitar's.
+const PICKS = 'voicings-v1';
+let picks = getJson(PICKS, {}) || {};
+const listeners = new Set();
+const pickKey = (instrument, chord) => (instrument === 'ukulele' ? `u:${chord}` : chord);
+
+/** Re-draws whoever uses it when a chord's chosen fingering changes. */
+export function usePicks() {
+  return useSyncExternalStore(
+    (fn) => {
+      listeners.add(fn);
+      return () => listeners.delete(fn);
+    },
+    () => picks,
+  );
+}
+
+/** The fingering to show for a chord and which of its choices that is: { shape, index, count } (null when there is none). */
+export function choiceFor(instrument, chord, current = picks) {
+  const shapes = shapesFor(instrument, chord);
+  if (shapes.length === 0) return null;
+  const index = Math.min(Math.max(Number(current[pickKey(instrument, chord)]) || 0, 0), shapes.length - 1);
+  return { shape: shapes[index], index, count: shapes.length };
+}
+
+/** Moves a chord to its next (or previous) way of playing, everywhere it appears. */
+export function stepPick(instrument, chord, delta) {
+  const count = shapesFor(instrument, chord).length;
+  if (count < 2) return;
+  const key = pickKey(instrument, chord);
+  const next = ((Number(picks[key]) || 0) + delta + count) % count;
+  picks = { ...picks };
+  if (next === 0) delete picks[key];
+  else picks[key] = next;
+  setJson(PICKS, picks);
+  listeners.forEach((fn) => fn());
 }
 
 /** The chords written in the chart, one per change and in order: [{ chord, cell }], and for every beat cell the entry sounding in it. */

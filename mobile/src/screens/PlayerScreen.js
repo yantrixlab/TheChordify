@@ -1,106 +1,61 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Linking, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Linking, Share, StyleSheet, Text, useWindowDimensions, Vibration, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import YoutubePlayer from 'react-native-youtube-iframe';
-import { addFavorite, errorMessage, getFavoriteKeys, getMyPlan, getResult, recordPlayed, removeFavorite } from '../api';
+import { chordKeyLabel } from 'chordsuno-shared/chordShapes';
+import { addFavorite, errorMessage, getFavoriteKeys, getResult, recordPlayed, removeFavorite } from '../api';
 import { useAuth } from '../auth/AuthContext';
-import DiagramsPanel from '../components/DiagramsPanel';
-import { Button, Centered, Note } from '../components/Ui';
-import { buildChart, cellAt, chordsFrom, clock } from '../lib/grid';
+import { DiagramsView, SummaryView } from '../components/DiagramsView';
+import { GridView } from '../components/GridView';
+import { ControlPanel, Toolbar } from '../components/PlayerBars';
+import { MenuRow, Segmented, Sheet, Stepper } from '../components/Sheet';
+import { AppBar, Button, Centered, Note } from '../components/Ui';
+import { SITE } from '../config';
+import { transposeChord } from '../lib/diagrams';
+import { buildChart, cellAt, clock } from '../lib/grid';
 import { getJson, setJson } from '../lib/storage';
-import { colors, radius, sectionColor } from '../theme';
+import { colors, radius } from '../theme';
 
-const BAR_H = 66;
-const LABEL_H = 38;
-
-/** Rows of the chart: a label row where a song part starts, then the bar. Heights are fixed so the list can jump to any bar. */
-function layoutItems(chart) {
-  const items = [];
-  const barIndex = [];
-  let offset = 0;
-  for (const row of chart.rows) {
-    if (row.label) {
-      items.push({ type: 'label', key: `l${row.bar}`, label: row.label, h: LABEL_H, offset });
-      offset += LABEL_H;
-    }
-    barIndex[row.bar] = items.length;
-    items.push({ type: 'bar', key: `b${row.bar}`, row, h: BAR_H, offset });
-    offset += BAR_H;
-  }
-  return { items, barIndex };
-}
-
-const Cell = memo(function Cell({ chord, on, first }) {
-  const rest = chord === 'N';
-  return (
-    <View style={[styles.cell, first && styles.cellFirst, on && styles.cellOn]}>
-      {chord ? (
-        <Text style={[styles.cellChord, on && styles.cellChordOn, rest && styles.cellRest]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>
-          {rest ? '𝄽' : chord}
-        </Text>
-      ) : (
-        <Text style={[styles.cellDot, on && styles.cellChordOn]}>{on ? '•' : ''}</Text>
-      )}
-    </View>
-  );
-});
-
-const BarRow = memo(function BarRow({ row, activeK, onSeek }) {
-  return (
-    <View style={styles.bar}>
-      {row.chords.map((chord, k) => (
-        <Pressable key={k} style={styles.cellWrap} disabled={row.beats[k] === null} onPress={() => onSeek(row.beats[k])}>
-          <Cell chord={chord} on={activeK === k} first={k === 0} />
-        </Pressable>
-      ))}
-    </View>
-  );
-});
+const VIEWS = [
+  { id: 'diagrams', label: 'Diagrams' },
+  { id: 'summary', label: 'Summary' },
+  { id: 'grid', label: 'Grid' },
+];
+const INSTRUMENTS = [
+  { id: 'guitar', label: 'Guitar', feature: null },
+  { id: 'ukulele', label: 'Ukulele', feature: 'instruments_more' },
+  { id: 'piano', label: 'Piano', soon: true },
+  { id: 'mandolin', label: 'Mandolin', soon: true },
+];
+const LOOPS = ['off', 'song', 'section'];
 
 export default function PlayerScreen({ route, navigation }) {
   const { sessionId, song } = route.params;
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
-  const { user } = useAuth();
+  const { user, can } = useAuth();
   const [result, setResult] = useState(route.params.result || null);
   const [error, setError] = useState('');
   const [playing, setPlaying] = useState(false);
   const [playerError, setPlayerError] = useState('');
   const [active, setActive] = useState(-1);
   const [favorite, setFavorite] = useState(false);
-  const [view, setView] = useState('diagrams'); // 'diagrams' | 'chart'
+  const [view, setView] = useState(getJson('view', 'diagrams'));
   const [instrument, setInstrument] = useState(getJson('instrument', 'guitar'));
-  const [ukuleleOk, setUkuleleOk] = useState(false); // the plan includes the ukulele diagrams
-  const [lockedNote, setLockedNote] = useState(false);
+  const [transpose, setTranspose] = useState(0);
+  const [capo, setCapo] = useState(0);
+  const [detailed, setDetailed] = useState(false);
+  const [tempoPct, setTempoPct] = useState(100);
+  const [volume, setVolume] = useState(100);
+  const [loopMode, setLoopMode] = useState('off');
+  const [countIn, setCountIn] = useState(false);
+  const [counting, setCounting] = useState(0); // 3, 2, 1 while the count-in runs, else 0
+  const [sheet, setSheet] = useState(null); // 'view' | 'transpose' | 'capo' | 'tempo' | 'volume' | 'more' | 'details'
   const player = useRef(null);
-  const list = useRef(null);
   const counted = useRef(false);
-  const lastRow = useRef(-1);
-
-  useEffect(() => {
-    getMyPlan().then(
-      (p) => setUkuleleOk(!!(p.entitlements && p.entitlements.instruments_more)),
-      () => {},
-    );
-  }, [user]);
-
-  useEffect(() => {
-    lastRow.current = -1; // the chart list is made afresh when its tab is shown again
-  }, [view]);
-
-  const chooseInstrument = useCallback(
-    (name) => {
-      if (name === 'ukulele' && !ukuleleOk) {
-        setLockedNote(true);
-        return;
-      }
-      setLockedNote(false);
-      setInstrument(name);
-      setJson('instrument', name);
-    },
-    [ukuleleOk],
-  );
-  const shownInstrument = instrument === 'ukulele' && !ukuleleOk ? 'guitar' : instrument;
+  const loopSection = useRef(null);
+  const timeRef = useRef(0);
+  const countTimer = useRef(null);
 
   useEffect(() => {
     if (result) return;
@@ -112,8 +67,13 @@ export default function PlayerScreen({ route, navigation }) {
     getFavoriteKeys().then((keys) => setFavorite(keys.includes(sessionId)), () => {});
   }, [user, sessionId]);
 
-  const chart = useMemo(() => (result ? buildChart(result) : null), [result]);
-  const laid = useMemo(() => (chart ? layoutItems(chart) : null), [chart]);
+  useEffect(() => () => clearTimeout(countTimer.current), []);
+
+  const hasDetail = !!(result && result.chordsDetailed && result.chordsDetailed !== result.chords && result.chordsDetailed.length > 0);
+  const chart = useMemo(() => (result ? buildChart(result, detailed && hasDetail) : null), [result, detailed, hasDetail]);
+  const ukuleleOk = can('instruments_more');
+  const shownInstrument = instrument === 'ukulele' && !ukuleleOk ? 'guitar' : instrument;
+  const sections = useMemo(() => ((result && result.sections) || []).filter((s) => s.end > s.start && s.startBar !== null), [result]);
 
   // Where the video is: asked about six times a second while it plays; only a change of beat re-draws anything.
   useEffect(() => {
@@ -123,25 +83,23 @@ export default function PlayerScreen({ route, navigation }) {
       if (stop || !player.current) return;
       try {
         const t = await player.current.getCurrentTime();
+        timeRef.current = t;
+        const section = loopSection.current;
+        if (section && t >= section.end - 0.04) {
+          player.current.seekTo(section.start, true); // loop the section
+          return;
+        }
         const i = cellAt(chart.cells, t);
         setActive((before) => (before === i ? before : i));
       } catch {
         // the player is not ready yet
       }
-    }, 160);
+    }, 150);
     return () => {
       stop = true;
       clearInterval(id);
     };
   }, [playing, chart]);
-
-  // Keep the playing bar in view, a little below the top.
-  const cell = chart && active >= 0 ? chart.cells[active] : null;
-  useEffect(() => {
-    if (!cell || !laid || !list.current || cell.row === lastRow.current) return;
-    lastRow.current = cell.row;
-    list.current.scrollToIndex({ index: laid.barIndex[cell.row], viewPosition: 0.25, animated: true });
-  }, [cell, laid]);
 
   const onState = useCallback(
     (state) => {
@@ -151,9 +109,15 @@ export default function PlayerScreen({ route, navigation }) {
           counted.current = true;
           recordPlayed(sessionId);
         }
-      } else if (state === 'paused' || state === 'ended') setPlaying(false);
+      } else if (state === 'paused') setPlaying(false);
+      else if (state === 'ended') {
+        if (loopMode === 'song' && player.current) {
+          player.current.seekTo(0, true);
+          setPlaying(true);
+        } else setPlaying(false);
+      }
     },
-    [user, sessionId],
+    [user, sessionId, loopMode],
   );
 
   const seek = useCallback((t) => {
@@ -163,9 +127,58 @@ export default function PlayerScreen({ route, navigation }) {
     }
   }, []);
 
+  // Play, with the count-in first when it is on: three beats at the song's own speed, a tick on each.
+  const togglePlay = useCallback(() => {
+    if (counting) return;
+    if (playing) {
+      setPlaying(false);
+      return;
+    }
+    if (!countIn || !result) {
+      setPlaying(true);
+      return;
+    }
+    const beat = 60000 / ((result.tempo || 100) * (tempoPct / 100));
+    let n = 3;
+    const step = () => {
+      setCounting(n);
+      Vibration.vibrate(n === 3 ? 40 : 20);
+      countTimer.current = setTimeout(() => {
+        n -= 1;
+        if (n > 0) step();
+        else {
+          setCounting(0);
+          setPlaying(true);
+        }
+      }, beat);
+    };
+    step();
+  }, [counting, playing, countIn, result, tempoPct]);
+
+  const restart = useCallback(() => {
+    clearTimeout(countTimer.current);
+    setCounting(0);
+    if (player.current) player.current.seekTo(0, true);
+    setActive(-1);
+    timeRef.current = 0;
+    setPlaying(true);
+  }, []);
+
+  // Loop: off, then the whole song, then the section that was playing when it was switched on.
+  const cycleLoop = useCallback(() => {
+    const options = sections.length > 0 ? LOOPS : LOOPS.slice(0, 2);
+    const next = options[(options.indexOf(loopMode) + 1) % options.length];
+    setLoopMode(next);
+    loopSection.current = null;
+    if (next === 'section') {
+      const t = timeRef.current;
+      loopSection.current = sections.find((s) => t >= s.start && t < s.end) || sections[0];
+    }
+  }, [loopMode, sections]);
+
   const toggleFavorite = useCallback(async () => {
     if (!user) {
-      navigation.navigate('Tabs', { screen: 'Account' });
+      navigation.navigate('Settings');
       return;
     }
     const next = !favorite;
@@ -179,26 +192,59 @@ export default function PlayerScreen({ route, navigation }) {
     }
   }, [user, favorite, sessionId, result, song, navigation]);
 
+  // A feature the plan leaves out shows a lock and leads to the plans.
+  const needsPlan = useCallback(() => {
+    setSheet(null);
+    navigation.navigate('Tabs', { screen: 'Premium' });
+  }, [navigation]);
+
+  const chooseView = (id) => {
+    setView(id);
+    setJson('view', id);
+  };
+  const chooseInstrument = (item) => {
+    if (item.soon) return;
+    if (item.feature && !can(item.feature)) {
+      needsPlan();
+      return;
+    }
+    setInstrument(item.id);
+    setJson('instrument', item.id);
+  };
+
+  const share = () => {
+    setSheet(null);
+    Share.share({ message: `${title}${artist ? ` by ${artist}` : ''}: chords on Chord Suno\n${SITE}/play?session=${encodeURIComponent(sessionId)}` }).catch(() => {});
+  };
+
   const videoId = result?.videoId || song?.videoId || (sessionId.startsWith('yt_') ? sessionId.slice(3) : '');
   const title = result?.title || song?.title || 'Song';
   const artist = result?.artist || song?.artist || '';
-  const [now, next] = chart ? chordsFrom(chart, active) : ['', ''];
   const videoHeight = Math.round((width * 9) / 16);
+  const key = result && result.key ? transposeChord(result.key, transpose) : '';
+  const transposeLocked = !can('transpose_capo');
 
-  const renderItem = useCallback(
-    ({ item }) =>
-      item.type === 'label' ? (
-        <View style={[styles.label, { backgroundColor: sectionColor(item.label) }]}>
-          <Text style={styles.labelText}>{item.label}</Text>
-        </View>
-      ) : (
-        <BarRow row={item.row} activeK={cell && cell.row === item.row.bar ? cell.k : -1} onSeek={seek} />
-      ),
-    [cell, seek],
-  );
+  const toolbar = [
+    { id: 'view', label: INSTRUMENTS.find((i) => i.id === shownInstrument).label, chevron: true, onPress: () => setSheet('view') },
+    { id: 'transpose', label: 'Transpose', dot: transpose !== 0, locked: transposeLocked, onPress: () => (transposeLocked ? needsPlan() : setSheet('transpose')) },
+    { id: 'capo', label: 'Capo', dot: capo !== 0, locked: transposeLocked, onPress: () => (transposeLocked ? needsPlan() : setSheet('capo')) },
+  ];
+  if (hasDetail) toolbar.push({ id: 'detail', label: detailed ? 'Simplify' : 'Detail', active: detailed, locked: !can('chord_detail'), onPress: () => (can('chord_detail') ? setDetailed((d) => !d) : needsPlan()) });
+
+  const arrows = can('chord_voicings');
 
   return (
     <View style={styles.screen}>
+      <AppBar
+        title={title}
+        subtitle={artist}
+        backIcon="close"
+        onBack={() => navigation.goBack()}
+        actions={[
+          { icon: 'heart', label: favorite ? 'Remove from favourites' : 'Add to favourites', onPress: toggleFavorite, filled: favorite },
+          { icon: 'more', label: 'More', onPress: () => setSheet('more') },
+        ]}
+      />
       {videoId ? (
         <View style={{ height: videoHeight, backgroundColor: '#000' }}>
           <YoutubePlayer
@@ -206,7 +252,9 @@ export default function PlayerScreen({ route, navigation }) {
             height={videoHeight}
             width={width}
             videoId={videoId}
-            play={playing}
+            play={playing && !counting}
+            volume={volume}
+            playbackRate={tempoPct / 100}
             onChangeState={onState}
             onError={() => setPlayerError('This video cannot be played inside apps.')}
             initialPlayerParams={{ controls: true, rel: false, preventFullScreen: true }}
@@ -215,19 +263,7 @@ export default function PlayerScreen({ route, navigation }) {
         </View>
       ) : null}
 
-      <View style={styles.titleRow}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.title} numberOfLines={1}>
-            {title}
-          </Text>
-          <Text style={styles.by} numberOfLines={1}>
-            {[artist, result ? `${result.tempo ? Math.round(result.tempo) + ' BPM' : ''}` : '', result ? clock(result.duration) : ''].filter(Boolean).join('  ·  ')}
-          </Text>
-        </View>
-        <Pressable onPress={toggleFavorite} accessibilityLabel={favorite ? 'Remove from favourites' : 'Add to favourites'} hitSlop={10} style={styles.heart}>
-          <Text style={[styles.heartText, favorite && { color: '#f472b6' }]}>{favorite ? '♥' : '♡'}</Text>
-        </Pressable>
-      </View>
+      {chart ? <Toolbar items={toolbar} /> : null}
 
       {result && !videoId ? (
         <View style={styles.pad}>
@@ -240,80 +276,133 @@ export default function PlayerScreen({ route, navigation }) {
           <Button title="Open in YouTube" kind="quiet" onPress={() => Linking.openURL(`https://www.youtube.com/watch?v=${videoId}`)} />
         </View>
       ) : null}
-      {error ? <View style={styles.pad}><Note>{error}</Note></View> : null}
+      {error ? (
+        <View style={styles.pad}>
+          <Note>{error}</Note>
+        </View>
+      ) : null}
 
-      {!chart ? (
-        error ? (
-          <Centered>
-            <Button title="Back" kind="quiet" onPress={() => navigation.goBack()} />
-          </Centered>
+      <View style={styles.body}>
+        {!chart ? (
+          error ? (
+            <Centered>
+              <Button title="Back" kind="quiet" onPress={() => navigation.goBack()} />
+            </Centered>
+          ) : (
+            <Centered>
+              <Text style={styles.by}>Loading the chords…</Text>
+            </Centered>
+          )
+        ) : view === 'diagrams' ? (
+          <DiagramsView chart={chart} active={active} instrument={shownInstrument} transpose={transpose} capo={capo} arrows={arrows} />
+        ) : view === 'summary' ? (
+          <SummaryView chart={chart} instrument={shownInstrument} transpose={transpose} capo={capo} arrows={arrows} bottomInset={0} />
         ) : (
-          <Centered>
-            <Text style={styles.by}>Loading the chords…</Text>
-          </Centered>
-        )
-      ) : (
-        <>
-          <View style={styles.tabs}>
-            {[
-              ['diagrams', 'Diagrams'],
-              ['chart', 'Chart'],
-            ].map(([id, name]) => (
-              <Pressable key={id} onPress={() => setView(id)} style={[styles.tab, view === id && styles.tabOn]} accessibilityRole="tab" accessibilityState={{ selected: view === id }}>
-                <Text style={[styles.tabText, view === id && styles.tabTextOn]}>{name}</Text>
-              </Pressable>
-            ))}
-            <View style={styles.spacer} />
-            {view === 'diagrams'
-              ? ['guitar', 'ukulele'].map((name) => (
-                  <Pressable key={name} onPress={() => chooseInstrument(name)} style={[styles.tab, shownInstrument === name && styles.tabOn]} accessibilityRole="button" accessibilityLabel={`${name} diagrams`}>
-                    <Text style={[styles.tabText, shownInstrument === name && styles.tabTextOn]}>{name === 'guitar' ? 'Guitar' : `Ukulele${ukuleleOk ? '' : ' 🔒'}`}</Text>
-                  </Pressable>
-                ))
-              : null}
-          </View>
-          {lockedNote && view === 'diagrams' ? (
-            <View style={styles.pad}>
-              <Note tone="info">Ukulele diagrams are part of the Premium plan.</Note>
-            </View>
-          ) : null}
-          {view === 'diagrams' ? (
-            <DiagramsPanel chart={chart} active={active} instrument={shownInstrument} bottomInset={insets.bottom} />
-          ) : null}
-          {view === 'chart' ? (
-            <>
-          <View style={styles.hero}>
-            <View style={styles.heroNow}>
-              <Text style={styles.heroLabel}>Now</Text>
-              <Text style={styles.heroChord} numberOfLines={1} adjustsFontSizeToFit>
-                {now === 'N' ? '—' : now || '·'}
+          <GridView chart={chart} active={active} transpose={transpose} onSeek={seek} bottomInset={0} />
+        )}
+      </View>
+
+      {chart ? (
+        <ControlPanel
+          playing={playing}
+          counting={counting}
+          onPlay={togglePlay}
+          onRestart={restart}
+          tempoPct={tempoPct}
+          onTempo={() => setSheet('tempo')}
+          loopMode={loopMode}
+          onLoop={cycleLoop}
+          countIn={countIn}
+          onCountIn={() => setCountIn((c) => !c)}
+          volume={volume}
+          onVolume={() => setSheet('volume')}
+          bottomInset={insets.bottom}
+        />
+      ) : null}
+
+      <Sheet visible={sheet === 'view'} title="Pick your view" onClose={() => setSheet(null)}>
+        <Segmented options={VIEWS} value={view} onChange={chooseView} />
+        <View style={styles.tiles}>
+          {INSTRUMENTS.map((item) => {
+            const locked = item.feature && !can(item.feature);
+            const on = shownInstrument === item.id;
+            return (
+              <Text key={item.id} onPress={() => chooseInstrument(item)} style={[styles.tile, on && styles.tileOn, (item.soon || locked) && styles.tileOff]} accessibilityRole="button">
+                {item.label}
+                {item.soon ? '\nsoon' : locked ? '\n🔒' : ''}
               </Text>
-            </View>
-            <View style={styles.heroNext}>
-              <Text style={styles.heroLabel}>Next</Text>
-              <Text style={styles.heroNextChord} numberOfLines={1}>
-                {next === 'N' ? '—' : next || ''}
-              </Text>
-            </View>
-          </View>
-          <FlatList
-            ref={list}
-            data={laid.items}
-            keyExtractor={(item) => item.key}
-            renderItem={renderItem}
-            extraData={cell}
-            getItemLayout={(_, index) => ({ length: laid.items[index].h, offset: laid.items[index].offset, index })}
-            initialNumToRender={14}
-            maxToRenderPerBatch={10}
-            windowSize={7}
-            removeClippedSubviews
-            onScrollToIndexFailed={() => {}}
-            contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: insets.bottom + 24 }}
-          />
-            </>
-          ) : null}
-        </>
-      )}
+            );
+          })}
+        </View>
+        <Button title="Done" onPress={() => setSheet(null)} />
+      </Sheet>
+
+      <Sheet visible={sheet === 'transpose'} title="Transpose" onClose={() => setSheet(null)}>
+        <Text style={styles.sheetHint}>Change the key of the song. The shapes follow; use Capo to keep playing the easy ones.</Text>
+        <Stepper label="Transpose" value={key || (transpose > 0 ? `+${transpose}` : String(transpose))} onMinus={() => setTranspose((t) => t - 1)} onPlus={() => setTranspose((t) => t + 1)} />
+        <Text style={styles.sheetSub}>{transpose === 0 ? 'Original key' : `${transpose > 0 ? '+' : ''}${transpose} semitone${Math.abs(transpose) === 1 ? '' : 's'}`}</Text>
+        <Button title="Reset" kind="quiet" onPress={() => setTranspose(0)} disabled={transpose === 0} style={styles.sheetButton} />
+      </Sheet>
+
+      <Sheet visible={sheet === 'capo'} title="Capo" onClose={() => setSheet(null)}>
+        <Text style={styles.sheetHint}>Put a capo on this fret and the diagrams show the shapes to play, so the song still sounds the same.</Text>
+        <Stepper label="Capo" value={capo === 0 ? 'None' : `Fret ${capo}`} onMinus={() => setCapo((c) => Math.max(0, c - 1))} onPlus={() => setCapo((c) => Math.min(7, c + 1))} minusDisabled={capo === 0} plusDisabled={capo === 7} />
+        <Button title="Reset" kind="quiet" onPress={() => setCapo(0)} disabled={capo === 0} style={styles.sheetButton} />
+      </Sheet>
+
+      <Sheet visible={sheet === 'tempo'} title="Tempo" onClose={() => setSheet(null)}>
+        <Text style={styles.sheetHint}>Slow the song down to practise, or speed it up.</Text>
+        <Stepper label="Tempo" value={`${tempoPct}%`} onMinus={() => setTempoPct((t) => Math.max(50, t - 10))} onPlus={() => setTempoPct((t) => Math.min(150, t + 10))} minusDisabled={tempoPct <= 50} plusDisabled={tempoPct >= 150} />
+        <Text style={styles.sheetSub}>{result && result.tempo ? `${Math.round(result.tempo * (tempoPct / 100))} BPM` : ''}</Text>
+        <Button title="Reset" kind="quiet" onPress={() => setTempoPct(100)} disabled={tempoPct === 100} style={styles.sheetButton} />
+      </Sheet>
+
+      <Sheet visible={sheet === 'volume'} title="Volume" onClose={() => setSheet(null)}>
+        <Stepper label="Volume" value={`${volume}`} onMinus={() => setVolume((v) => Math.max(0, v - 10))} onPlus={() => setVolume((v) => Math.min(100, v + 10))} minusDisabled={volume <= 0} plusDisabled={volume >= 100} />
+        <Text style={styles.sheetSub}>The phone's own volume keys work too.</Text>
+      </Sheet>
+
+      <Sheet visible={sheet === 'more'} title={title} onClose={() => setSheet(null)}>
+        <MenuRow icon="share" title="Share this song" hint="Send a link" onPress={share} />
+        <MenuRow icon="library" title="Song details" hint="Key, tempo and the chords used" onPress={() => setSheet('details')} />
+      </Sheet>
+
+      <Sheet visible={sheet === 'details'} title="Song details" onClose={() => setSheet(null)} scroll>
+        {result ? <Details result={result} transpose={transpose} chart={chart} sections={sections} /> : null}
+      </Sheet>
+    </View>
+  );
+}
+
+function Details({ result, transpose, chart, sections }) {
+  const totals = new Map();
+  (result.chords || []).forEach((seg) => {
+    if (seg.chord !== 'N') totals.set(seg.chord, (totals.get(seg.chord) || 0) + seg.end - seg.start);
+  });
+  const used = [...totals.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10);
+  const rows = [
+    ['Key', result.key ? chordKeyLabel(transposeChord(result.key, transpose)) : '—'],
+    ['Tempo', result.tempo ? `${Math.round(result.tempo)} BPM` : '—'],
+    ['Time signature', `${chart ? chart.perBar : 4} beats to a bar`],
+    ['Length', clock(result.duration)],
+    ['Sections', sections.length > 0 ? String(sections.length) : '—'],
+  ];
+  return (
+    <View>
+      {rows.map(([k, v]) => (
+        <View key={k} style={styles.detailRow}>
+          <Text style={styles.detailKey}>{k}</Text>
+          <Text style={styles.detailValue}>{v}</Text>
+        </View>
+      ))}
+      <Text style={styles.detailHead}>Chords used</Text>
+      <View style={styles.chips}>
+        {used.map(([raw]) => (
+          <Text key={raw} style={styles.chip}>
+            {transposeChord(raw, transpose)}
+          </Text>
+        ))}
+      </View>
     </View>
   );
 }
@@ -321,32 +410,19 @@ export default function PlayerScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   pad: { paddingHorizontal: 16 },
-  titleRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
-  title: { color: colors.text, fontSize: 17, fontWeight: '800' },
-  by: { color: colors.mute, fontSize: 13, marginTop: 2 },
-  heart: { padding: 6 },
-  heartText: { color: colors.mute, fontSize: 26 },
-  tabs: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingBottom: 10 },
-  tab: { paddingHorizontal: 14, height: 34, borderRadius: radius.pill, backgroundColor: colors.card, justifyContent: 'center' },
-  tabOn: { backgroundColor: colors.violet },
-  tabText: { color: colors.mute, fontSize: 13.5, fontWeight: '700' },
-  tabTextOn: { color: '#fff' },
-  spacer: { flex: 1 },
-  hero: { flexDirection: 'row', gap: 10, paddingHorizontal: 12, paddingBottom: 10 },
-  heroNow: { flex: 2, height: 84, borderRadius: radius.card, backgroundColor: colors.violet, paddingHorizontal: 16, paddingTop: 8, justifyContent: 'center' },
-  heroNext: { flex: 1, height: 84, borderRadius: radius.card, backgroundColor: colors.card, paddingHorizontal: 14, paddingTop: 8, justifyContent: 'center' },
-  heroLabel: { color: '#ffffffaa', fontSize: 11, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase' },
-  heroChord: { color: '#fff', fontSize: 44, fontWeight: '800', letterSpacing: -1 },
-  heroNextChord: { color: '#e4dcf5', fontSize: 28, fontWeight: '700' },
-  label: { height: LABEL_H - 8, marginTop: 8, borderRadius: 8, justifyContent: 'center', paddingHorizontal: 12, alignSelf: 'flex-start' },
-  labelText: { color: '#1a0533', fontSize: 13, fontWeight: '800' },
-  bar: { height: BAR_H, flexDirection: 'row', paddingVertical: 4, gap: 4 },
-  cellWrap: { flex: 1 },
-  cell: { flex: 1, borderRadius: 10, backgroundColor: colors.card, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2 },
-  cellFirst: { backgroundColor: '#ffffff17' },
-  cellOn: { backgroundColor: colors.violet },
-  cellChord: { color: colors.text, fontSize: 21, fontWeight: '800' },
-  cellChordOn: { color: '#fff' },
-  cellRest: { color: colors.faint },
-  cellDot: { color: colors.faint, fontSize: 18 },
+  body: { flex: 1 },
+  by: { color: colors.mute, fontSize: 14 },
+  tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginVertical: 16 },
+  tile: { width: '47%', paddingVertical: 20, textAlign: 'center', borderRadius: radius.card, backgroundColor: colors.soft, color: colors.ink, fontSize: 17, fontWeight: '700', overflow: 'hidden', lineHeight: 24 },
+  tileOn: { backgroundColor: colors.violet, color: '#fff' },
+  tileOff: { opacity: 0.55 },
+  sheetHint: { color: colors.mute, fontSize: 14.5, lineHeight: 21, marginBottom: 6 },
+  sheetSub: { color: colors.mute, fontSize: 14, textAlign: 'center', marginBottom: 8 },
+  sheetButton: { marginTop: 8 },
+  detailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line },
+  detailKey: { color: colors.mute, fontSize: 15 },
+  detailValue: { color: colors.ink, fontSize: 15, fontWeight: '700' },
+  detailHead: { color: colors.ink, fontSize: 16, fontWeight: '800', marginTop: 18, marginBottom: 10 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: { overflow: 'hidden', paddingHorizontal: 12, paddingVertical: 5, borderRadius: radius.pill, backgroundColor: colors.violetSoft, color: colors.violetDeep, fontSize: 15, fontWeight: '800' },
 });

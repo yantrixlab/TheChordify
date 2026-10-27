@@ -85,10 +85,11 @@ function placeChordsWithRests(chords, bars, perBar, duration) {
  *   cells    every cell that has a beat, in time order: { t, row, k }: what the playing position is looked up in
  *   perBar   beats to a bar
  */
-export function buildChart(result) {
+export function buildChart(result, detailed = false) {
   const perBar = result.beatsPerBar || 4;
   const bars = trimPickup(result.bars || []);
-  const chords = result.chords || [];
+  // the simple chords (major and minor), or every kind the detector heard (7ths, sus, slash chords)
+  const chords = (detailed && result.chordsDetailed) || result.chords || [];
   const written = placeChordsWithRests(chords, bars, perBar, result.duration || 0);
   const labelAt = new Map();
   for (const section of result.sections || []) {
