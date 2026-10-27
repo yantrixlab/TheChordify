@@ -409,10 +409,20 @@ _SESSION_COOKIE = "cs_session"
 _login_limiter = RateLimiter(limit=20, window=60.0)
 
 
+def _session_token(request: Request) -> str:
+    """The sign-in a request carries: the browser's cookie, or the mobile app's "Authorization: Bearer <token>"."""
+    token = request.cookies.get(_SESSION_COOKIE, "")
+    if not token:
+        header = request.headers.get("authorization", "")
+        if header[:7].lower() == "bearer ":
+            token = header[7:].strip()
+    return token
+
+
 def _session_user(request: Request) -> Optional[dict]:
-    """The signed-in person behind this request's cookie, if any."""
+    """The signed-in person behind this request's cookie or bearer token, if any."""
     try:
-        return accounts.user_for_session(request.cookies.get(_SESSION_COOKIE, ""))
+        return accounts.user_for_session(_session_token(request))
     except Exception as exc:
         log.warning("Could not look up the session: %s", exc)
         return None
@@ -474,6 +484,7 @@ def _is_admin(request: Request) -> bool:
 
 class GoogleBody(BaseModel):
     credential: str
+    mobile: bool = False  # the apps keep the token themselves instead of a cookie
 
 
 @app.get("/api/auth/config")
@@ -501,15 +512,24 @@ def sign_in_with_google(body: GoogleBody, request: Request, response: Response) 
     user = accounts.sign_in(who["sub"], who["email"], who["name"], who["picture"])
     if user["disabled"]:
         raise HTTPException(status_code=403, detail="This account has been blocked.")
-    _start_session(user, request, response)
-    return {"user": _public_user(user)}
+    return _signed_in(user, request, response, body.mobile)
 
 
-def _start_session(user: dict, request: Request, response: Response) -> None:
+def _start_session(user: dict, request: Request, response: Response) -> str:
+    token = accounts.start_session(user["id"])
     response.set_cookie(
-        _SESSION_COOKIE, accounts.start_session(user["id"]), max_age=accounts_module.SESSION_DAYS * 86400,
+        _SESSION_COOKIE, token, max_age=accounts_module.SESSION_DAYS * 86400,
         httponly=True, samesite="lax", secure=request.url.scheme == "https", path="/",
     )
+    return token
+
+
+def _signed_in(user: dict, request: Request, response: Response, mobile: bool) -> dict:
+    """The answer to a sign-in. The website gets a cookie; an app gets the token in the answer, to send back as a bearer token."""
+    if mobile:
+        return {"user": _public_user(user), "token": accounts.start_session(user["id"]), "expiresInDays": accounts_module.SESSION_DAYS}
+    _start_session(user, request, response)
+    return {"user": _public_user(user)}
 
 
 # A login for the people who review the site for a payment service, who cannot use Google sign-in. It is on only while
@@ -529,6 +549,7 @@ _reviewer_limiter = RateLimiter(limit=8, window=60.0)
 class ReviewerBody(BaseModel):
     email: str
     password: str
+    mobile: bool = False
 
 
 @app.post("/api/auth/reviewer")
@@ -545,8 +566,7 @@ def sign_in_as_reviewer(body: ReviewerBody, request: Request, response: Response
     user = accounts.sign_in("reviewer:" + _REVIEWER_EMAIL, _REVIEWER_EMAIL, "Razorpay reviewer", "")
     if user["disabled"]:
         raise HTTPException(status_code=403, detail="This account has been blocked.")
-    _start_session(user, request, response)
-    return {"user": _public_user(user)}
+    return _signed_in(user, request, response, body.mobile)
 
 
 @app.get("/api/auth/me")
@@ -564,9 +584,25 @@ def whoami(request: Request, response: Response) -> dict:
 def sign_out(request: Request, response: Response) -> dict:
     if not _origin_ok(request):
         raise HTTPException(status_code=403, detail="This request came from another site")
-    accounts.end_session(request.cookies.get(_SESSION_COOKIE, ""))
+    accounts.end_session(_session_token(request))
     response.delete_cookie(_SESSION_COOKIE, path="/")
     return {"ok": True}
+
+
+@app.get("/api/app/config")
+def app_config(response: Response) -> dict:
+    """What the mobile apps ask on start: the oldest version still allowed (a lower one is asked to update) and the newest there is."""
+    response.headers["Cache-Control"] = "no-store"
+    def number(name: str) -> int:
+        try:
+            return int(os.environ.get(name, "0") or 0)
+        except ValueError:
+            return 0
+    return {
+        "android": {"minVersionCode": number("ANDROID_MIN_VERSION_CODE"), "latestVersionCode": number("ANDROID_LATEST_VERSION_CODE")},
+        "ios": {"minBuild": number("IOS_MIN_BUILD"), "latestBuild": number("IOS_LATEST_BUILD")},
+        "storeUrl": os.environ.get("ANDROID_STORE_URL", "https://play.google.com/store/apps/details?id=com.yantrixlab.chordsuno"),
+    }
 
 
 def _today() -> int:
