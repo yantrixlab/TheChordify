@@ -2,10 +2,12 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Linking, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import YoutubePlayer from 'react-native-youtube-iframe';
-import { addFavorite, errorMessage, getFavoriteKeys, getResult, recordPlayed, removeFavorite } from '../api';
+import { addFavorite, errorMessage, getFavoriteKeys, getMyPlan, getResult, recordPlayed, removeFavorite } from '../api';
 import { useAuth } from '../auth/AuthContext';
+import DiagramsPanel from '../components/DiagramsPanel';
 import { Button, Centered, Note } from '../components/Ui';
 import { buildChart, cellAt, chordsFrom, clock } from '../lib/grid';
+import { getJson, setJson } from '../lib/storage';
 import { colors, radius, sectionColor } from '../theme';
 
 const BAR_H = 66;
@@ -66,10 +68,39 @@ export default function PlayerScreen({ route, navigation }) {
   const [playerError, setPlayerError] = useState('');
   const [active, setActive] = useState(-1);
   const [favorite, setFavorite] = useState(false);
+  const [view, setView] = useState('diagrams'); // 'diagrams' | 'chart'
+  const [instrument, setInstrument] = useState(getJson('instrument', 'guitar'));
+  const [ukuleleOk, setUkuleleOk] = useState(false); // the plan includes the ukulele diagrams
+  const [lockedNote, setLockedNote] = useState(false);
   const player = useRef(null);
   const list = useRef(null);
   const counted = useRef(false);
   const lastRow = useRef(-1);
+
+  useEffect(() => {
+    getMyPlan().then(
+      (p) => setUkuleleOk(!!(p.entitlements && p.entitlements.instruments_more)),
+      () => {},
+    );
+  }, [user]);
+
+  useEffect(() => {
+    lastRow.current = -1; // the chart list is made afresh when its tab is shown again
+  }, [view]);
+
+  const chooseInstrument = useCallback(
+    (name) => {
+      if (name === 'ukulele' && !ukuleleOk) {
+        setLockedNote(true);
+        return;
+      }
+      setLockedNote(false);
+      setInstrument(name);
+      setJson('instrument', name);
+    },
+    [ukuleleOk],
+  );
+  const shownInstrument = instrument === 'ukulele' && !ukuleleOk ? 'guitar' : instrument;
 
   useEffect(() => {
     if (result) return;
@@ -223,6 +254,34 @@ export default function PlayerScreen({ route, navigation }) {
         )
       ) : (
         <>
+          <View style={styles.tabs}>
+            {[
+              ['diagrams', 'Diagrams'],
+              ['chart', 'Chart'],
+            ].map(([id, name]) => (
+              <Pressable key={id} onPress={() => setView(id)} style={[styles.tab, view === id && styles.tabOn]} accessibilityRole="tab" accessibilityState={{ selected: view === id }}>
+                <Text style={[styles.tabText, view === id && styles.tabTextOn]}>{name}</Text>
+              </Pressable>
+            ))}
+            <View style={styles.spacer} />
+            {view === 'diagrams'
+              ? ['guitar', 'ukulele'].map((name) => (
+                  <Pressable key={name} onPress={() => chooseInstrument(name)} style={[styles.tab, shownInstrument === name && styles.tabOn]} accessibilityRole="button" accessibilityLabel={`${name} diagrams`}>
+                    <Text style={[styles.tabText, shownInstrument === name && styles.tabTextOn]}>{name === 'guitar' ? 'Guitar' : `Ukulele${ukuleleOk ? '' : ' 🔒'}`}</Text>
+                  </Pressable>
+                ))
+              : null}
+          </View>
+          {lockedNote && view === 'diagrams' ? (
+            <View style={styles.pad}>
+              <Note tone="info">Ukulele diagrams are part of the Premium plan.</Note>
+            </View>
+          ) : null}
+          {view === 'diagrams' ? (
+            <DiagramsPanel chart={chart} active={active} instrument={shownInstrument} bottomInset={insets.bottom} />
+          ) : null}
+          {view === 'chart' ? (
+            <>
           <View style={styles.hero}>
             <View style={styles.heroNow}>
               <Text style={styles.heroLabel}>Now</Text>
@@ -251,6 +310,8 @@ export default function PlayerScreen({ route, navigation }) {
             onScrollToIndexFailed={() => {}}
             contentContainerStyle={{ paddingHorizontal: 12, paddingBottom: insets.bottom + 24 }}
           />
+            </>
+          ) : null}
         </>
       )}
     </View>
@@ -265,6 +326,12 @@ const styles = StyleSheet.create({
   by: { color: colors.mute, fontSize: 13, marginTop: 2 },
   heart: { padding: 6 },
   heartText: { color: colors.mute, fontSize: 26 },
+  tabs: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingBottom: 10 },
+  tab: { paddingHorizontal: 14, height: 34, borderRadius: radius.pill, backgroundColor: colors.card, justifyContent: 'center' },
+  tabOn: { backgroundColor: colors.violet },
+  tabText: { color: colors.mute, fontSize: 13.5, fontWeight: '700' },
+  tabTextOn: { color: '#fff' },
+  spacer: { flex: 1 },
   hero: { flexDirection: 'row', gap: 10, paddingHorizontal: 12, paddingBottom: 10 },
   heroNow: { flex: 2, height: 84, borderRadius: radius.card, backgroundColor: colors.violet, paddingHorizontal: 16, paddingTop: 8, justifyContent: 'center' },
   heroNext: { flex: 1, height: 84, borderRadius: radius.card, backgroundColor: colors.card, paddingHorizontal: 14, paddingTop: 8, justifyContent: 'center' },
