@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import * as api from '../api';
 import { getJson, loadToken, saveToken, setJson } from '../lib/storage';
@@ -22,6 +23,15 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     if (ready) refreshPlan();
   }, [ready, userId, refreshPlan]);
+  // The admin can change what a plan includes at any time: ask again whenever the app comes back to the front, so the change shows
+  // without the app being closed first.
+  useEffect(() => {
+    if (!ready) return undefined;
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refreshPlan();
+    });
+    return () => sub.remove();
+  }, [ready, refreshPlan]);
 
   // The same rules as the website: a feature the plan has no rule for is allowed, and until the answer arrives nothing is locked.
   const can = useCallback((key) => {
