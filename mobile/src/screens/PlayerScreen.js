@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { Animated, Easing, Linking, Share, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Animated, BackHandler, Easing, Linking, Share, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Video from 'react-native-video';
 import YoutubePlayer from 'react-native-youtube-iframe';
@@ -12,6 +12,7 @@ import { StrumView, strumPatterns } from '../components/StrumView';
 import { ControlPanel, Toolbar } from '../components/PlayerBars';
 import { Icon } from '../components/Icons';
 import { MenuRow, Segmented, Sheet, Stepper } from '../components/Sheet';
+import ViewPanel from '../components/ViewPanel';
 import { RateSheet, SimilarSheet } from '../components/SongSheets';
 import { AppBar, Button, Centered, Note } from '../components/Ui';
 import { API_BASE, SITE } from '../config';
@@ -97,6 +98,7 @@ export default function PlayerScreen({ route, navigation }) {
   const [meter, setMeter] = useState(null); // beats per bar, pulse and bar start, as this player set them for this song (null: the song's own)
   const [strumTime, setStrumTime] = useState(0); // the playing time, kept only while the Strum view is shown
   const [beatLead, setBeatLead] = useState(() => getJson('beatLead', LEAD_DEFAULT)); // ms; the same for every song on this phone
+  const [viewOpen, setViewOpen] = useState(false); // the panel that picks the view and the instrument
   const [sheet, setSheet] = useState(null); // 'view' | 'transpose' | 'capo' | 'tempo' | 'volume' | 'more' | 'details' | 'bars'
   // The title bar and toolbar slide away while the song plays and come back when it is paused: 1 shown, 0 hidden.
   const topAnim = useRef(new Animated.Value(1)).current;
@@ -132,6 +134,17 @@ export default function PlayerScreen({ route, navigation }) {
   useEffect(() => () => clearTimeout(countTimer.current), []);
 
   const hideTop = playing && !counting && !!result;
+  useEffect(() => {
+    if (hideTop) setViewOpen(false);
+  }, [hideTop]);
+  useEffect(() => {
+    if (!viewOpen) return undefined;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      setViewOpen(false);
+      return true;
+    });
+    return () => sub.remove();
+  }, [viewOpen]);
   useEffect(() => {
     Animated.timing(topAnim, { toValue: hideTop ? 0 : 1, duration: TOP_MS, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
   }, [hideTop, topAnim]);
@@ -362,6 +375,7 @@ export default function PlayerScreen({ route, navigation }) {
   const chooseInstrument = (item) => {
     if (item.soon) return;
     if (item.feature && !can(item.feature)) {
+      setViewOpen(false);
       needsPlan();
       return;
     }
@@ -450,7 +464,7 @@ export default function PlayerScreen({ route, navigation }) {
   const transposeLocked = !can('transpose_capo');
 
   const toolbar = [
-    { id: 'view', label: INSTRUMENTS.find((i) => i.id === shownInstrument).label, chevron: true, onPress: () => setSheet('view') },
+    { id: 'view', label: INSTRUMENTS.find((i) => i.id === shownInstrument).label, chevron: true, open: viewOpen, active: viewOpen, onPress: () => setViewOpen((o) => !o) },
     { id: 'transpose', label: 'Transpose', dot: transpose !== 0, locked: transposeLocked, onPress: () => (transposeLocked ? needsPlan() : setSheet('transpose')) },
     { id: 'capo', label: 'Capo', dot: capo !== 0, locked: transposeLocked, onPress: () => (transposeLocked ? needsPlan() : setSheet('capo')) },
   ];
@@ -515,6 +529,18 @@ export default function PlayerScreen({ route, navigation }) {
         ) : (
           <LiveGrid store={activeStore} chart={chart} transpose={transpose} onSeek={seek} bottomInset={0} />
         )}
+        {chart ? (
+          <ViewPanel
+            open={viewOpen}
+            onClose={() => setViewOpen(false)}
+            views={VIEWS.filter((v) => v.id !== 'strum' || strumList.length > 0)}
+            view={view}
+            onView={chooseView}
+            instruments={INSTRUMENTS.map((item) => ({ ...item, locked: !!item.feature && !can(item.feature) }))}
+            instrument={shownInstrument}
+            onInstrument={chooseInstrument}
+          />
+        ) : null}
       </View>
 
       {chart ? (
@@ -537,23 +563,6 @@ export default function PlayerScreen({ route, navigation }) {
           mediaHeight={mediaHeight}
         />
       ) : null}
-
-      <Sheet visible={sheet === 'view'} title="Pick your view" onClose={() => setSheet(null)}>
-        <Segmented options={VIEWS.filter((v) => v.id !== 'strum' || strumList.length > 0)} value={view} onChange={chooseView} />
-        <View style={styles.tiles}>
-          {INSTRUMENTS.map((item) => {
-            const locked = item.feature && !can(item.feature);
-            const on = shownInstrument === item.id;
-            return (
-              <Text key={item.id} onPress={() => chooseInstrument(item)} style={[styles.tile, on && styles.tileOn, (item.soon || locked) && styles.tileOff]} accessibilityRole="button">
-                {item.label}
-                {item.soon ? '\nsoon' : locked ? '\n🔒' : ''}
-              </Text>
-            );
-          })}
-        </View>
-        <Button title="Done" onPress={() => setSheet(null)} />
-      </Sheet>
 
       <Sheet visible={sheet === 'transpose'} title="Transpose" onClose={() => setSheet(null)}>
         <Text style={styles.sheetHint}>Change the key of the song. The shapes follow; use Capo to keep playing the easy ones.</Text>
@@ -697,15 +706,11 @@ const styles = StyleSheet.create({
   topInner: { position: 'absolute', left: 0, right: 0, top: 0 },
   screen: { flex: 1, backgroundColor: colors.bg },
   pad: { paddingHorizontal: 16 },
-  body: { flex: 1 },
+  body: { flex: 1, overflow: 'hidden' },
   by: { color: colors.mute, fontSize: 14 },
   audio: { flex: 1, backgroundColor: '#1a0533', alignItems: 'center', justifyContent: 'center', gap: 6 },
   audioText: { color: '#c4b5fd', fontSize: 14, fontWeight: '700' },
   hiddenVideo: { width: 0, height: 0 },
-  tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginVertical: 16 },
-  tile: { width: '47%', paddingVertical: 20, textAlign: 'center', borderRadius: radius.card, backgroundColor: colors.soft, color: colors.ink, fontSize: 17, fontWeight: '700', overflow: 'hidden', lineHeight: 24 },
-  tileOn: { backgroundColor: colors.violet, color: '#fff' },
-  tileOff: { opacity: 0.55 },
   sheetHint: { color: colors.mute, fontSize: 14.5, lineHeight: 21, marginBottom: 6 },
   sheetSub: { color: colors.mute, fontSize: 14, textAlign: 'center', marginBottom: 8 },
   sheetButton: { marginTop: 8 },

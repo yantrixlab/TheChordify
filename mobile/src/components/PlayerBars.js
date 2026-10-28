@@ -19,7 +19,11 @@ export function Toolbar({ items }) {
           <Text style={[styles.toolText, item.active && styles.toolTextActive]} numberOfLines={1}>
             {item.label}
           </Text>
-          {item.chevron ? <Icon name="down" size={16} color={colors.ink} /> : null}
+          {item.chevron ? (
+            <View style={item.open ? styles.flip : null}>
+              <Icon name="down" size={16} color={item.active ? colors.violetDeep : colors.ink} />
+            </View>
+          ) : null}
           {item.locked ? <Icon name="lock" size={13} color={colors.gold} /> : null}
           {item.dot ? <View style={styles.dot} /> : null}
         </Pressable>
@@ -79,9 +83,10 @@ export function ControlPanel({ playing, counting, onPlay, onRestart, tempoPct, o
 const styles = StyleSheet.create({
   toolbar: { flexDirection: 'row', backgroundColor: colors.surface, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line, paddingHorizontal: 4 },
   toolItem: { flex: 1, height: 50, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
-  toolActive: { backgroundColor: colors.soft },
+  toolActive: { backgroundColor: colors.soft, borderRadius: 12, height: 38, alignSelf: 'center' },
   toolText: { color: colors.ink, fontSize: 12.5, fontWeight: '600', letterSpacing: 1.2, textTransform: 'uppercase' },
   toolTextActive: { color: colors.violetDeep },
+  flip: { transform: [{ rotate: '180deg' }] },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.violet, marginLeft: 1, marginBottom: 10 },
   panel: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#241a3d', paddingTop: 12, paddingHorizontal: 8 },
   panelWithMedia: { flexDirection: 'row', backgroundColor: '#241a3d' },
