@@ -19,13 +19,18 @@ Signing key: `C:\Users\Admin\.chordsuno-keys\chordsuno-upload.jks` (alias `chord
 
 > **Back up the `.jks` file and those four lines somewhere safe (a password manager, a private drive).** With Play App Signing (the default) a lost upload key can be reset through Play support, but it takes days.
 
-This project sits in a deep folder, and the release build of the native code makes file paths longer than Windows' 260-character limit. Build through a short drive letter (no admin rights needed; repeat the `subst` after each restart):
+This project sits in a deep folder, and the native code makes file paths longer than Windows' 260-character limit (`subst` does not help: Metro cannot follow it). Build from a copy at a short path, `C:\cs`, which `mobile\scripts\release-build.ps1` makes and builds, then copies the results to `mobile\release\`:
 
 ```powershell
-subst X: "D:\DevX\WEB APP\WEB APP\LIVE_PROJECTS\thechordify.com"
-cd X:\mobile\android
-.\gradlew.bat bundleRelease      # the file you upload to Play: app\build\outputs\bundle\release\app-release.aab
-.\gradlew.bat assembleRelease    # an installable APK for testing on a phone: app\build\outputs\apk\release\
+.\mobile\scripts\release-build.ps1
+```
+
+If PowerShell's policy refuses to run the script, do its steps by hand: `robocopy` the `mobile` folder and `absolute-ablation\src\lib` to `C:\cs` (leave out `node_modules`, `build`, `.cxx`, `.gradle`, `release`), `npm ci` in `C:\cs\mobile` (this also applies the library patch in `mobile\patches`), put `C:\Program Files\Git\usr\bin` on `PATH` (the audio library's build needs `rm`), then in `C:\cs\mobile\android`:
+
+```powershell
+.\gradlew.bat bundleRelease assembleRelease
+# the file you upload to Play: app\build\outputs\bundle\release\app-release.aab
+# an installable APK for testing on a phone: app\build\outputs\apk\release\app-release.apk
 ```
 
 Every upload needs a higher `versionCode`. Change it in `android/app/build.gradle` (`versionCode`, `versionName`) **and** in `src/config.js` (`VERSION_CODE`, `VERSION_NAME`).
@@ -66,9 +71,16 @@ Chord Suno finds the chords of any song and shows them to you beat by beat, in t
 • Follow along: a beat strip lights the playing beat, and a row of chord diagrams slides with the song, with the chord you should be playing enlarged.
 • Guitar and ukulele diagrams for every chord, including barre chords and slash chords.
 • A chord chart of the whole song, split into intro, verses and choruses, with the chord on the beat where it changes. Tap any beat to jump there.
-• Tempo and key worked out for you.
+• Tempo and key worked out for you, and you can change the key (Transpose), put a capo on, and set how many beats make a bar.
+• A strumming view with the strumming pattern of the song, with an easier version to start with.
+• Import your own song from your phone (MP3, WAV, FLAC or M4A) and get its chords, then play along with the file.
+• Practice your chords: six drills, from exploring chords and following along to a one-minute chord-change test and a chord quiz.
+• Tuner, metronome and live chord detection that listen through your microphone, for guitar, ukulele, bass and more.
+• Share a song's chord sheet as a PDF, or as a MIDI file.
 • Keep a library: the songs you played and the ones you favourited, on any device.
 • Earn XP, levels and badges as you practise.
+
+Some tools (the tuner, metronome, live chord detection and exports) are part of Chord Suno Premium. Plans you have on chordsuno.com carry over when you sign in.
 
 Sign in with Google to keep your library. You can delete your account and all its data at any time, in the app.
 
@@ -77,7 +89,7 @@ Chord Suno plays songs through YouTube's own player. By using it you also agree 
 Questions? yantrixlab@gmail.com
 ```
 
-*(Add lines for the tuner, exports and Premium plans only when the app really has them. Describing features that are missing is a policy violation.)*
+*(Every line above is in the 1.0 app. Describing features that are missing is a policy violation, so when something is added or removed, change this text with it. Do not say you can subscribe in the app until Play Billing is in.)*
 
 **Category**: Music & Audio · **Tags**: music learning, guitar, ukulele · **Contact email**: yantrixlab@gmail.com · **Website**: https://chordsuno.com · **Privacy policy**: https://chordsuno.com/privacy/
 
@@ -87,7 +99,7 @@ Ready in `mobile/store/`:
 
 - [x] `play-icon-512.png` — app icon, 512×512.
 - [x] `play-feature-graphic-1024x500.png` — feature graphic.
-- [ ] **Phone screenshots**: 2 to 8, PNG or JPEG, 16:9 or 9:16, each side 320–3840 px. Take them from the OnePlus (`adb exec-out screencap -p`, or the volume + power buttons). Suggested set: Home with trending, a song's Diagrams tab while playing, the Chart tab with section labels, the Library, the Account/sign-in screen.
+- [x] **Phone screenshots** (1080×2400, in `mobile/store/screenshots/`, taken from the OnePlus): Discover, a song's chord diagrams with the beat strip, the chord grid, the strumming view, the Toolkit, the tuner, My Library. Play accepts 2 to 8, PNG or JPEG, 16:9 or 9:16, each side 320–3840 px.
 - [ ] 7-inch and 10-inch tablet screenshots: optional, but recommended; the app works on tablets.
 
 ## 6. App content (Play Console → Policy → App content)
@@ -102,7 +114,7 @@ Ready in `mobile/store/`:
 | **News app / COVID / health / financial / government** | No to all. |
 | **Account deletion** | Yes. In-app: Account → *Delete my account*. Web URL for the form: `https://chordsuno.com/delete-account/`. |
 | **Advertising ID** | Not used (declare "No"). If Firebase/Google Analytics is added to the app later, this and the Data safety form change. |
-| **Permissions** | `INTERNET`, and `RECORD_AUDIO` (the tuner, the live chord detector and chord practice listen to the instrument). The permission is asked for when one of those is opened, never at start-up. In the Play Console's permissions declaration, say the microphone is used only while a tool is running, analysed on the device, and never recorded, stored or sent. |
+| **Permissions** | `INTERNET`, `VIBRATE` (a short buzz when a string is in tune; needs no declaration), and `RECORD_AUDIO` (the tuner, the live chord detector and chord practice listen to the instrument). The permission is asked for when one of those is opened, never at start-up. In the Play Console's permissions declaration, say the microphone is used only while a tool is running, analysed on the device, and never recorded, stored or sent. |
 | **Foreground service / background location / SMS / call log** | None. |
 
 ### Data safety form
@@ -117,8 +129,9 @@ Matches the Privacy Policy and what the app does now (no analytics SDK, no ads, 
 | Profile photo (*Personal info → Other info*) | Yes | No | Yes | Account management |
 | App interactions (songs played, favourites, XP, ratings, comments) | Yes | No | Yes | App functionality, personalisation |
 | Other user-generated content (comments about a song) | Yes | No | Yes | App functionality |
+| Audio → *Music files* (a song you import from your phone) | Yes, only when you import one | No | Yes | App functionality (to work out its chords and play it back to you) |
 | IP address (server logs) | Yes | No | No | Security, fraud prevention |
-| Approximate/precise location, contacts, photos, files, audio, financial info, health | **No** | | | |
+| Approximate/precise location, contacts, photos and videos, other files and documents, voice or sound recordings, financial info, health | **No** | | | |
 
 "Shared": the YouTube player is Google's own embed and loads inside the app; list it as a **service provider** processing, not a sale. Declare nothing as "shared for advertising".
 
@@ -128,7 +141,7 @@ The tuner, chord detector and chord practice use the microphone: its sound is an
 
 The app uses the YouTube embedded player under the YouTube API Services Terms. Keep all of these true:
 
-- [x] The player is YouTube's own, unmodified, full width, with its controls visible and nothing covering it.
+- [x] The player is YouTube's own and unmodified, with its controls visible and nothing covering it. It sits in the bottom panel, right of the controls, and its viewport is never smaller than 200 × 200 (the page is built inside the app, `useLocalHTML`, with a stylesheet patch in `mobile/patches/` so the viewport fills the box; YouTube centres the picture in it). Do not shrink it below that.
 - [x] Links to the **YouTube Terms of Service** and **Google Privacy Policy** are in the Account screen (and in the Store description).
 - [x] No background or audio-only playback; no downloading of video in the app.
 - [ ] Never hide or cover the YouTube logo or the "Watch on YouTube" link.
@@ -148,7 +161,8 @@ The app uses the YouTube embedded player under the YouTube API Services Terms. K
 
 ## 9. Known gaps in 1.0
 
-- No in-app purchases. The ukulele diagrams are a Premium feature on the website, so a free account sees a lock. Do not add a link or button there that sends people to the website's checkout: Google Play does not allow steering people to outside payments for digital features. Subscriptions inside the app are a later release (Play Billing).
-- Songs people uploaded on the website show their chords but do not play in the app.
-- The Toolkit's tuner, metronome, chord practice and chord detector are in the app (the tuner, metronome and chord detector need a Premium plan and chord practice is free, as on the website). Importing a song, exports and offline mode are not yet.
+- **No in-app purchases yet.** The tuner, metronome, live chord detector, ukulele diagrams and the PDF/MIDI exports are Premium on the website, so a free account sees a lock on them, and the Premium screen only lists the plans (it says subscribing in the app is coming). A plan someone bought on the website carries over when they sign in. Do not add a link or button there that sends people to the website's checkout: Google Play does not allow steering people to outside payments for digital features. Subscriptions inside the app need Play Billing (phase 7). Until then the app is honest about it, but a new free user cannot unlock those tools from the phone: consider doing the billing before the production release.
+- The tuner, metronome, chord practice, live chord detector, importing a song and the exports are in the app. Offline mode and lyrics are not (they are "soon" on the website too).
+- Imported songs play from the file on our server; the tuner, detector and practice listen on the device only.
 - No crash reporting or analytics in the app. Consider adding crash reporting before wide release (and update the Data safety form and the Privacy Policy when you do).
+- Not yet tried: a real guitar or ukulele into the tuner, detector and listening drills (only a generated tone and the speaker were), very low-end phones, and Google Sign-In (it needs the Android OAuth clients in §3 first).

@@ -14,4 +14,11 @@
 -keep class com.reactnativecommunity.webview.** { *; }
 -keep class com.oblador.keychain.** { *; }
 -keep class com.reactnativegooglesignin.** { *; }
+# The Toolkit's microphone and sound engine (react-native-audio-api and its worklets runtime), the file picker, sharing and the
+# video player used for imported songs: classes their native or reflective code looks up by name.
+-keep class com.swmansion.audioapi.** { *; }
+-keep class com.swmansion.worklets.** { *; }
+-keep class com.reactnativedocumentpicker.** { *; }
+-keep class cl.json.** { *; }
+-keep class com.brentvatne.react.** { *; }
 -dontwarn com.google.android.gms.**

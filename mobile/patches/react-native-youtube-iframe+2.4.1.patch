@@ -1,0 +1,52 @@
+diff --git a/node_modules/react-native-youtube-iframe/lib/commonjs/PlayerScripts.js b/node_modules/react-native-youtube-iframe/lib/commonjs/PlayerScripts.js
+--- a/node_modules/react-native-youtube-iframe/lib/commonjs/PlayerScripts.js
++++ b/node_modules/react-native-youtube-iframe/lib/commonjs/PlayerScripts.js
+@@ -144,7 +144,7 @@
+         position: relative;
+         width: 100%;
+-        height: 0;
+-        padding-bottom: 56.25%;
++        height: 100vh;
++        padding-bottom: 0;
+       }
+       .video {
+           position: absolute;
+@@ -234,33 +234,36 @@
+       document.addEventListener('msfullscreenchange', onFullScreenChange)
+       document.addEventListener('webkitfullscreenchange', onFullScreenChange)
+ 
+-      window.addEventListener('message', function (event) {
++      // Chord Suno: react-native-webview on Android delivers the app's messages to document (iOS: window), so listen on both.
++      var onHostMessage = function (event) {
+         const {data} = event;
+ 
+         try {
+           const parsedData = JSON.parse(data);
+ 
+           switch (parsedData.eventName) {
+             case 'playVideo':
+               player.playVideo();
+               break;
+ 
+             case 'pauseVideo':
+               player.pauseVideo();
+               break;
+ 
+             case 'muteVideo':
+               player.mute();
+               break;
+ 
+             case 'unMuteVideo':
+               player.unMute();
+               break;
+           }
+         } catch (error) {
+           console.error('Error parsing data', event, error);
+         }
+-      });
++      };
++      window.addEventListener('message', onHostMessage);
++      document.addEventListener('message', onHostMessage);
+     </script>
+   </body>
+ </html>

@@ -298,7 +298,46 @@ export default function PlayerScreen({ route, navigation }) {
 
   const title = result?.title || song?.title || 'Song';
   const artist = result?.artist || song?.artist || '';
-  const videoHeight = Math.round((width * 9) / 16);
+  // The player lives in the bottom panel, on the right of the controls: half the width, and never under the 200 x 200 YouTube asks for.
+  const mediaWidth = Math.max(200, Math.round(width / 2));
+  const mediaHeight = Math.max(210, Math.round(mediaWidth * 0.56));
+  const media = videoId ? (
+    <YoutubePlayer
+      ref={player}
+      height={mediaHeight}
+      width={mediaWidth}
+      videoId={videoId}
+      play={playing && !counting}
+      volume={volume}
+      playbackRate={tempoPct / 100}
+      onChangeState={onState}
+      onError={() => setPlayerError('This video cannot be played inside apps.')}
+      initialPlayerParams={{ controls: true, rel: false, preventFullScreen: true }}
+      useLocalHTML
+      baseUrlOverride={SITE}
+      webViewProps={{ androidLayerType: 'hardware' }}
+    />
+  ) : audioUrl ? (
+    <View style={styles.audio}>
+      <Icon name="upload" size={30} color="#c4b5fd" />
+      <Text style={styles.audioText}>Playing your file</Text>
+      <Video
+        ref={video}
+        source={{ uri: audioUrl }}
+        paused={!(playing && !counting)}
+        rate={tempoPct / 100}
+        volume={volume / 100}
+        progressUpdateInterval={100}
+        onProgress={(e) => {
+          mediaTime.current = e.currentTime;
+        }}
+        onEnd={() => onState('ended')}
+        onError={() => setPlayerError('This file cannot be played here.')}
+        playInBackground={false}
+        style={styles.hiddenVideo}
+      />
+    </View>
+  ) : null;
   const key = result && result.key ? transposeChord(result.key, transpose) : '';
   const transposeLocked = !can('transpose_capo');
 
@@ -323,47 +362,8 @@ export default function PlayerScreen({ route, navigation }) {
           { icon: 'more', label: 'More', onPress: () => setSheet('more') },
         ]}
       />
-      {videoId ? (
-        <View style={{ height: videoHeight, backgroundColor: '#000' }}>
-          <YoutubePlayer
-            ref={player}
-            height={videoHeight}
-            width={width}
-            videoId={videoId}
-            play={playing && !counting}
-            volume={volume}
-            playbackRate={tempoPct / 100}
-            onChangeState={onState}
-            onError={() => setPlayerError('This video cannot be played inside apps.')}
-            initialPlayerParams={{ controls: true, rel: false, preventFullScreen: true }}
-            webViewProps={{ androidLayerType: 'hardware' }}
-          />
-        </View>
-      ) : null}
-
       {chart ? <Toolbar items={toolbar} /> : null}
 
-      {audioUrl ? (
-        <View style={styles.audio}>
-          <Icon name="upload" size={30} color="#c4b5fd" />
-          <Text style={styles.audioText}>Playing your file</Text>
-          <Video
-            ref={video}
-            source={{ uri: audioUrl }}
-            paused={!(playing && !counting)}
-            rate={tempoPct / 100}
-            volume={volume / 100}
-            progressUpdateInterval={100}
-            onProgress={(e) => {
-              mediaTime.current = e.currentTime;
-            }}
-            onEnd={() => onState('ended')}
-            onError={() => setPlayerError('This file cannot be played here.')}
-            playInBackground={false}
-            style={styles.hiddenVideo}
-          />
-        </View>
-      ) : null}
       {playerError && videoId ? (
         <View style={styles.pad}>
           <Note>{playerError}</Note>
@@ -413,6 +413,9 @@ export default function PlayerScreen({ route, navigation }) {
           volume={volume}
           onVolume={() => setSheet('volume')}
           bottomInset={insets.bottom}
+          media={media}
+          mediaWidth={mediaWidth}
+          mediaHeight={mediaHeight}
         />
       ) : null}
 
@@ -561,7 +564,7 @@ const styles = StyleSheet.create({
   pad: { paddingHorizontal: 16 },
   body: { flex: 1 },
   by: { color: colors.mute, fontSize: 14 },
-  audio: { height: 100, backgroundColor: '#1a0533', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  audio: { flex: 1, backgroundColor: '#1a0533', alignItems: 'center', justifyContent: 'center', gap: 6 },
   audioText: { color: '#c4b5fd', fontSize: 14, fontWeight: '700' },
   hiddenVideo: { width: 0, height: 0 },
   tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginVertical: 16 },
