@@ -388,7 +388,7 @@ export default function PlayerScreen({ route, navigation }) {
             </Centered>
           )
         ) : view === 'diagrams' ? (
-          <DiagramsView chart={chart} active={active} instrument={shownInstrument} transpose={transpose} capo={capo} arrows={arrows} />
+          <DiagramsView chart={chart} active={active} instrument={shownInstrument} transpose={transpose} capo={capo} arrows={arrows} onSeek={seek} />
         ) : view === 'strum' && strumList.length > 0 ? (
           <StrumView result={result} chart={chart} time={strumTime} bottomInset={0} />
         ) : view === 'summary' ? (
