@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { chordNotes } from 'chordsuno-shared/chordShapes';
 import ChordDiagram from './ChordDiagram';
@@ -76,37 +76,35 @@ const StripCell = memo(function StripCell({ t, label, bar, on, size, onSeek }) {
   );
 });
 
-/** The row of chord diagrams, the playing chord enlarged at the anchor. It is drawn again only when the chord (or what the diagrams
- *  look like) changes, not on every beat. */
+/**
+ * The row of chord diagrams, the playing chord enlarged at the anchor. Only the diagrams in view are drawn, laid in a track that is
+ * shifted so the playing one sits at the anchor: the highlight, the diagrams and the shift all change in the same draw, so the
+ * highlighted card is never seen anywhere but the first position. It is drawn again only when the chord (or what the diagrams look
+ * like) changes, not on every beat.
+ */
 const ChordRow = memo(function ChordRow({ sequence, current, instrument, transpose, capo, arrows, picks, width }) {
-  const row = useRef(null);
   const padLeft = Math.max(0, width * ANCHOR - ITEM / 2);
-
-  // Put the row where the playing chord is at the anchor. Straight there, with no slide: a slide costs a slow phone frames and makes the
-  // change land after the beat it belongs to.
+  const start = Math.max(0, current - 1); // the one before shows at the edge
+  const visible = current + Math.ceil(width / ITEM) + 2;
+  // The diagrams still to come are drawn a few at a time, off screen and between beats, so that a change of chord has nothing new to
+  // draw (drawing one at the beat costs a slow phone about a frame).
+  const [ready, setReady] = useState(0);
+  const end = Math.min(sequence.length, Math.min(Math.max(ready, visible), visible + 8));
   useEffect(() => {
-    if (row.current) row.current.scrollToOffset({ offset: current * ITEM, animated: false });
-  }, [current]);
-
+    if (visible + 6 <= ready) return undefined;
+    const id = setTimeout(() => setReady(visible + 6), 80);
+    return () => clearTimeout(id);
+  }, [visible, ready]);
+  const slots = [];
+  for (let i = start; i < end; i++) {
+    slots.push(
+      <Slot key={i} raw={sequence[i].chord} transpose={transpose} capo={capo} instrument={instrument} picks={picks} arrows={arrows} on={i === current} scale={i === current ? 1.3 : 1.05} />,
+    );
+  }
   return (
-    <FlatList
-      ref={row}
-      horizontal
-      data={sequence}
-      keyExtractor={(_, i) => String(i)}
-      renderItem={({ item, index }) => (
-        <Slot raw={item.chord} transpose={transpose} capo={capo} instrument={instrument} picks={picks} arrows={arrows} on={index === current} scale={index === current ? 1.3 : 1.05} />
-      )}
-      getItemLayout={(_, index) => ({ length: ITEM, offset: padLeft + ITEM * index, index })}
-      showsHorizontalScrollIndicator={false}
-      initialNumToRender={5}
-      windowSize={5}
-      maxToRenderPerBatch={4}
-      scrollEnabled={false}
-      contentContainerStyle={{ paddingLeft: padLeft, paddingRight: width, paddingTop: 40, paddingBottom: 10 }}
-      style={styles.row}
-      extraData={`${current}|${instrument}|${transpose}|${capo}|${arrows}|${JSON.stringify(picks)}`}
-    />
+    <View style={styles.row}>
+      <View style={[styles.track, { transform: [{ translateX: padLeft - (current - start) * ITEM }] }]}>{slots}</View>
+    </View>
   );
 });
 
@@ -125,11 +123,54 @@ export function DiagramsView({ chart, active, instrument, transpose, capo, arrow
   );
 }
 
+const keyOf = (item) => String(item.i);
+
+/** The cells in their list. Its props change only with the chart, the key or the lit cell, so a beat does not draw it again. */
+const StripList = memo(function StripList({ listRef, items, markerX, width, size, lit, transpose, onPick, onDragStart, onDragEnd, onLayout }) {
+  const renderItem = useCallback(
+    ({ item }) => <StripCell t={item.t} label={item.raw ? labelOf(item.raw, transpose) : ''} bar={item.bar} on={item.i === lit} size={size} onSeek={onPick} />,
+    [transpose, lit, size, onPick],
+  );
+  const getItemLayout = useCallback((_, index) => ({ length: items[index].length, offset: markerX + items[index].offset, index }), [items, markerX]);
+  const content = useMemo(() => ({ paddingLeft: markerX, paddingRight: Math.max(0, width - markerX - size) }), [markerX, width, size]);
+  return (
+    <FlatList
+      ref={listRef}
+      horizontal
+      data={items}
+      keyExtractor={keyOf}
+      renderItem={renderItem}
+      getItemLayout={getItemLayout}
+      extraData={`${lit}|${transpose}`}
+      initialNumToRender={Math.ceil(width / size) + 2}
+      windowSize={5}
+      maxToRenderPerBatch={10}
+      showsHorizontalScrollIndicator
+      onLayout={onLayout}
+      onScrollBeginDrag={onDragStart}
+      onScrollEndDrag={onDragEnd}
+      contentContainerStyle={content}
+    />
+  );
+});
+
+/** The dark square on the playing beat: it never moves, the strip steps beneath it. */
+const Marker = memo(function Marker({ label, markerX, size }) {
+  return (
+    <View pointerEvents="none" style={[styles.marker, { left: markerX, top: PAD, width: size, height: size }]}>
+      <Text style={[styles.beatChord, styles.beatTextOn, { fontSize: fontFor(label, size) }, label === 'rest' && styles.markerRest]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>
+        {label === 'rest' ? '𝄽' : label}
+      </Text>
+    </View>
+  );
+});
+
 /**
  * The strip of beats under the diagrams: one square cell per beat of the whole song, a bar after a dark line. While the song plays the
  * playing beat stays at a fixed spot (under the dark marker) and the strip steps beneath it, in step with the diagram row; swipe it
  * to look ahead or back (the marker steps aside and the playing cell lights up where it is) and a tap on a cell jumps there.
  * Playback brings the strip back to the playing beat a moment after the hand lets go.
+ * A beat changes only the marker and the strip's position: the list of cells is left alone.
  */
 function BeatStrip({ chart, active, transpose, onSeek }) {
   const { width } = useWindowDimensions();
@@ -139,6 +180,7 @@ function BeatStrip({ chart, active, transpose, onSeek }) {
   const busyUntil = useRef(0);
   const placed = useRef(-1);
   const placedFor = useRef(null);
+  const placeAt = useRef(0);
   const [free, setFree] = useState(false);
   const current = active >= 0 ? active : 0;
 
@@ -155,8 +197,12 @@ function BeatStrip({ chart, active, transpose, onSeek }) {
     return { items, total: offset };
   }, [chart, size]);
 
-  // Bring the playing beat to the marker, one beat at a time and with no glide (a glide costs a slow phone frames and lands late).
-  useEffect(() => {
+  const marker = laid.items[current];
+  placeAt.current = marker ? marker.at : 0;
+
+  // Bring the playing beat to the marker, one beat at a time and with no glide (a glide costs a slow phone frames and lands late). Done
+  // in the layout phase, so it goes out with the marker's new chord instead of a frame after it.
+  useLayoutEffect(() => {
     const item = laid.items[current];
     if (!list.current || !item) return;
     const far = placedFor.current !== laid || Math.abs(current - placed.current) > 2; // a new chart, or a jump
@@ -170,6 +216,10 @@ function BeatStrip({ chart, active, transpose, onSeek }) {
   const hold = useCallback(() => {
     busyUntil.current = Date.now() + HOLD;
   }, []);
+  const onDragStart = useCallback(() => {
+    hold();
+    setFree(true);
+  }, [hold]);
   const pick = useCallback(
     (t) => {
       busyUntil.current = 0;
@@ -177,51 +227,29 @@ function BeatStrip({ chart, active, transpose, onSeek }) {
     },
     [onSeek],
   );
-  // Which cell is lit by itself: only while the strip is scrolled by hand (the marker lights the playing one otherwise). Keeping this
-  // fixed while playing means a beat does not re-draw the cells.
-  const lit = free ? active : -1;
-  const renderItem = useCallback(
-    ({ item }) => {
-      const raw = item.raw;
-      return <StripCell t={item.t} label={raw ? labelOf(raw, transpose) : ''} bar={item.bar} on={item.i === lit} size={size} onSeek={pick} />;
-    },
-    [transpose, lit, size, pick],
-  );
+  const onLayout = useCallback(() => {
+    if (list.current) list.current.scrollToOffset({ offset: placeAt.current, animated: false }); // the first placing can come before the list has a size
+  }, []);
 
-  const marker = laid.items[current];
+  // Which cell is lit by itself: only while the strip is scrolled by hand (the marker lights the playing one otherwise).
+  const lit = free ? active : -1;
   const markerLabel = marker && marker.raw ? labelOf(marker.raw, transpose) : '';
   return (
     <View style={{ height: size + PAD * 2, marginBottom: 8 }}>
-      <FlatList
-        ref={list}
-        horizontal
-        data={laid.items}
-        keyExtractor={(item) => String(item.i)}
-        renderItem={renderItem}
-        getItemLayout={(_, index) => ({ length: laid.items[index].length, offset: markerX + laid.items[index].offset, index })}
-        extraData={`${lit}|${transpose}`}
-        initialNumToRender={Math.ceil(width / size) + 2}
-        windowSize={11}
-        maxToRenderPerBatch={12}
-        showsHorizontalScrollIndicator
-        onLayout={() => {
-          const item = laid.items[current];
-          if (list.current && item) list.current.scrollToOffset({ offset: item.at, animated: false }); // the first placing can come before the list has a size
-        }}
-        onScrollBeginDrag={() => {
-          hold();
-          setFree(true);
-        }}
-        onScrollEndDrag={hold}
-        contentContainerStyle={{ paddingLeft: markerX, paddingRight: Math.max(0, width - markerX - size) }}
+      <StripList
+        listRef={list}
+        items={laid.items}
+        markerX={markerX}
+        width={width}
+        size={size}
+        lit={lit}
+        transpose={transpose}
+        onPick={pick}
+        onDragStart={onDragStart}
+        onDragEnd={hold}
+        onLayout={onLayout}
       />
-      {!free && marker ? (
-        <View pointerEvents="none" style={[styles.marker, { left: markerX, top: PAD, width: size, height: size }]}>
-          <Text style={[styles.beatChord, styles.beatTextOn, { fontSize: fontFor(markerLabel, size) }, markerLabel === 'rest' && styles.markerRest]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>
-            {markerLabel === 'rest' ? '𝄽' : markerLabel}
-          </Text>
-        </View>
-      ) : null}
+      {!free && marker ? <Marker label={markerLabel} markerX={markerX} size={size} /> : null}
     </View>
   );
 }
@@ -251,7 +279,8 @@ export function SummaryView({ chart, instrument, transpose, capo, arrows, bottom
 
 const styles = StyleSheet.create({
   view: { flex: 1, justifyContent: 'space-between' },
-  row: { flexGrow: 0 },
+  row: { flexGrow: 0, overflow: 'hidden', paddingTop: 40, paddingBottom: 10 },
+  track: { flexDirection: 'row', alignSelf: 'flex-start' },
   slot: { width: ITEM, alignItems: 'center' },
   lift: { marginBottom: 12 },
   liftOn: { marginBottom: 44 }, // the playing card is drawn bigger than its box: room for the arrows below it

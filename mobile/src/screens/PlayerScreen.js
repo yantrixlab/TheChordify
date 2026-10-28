@@ -39,7 +39,10 @@ const INSTRUMENTS = [
 const LOOPS = ['off', 'song', 'section'];
 
 const CLOCK_ASK = 250; // ms between two questions to the video about where it is
-const CLOCK_TICK = 33; // ms between two looks at which beat is playing
+const CLOCK_TICK = 16; // ms between two looks at which beat is playing
+const LEAD_DEFAULT = 80; // ms: the beat is shown this much early, for the time it takes to reach the screen
+const LEAD_MIN = -200;
+const LEAD_MAX = 400;
 const SLOW_ANSWER = 90; // ms: an answer from the video that took longer than this is not trusted
 
 // The playing beat lives outside the screen's state: a change of beat re-draws only the views that show it (the diagrams, the grid),
@@ -92,6 +95,7 @@ export default function PlayerScreen({ route, navigation }) {
   const [counting, setCounting] = useState(0); // 3, 2, 1 while the count-in runs, else 0
   const [meter, setMeter] = useState(null); // beats per bar, pulse and bar start, as this player set them for this song (null: the song's own)
   const [strumTime, setStrumTime] = useState(0); // the playing time, kept only while the Strum view is shown
+  const [beatLead, setBeatLead] = useState(() => getJson('beatLead', LEAD_DEFAULT)); // ms; the same for every song on this phone
   const [sheet, setSheet] = useState(null); // 'view' | 'transpose' | 'capo' | 'tempo' | 'volume' | 'more' | 'details' | 'bars'
   const openSong = useOpenSong();
   const player = useRef(null);
@@ -105,6 +109,8 @@ export default function PlayerScreen({ route, navigation }) {
   const askGuard = useRef({ until: 0, target: 0 }); // after a jump, answers from the video that are still the old place are ignored
   const rateRef = useRef(1);
   rateRef.current = tempoPct / 100;
+  const leadRef = useRef(beatLead);
+  leadRef.current = beatLead;
   const countTimer = useRef(null);
   const viewRef = useRef(view);
   viewRef.current = view;
@@ -202,7 +208,7 @@ export default function PlayerScreen({ route, navigation }) {
     };
     const look = () => {
       if (!moving || !clockRef.current.ok) return;
-      const t = songNow();
+      const t = songNow() + (leadRef.current / 1000) * rateRef.current; // the beat as the screen will show it, a moment from now
       timeRef.current = t;
       const section = loopSection.current;
       if (section && t >= section.end - 0.04) {
@@ -333,6 +339,12 @@ export default function PlayerScreen({ route, navigation }) {
     setSheet(null);
     navigation.navigate('Tabs', { screen: 'Premium' });
   }, [navigation]);
+
+  const changeLead = (ms) => {
+    const next = Math.min(LEAD_MAX, Math.max(LEAD_MIN, ms));
+    setBeatLead(next);
+    setJson('beatLead', next);
+  };
 
   const chooseView = (id) => {
     setView(id);
@@ -543,6 +555,19 @@ export default function PlayerScreen({ route, navigation }) {
         <Button title="Reset" kind="quiet" onPress={() => setTempoPct(100)} disabled={tempoPct === 100} style={styles.sheetButton} />
       </Sheet>
 
+      <Sheet visible={sheet === 'sync'} title="Beat timing" onClose={() => setSheet(null)}>
+        <Text style={styles.sheetHint}>If the lit beat comes after you hear it, make this higher; if it comes before, lower it. It is kept for every song on this phone.</Text>
+        <Stepper
+          label="Beat timing"
+          value={`${beatLead > 0 ? '+' : ''}${beatLead} ms`}
+          onMinus={() => changeLead(beatLead - 20)}
+          onPlus={() => changeLead(beatLead + 20)}
+          minusDisabled={beatLead <= LEAD_MIN}
+          plusDisabled={beatLead >= LEAD_MAX}
+        />
+        <Button title="Reset" kind="quiet" onPress={() => changeLead(LEAD_DEFAULT)} disabled={beatLead === LEAD_DEFAULT} style={styles.sheetButton} />
+      </Sheet>
+
       <Sheet visible={sheet === 'volume'} title="Volume" onClose={() => setSheet(null)}>
         <Stepper label="Volume" value={`${volume}`} onMinus={() => setVolume((v) => Math.max(0, v - 10))} onPlus={() => setVolume((v) => Math.min(100, v + 10))} minusDisabled={volume <= 0} plusDisabled={volume >= 100} />
         <Text style={styles.sheetSub}>The phone's own volume keys work too.</Text>
@@ -561,6 +586,7 @@ export default function PlayerScreen({ route, navigation }) {
         <MenuRow icon="star" title="Rate these chords" hint="Stars and a few words" onPress={() => setSheet('rate')} />
         <MenuRow icon="discover" title="Songs like this" hint="More to play next" onPress={() => setSheet('similar')} />
         <MenuRow icon="timer" title="Bar length" hint="Beats per bar, pulse and where bars start" onPress={() => setSheet('bars')} />
+        <MenuRow icon="timer" title="Beat timing" hint="If the lit beat comes late or early" onPress={() => setSheet('sync')} />
       </Sheet>
 
       <RateSheet visible={sheet === 'rate'} sessionId={sessionId} onClose={() => setSheet(null)} />
