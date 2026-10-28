@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { Linking, Share, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Animated, Easing, Linking, Share, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Video from 'react-native-video';
 import YoutubePlayer from 'react-native-youtube-iframe';
@@ -41,6 +41,7 @@ const LOOPS = ['off', 'song', 'section'];
 const CLOCK_ASK = 250; // ms between two questions to the video about where it is
 const CLOCK_TICK = 16; // ms between two looks at which beat is playing
 const LEAD_DEFAULT = 80; // ms: the beat is shown this much early, for the time it takes to reach the screen
+const TOP_MS = 260; // the top section's slide away and back
 const LEAD_MIN = -200;
 const LEAD_MAX = 400;
 const SLOW_ANSWER = 90; // ms: an answer from the video that took longer than this is not trusted
@@ -97,6 +98,9 @@ export default function PlayerScreen({ route, navigation }) {
   const [strumTime, setStrumTime] = useState(0); // the playing time, kept only while the Strum view is shown
   const [beatLead, setBeatLead] = useState(() => getJson('beatLead', LEAD_DEFAULT)); // ms; the same for every song on this phone
   const [sheet, setSheet] = useState(null); // 'view' | 'transpose' | 'capo' | 'tempo' | 'volume' | 'more' | 'details' | 'bars'
+  // The title bar and toolbar slide away while the song plays and come back when it is paused: 1 shown, 0 hidden.
+  const topAnim = useRef(new Animated.Value(1)).current;
+  const [topHeight, setTopHeight] = useState(0);
   const openSong = useOpenSong();
   const player = useRef(null);
   const video = useRef(null); // the audio of an uploaded song
@@ -126,6 +130,11 @@ export default function PlayerScreen({ route, navigation }) {
   }, [user, sessionId]);
 
   useEffect(() => () => clearTimeout(countTimer.current), []);
+
+  const hideTop = playing && !counting && !!result;
+  useEffect(() => {
+    Animated.timing(topAnim, { toValue: hideTop ? 0 : 1, duration: TOP_MS, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
+  }, [hideTop, topAnim]);
 
   const hasDetail = !!(result && result.chordsDetailed && result.chordsDetailed !== result.chords && result.chordsDetailed.length > 0);
   // The bar length saved for this song, found once its beats are known.
@@ -451,17 +460,28 @@ export default function PlayerScreen({ route, navigation }) {
 
   return (
     <View style={styles.screen}>
-      <AppBar
-        title={title}
-        subtitle={artist}
-        backIcon="close"
-        onBack={() => navigation.goBack()}
-        actions={[
-          { icon: 'heart', label: favorite ? 'Remove from favourites' : 'Add to favourites', onPress: toggleFavorite, filled: favorite },
-          { icon: 'more', label: 'More', onPress: () => setSheet('more') },
+      <View style={{ height: insets.top, backgroundColor: colors.bar }} />
+      <Animated.View
+        style={[
+          styles.top,
+          topHeight ? { height: topAnim.interpolate({ inputRange: [0, 1], outputRange: [0, topHeight] }), opacity: topAnim } : null,
         ]}
-      />
-      {chart ? <Toolbar items={toolbar} /> : null}
+      >
+        <View onLayout={(e) => setTopHeight(Math.round(e.nativeEvent.layout.height))} style={topHeight ? styles.topInner : null}>
+          <AppBar
+            title={title}
+            subtitle={artist}
+            backIcon="close"
+            inset={false}
+            onBack={() => navigation.goBack()}
+            actions={[
+              { icon: 'heart', label: favorite ? 'Remove from favourites' : 'Add to favourites', onPress: toggleFavorite, filled: favorite },
+              { icon: 'more', label: 'More', onPress: () => setSheet('more') },
+            ]}
+          />
+          {chart ? <Toolbar items={toolbar} /> : null}
+        </View>
+      </Animated.View>
 
       {playerError && videoId ? (
         <View style={styles.pad}>
@@ -673,6 +693,8 @@ function Details({ result, transpose, chart, sections }) {
 }
 
 const styles = StyleSheet.create({
+  top: { overflow: 'hidden' },
+  topInner: { position: 'absolute', left: 0, right: 0, top: 0 },
   screen: { flex: 1, backgroundColor: colors.bg },
   pad: { paddingHorizontal: 16 },
   body: { flex: 1 },

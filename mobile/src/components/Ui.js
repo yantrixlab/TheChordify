@@ -5,10 +5,10 @@ import { Icon } from './Icons';
 import { colors, radius } from '../theme';
 
 /** The violet bar at the top of a screen: a title, an optional back or close button on the left and icon buttons on the right. */
-export function AppBar({ title, onBack, backIcon = 'back', actions = [], subtitle }) {
+export function AppBar({ title, onBack, backIcon = 'back', actions = [], subtitle, inset = true }) {
   const insets = useSafeAreaInsets();
   return (
-    <View style={[styles.bar, { paddingTop: insets.top }]}>
+    <View style={[styles.bar, { paddingTop: inset ? insets.top : 0 }]}>
       <StatusBar barStyle="light-content" backgroundColor={colors.bar} />
       <View style={styles.barRow}>
         {onBack ? (
