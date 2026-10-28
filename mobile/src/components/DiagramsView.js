@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Animated, Easing, FlatList, PanResponder, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { chordNotes } from 'chordsuno-shared/chordShapes';
 import ChordDiagram from './ChordDiagram';
 import { Icon } from './Icons';
@@ -11,7 +11,7 @@ const ANCHOR = 0.3; // where the playing chord sits across the row
 const GAP = 4; // between two beat cells
 const BAR_GAP = 9; // the extra room (and the dark line) where a bar starts
 const PAD = 7; // above and below the cells
-const HOLD = 3000; // ms after a hand-scroll before playback pulls the strip back to the playing beat
+const HOLD = 3000; // ms after a hand-scroll before playback pulls the strip, or the diagrams, back to the playing place
 const SUMMARY_COLUMNS = 2;
 
 const labelOf = (raw, transpose) => (raw === 'N' ? 'rest' : transposeChord(raw, transpose));
@@ -80,21 +80,24 @@ const StripCell = memo(function StripCell({ t, label, bar, on, size, onSeek }) {
  * The row of chord diagrams, the playing chord enlarged at the anchor. Only the diagrams in view are drawn, laid in a track that is
  * shifted so the playing one sits at the anchor: the highlight, the diagrams and the shift all change in the same draw, so the
  * highlighted card is never seen anywhere but the first position. It is drawn again only when the chord (or what the diagrams look
- * like) changes, not on every beat.
+ * like) changes, not on every beat. While somebody looks around (`browse`), the track is anchored where they started and moved by
+ * `shift` (their finger), and the diagrams drawn are the ones around where they have got to (`center`).
  */
-const ChordRow = memo(function ChordRow({ sequence, current, instrument, transpose, capo, arrows, picks, width }) {
+const ChordRow = memo(function ChordRow({ sequence, current, browse, center, shift, instrument, transpose, capo, arrows, picks, width }) {
   const padLeft = Math.max(0, width * ANCHOR - ITEM / 2);
-  const start = Math.max(0, current - 1); // the one before shows at the edge
-  const visible = current + Math.ceil(width / ITEM) + 2;
+  const anchor = browse ? browse.frozen : current;
+  const focus = browse ? center : current;
+  const start = Math.max(0, focus - (browse ? 2 : 1)); // the one before shows at the edge
+  const visible = focus + Math.ceil(width / ITEM) + 2;
   // The diagrams still to come are drawn a few at a time, off screen and between beats, so that a change of chord has nothing new to
   // draw (drawing one at the beat costs a slow phone about a frame).
   const [ready, setReady] = useState(0);
-  const end = Math.min(sequence.length, Math.min(Math.max(ready, visible), visible + 8));
+  const end = browse ? Math.min(sequence.length, visible + 2) : Math.min(sequence.length, Math.min(Math.max(ready, visible), visible + 8));
   useEffect(() => {
-    if (visible + 6 <= ready) return undefined;
+    if (browse || visible + 6 <= ready) return undefined;
     const id = setTimeout(() => setReady(visible + 6), 80);
     return () => clearTimeout(id);
-  }, [visible, ready]);
+  }, [browse, visible, ready]);
   const slots = [];
   for (let i = start; i < end; i++) {
     slots.push(
@@ -103,13 +106,118 @@ const ChordRow = memo(function ChordRow({ sequence, current, instrument, transpo
   }
   return (
     <View style={styles.row}>
-      <View style={[styles.track, { transform: [{ translateX: padLeft - (current - start) * ITEM }] }]}>{slots}</View>
+      <View style={[styles.track, { transform: [{ translateX: padLeft + (start - anchor) * ITEM }] }]}>
+        <Animated.View style={[styles.track, browse ? { transform: [{ translateX: shift }] } : null]}>{slots}</Animated.View>
+      </View>
     </View>
   );
 });
 
+/**
+ * The area above the strip: the chord row, centred up and down. It can be swiped to look at the chords to come (or the ones gone by);
+ * the diagrams follow the finger and keep going a little when it lets go. A few seconds after the last touch the row glides back to the
+ * playing chord, and from then on follows the song again.
+ */
+function ChordArea({ sequence, current, instrument, transpose, capo, arrows, picks, width }) {
+  const last = sequence.length - 1;
+  const drag = useRef(new Animated.Value(0)).current; // how far the row has been moved from where it was when the person started (px)
+  const dragAt = useRef(0);
+  const timer = useRef(null);
+  const [browse, setBrowse] = useState(null); // null: following the song; { frozen } while somebody looks around (frozen: the chord that played then)
+  const [center, setCenter] = useState(0); // the chord in the middle of what is being looked at
+  const live = useRef({});
+  live.current = { current, last, browse };
+
+  useEffect(() => {
+    const id = drag.addListener(({ value }) => {
+      dragAt.current = value;
+      const b = live.current.browse;
+      if (b) setCenter(Math.min(live.current.last, Math.max(0, Math.round((b.frozen * ITEM - value) / ITEM))));
+    });
+    return () => drag.removeListener(id);
+  }, [drag]);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  useEffect(() => {
+    // another song, or the chords were regrouped: back to following
+    clearTimeout(timer.current);
+    drag.stopAnimation();
+    drag.setValue(0);
+    setBrowse(null);
+  }, [sequence, drag]);
+
+  const goBack = useCallback(() => {
+    const { current: now, browse: b } = live.current;
+    if (!b) return;
+    Animated.timing(drag, { toValue: (b.frozen - now) * ITEM, duration: 320, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start(({ finished }) => {
+      if (!finished) return;
+      setBrowse(null);
+      drag.setValue(0);
+    });
+  }, [drag]);
+  const later = useCallback(() => {
+    clearTimeout(timer.current);
+    timer.current = setTimeout(goBack, HOLD);
+  }, [goBack]);
+
+  const pan = useMemo(() => {
+    let from = 0;
+    return PanResponder.create({
+      onMoveShouldSetPanResponder: (_, g) => live.current.last > 0 && Math.abs(g.dx) > 8 && Math.abs(g.dx) > Math.abs(g.dy),
+      onPanResponderGrant: () => {
+        clearTimeout(timer.current);
+        drag.stopAnimation();
+        if (!live.current.browse) {
+          const b = { frozen: live.current.current };
+          live.current.browse = b;
+          drag.setValue(0);
+          setCenter(b.frozen);
+          setBrowse(b);
+        }
+        from = dragAt.current;
+      },
+      onPanResponderMove: (_, g) => {
+        const { browse: b, last: end } = live.current;
+        if (!b) return;
+        drag.setValue(Math.min(b.frozen * ITEM, Math.max((b.frozen - end) * ITEM, from + g.dx)));
+      },
+      onPanResponderRelease: (_, g) => {
+        Animated.decay(drag, { velocity: g.vx, deceleration: 0.996, useNativeDriver: false }).start();
+        later();
+      },
+      onPanResponderTerminate: later,
+    });
+  }, [drag, later]);
+
+  // Never farther than the first or the last chord, however far a fling carries.
+  const shift = useMemo(() => {
+    if (!browse || last <= 0) return drag;
+    const lo = (browse.frozen - last) * ITEM;
+    const hi = browse.frozen * ITEM;
+    return drag.interpolate({ inputRange: [lo, hi], outputRange: [lo, hi], extrapolate: 'clamp' });
+  }, [drag, browse, last]);
+
+  return (
+    <View style={styles.area} {...pan.panHandlers}>
+      <ChordRow
+        sequence={sequence}
+        current={current}
+        browse={browse}
+        center={center}
+        shift={shift}
+        instrument={instrument}
+        transpose={transpose}
+        capo={capo}
+        arrows={arrows}
+        picks={picks}
+        width={width}
+      />
+    </View>
+  );
+}
+
 /** "Diagrams": a row of chord diagrams with the playing chord enlarged, over a strip of every beat of the song with the playing one
- *  marked. Both step straight to the playing place, with no animation, so they stay on the beat even on a slow phone. */
+ *  marked. Both step straight to the playing place, with no animation, so they stay on the beat even on a slow phone; both can be swiped
+ *  to look ahead, and both come back to the playing place by themselves. */
 export function DiagramsView({ chart, active, instrument, transpose, capo, arrows, onSeek }) {
   const { width } = useWindowDimensions();
   const picks = usePicks();
@@ -117,7 +225,7 @@ export function DiagramsView({ chart, active, instrument, transpose, capo, arrow
   const current = active >= 0 ? at[active] : 0;
   return (
     <View style={styles.view}>
-      <ChordRow sequence={sequence} current={current} instrument={instrument} transpose={transpose} capo={capo} arrows={arrows} picks={picks} width={width} />
+      <ChordArea sequence={sequence} current={current} instrument={instrument} transpose={transpose} capo={capo} arrows={arrows} picks={picks} width={width} />
       <BeatStrip chart={chart} active={active} transpose={transpose} onSeek={onSeek} />
     </View>
   );
@@ -279,7 +387,8 @@ export function SummaryView({ chart, instrument, transpose, capo, arrows, bottom
 
 const styles = StyleSheet.create({
   view: { flex: 1, justifyContent: 'space-between' },
-  row: { flexGrow: 0, overflow: 'hidden', paddingTop: 40, paddingBottom: 10 },
+  area: { flex: 1, justifyContent: 'center' },
+  row: { flexGrow: 0, overflow: 'hidden', paddingVertical: 30 },
   track: { flexDirection: 'row', alignSelf: 'flex-start' },
   slot: { width: ITEM, alignItems: 'center' },
   lift: { marginBottom: 12 },
