@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { Animated, BackHandler, Easing, Linking, Share, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Animated, BackHandler, Easing, Linking, Share, StatusBar, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Video from 'react-native-video';
 import YoutubePlayer from 'react-native-youtube-iframe';
@@ -422,9 +422,13 @@ export default function PlayerScreen({ route, navigation }) {
   // The player lives in the bottom panel, on the right of the controls: half the width, and never under the 200 x 200 YouTube asks for.
   // Held across, the chords take the left and a column at the right holds the video over the controls.
   const landscape = width > height;
-  const sideWidth = landscape ? Math.min(340, Math.max(260, Math.round(width * 0.36))) : 0;
-  const mediaWidth = landscape ? sideWidth : Math.max(200, Math.round(width / 2));
-  const mediaHeight = landscape ? Math.max(200, Math.round(sideWidth * 0.5625)) : Math.max(210, Math.round(mediaWidth * 0.56));
+  // The player's size held upright (half the short side, never under 200 x 210); held across, the column at the right is as wide as that
+  // player is tall.
+  const uprightWidth = Math.max(200, Math.round(Math.min(width, height) / 2));
+  const uprightHeight = Math.max(210, Math.round(uprightWidth * 0.56));
+  const sideWidth = landscape ? uprightHeight : 0;
+  const mediaWidth = landscape ? sideWidth : uprightWidth;
+  const mediaHeight = landscape ? Math.max(200, Math.round(sideWidth * 0.5625)) : uprightHeight;
   const contentWidth = landscape ? width - sideWidth - insets.left - insets.right : width; // what the chord views have to draw in
   // Built only when one of these changes, so a change of beat never touches the video.
   const media = useMemo(() => (videoId ? (
@@ -478,6 +482,7 @@ export default function PlayerScreen({ route, navigation }) {
 
   return (
     <View style={[styles.screen, landscape && { flexDirection: 'row', paddingLeft: insets.left }]}>
+      <StatusBar hidden={landscape} animated />
       <View style={styles.main}>
       <View style={{ height: insets.top, backgroundColor: colors.bar }} />
       <Animated.View
