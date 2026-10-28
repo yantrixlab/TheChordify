@@ -61,7 +61,7 @@ export function GridView({ chart, active, transpose, onSeek, bottomInset }) {
   useEffect(() => {
     if (!cell || !list.current || cell.row === lastRow.current) return;
     lastRow.current = cell.row;
-    list.current.scrollToIndex({ index: laid.barIndex[cell.row], viewPosition: 0.25, animated: true });
+    list.current.scrollToIndex({ index: laid.barIndex[cell.row], viewPosition: 0.25, animated: false });
   }, [cell, laid]);
 
   const renderItem = useCallback(

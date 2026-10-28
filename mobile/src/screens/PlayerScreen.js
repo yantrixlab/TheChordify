@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { Linking, Share, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Video from 'react-native-video';
@@ -38,6 +38,37 @@ const INSTRUMENTS = [
 ];
 const LOOPS = ['off', 'song', 'section'];
 
+const CLOCK_ASK = 250; // ms between two questions to the video about where it is
+const CLOCK_TICK = 33; // ms between two looks at which beat is playing
+const SLOW_ANSWER = 90; // ms: an answer from the video that took longer than this is not trusted
+
+// The playing beat lives outside the screen's state: a change of beat re-draws only the views that show it (the diagrams, the grid),
+// not the whole screen with its video, panel and sheets. That keeps a slow phone on time.
+function createActive() {
+  let value = -1;
+  const listeners = new Set();
+  return {
+    get: () => value,
+    set: (next) => {
+      if (next === value) return;
+      value = next;
+      listeners.forEach((fn) => fn());
+    },
+    subscribe: (fn) => {
+      listeners.add(fn);
+      return () => listeners.delete(fn);
+    },
+  };
+}
+const useActive = (store) => useSyncExternalStore(store.subscribe, store.get);
+
+const LiveDiagrams = memo(function LiveDiagrams({ store, ...rest }) {
+  return <DiagramsView active={useActive(store)} {...rest} />;
+});
+const LiveGrid = memo(function LiveGrid({ store, ...rest }) {
+  return <GridView active={useActive(store)} {...rest} />;
+});
+
 export default function PlayerScreen({ route, navigation }) {
   const { sessionId, song } = route.params;
   const insets = useSafeAreaInsets();
@@ -47,7 +78,7 @@ export default function PlayerScreen({ route, navigation }) {
   const [error, setError] = useState('');
   const [playing, setPlaying] = useState(false);
   const [playerError, setPlayerError] = useState('');
-  const [active, setActive] = useState(-1);
+  const [activeStore] = useState(createActive); // the playing cell of the chart (-1 before the first)
   const [favorite, setFavorite] = useState(false);
   const [view, setView] = useState(getJson('view', 'diagrams'));
   const [instrument, setInstrument] = useState(getJson('instrument', 'guitar'));
@@ -69,6 +100,11 @@ export default function PlayerScreen({ route, navigation }) {
   const counted = useRef(false);
   const loopSection = useRef(null);
   const timeRef = useRef(0);
+  // Where the song is, by the phone's own clock: { media: seconds into the song, at: when that was true (performance.now), ok: has it been measured }
+  const clockRef = useRef({ media: 0, at: 0, ok: false });
+  const askGuard = useRef({ until: 0, target: 0 }); // after a jump, answers from the video that are still the old place are ignored
+  const rateRef = useRef(1);
+  rateRef.current = tempoPct / 100;
   const countTimer = useRef(null);
   const viewRef = useRef(view);
   viewRef.current = view;
@@ -102,43 +138,92 @@ export default function PlayerScreen({ route, navigation }) {
 
   // Move the song (the YouTube video, or the file of an uploaded song) to a time.
   const seekMedia = useCallback(
-    (t) => {
+    (t, shown = t) => {
       if (videoId) {
         if (player.current) player.current.seekTo(t, true);
       } else if (video.current) {
         video.current.seek(t);
         mediaTime.current = t;
       }
+      // The clock moves at once (to `shown`, the beat the person asked for); the video's answers that still say the old place are ignored for a moment.
+      const now = performance.now();
+      clockRef.current = { media: shown, at: now, ok: true };
+      askGuard.current = { until: now + 700, target: t };
+      timeRef.current = shown;
     },
     [videoId],
   );
 
-  // Where the video is: asked about six times a second while it plays; only a change of beat re-draws anything.
+  // Which beat is playing. The video is asked where it is a few times a second (for the YouTube player that is a round trip through the
+  // web view, and it can come late); between answers the phone's own clock, running at the playback speed, says where the song is,
+  // so a beat lands when it should, not when the last answer happened to arrive.
   useEffect(() => {
     if (!playing || !chart) return undefined;
-    let stop = false;
-    const id = setInterval(async () => {
-      if (stop || (videoId && !player.current)) return;
+    const clock = clockRef.current;
+    if (performance.now() - clock.at > 700) clock.ok = false; // resumed from a pause: wait for the first answer
+    // Until the video's time is seen to move (it is still starting, or buffering) the beat is not run, so it never gets ahead of the sound.
+    // After a jump the clock is already placed, and runs at once.
+    let moving = clock.ok;
+    let lastT = null;
+    let asking = false;
+    let lastGood = 0; // when the clock was last set from an answer
+    let ticks = 0;
+    const songNow = () => {
+      const c = clockRef.current;
+      return c.media + ((performance.now() - c.at) / 1000) * rateRef.current;
+    };
+    const ask = async () => {
+      if (asking || (videoId && !player.current)) return;
+      asking = true;
       try {
+        const before = performance.now();
         const t = videoId ? await player.current.getCurrentTime() : mediaTime.current;
-        timeRef.current = t;
-        const section = loopSection.current;
-        if (section && t >= section.end - 0.04) {
-          seekMedia(section.start); // loop the section
-          return;
+        const now = performance.now();
+        const guard = askGuard.current;
+        if (now < guard.until && Math.abs(t - guard.target) > 1) return; // the video has not jumped yet
+        const c = clockRef.current;
+        const mid = (before + now) / 2; // the answer is about the middle of the round trip
+        if (!moving) {
+          if (lastT !== null && Math.abs(t - lastT) > 0.04) moving = true;
+          lastT = t;
         }
-        const i = cellAt(chart.cells, t);
-        setActive((before) => (before === i ? before : i));
-        if (viewRef.current === 'strum') setStrumTime(t);
+        // A slow round trip (one in ten, on a busy phone) brings back a time that is already old: skip it, unless it has been a while.
+        if (c.ok && now - before > SLOW_ANSWER && now - lastGood < 1500) return;
+        const expected = c.media + ((mid - c.at) / 1000) * rateRef.current;
+        const off = t - expected;
+        // Small differences are the noise of the question and are only half-believed; a big one (a seek, a stall) is taken whole.
+        clockRef.current = { media: !c.ok || Math.abs(off) > 0.12 ? t : expected + off * 0.4, at: mid, ok: true };
+        lastGood = now;
       } catch {
         // the player is not ready yet
+      } finally {
+        asking = false;
       }
-    }, 150);
-    return () => {
-      stop = true;
-      clearInterval(id);
     };
-  }, [playing, chart, videoId, seekMedia]);
+    const look = () => {
+      if (!moving || !clockRef.current.ok) return;
+      const t = songNow();
+      timeRef.current = t;
+      const section = loopSection.current;
+      if (section && t >= section.end - 0.04) {
+        seekMedia(section.start); // loop the section
+        return;
+      }
+      let i = cellAt(chart.cells, t);
+      const now = activeStore.get();
+      // An answer that corrects the clock by a few milliseconds must not make a beat that has just changed flick back.
+      if (i < now && now >= 0 && chart.cells[now] && t > chart.cells[now].t - 0.12) i = now;
+      activeStore.set(i);
+      if (viewRef.current === 'strum' && ++ticks % 3 === 0) setStrumTime(t);
+    };
+    ask();
+    const askId = setInterval(ask, CLOCK_ASK);
+    const lookId = setInterval(look, CLOCK_TICK);
+    return () => {
+      clearInterval(askId);
+      clearInterval(lookId);
+    };
+  }, [playing, chart, videoId, seekMedia, activeStore]);
 
   const onState = useCallback(
     (state) => {
@@ -170,11 +255,12 @@ export default function PlayerScreen({ route, navigation }) {
   const seek = useCallback(
     (t) => {
       if (t !== null) {
-        seekMedia(Math.max(0, t - 0.05));
+        seekMedia(Math.max(0, t - 0.05), t);
+        if (chart) activeStore.set(cellAt(chart.cells, t)); // the tapped beat lights up now, not when the video has caught up
         setPlaying(true);
       }
     },
-    [seekMedia],
+    [seekMedia, chart, activeStore],
   );
 
   // Play, with the count-in first when it is on: three beats at the song's own speed, a tick on each.
@@ -209,10 +295,10 @@ export default function PlayerScreen({ route, navigation }) {
     clearTimeout(countTimer.current);
     setCounting(0);
     seekMedia(0);
-    setActive(-1);
+    activeStore.set(-1);
     timeRef.current = 0;
     setPlaying(true);
-  }, [seekMedia]);
+  }, [seekMedia, activeStore]);
 
   // Loop: off, then the whole song, then the section that was playing when it was switched on.
   const cycleLoop = useCallback(() => {
@@ -271,7 +357,7 @@ export default function PlayerScreen({ route, navigation }) {
     if (merged.perBar !== before.perBar || merged.pulse !== before.pulse) merged.shift = next.shift === undefined ? null : next.shift; // the old pickup no longer fits
     setMeter(merged);
     saveMeter(sessionId, merged, own);
-    setActive(-1);
+    activeStore.set(-1);
   };
 
   // The chord sheet or a MIDI file, made from what is on screen (key, capo and bar length included).
@@ -301,7 +387,8 @@ export default function PlayerScreen({ route, navigation }) {
   // The player lives in the bottom panel, on the right of the controls: half the width, and never under the 200 x 200 YouTube asks for.
   const mediaWidth = Math.max(200, Math.round(width / 2));
   const mediaHeight = Math.max(210, Math.round(mediaWidth * 0.56));
-  const media = videoId ? (
+  // Built only when one of these changes, so a change of beat never touches the video.
+  const media = useMemo(() => (videoId ? (
     <YoutubePlayer
       ref={player}
       height={mediaHeight}
@@ -337,7 +424,7 @@ export default function PlayerScreen({ route, navigation }) {
         style={styles.hiddenVideo}
       />
     </View>
-  ) : null;
+  ) : null), [videoId, audioUrl, playing, counting, volume, tempoPct, mediaWidth, mediaHeight, onState]);
   const key = result && result.key ? transposeChord(result.key, transpose) : '';
   const transposeLocked = !can('transpose_capo');
 
@@ -388,13 +475,13 @@ export default function PlayerScreen({ route, navigation }) {
             </Centered>
           )
         ) : view === 'diagrams' ? (
-          <DiagramsView chart={chart} active={active} instrument={shownInstrument} transpose={transpose} capo={capo} arrows={arrows} onSeek={seek} />
+          <LiveDiagrams store={activeStore} chart={chart} instrument={shownInstrument} transpose={transpose} capo={capo} arrows={arrows} onSeek={seek} />
         ) : view === 'strum' && strumList.length > 0 ? (
           <StrumView result={result} chart={chart} time={strumTime} bottomInset={0} />
         ) : view === 'summary' ? (
           <SummaryView chart={chart} instrument={shownInstrument} transpose={transpose} capo={capo} arrows={arrows} bottomInset={0} />
         ) : (
-          <GridView chart={chart} active={active} transpose={transpose} onSeek={seek} bottomInset={0} />
+          <LiveGrid store={activeStore} chart={chart} transpose={transpose} onSeek={seek} bottomInset={0} />
         )}
       </View>
 

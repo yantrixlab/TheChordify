@@ -76,41 +76,50 @@ const StripCell = memo(function StripCell({ t, label, bar, on, size, onSeek }) {
   );
 });
 
-/** "Diagrams": a strip of the next beats with the playing one lit, over a row of chord diagrams that slides one chord at a time
- *  with the playing chord enlarged. Only transforms and a colour change move per beat, so it is light on a slow phone. */
-export function DiagramsView({ chart, active, instrument, transpose, capo, arrows, onSeek }) {
-  const { width } = useWindowDimensions();
+/** The row of chord diagrams, the playing chord enlarged at the anchor. It is drawn again only when the chord (or what the diagrams
+ *  look like) changes, not on every beat. */
+const ChordRow = memo(function ChordRow({ sequence, current, instrument, transpose, capo, arrows, picks, width }) {
   const row = useRef(null);
-  const picks = usePicks();
-  const { sequence, at } = useMemo(() => chordSequence(chart), [chart]);
-  const current = active >= 0 ? at[active] : 0;
   const padLeft = Math.max(0, width * ANCHOR - ITEM / 2);
 
-  // Slide the row so the playing chord stays at the anchor.
+  // Put the row where the playing chord is at the anchor. Straight there, with no slide: a slide costs a slow phone frames and makes the
+  // change land after the beat it belongs to.
   useEffect(() => {
-    if (row.current) row.current.scrollToOffset({ offset: current * ITEM, animated: true });
+    if (row.current) row.current.scrollToOffset({ offset: current * ITEM, animated: false });
   }, [current]);
 
   return (
+    <FlatList
+      ref={row}
+      horizontal
+      data={sequence}
+      keyExtractor={(_, i) => String(i)}
+      renderItem={({ item, index }) => (
+        <Slot raw={item.chord} transpose={transpose} capo={capo} instrument={instrument} picks={picks} arrows={arrows} on={index === current} scale={index === current ? 1.3 : 1.05} />
+      )}
+      getItemLayout={(_, index) => ({ length: ITEM, offset: padLeft + ITEM * index, index })}
+      showsHorizontalScrollIndicator={false}
+      initialNumToRender={5}
+      windowSize={5}
+      maxToRenderPerBatch={4}
+      scrollEnabled={false}
+      contentContainerStyle={{ paddingLeft: padLeft, paddingRight: width, paddingTop: 40, paddingBottom: 10 }}
+      style={styles.row}
+      extraData={`${current}|${instrument}|${transpose}|${capo}|${arrows}|${JSON.stringify(picks)}`}
+    />
+  );
+});
+
+/** "Diagrams": a row of chord diagrams with the playing chord enlarged, over a strip of every beat of the song with the playing one
+ *  marked. Both step straight to the playing place, with no animation, so they stay on the beat even on a slow phone. */
+export function DiagramsView({ chart, active, instrument, transpose, capo, arrows, onSeek }) {
+  const { width } = useWindowDimensions();
+  const picks = usePicks();
+  const { sequence, at } = useMemo(() => chordSequence(chart), [chart]);
+  const current = active >= 0 ? at[active] : 0;
+  return (
     <View style={styles.view}>
-      <FlatList
-        ref={row}
-        horizontal
-        data={sequence}
-        keyExtractor={(_, i) => String(i)}
-        renderItem={({ item, index }) => (
-          <Slot raw={item.chord} transpose={transpose} capo={capo} instrument={instrument} picks={picks} arrows={arrows} on={index === current} scale={index === current ? 1.3 : 1.05} />
-        )}
-        getItemLayout={(_, index) => ({ length: ITEM, offset: padLeft + ITEM * index, index })}
-        showsHorizontalScrollIndicator={false}
-        initialNumToRender={5}
-        windowSize={5}
-        maxToRenderPerBatch={4}
-        scrollEnabled={false}
-        contentContainerStyle={{ paddingLeft: padLeft, paddingRight: width, paddingTop: 40, paddingBottom: 10 }}
-        style={styles.row}
-        extraData={`${current}|${instrument}|${transpose}|${capo}|${arrows}|${JSON.stringify(picks)}`}
-      />
+      <ChordRow sequence={sequence} current={current} instrument={instrument} transpose={transpose} capo={capo} arrows={arrows} picks={picks} width={width} />
       <BeatStrip chart={chart} active={active} transpose={transpose} onSeek={onSeek} />
     </View>
   );
@@ -118,7 +127,7 @@ export function DiagramsView({ chart, active, instrument, transpose, capo, arrow
 
 /**
  * The strip of beats under the diagrams: one square cell per beat of the whole song, a bar after a dark line. While the song plays the
- * playing beat stays at a fixed spot (under the dark marker) and the strip glides beneath it, in step with the diagram row; swipe it
+ * playing beat stays at a fixed spot (under the dark marker) and the strip steps beneath it, in step with the diagram row; swipe it
  * to look ahead or back (the marker steps aside and the playing cell lights up where it is) and a tap on a cell jumps there.
  * Playback brings the strip back to the playing beat a moment after the hand lets go.
  */
@@ -146,7 +155,7 @@ function BeatStrip({ chart, active, transpose, onSeek }) {
     return { items, total: offset };
   }, [chart, size]);
 
-  // Bring the playing beat to the marker: smoothly from one beat to the next, at once after a jump or a new chart.
+  // Bring the playing beat to the marker, one beat at a time and with no glide (a glide costs a slow phone frames and lands late).
   useEffect(() => {
     const item = laid.items[current];
     if (!list.current || !item) return;
@@ -155,7 +164,7 @@ function BeatStrip({ chart, active, transpose, onSeek }) {
     placed.current = current;
     if (!far && Date.now() < busyUntil.current) return; // being scrolled by hand
     setFree(false);
-    list.current.scrollToOffset({ offset: item.at, animated: !far });
+    list.current.scrollToOffset({ offset: item.at, animated: false });
   }, [current, laid]);
 
   const hold = useCallback(() => {
@@ -168,12 +177,15 @@ function BeatStrip({ chart, active, transpose, onSeek }) {
     },
     [onSeek],
   );
+  // Which cell is lit by itself: only while the strip is scrolled by hand (the marker lights the playing one otherwise). Keeping this
+  // fixed while playing means a beat does not re-draw the cells.
+  const lit = free ? active : -1;
   const renderItem = useCallback(
     ({ item }) => {
       const raw = item.raw;
-      return <StripCell t={item.t} label={raw ? labelOf(raw, transpose) : ''} bar={item.bar} on={free && item.i === active} size={size} onSeek={pick} />;
+      return <StripCell t={item.t} label={raw ? labelOf(raw, transpose) : ''} bar={item.bar} on={item.i === lit} size={size} onSeek={pick} />;
     },
-    [transpose, free, active, size, pick],
+    [transpose, lit, size, pick],
   );
 
   const marker = laid.items[current];
@@ -187,7 +199,7 @@ function BeatStrip({ chart, active, transpose, onSeek }) {
         keyExtractor={(item) => String(item.i)}
         renderItem={renderItem}
         getItemLayout={(_, index) => ({ length: laid.items[index].length, offset: markerX + laid.items[index].offset, index })}
-        extraData={`${free ? active : -1}|${transpose}`}
+        extraData={`${lit}|${transpose}`}
         initialNumToRender={Math.ceil(width / size) + 2}
         windowSize={11}
         maxToRenderPerBatch={12}
