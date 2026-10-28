@@ -159,6 +159,14 @@ export default function PlayerScreen({ route, navigation }) {
     [user, sessionId, loopMode, seekMedia],
   );
 
+  // A song played from its file has no YouTube player to say "playing", so its first play is counted here (library and XP).
+  useEffect(() => {
+    if (audioUrl && playing && !counting && user && !counted.current) {
+      counted.current = true;
+      recordPlayed(sessionId);
+    }
+  }, [audioUrl, playing, counting, user, sessionId]);
+
   const seek = useCallback(
     (t) => {
       if (t !== null) {

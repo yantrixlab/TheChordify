@@ -1,0 +1,13 @@
+diff --git a/node_modules/react-native-share/android/src/main/java/cl/json/ShareFile.java b/node_modules/react-native-share/android/src/main/java/cl/json/ShareFile.java
+--- a/node_modules/react-native-share/android/src/main/java/cl/json/ShareFile.java
++++ b/node_modules/react-native-share/android/src/main/java/cl/json/ShareFile.java
+@@ -128,7 +128,8 @@ public class ShareFile {
+                 if (!dir.exists() && !dir.mkdirs()) {
+                     throw new IOException("mkdirs failed on " + dir.getAbsolutePath());
+                 }
+-                File file = new File(dir, filename + "." + extension);
++                // Chord Suno: a name that already has its extension keeps it (Android's table names MIDI files ".rtx").
++                File file = new File(dir, filename.contains(".") ? filename : filename + "." + extension);
+                 final FileOutputStream fos = new FileOutputStream(file);
+                 fos.write(Base64.decode(encodedImg, Base64.DEFAULT));
+                 fos.flush();
