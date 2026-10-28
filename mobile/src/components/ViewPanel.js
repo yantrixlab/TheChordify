@@ -44,18 +44,18 @@ function StrumPreview() {
   );
 }
 
-function Tile({ item, on, onPress, wide }) {
+function Tile({ item, on, onPress, wide, compact }) {
   return (
     <Pressable
       onPress={() => onPress(item)}
-      style={[styles.tile, wide && styles.tileWide, on && styles.tileOn, item.soon && styles.tileSoon]}
+      style={[styles.tile, wide && styles.tileWide, compact && styles.tileCompact, on && styles.tileOn, item.soon && styles.tileSoon]}
       accessibilityRole="button"
       accessibilityState={{ selected: on, disabled: !!item.soon }}
       accessibilityLabel={`${item.label}${item.soon ? ', coming soon' : item.locked ? ', needs a plan' : ''}`}
     >
-      <InstrumentArt kind={item.id} color={on ? '#ffffffcc' : colors.mute} dot={on ? '#fff' : colors.ink} />
-      <Text style={[styles.tileLabel, on && styles.tileLabelOn]}>{item.label}</Text>
-      {item.soon ? <Text style={styles.tileNote}>Soon</Text> : null}
+      <InstrumentArt kind={item.id} color={on ? '#ffffffcc' : colors.mute} dot={on ? '#fff' : colors.ink} scale={compact ? 0.72 : 1} />
+      <Text style={[styles.tileLabel, compact && styles.tileLabelCompact, on && styles.tileLabelOn]}>{item.label}</Text>
+      {item.soon ? <Text style={[styles.tileNote, compact && styles.tileNoteCompact]}>Soon</Text> : null}
       {item.locked && !item.soon ? (
         <View style={styles.tileLock}>
           <Icon name="lock" size={14} color={colors.gold} />
@@ -84,6 +84,8 @@ function ViewPanel({ open, wide = false, onClose, views, view, onView, instrumen
   }, [open, progress]);
 
   const withInstruments = view === 'diagrams' || view === 'summary';
+  // Little height (a phone held across): no title block, smaller cards and text, the button fixed at the bottom, all on one screen.
+  const compact = height > 0 && height < 430;
   return (
     <Animated.View
       pointerEvents={open ? 'auto' : 'none'}
@@ -91,28 +93,28 @@ function ViewPanel({ open, wide = false, onClose, views, view, onView, instrumen
       onLayout={(e) => setHeight(Math.round(e.nativeEvent.layout.height))}
       style={[styles.panel, { opacity: height ? 1 : 0, transform: [{ translateY: height ? progress.interpolate({ inputRange: [0, 1], outputRange: [-height, 0] }) : 0 }] }]}
     >
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={styles.title}>Pick your view</Text>
-        <Text style={styles.sub}>Choose how you want your chords to be presented.</Text>
+      <ScrollView contentContainerStyle={[styles.content, compact && styles.contentCompact]} showsVerticalScrollIndicator={false}>
+        {compact ? null : <Text style={styles.title}>Pick your view</Text>}
+        {compact ? null : <Text style={styles.sub}>Choose how you want your chords to be presented.</Text>}
 
-        <View style={styles.segWrap}>
+        <View style={[styles.segWrap, compact && styles.segWrapCompact]}>
           <View style={styles.seg}>
             {views.map((v) => {
               const on = v.id === view;
               return (
-                <Pressable key={v.id} onPress={() => onView(v.id)} style={[styles.segItem, on && styles.segOn]} accessibilityRole="button" accessibilityState={{ selected: on }}>
-                  <Text style={[styles.segText, on && styles.segTextOn]}>{v.label}</Text>
+                <Pressable key={v.id} onPress={() => onView(v.id)} style={[styles.segItem, compact && styles.segItemCompact, on && styles.segOn]} accessibilityRole="button" accessibilityState={{ selected: on }}>
+                  <Text style={[styles.segText, compact && styles.segTextCompact, on && styles.segTextOn]}>{v.label}</Text>
                 </Pressable>
               );
             })}
           </View>
         </View>
 
-        <View style={styles.stage}>
+        <View style={[styles.stage, compact && styles.stageCompact]}>
           {withInstruments ? (
             <View style={[styles.tiles, wide && styles.tilesWide]}>
               {instruments.map((item) => (
-                <Tile key={item.id} item={item} on={instrument === item.id} onPress={onInstrument} wide={wide} />
+                <Tile key={item.id} item={item} on={instrument === item.id} onPress={onInstrument} wide={wide} compact={compact} />
               ))}
             </View>
           ) : view === 'grid' ? (
@@ -121,17 +123,10 @@ function ViewPanel({ open, wide = false, onClose, views, view, onView, instrumen
             <StrumPreview />
           )}
         </View>
-        {wide ? (
-          <View style={styles.ctaInline}>
-            <Button title="Start jamming" onPress={onClose} />
-          </View>
-        ) : null}
       </ScrollView>
-      {wide ? null : (
-        <View style={styles.cta}>
-          <Button title="Start jamming" onPress={onClose} />
-        </View>
-      )}
+      <View style={[styles.cta, compact && styles.ctaCompact]}>
+        <Button title="Start jamming" onPress={onClose} style={compact ? styles.buttonCompact : null} />
+      </View>
     </Animated.View>
   );
 }
@@ -192,5 +187,14 @@ const styles = StyleSheet.create({
   strumRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center', paddingVertical: 8 },
   strumTile: { width: 58, height: 58, borderRadius: 12, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   cta: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 14 },
-  ctaInline: { marginTop: 14 }, // when there is little height (a phone held across) the button scrolls with the rest
+  ctaCompact: { paddingTop: 6, paddingBottom: 8 },
+  buttonCompact: { height: 40 },
+  contentCompact: { paddingTop: 8, paddingBottom: 6 },
+  segWrapCompact: { marginTop: 0 },
+  segItemCompact: { paddingHorizontal: 11, paddingVertical: 6 },
+  segTextCompact: { fontSize: 13 },
+  stageCompact: { marginTop: -12, paddingTop: 24, paddingBottom: 10, paddingHorizontal: 10 },
+  tileCompact: { paddingTop: 8, paddingBottom: 6 },
+  tileLabelCompact: { fontSize: 13, marginTop: 4 },
+  tileNoteCompact: { fontSize: 10 },
 });

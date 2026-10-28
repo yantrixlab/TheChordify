@@ -5,7 +5,7 @@ const W = 84;
 const H = 60;
 
 /** A small drawing of each instrument's neck (or keys), in `color`, with its finger dots in `dot`. */
-function InstrumentArt({ kind, color, dot }) {
+function InstrumentArt({ kind, color, dot, scale = 1 }) {
   const parts = [];
   if (kind === 'piano') {
     const keys = 7;
@@ -43,7 +43,7 @@ function InstrumentArt({ kind, color, dot }) {
     spots.forEach(([s, r], i) => parts.push(<Circle key={`d${i}`} cx={xs[Math.min(s, xs.length - 1)]} cy={top + cell * (r - 0.5)} r={3.4} fill={dot} />));
   }
   return (
-    <Svg width={W} height={H} viewBox={`0 0 ${W} ${H}`}>
+    <Svg width={W * scale} height={H * scale} viewBox={`0 0 ${W} ${H}`}>
       {parts}
     </Svg>
   );
