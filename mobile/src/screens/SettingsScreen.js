@@ -23,7 +23,7 @@ export default function SettingsScreen({ navigation }) {
       await task();
     } catch (err) {
       // The person closing the Google window is not a failure.
-      if (!(err && (err.code === 'SIGN_IN_CANCELLED' || err.code === '12501'))) setError(errorMessage(err));
+      if (!(err && (err.code === 'SIGN_IN_CANCELLED' || err.code === '12501' || err.code === 'ASYNC_OP_IN_PROGRESS'))) setError(errorMessage(err));
     } finally {
       setBusy('');
     }

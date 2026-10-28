@@ -6,6 +6,26 @@ import { getJson, loadToken, saveToken, setJson } from '../lib/storage';
 
 const AuthContext = createContext(null);
 
+// What Google's sign-in says when it fails, in words for the person (the codes are Android's ApiException status codes).
+const GOOGLE_PROBLEMS = {
+  10: 'Google sign-in is not set up for this version of the app yet. Please update the app, or try again later.', // DEVELOPER_ERROR: this build's signing key is not registered with Google
+  7: 'No connection. Check your internet and try again.',
+  8: 'Google had a problem. Please try again.',
+  12500: 'Google could not sign you in. Please try again.',
+  12502: 'A sign-in is already open. Finish it, or close it and try again.',
+  PLAY_SERVICES_NOT_AVAILABLE: 'Google Play services is missing or out of date on this phone, so Google sign-in cannot open.',
+};
+
+/** Turns a failure of Google's own sign-in window into an Error with a plain message; a cancel is passed on as it is. */
+function googleFailure(err) {
+  const code = err && err.code !== undefined ? String(err.code) : '';
+  if (__DEV__) console.warn(`[google sign-in] ${code} ${err && err.message}`);
+  if (code === 'SIGN_IN_CANCELLED' || code === '12501' || code === 'ASYNC_OP_IN_PROGRESS') return err;
+  const failure = new Error(GOOGLE_PROBLEMS[code] || 'Google sign-in did not work. Please try again.');
+  failure.code = code;
+  return failure;
+}
+
 export function useAuth() {
   return useContext(AuthContext);
 }
@@ -98,11 +118,18 @@ export function AuthProvider({ children }) {
       GoogleSignin.configure({ webClientId: cfg.googleClientId });
       googleReady.current = true;
     }
-    await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-    const result = await GoogleSignin.signIn();
-    const idToken = result && result.data ? result.data.idToken : result && result.idToken;
+    let idToken;
+    try {
+      await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+      const result = await GoogleSignin.signIn();
+      idToken = result && result.data ? result.data.idToken : result && result.idToken;
+    } catch (err) {
+      throw googleFailure(err);
+    }
     if (!idToken) return null; // the person closed the window
     const answer = await api.signInWithGoogle(idToken);
+    // A server that does not know the apps yet answers with a cookie only: nothing to keep, so do not pretend to be signed in.
+    if (!answer.token) throw new Error('The server is not ready for the app yet. Please try again in a little while.');
     await remember(answer.user, answer.token);
     return answer.user;
   }, [config, remember]);
@@ -110,6 +137,7 @@ export function AuthProvider({ children }) {
   const signInAsReviewer = useCallback(
     async (email, password) => {
       const answer = await api.signInAsReviewer(email, password);
+      if (!answer.token) throw new Error('The server is not ready for the app yet. Please try again in a little while.');
       await remember(answer.user, answer.token);
       return answer.user;
     },
