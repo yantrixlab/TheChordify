@@ -34,7 +34,7 @@ export function Toolbar({ items }) {
 
 function PanelButton({ icon, value, label, on, onPress, big, cell, children }) {
   return (
-    <Pressable onPress={onPress} style={cell ? styles.cell : styles.panelItem} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected: !!on }}>
+    <Pressable onPress={onPress} style={cell || styles.panelItem} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected: !!on }}>
       {big ? (
         children
       ) : (
@@ -52,7 +52,7 @@ function PanelButton({ icon, value, label, on, onPress, big, cell, children }) {
  * 3, 2, 1). With `media` (the YouTube player, or the tile of an imported song) the six controls fill the left half, two to a row, and
  * the media sits on the right, `mediaWidth` x `mediaHeight` (YouTube asks for a player of at least 200 x 200).
  */
-export function ControlPanel({ playing, counting, onPlay, onRestart, tempoPct, onTempo, loopMode, onLoop, countIn, onCountIn, volume, onVolume, bottomInset, media, mediaWidth, mediaHeight }) {
+export function ControlPanel({ playing, counting, onPlay, onRestart, tempoPct, onTempo, loopMode, onLoop, countIn, onCountIn, volume, onVolume, bottomInset, media, mediaWidth, mediaHeight, side = false, topInset = 0, rightInset = 0, sideWidth = 0 }) {
   const buttons = (cell) => (
     <>
       <PanelButton big cell={cell} onPress={onRestart} label="Restart">
@@ -71,10 +71,19 @@ export function ControlPanel({ playing, counting, onPlay, onRestart, tempoPct, o
       <PanelButton cell={cell} icon={volume === 0 ? 'mute' : 'volume'} label="VOLUME" on={volume !== 100} onPress={onVolume} />
     </>
   );
-  if (!media) return <View style={[styles.panel, { paddingBottom: bottomInset + 10 }]}>{buttons(false)}</View>;
+  if (!media) return <View style={[styles.panel, { paddingBottom: bottomInset + 10 }]}>{buttons(null)}</View>;
+  // One tree for both ways of holding the phone, so the video is never rebuilt when it is turned: along the bottom, the six controls
+  // on the left (two to a row) and the media on the right; or, in landscape, a column at the right with the media on top (the
+  // column is laid in reverse) and the controls under it, three to a row.
   return (
-    <View style={[styles.panelWithMedia, { paddingBottom: bottomInset }]}>
-      <View style={[styles.grid, { height: mediaHeight }]}>{buttons(true)}</View>
+    <View
+      style={
+        side
+          ? [styles.side, { width: sideWidth + rightInset, paddingTop: topInset, paddingRight: rightInset, paddingBottom: bottomInset }]
+          : [styles.panelWithMedia, { paddingBottom: bottomInset }]
+      }
+    >
+      <View style={side ? styles.sideGrid : [styles.grid, { height: mediaHeight }]}>{buttons(side ? styles.cellThree : styles.cell)}</View>
       <View style={{ width: mediaWidth, height: mediaHeight, backgroundColor: '#000' }}>{media}</View>
     </View>
   );
@@ -92,6 +101,9 @@ const styles = StyleSheet.create({
   panelWithMedia: { flexDirection: 'row', backgroundColor: '#241a3d' },
   grid: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', alignContent: 'stretch' },
   cell: { width: '50%', height: '33.33%', alignItems: 'center', justifyContent: 'center' },
+  cellThree: { width: '33.33%', height: '50%', alignItems: 'center', justifyContent: 'center' },
+  side: { backgroundColor: '#241a3d', flexDirection: 'column-reverse' },
+  sideGrid: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', alignContent: 'stretch' },
   panelItem: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 64 },
   panelValueBox: { height: 30, alignItems: 'center', justifyContent: 'center' },
   panelValue: { color: '#fff', fontSize: 15.5, fontWeight: '800' },

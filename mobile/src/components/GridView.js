@@ -58,8 +58,9 @@ const BarRow = memo(function BarRow({ row, transpose, activeK, onSeek, size }) {
  * "Grid": the whole chart, bar by bar, with the song's parts named. Every beat is a square cell (as wide as the bar allows, centred);
  * the playing beat is lit black and kept in view; a tap jumps to a beat.
  */
-export function GridView({ chart, active, transpose, onSeek, bottomInset }) {
-  const { width } = useWindowDimensions();
+export function GridView({ chart, active, transpose, onSeek, bottomInset, width: given }) {
+  const screen = useWindowDimensions();
+  const width = given || screen.width; // the width of the space it has (less than the screen when the phone is held across)
   const list = useRef(null);
   const lastRow = useRef(-1);
   const perBar = Math.max(1, chart.perBar);

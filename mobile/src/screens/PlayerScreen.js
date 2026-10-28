@@ -77,7 +77,7 @@ const LiveGrid = memo(function LiveGrid({ store, ...rest }) {
 export default function PlayerScreen({ route, navigation }) {
   const { sessionId, song } = route.params;
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const { user, can } = useAuth();
   const [result, setResult] = useState(route.params.result || null);
   const [error, setError] = useState('');
@@ -420,8 +420,12 @@ export default function PlayerScreen({ route, navigation }) {
   const title = result?.title || song?.title || 'Song';
   const artist = result?.artist || song?.artist || '';
   // The player lives in the bottom panel, on the right of the controls: half the width, and never under the 200 x 200 YouTube asks for.
-  const mediaWidth = Math.max(200, Math.round(width / 2));
-  const mediaHeight = Math.max(210, Math.round(mediaWidth * 0.56));
+  // Held across, the chords take the left and a column at the right holds the video over the controls.
+  const landscape = width > height;
+  const sideWidth = landscape ? Math.min(340, Math.max(260, Math.round(width * 0.36))) : 0;
+  const mediaWidth = landscape ? sideWidth : Math.max(200, Math.round(width / 2));
+  const mediaHeight = landscape ? Math.max(200, Math.round(sideWidth * 0.5625)) : Math.max(210, Math.round(mediaWidth * 0.56));
+  const contentWidth = landscape ? width - sideWidth - insets.left - insets.right : width; // what the chord views have to draw in
   // Built only when one of these changes, so a change of beat never touches the video.
   const media = useMemo(() => (videoId ? (
     <YoutubePlayer
@@ -473,7 +477,8 @@ export default function PlayerScreen({ route, navigation }) {
   const arrows = can('chord_voicings');
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, landscape && { flexDirection: 'row', paddingLeft: insets.left }]}>
+      <View style={styles.main}>
       <View style={{ height: insets.top, backgroundColor: colors.bar }} />
       <Animated.View
         style={[
@@ -521,17 +526,18 @@ export default function PlayerScreen({ route, navigation }) {
             </Centered>
           )
         ) : view === 'diagrams' ? (
-          <LiveDiagrams store={activeStore} chart={chart} instrument={shownInstrument} transpose={transpose} capo={capo} arrows={arrows} onSeek={seek} />
+          <LiveDiagrams store={activeStore} width={contentWidth} chart={chart} instrument={shownInstrument} transpose={transpose} capo={capo} arrows={arrows} onSeek={seek} />
         ) : view === 'strum' && strumList.length > 0 ? (
-          <StrumView result={result} chart={chart} time={strumTime} bottomInset={0} />
+          <StrumView result={result} chart={chart} time={strumTime} bottomInset={0} width={contentWidth} />
         ) : view === 'summary' ? (
-          <SummaryView chart={chart} instrument={shownInstrument} transpose={transpose} capo={capo} arrows={arrows} bottomInset={0} />
+          <SummaryView chart={chart} instrument={shownInstrument} transpose={transpose} capo={capo} arrows={arrows} bottomInset={0} width={contentWidth} />
         ) : (
-          <LiveGrid store={activeStore} chart={chart} transpose={transpose} onSeek={seek} bottomInset={0} />
+          <LiveGrid store={activeStore} width={contentWidth} chart={chart} transpose={transpose} onSeek={seek} bottomInset={0} />
         )}
         {chart ? (
           <ViewPanel
             open={viewOpen}
+            wide={contentWidth >= 440}
             onClose={() => setViewOpen(false)}
             views={VIEWS.filter((v) => v.id !== 'strum' || strumList.length > 0)}
             view={view}
@@ -541,6 +547,8 @@ export default function PlayerScreen({ route, navigation }) {
             onInstrument={chooseInstrument}
           />
         ) : null}
+      </View>
+
       </View>
 
       {chart ? (
@@ -561,6 +569,10 @@ export default function PlayerScreen({ route, navigation }) {
           media={media}
           mediaWidth={mediaWidth}
           mediaHeight={mediaHeight}
+          side={landscape}
+          sideWidth={sideWidth}
+          topInset={insets.top}
+          rightInset={insets.right}
         />
       ) : null}
 
@@ -706,6 +718,7 @@ const styles = StyleSheet.create({
   topInner: { position: 'absolute', left: 0, right: 0, top: 0 },
   screen: { flex: 1, backgroundColor: colors.bg },
   pad: { paddingHorizontal: 16 },
+  main: { flex: 1 },
   body: { flex: 1, overflow: 'hidden' },
   by: { color: colors.mute, fontSize: 14 },
   audio: { flex: 1, backgroundColor: '#1a0533', alignItems: 'center', justifyContent: 'center', gap: 6 },

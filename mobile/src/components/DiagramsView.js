@@ -17,17 +17,17 @@ const SUMMARY_COLUMNS = 2;
 const labelOf = (raw, transpose) => (raw === 'N' ? 'rest' : transposeChord(raw, transpose));
 
 /** One diagram with the arrows that change which way of playing the chord is shown (when the plan has that). */
-const Slot = memo(function Slot({ raw, transpose, capo, instrument, picks, arrows, on, scale }) {
+const Slot = memo(function Slot({ raw, transpose, capo, instrument, picks, arrows, on, scale, compact }) {
   const fingered = raw === 'N' ? 'N' : transposeChord(raw, transpose - capo); // the shape to finger: Transpose, undone by Capo
   const choice = choiceFor(instrument, fingered, picks);
   const label = labelOf(raw, transpose);
   const notes = useMemo(() => (raw === 'N' ? [] : chordNotes(transposeChord(raw, transpose))), [raw, transpose]);
   return (
     <View style={styles.slot}>
-      <View style={on ? styles.liftOn : styles.lift}>
+      <View style={compact ? styles.liftCompact : on ? styles.liftOn : styles.lift}>
         <ChordDiagram shape={choice ? choice.shape : null} label={label} notes={notes} scale={scale} active={on} />
       </View>
-      {arrows && choice && choice.count > 1 ? (
+      {compact ? null : arrows && choice && choice.count > 1 ? (
         <View style={styles.arrows}>
           <Pressable onPress={() => stepPick(instrument, fingered, -1)} hitSlop={10} style={styles.arrow} accessibilityRole="button" accessibilityLabel={`Previous way to play ${label}`}>
             <Icon name="back" size={22} color={colors.ink} />
@@ -83,7 +83,8 @@ const StripCell = memo(function StripCell({ t, label, bar, on, size, onSeek }) {
  * like) changes, not on every beat. While somebody looks around (`browse`), the track is anchored where they started and moved by
  * `shift` (their finger), and the diagrams drawn are the ones around where they have got to (`center`).
  */
-const ChordRow = memo(function ChordRow({ sequence, current, browse, center, shift, instrument, transpose, capo, arrows, picks, width }) {
+const ChordRow = memo(function ChordRow({ sequence, current, browse, center, shift, instrument, transpose, capo, arrows, picks, width, fit }) {
+  const compact = fit > 0; // a short area (a phone held across): smaller diagrams, no arrows, so the row fits
   const padLeft = Math.max(0, width * ANCHOR - ITEM / 2);
   const anchor = browse ? browse.frozen : current;
   const focus = browse ? center : current;
@@ -101,11 +102,22 @@ const ChordRow = memo(function ChordRow({ sequence, current, browse, center, shi
   const slots = [];
   for (let i = start; i < end; i++) {
     slots.push(
-      <Slot key={i} raw={sequence[i].chord} transpose={transpose} capo={capo} instrument={instrument} picks={picks} arrows={arrows} on={i === current} scale={i === current ? 1.3 : 1.05} />,
+      <Slot
+        key={i}
+        raw={sequence[i].chord}
+        transpose={transpose}
+        capo={capo}
+        instrument={instrument}
+        picks={picks}
+        arrows={arrows}
+        on={i === current}
+        scale={compact ? (i === current ? fit : fit * 0.8) : i === current ? 1.3 : 1.05}
+        compact={compact}
+      />,
     );
   }
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, compact && styles.rowCompact]}>
       <View style={[styles.track, { transform: [{ translateX: padLeft + (start - anchor) * ITEM }] }]}>
         <Animated.View style={[styles.track, browse ? { transform: [{ translateX: shift }] } : null]}>{slots}</Animated.View>
       </View>
@@ -127,6 +139,9 @@ function ChordArea({ sequence, current, instrument, transpose, capo, arrows, pic
   const [center, setCenter] = useState(0); // the chord in the middle of what is being looked at
   const live = useRef({});
   live.current = { current, last, browse };
+  // How tall the space for the row is: when it is too short for full-size diagrams with their arrows, they are drawn smaller to fit.
+  const [areaHeight, setAreaHeight] = useState(0);
+  const fit = areaHeight > 0 && areaHeight < 330 ? Math.max(0.5, Math.min(1, (areaHeight - 24) / 175)) : 0;
 
   useEffect(() => {
     const id = drag.addListener(({ value }) => {
@@ -197,7 +212,7 @@ function ChordArea({ sequence, current, instrument, transpose, capo, arrows, pic
   }, [drag, browse, last]);
 
   return (
-    <View style={styles.area} {...pan.panHandlers}>
+    <View style={styles.area} onLayout={(e) => setAreaHeight(Math.round(e.nativeEvent.layout.height))} {...pan.panHandlers}>
       <ChordRow
         sequence={sequence}
         current={current}
@@ -210,6 +225,7 @@ function ChordArea({ sequence, current, instrument, transpose, capo, arrows, pic
         arrows={arrows}
         picks={picks}
         width={width}
+        fit={fit}
       />
     </View>
   );
@@ -218,15 +234,16 @@ function ChordArea({ sequence, current, instrument, transpose, capo, arrows, pic
 /** "Diagrams": a row of chord diagrams with the playing chord enlarged, over a strip of every beat of the song with the playing one
  *  marked. Both step straight to the playing place, with no animation, so they stay on the beat even on a slow phone; both can be swiped
  *  to look ahead, and both come back to the playing place by themselves. */
-export function DiagramsView({ chart, active, instrument, transpose, capo, arrows, onSeek }) {
-  const { width } = useWindowDimensions();
+export function DiagramsView({ chart, active, instrument, transpose, capo, arrows, onSeek, width: given }) {
+  const window = useWindowDimensions();
+  const width = given || window.width; // the width of the space it has (less than the screen when the phone is held across)
   const picks = usePicks();
   const { sequence, at } = useMemo(() => chordSequence(chart), [chart]);
   const current = active >= 0 ? at[active] : 0;
   return (
     <View style={styles.view}>
       <ChordArea sequence={sequence} current={current} instrument={instrument} transpose={transpose} capo={capo} arrows={arrows} picks={picks} width={width} />
-      <BeatStrip chart={chart} active={active} transpose={transpose} onSeek={onSeek} />
+      <BeatStrip chart={chart} active={active} transpose={transpose} onSeek={onSeek} width={width} />
     </View>
   );
 }
@@ -280,8 +297,7 @@ const Marker = memo(function Marker({ label, markerX, size }) {
  * Playback brings the strip back to the playing beat a moment after the hand lets go.
  * A beat changes only the marker and the strip's position: the list of cells is left alone.
  */
-function BeatStrip({ chart, active, transpose, onSeek }) {
-  const { width } = useWindowDimensions();
+function BeatStrip({ chart, active, transpose, onSeek, width }) {
   const size = width >= 360 ? 44 : 38;
   const markerX = Math.round(width * ANCHOR - size / 2); // the playing cell's left edge, in line with the playing diagram
   const list = useRef(null);
@@ -363,17 +379,18 @@ function BeatStrip({ chart, active, transpose, onSeek }) {
 }
 
 /** "Summary": every chord of the song with its diagram, most used first. */
-export function SummaryView({ chart, instrument, transpose, capo, arrows, bottomInset }) {
+export function SummaryView({ chart, instrument, transpose, capo, arrows, bottomInset, width }) {
+  const columns = width && width >= 560 ? 4 : SUMMARY_COLUMNS;
   const picks = usePicks();
   const used = useMemo(() => chordsUsed(chordSequence(chart).sequence), [chart]);
   return (
     <FlatList
       data={used}
       keyExtractor={(item) => item.chord}
-      numColumns={SUMMARY_COLUMNS}
-      key={SUMMARY_COLUMNS}
+      numColumns={columns}
+      key={columns}
       renderItem={({ item }) => (
-        <View style={styles.summaryCell}>
+        <View style={[styles.summaryCell, { flex: 1 / columns }]}>
           <Slot raw={item.chord} transpose={transpose} capo={capo} instrument={instrument} picks={picks} arrows={arrows} scale={1} />
         </View>
       )}
@@ -389,9 +406,11 @@ const styles = StyleSheet.create({
   view: { flex: 1, justifyContent: 'space-between' },
   area: { flex: 1, justifyContent: 'center' },
   row: { flexGrow: 0, overflow: 'hidden', paddingVertical: 30 },
+  rowCompact: { paddingVertical: 12 },
   track: { flexDirection: 'row', alignSelf: 'flex-start' },
   slot: { width: ITEM, alignItems: 'center' },
   lift: { marginBottom: 12 },
+  liftCompact: { marginBottom: 0 },
   liftOn: { marginBottom: 44 }, // the playing card is drawn bigger than its box: room for the arrows below it
   arrows: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', height: 40, gap: 14, marginTop: 6 },
   arrow: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.soft, alignItems: 'center', justifyContent: 'center' },

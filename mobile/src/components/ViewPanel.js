@@ -44,11 +44,11 @@ function StrumPreview() {
   );
 }
 
-function Tile({ item, on, onPress }) {
+function Tile({ item, on, onPress, wide }) {
   return (
     <Pressable
       onPress={() => onPress(item)}
-      style={[styles.tile, on && styles.tileOn, item.soon && styles.tileSoon]}
+      style={[styles.tile, wide && styles.tileWide, on && styles.tileOn, item.soon && styles.tileSoon]}
       accessibilityRole="button"
       accessibilityState={{ selected: on, disabled: !!item.soon }}
       accessibilityLabel={`${item.label}${item.soon ? ', coming soon' : item.locked ? ', needs a plan' : ''}`}
@@ -69,7 +69,7 @@ function Tile({ item, on, onPress }) {
  * "Pick your view": a panel that slides down over the song, under the toolbar, instead of a sheet from the bottom. A choice of the view
  * (diagrams, summary, grid, strumming) over what it shows: the instruments to pick from, or a picture of the view.
  */
-function ViewPanel({ open, onClose, views, view, onView, instruments, instrument, onInstrument }) {
+function ViewPanel({ open, wide = false, onClose, views, view, onView, instruments, instrument, onInstrument }) {
   const progress = useRef(new Animated.Value(0)).current;
   const [height, setHeight] = useState(0);
 
@@ -110,9 +110,9 @@ function ViewPanel({ open, onClose, views, view, onView, instruments, instrument
 
         <View style={styles.stage}>
           {withInstruments ? (
-            <View style={styles.tiles}>
+            <View style={[styles.tiles, wide && styles.tilesWide]}>
               {instruments.map((item) => (
-                <Tile key={item.id} item={item} on={instrument === item.id} onPress={onInstrument} />
+                <Tile key={item.id} item={item} on={instrument === item.id} onPress={onInstrument} wide={wide} />
               ))}
             </View>
           ) : view === 'grid' ? (
@@ -121,10 +121,17 @@ function ViewPanel({ open, onClose, views, view, onView, instruments, instrument
             <StrumPreview />
           )}
         </View>
+        {wide ? (
+          <View style={styles.ctaInline}>
+            <Button title="Start jamming" onPress={onClose} />
+          </View>
+        ) : null}
       </ScrollView>
-      <View style={styles.cta}>
-        <Button title="Start jamming" onPress={onClose} />
-      </View>
+      {wide ? null : (
+        <View style={styles.cta}>
+          <Button title="Start jamming" onPress={onClose} />
+        </View>
+      )}
     </Animated.View>
   );
 }
@@ -168,6 +175,8 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },
   },
+  tileWide: { width: '23%' }, // all four in one row when there is room (a phone held across)
+  tilesWide: { gap: 6 },
   tileOn: { backgroundColor: colors.violet },
   tileSoon: { opacity: 0.6 },
   tileLabel: { color: colors.ink, fontSize: 15, fontWeight: '700', marginTop: 8 },
@@ -183,4 +192,5 @@ const styles = StyleSheet.create({
   strumRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center', paddingVertical: 8 },
   strumTile: { width: 58, height: 58, borderRadius: 12, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   cta: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 14 },
+  ctaInline: { marginTop: 14 }, // when there is little height (a phone held across) the button scrolls with the rest
 });

@@ -36,8 +36,9 @@ function slotAt(chart, time, sub, count) {
 }
 
 /** "Strum": the pattern as arrows (down, up, or a beat to skip), with the slot that is playing lit. */
-export function StrumView({ result, chart, time, bottomInset }) {
-  const { width } = useWindowDimensions();
+export function StrumView({ result, chart, time, bottomInset, width: given }) {
+  const screen = useWindowDimensions();
+  const width = given || screen.width;
   const list = useMemo(() => strumPatterns(result), [result]);
   const [index, setIndex] = useState(0);
   const [easy, setEasy] = useState(false);
