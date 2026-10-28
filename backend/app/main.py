@@ -27,6 +27,7 @@ from .plans import FREE_CODE, PERIODS, PlanStore
 from .engagement import BADGE_RULES, DEFAULT_CONFIG, REWARD_KINDS, Engagement
 from .jobs import JobQueue
 from .search import RateLimiter, SearchUnavailable, clean_query, find_video, radio, search_songs, suggest
+from .sections_ai import status as section_model_status
 from .similar import shelf as similar_shelf
 from .songpages import SongPages
 from .store import SongStore
@@ -91,6 +92,11 @@ except Exception as exc:
 # 23: the bass line decides where a chord begins and what it is (an F that the B-flat chord holds, G minor over a B-flat bass), and a chord is only added where the bass plays it.
 # 24: a song counted in threes at a quick pulse (a waltz at 173 BPM) is counted so again, now that the pulse finder found a pulse of its own at two thirds of that speed: the quick grid, followed through the song, wins when its bars of three fit clearly better.
 ANALYSIS_VERSION = 24
+
+_sections = section_model_status()
+logging.getLogger("thechordify.sections").info(
+    "Structure model: %s (%s)", "on" if _sections["willRun"] else "OFF - songs get the quick sections only", _sections["reason"]
+)
 
 ALLOWED_UPLOAD_EXTENSIONS ={".mp3", ".wav", ".flac", ".m4a"}
 MAX_UPLOAD_BYTES = 50 * 1024 * 1024  # 50MB
@@ -864,6 +870,8 @@ def admin_overview(request: Request) -> dict:
             "configured": bool(_GOOGLE_CLIENT_ID), "admins": len(_ADMIN_EMAILS),
             "reviewer": _reviewer_enabled(),
         },
+        # Why songs get (or do not get) the trained structure model's sections (intro, instrumental, outro).
+        "sectionModel": section_model_status(),
     }
 
 

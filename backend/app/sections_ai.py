@@ -74,6 +74,29 @@ def _analyze(audio_path: str, work: str) -> list[Section]:
     return [(float(s.start), float(s.end), str(s.label)) for s in result.segments]
 
 
+def status() -> dict:
+    """Whether the structure model can run on this machine, and if not, why. For the admin page and the start-up log: when
+    the model is skipped the player falls back to the quick sections, which never name an instrumental break or an outro."""
+    cpus = os.cpu_count() or 1
+    installed = importlib.util.find_spec("allin1_infer") is not None
+    free = available_memory_mb()
+    if _ENGINE == "classic":
+        reason = "SECTION_ENGINE=classic turns the model off"
+    elif _ENGINE != "model" and cpus < _MIN_CPUS:
+        reason = f"only {cpus} CPU(s); the model needs {_MIN_CPUS} (or set SECTION_ENGINE=model to force it)"
+    elif not installed:
+        reason = "all-in-one-infer is not installed (check the build log for 'structure model not installed')"
+    elif free is not None and free < _MIN_MEMORY_MB:
+        reason = f"only {free:.0f} MB of memory free right now; it needs {_MIN_MEMORY_MB:.0f} MB (SECTION_MIN_MEMORY_MB)"
+    else:
+        reason = "ready"
+    return {
+        "engine": _ENGINE, "installed": installed, "cpus": cpus, "minCpus": _MIN_CPUS,
+        "freeMemoryMB": None if free is None else round(free), "minMemoryMB": _MIN_MEMORY_MB,
+        "budgetSeconds": _BUDGET, "willRun": reason == "ready", "reason": reason,
+    }
+
+
 _slot = threading.Semaphore(1)  # one model at a time: it is heavy, and a queue of songs would exhaust memory
 
 

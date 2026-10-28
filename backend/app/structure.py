@@ -35,6 +35,7 @@ MAX_NAMED_BARS = 32  # neighbouring sections the structure model gave the same n
 MAX_SECTION_BARS = 20  # a section longer than this is split at its strongest internal change...
 MIN_SPLIT_BARS = 8  # ...but never closer than this to either end
 MAX_SHIFT_BARS = 4  # a section start moves on past at most this many bars that have no chord change
+FADE_DB = 4.0  # a last section whose closing quarter is this much quieter than the rest of it is an outro (the song fades out)
 AUDIBLE_RMS = 0.003  # about -50 dBFS: below this nothing can be heard; above it (however soft) it is music
 
 
@@ -245,7 +246,21 @@ def _classic_segments(similarity: np.ndarray, novelty: np.ndarray, energy: np.nd
 
     energy_db = np.array([20 * np.log10(energy[a:b].mean() + 1e-9) for a, b in segments])
     labels = _name_sections(segments, clusters, energy_db, separation)
+    # A closing section that fades out is the outro, even when it plays the chorus again.
+    if len(segments) > 2 and not labels[-1].startswith("Outro") and fades_out(energy, *segments[-1]):
+        labels[-1] = "Outro"
     return segments, labels
+
+
+def fades_out(energy: np.ndarray, a: int, b: int) -> bool:
+    """Whether the bars a..b-1 end in a fade: the last quarter is clearly quieter than the rest. A song that fades away is ending,
+    whatever chords it ends on, so that closing section is an outro even when it repeats the chorus."""
+    if b - a < 4:
+        return False
+    tail = max(1, (b - a) // 4)
+    head = float(energy[a : b - tail].mean())
+    end = float(energy[b - tail : b].mean())
+    return end > 0 and head > 0 and 20 * np.log10(end / head) <= -FADE_DB
 
 
 def _early_chord_bars(chords: list[dict], bars: list[dict], bpb: int = BEATS_PER_BAR) -> set[int]:
