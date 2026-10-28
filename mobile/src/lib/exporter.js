@@ -76,7 +76,8 @@ function toBase64(bytes) {
 
 async function offer(bytes, name, mime) {
   try {
-    await Share.open({ url: `data:${mime};base64,${toBase64(bytes)}`, filename: name, type: mime, failOnCancel: false, showAppsToView: true });
+    // The library adds the extension itself, and only shares files from the app's internal cache (its file provider covers that).
+    await Share.open({ url: `data:${mime};base64,${toBase64(bytes)}`, filename: name.replace(/\.[^.]+$/, ''), type: mime, failOnCancel: false, useInternalStorage: true });
   } catch (err) {
     if (!(err && /cancel|dismiss/i.test(String(err.message || err)))) throw err;
   }
