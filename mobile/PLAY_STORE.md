@@ -99,7 +99,7 @@ Ready in `mobile/store/`:
 
 - [x] `play-icon-512.png` — app icon, 512×512.
 - [x] `play-feature-graphic-1024x500.png` — feature graphic.
-- [x] **Phone screenshots** (1080×2400, in `mobile/store/screenshots/`, taken from the OnePlus): Discover, a song's chord diagrams with the beat strip, the chord grid, the strumming view, the Toolkit, the tuner, My Library. Play accepts 2 to 8, PNG or JPEG, 16:9 or 9:16, each side 320–3840 px.
+- [x] **Phone screenshots** (1080×1920, in `mobile/store/screenshots/`, framed with a caption from OnePlus captures): a song's chord diagrams with the beat strip, the chord grid, the Toolkit, the tuner, chord practice, My Library. Play accepts 2 to 8, PNG or JPEG, 16:9 or 9:16, each side 320–3840 px. The two song shots show a third-party music video in the player panel; if Play's review objects, retake them with an imported file (the panel then shows "Playing your file") or a video you own.
 - [ ] 7-inch and 10-inch tablet screenshots: optional, but recommended; the app works on tablets.
 
 ## 6. App content (Play Console → Policy → App content)
