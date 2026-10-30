@@ -872,6 +872,8 @@ def admin_overview(request: Request) -> dict:
         },
         # Why songs get (or do not get) the trained structure model's sections (intro, instrumental, outro).
         "sectionModel": section_model_status(),
+        # How fresh the trending shelves are, and why a refresh failed, if it did.
+        "trending": trending_shelves.status(),
     }
 
 
@@ -1235,7 +1237,7 @@ def trending(response: Response) -> dict:
     if len(favourites) >= 3:
         out.insert(0, {"id": "popular", "title": "Popular on Chord Suno", "about": "What people are jamming to", "songs": favourites})
     response.headers["Cache-Control"] = "public, max-age=120"
-    return {"shelves": out}
+    return {"shelves": out, "updatedAt": trending_shelves.updated_at()}
 
 
 _similar_limiter = RateLimiter(limit=20, window=60.0)

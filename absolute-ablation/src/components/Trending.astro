@@ -286,7 +286,40 @@
     }
     shelves.replaceChildren(...useful.map(shelf));
     shelves.setAttribute("aria-busy", "false");
+    shown = signature(useful);
+    fetchedAt = Date.now();
   }
+
+  // What is on screen, as one string: the songs of every shelf and what is known about them (chords, jam sessions).
+  let shown = "";
+  let fetchedAt = 0;
+  const signature = (list: TrendingShelf[]) =>
+    list.map((s) => `${s.id}:${s.songs.map((x) => `${x.videoId}${x.jams ?? 0}${x.chords?.length ?? 0}`).join(",")}`).join("|");
+
+  // The charts and the jam counts move while the page stays open (or is restored from the back button): look again when the visitor
+  // comes back to the tab, and now and then while it is in view, and redraw only when something actually changed (so a row the
+  // visitor has scrolled is not thrown back to its start for nothing).
+  const FRESH_MS = 5 * 60 * 1000;
+  async function refresh() {
+    if (!loaded || document.hidden || Date.now() - fetchedAt < FRESH_MS) return;
+    fetchedAt = Date.now();
+    try {
+      const next = (await getTrending()).filter((s) => s.songs && s.songs.length > 0);
+      if (next.length === 0 || signature(next) === shown) return;
+      shelves.replaceChildren(...next.map(shelf));
+      shown = signature(next);
+    } catch {
+      // keep what is shown
+    }
+  }
+  document.addEventListener("visibilitychange", refresh);
+  window.addEventListener("pageshow", (e) => {
+    if ((e as PageTransitionEvent).persisted) {
+      fetchedAt = 0;
+      refresh();
+    }
+  });
+  window.setInterval(refresh, FRESH_MS);
 
   // Fetch when the visitor is about to scroll here, not on every page load.
   if ("IntersectionObserver" in window) {

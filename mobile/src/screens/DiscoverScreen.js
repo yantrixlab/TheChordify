@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, AppState, FlatList, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { TOOLS } from 'chordsuno-shared/tools/catalog';
 import { getLibrary, getTrending } from '../api';
@@ -16,6 +16,7 @@ function Gap() {
 }
 
 // The tools and, last, importing a song from the phone.
+const FRESH_MS = 5 * 60 * 1000; // shelves older than this are fetched again when Discover is looked at
 const TILES = [...TOOLS, { id: 'upload', name: 'Import music', cover: toolCovers.upload }].map((t) => ({ ...t, cover: coverOf(t.id, t.cover) }));
 
 /** The artists behind the songs this person played, most played first: [{ name, thumbnail }]. */
@@ -42,14 +43,28 @@ export default function DiscoverScreen({ navigation }) {
   const [history, setHistory] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
 
+  const loadedAt = useRef(0);
   const load = useCallback(async () => {
     const trending = await getTrending();
+    loadedAt.current = Date.now();
     setShelves(trending.filter((s) => s.songs && s.songs.length > 0));
   }, []);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  // The charts and the jam counts keep moving: look again when Discover comes back into view (from another tab, or the phone's
+  // home screen) and the shelves have been on screen for a few minutes.
+  useFocusEffect(
+    useCallback(() => {
+      if (loadedAt.current && Date.now() - loadedAt.current > FRESH_MS) load().catch(() => {});
+      const sub = AppState.addEventListener('change', (state) => {
+        if (state === 'active' && loadedAt.current && Date.now() - loadedAt.current > FRESH_MS) load().catch(() => {});
+      });
+      return () => sub.remove();
+    }, [load]),
+  );
 
   // The person's own history is read again each time Discover comes back into view.
   useFocusEffect(
