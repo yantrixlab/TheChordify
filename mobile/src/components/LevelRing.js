@@ -1,9 +1,11 @@
 import { Image, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Defs, LinearGradient, Stop } from 'react-native-svg';
-import { colors } from '../theme';
+import { makeStyles, useColors } from '../theme';
 
 /** A profile picture inside a ring that fills as the person gets to their next level, with the level on a small gold badge. */
 export function LevelRing({ user, profile, size = 96 }) {
+  const colors = useColors();
+  const styles = useStyles();
   const stroke = Math.max(4, Math.round(size * 0.085));
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -20,12 +22,12 @@ export function LevelRing({ user, profile, size = 96 }) {
       <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         <Defs>
           <LinearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
-            <Stop offset="0" stopColor="#a78bfa" />
-            <Stop offset="0.55" stopColor="#ec4899" />
-            <Stop offset="1" stopColor="#f59e0b" />
+            <Stop offset="0" stopColor="#F6D38B" />
+            <Stop offset="0.55" stopColor="#E8A33D" />
+            <Stop offset="1" stopColor="#B45309" />
           </LinearGradient>
         </Defs>
-        <Circle cx={size / 2} cy={size / 2} r={radius} stroke={(profile && profile.ring) || '#e6e0f0'} strokeWidth={stroke} fill="none" opacity={0.6} />
+        <Circle cx={size / 2} cy={size / 2} r={radius} stroke={(profile && profile.ring) || colors.line} strokeWidth={stroke} fill="none" opacity={0.6} />
         {fraction > 0 ? (
           <Circle
             cx={size / 2}
@@ -52,9 +54,9 @@ export function LevelRing({ user, profile, size = 96 }) {
   );
 }
 
-const styles = StyleSheet.create({
-  photo: { position: 'absolute', overflow: 'hidden', backgroundColor: colors.violetSoft, alignItems: 'center', justifyContent: 'center' },
-  initials: { color: colors.violetDeep, fontWeight: '800' },
+const useStyles = makeStyles((colors) => ({
+  photo: { position: 'absolute', overflow: 'hidden', backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' },
+  initials: { color: colors.accentDeep, fontWeight: '800' },
   chip: { position: 'absolute', right: -2, bottom: -2, minWidth: 26, height: 26, paddingHorizontal: 6, borderRadius: 13, backgroundColor: '#fbbf24', borderWidth: 2, borderColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   chipText: { color: '#5b3a00', fontSize: 13, fontWeight: '800' },
-});
+}));

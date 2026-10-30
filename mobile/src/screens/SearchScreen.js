@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Keyboard, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
 import { errorMessage, searchSongs } from '../api';
@@ -8,9 +8,11 @@ import { Art, AppBar, Note } from '../components/Ui';
 import { SongRow } from '../components/Songs';
 import { clearRecents, forget, getRecents, rememberQuery } from '../lib/recent';
 import { useOpenSong } from '../lib/useOpenSong';
-import { colors, radius } from '../theme';
+import { radius, makeStyles, useColors } from '../theme';
 
 export default function SearchScreen({ route, navigation }) {
+  const colors = useColors();
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const openSong = useOpenSong();
   const [query, setQuery] = useState('');
@@ -102,7 +104,7 @@ export default function SearchScreen({ route, navigation }) {
             autoCapitalize="none"
             accessibilityLabel="Search songs"
           />
-          {searching ? <ActivityIndicator color={colors.violet} /> : null}
+          {searching ? <ActivityIndicator color={colors.accent} /> : null}
           {query.length > 0 && !searching ? (
             <Pressable onPress={() => setQuery('')} accessibilityLabel="Clear the search" hitSlop={12}>
               <Icon name="close" color={colors.mute} size={20} />
@@ -144,7 +146,7 @@ export default function SearchScreen({ route, navigation }) {
                 entry.type === 'song' ? (
                   <SongRow key={`s${entry.videoId}`} song={entry} onPress={openSong} trailing={<RemoveButton onPress={() => remove(entry)} />} />
                 ) : (
-                  <Pressable key={`q${entry.q}`} onPress={() => setQuery(entry.q)} style={styles.queryRow} android_ripple={{ color: '#7c3aed22' }}>
+                  <Pressable key={`q${entry.q}`} onPress={() => setQuery(entry.q)} style={styles.queryRow} android_ripple={{ color: colors.ripple }}>
                     <View style={styles.queryIcon}>
                       <Icon name="search" size={20} color={colors.mute} />
                     </View>
@@ -170,6 +172,8 @@ export default function SearchScreen({ route, navigation }) {
 }
 
 function RemoveButton({ onPress }) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <Pressable onPress={onPress} hitSlop={10} style={styles.remove} accessibilityRole="button" accessibilityLabel="Remove from recent">
       <Icon name="close" size={18} color={colors.faint} />
@@ -177,7 +181,7 @@ function RemoveButton({ onPress }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.bg },
   searchRow: { paddingHorizontal: 16, paddingVertical: 12, backgroundColor: colors.bar },
   searchBox: { height: 50, borderRadius: radius.pill, backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16 },
@@ -185,13 +189,13 @@ const styles = StyleSheet.create({
   empty: { color: colors.mute, fontSize: 15, lineHeight: 22, textAlign: 'center', marginTop: 48, paddingHorizontal: 32 },
   recentHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 18, paddingBottom: 6 },
   recentTitle: { color: colors.ink, fontSize: 18, fontWeight: '700' },
-  clear: { color: colors.violetDeep, fontSize: 15, fontWeight: '600' },
+  clear: { color: colors.accentDeep, fontSize: 15, fontWeight: '600' },
   queryRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, height: 52 },
   queryIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.soft, alignItems: 'center', justifyContent: 'center' },
   queryText: { flex: 1, color: colors.ink, fontSize: 16 },
   remove: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   hint: { alignItems: 'center', paddingTop: 64, paddingHorizontal: 36 },
-  hintArt: { backgroundColor: colors.violetSoft },
+  hintArt: { backgroundColor: colors.accentSoft },
   hintTitle: { color: colors.ink, fontSize: 19, fontWeight: '800', marginTop: 18 },
   hintText: { color: colors.mute, fontSize: 15, lineHeight: 22, textAlign: 'center', marginTop: 6 },
-});
+}));

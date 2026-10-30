@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { Animated, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { errorMessage, getJob } from '../api';
 import { AppBar, Art, Button, Note } from '../components/Ui';
-import { colors } from '../theme';
+import { makeStyles } from '../theme';
 
 const STAGES = { queued: 'Waiting for a turn…', downloading: 'Fetching the song…', analyzing: 'Listening for the chords…' };
 
 /** The waiting screen of a song that is being made: it asks the server how far along it is, and replaces itself with the player. */
 export default function ProcessingScreen({ route, navigation }) {
+  const styles = useStyles();
   const { sessionId, song } = route.params;
   const insets = useSafeAreaInsets();
   const [stage, setStage] = useState('queued');
@@ -91,7 +92,7 @@ export default function ProcessingScreen({ route, navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { flex: 1, alignItems: 'center', paddingTop: 28, paddingHorizontal: 24 },
   art: { marginBottom: 22, borderRadius: 16 },
@@ -99,8 +100,8 @@ const styles = StyleSheet.create({
   by: { color: colors.mute, fontSize: 15, marginTop: 4 },
   wait: { width: '100%', marginTop: 32, alignItems: 'center' },
   track: { width: '100%', height: 6, borderRadius: 3, backgroundColor: colors.soft, overflow: 'hidden' },
-  fill: { height: 6, width: '100%', backgroundColor: colors.violet, transformOrigin: 'left' },
-  stage: { color: colors.violetDeep, fontSize: 15, fontWeight: '600', marginTop: 16 },
+  fill: { height: 6, width: '100%', backgroundColor: colors.accent, transformOrigin: 'left' },
+  stage: { color: colors.accentDeep, fontSize: 15, fontWeight: '600', marginTop: 16 },
   hint: { color: colors.faint, fontSize: 13, textAlign: 'center', marginTop: 8 },
   fail: { width: '100%', marginTop: 28 },
-});
+}));

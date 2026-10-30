@@ -1,15 +1,16 @@
 import { memo, useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Pressable, ScrollView, Text, View } from 'react-native';
 import InstrumentArt from './InstrumentArt';
 import { Icon } from './Icons';
 import { Button } from './Ui';
-import { colors, radius } from '../theme';
+import { radius, makeStyles, useColors } from '../theme';
 
 const OPEN_MS = 210; // quick: it is a switch, not a scene
 const CLOSE_MS = 160;
 
 /** A drawing of what a view looks like, for the views that have no instrument to choose (the grid, the strumming). */
 function GridPreview() {
+  const styles = useStyles();
   const rows = [
     ['Am', '', 'F', ''],
     ['', '', '', ''],
@@ -32,12 +33,14 @@ function GridPreview() {
 }
 
 function StrumPreview() {
+  const colors = useColors();
+  const styles = useStyles();
   const arrows = ['D', 'D', 'U', 'U', 'D', 'U', 'D', 'U'];
   return (
     <View style={styles.strumRow}>
       {arrows.map((a, i) => (
         <View key={i} style={[styles.strumTile, i === 2 && styles.miniOn]}>
-          <Icon name={a === 'D' ? 'down' : 'up'} size={22} color={i === 2 ? '#fff' : colors.ink} />
+          <Icon name={a === 'D' ? 'down' : 'up'} size={22} color={i === 2 ? colors.onPlaying : colors.ink} />
         </View>
       ))}
     </View>
@@ -45,6 +48,8 @@ function StrumPreview() {
 }
 
 function Tile({ item, on, onPress, wide, compact }) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
     <Pressable
       onPress={() => onPress(item)}
@@ -53,7 +58,7 @@ function Tile({ item, on, onPress, wide, compact }) {
       accessibilityState={{ selected: on, disabled: !!item.soon }}
       accessibilityLabel={`${item.label}${item.soon ? ', coming soon' : item.locked ? ', needs a plan' : ''}`}
     >
-      <InstrumentArt kind={item.id} color={on ? '#ffffffcc' : colors.mute} dot={on ? '#fff' : colors.ink} scale={compact ? 0.72 : 1} />
+      <InstrumentArt kind={item.id} color={on ? `${colors.onAccent}CC` : colors.mute} dot={on ? colors.onAccent : colors.ink} scale={compact ? 0.72 : 1} />
       <Text style={[styles.tileLabel, compact && styles.tileLabelCompact, on && styles.tileLabelOn]}>{item.label}</Text>
       {item.soon ? <Text style={[styles.tileNote, compact && styles.tileNoteCompact]}>Soon</Text> : null}
       {item.locked && !item.soon ? (
@@ -70,6 +75,7 @@ function Tile({ item, on, onPress, wide, compact }) {
  * (diagrams, summary, grid, strumming) over what it shows: the instruments to pick from, or a picture of the view.
  */
 function ViewPanel({ open, wide = false, onClose, views, view, onView, instruments, instrument, onInstrument }) {
+  const styles = useStyles();
   const progress = useRef(new Animated.Value(0)).current;
   const [height, setHeight] = useState(0);
 
@@ -133,7 +139,7 @@ function ViewPanel({ open, wide = false, onClose, views, view, onView, instrumen
 
 export default memo(ViewPanel);
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   panel: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: colors.surface },
   content: { paddingHorizontal: 16, paddingTop: 20, paddingBottom: 12 },
   title: { color: colors.ink, fontSize: 21, fontWeight: '800', textAlign: 'center' },
@@ -146,16 +152,16 @@ const styles = StyleSheet.create({
     padding: 4,
     gap: 2,
     elevation: 4,
-    shadowColor: '#1a0533',
+    shadowColor: '#000000',
     shadowOpacity: 0.14,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 3 },
   },
   segItem: { paddingHorizontal: 13, paddingVertical: 9, borderRadius: 10 },
-  segOn: { backgroundColor: colors.violet },
-  segText: { color: colors.violetDeep, fontSize: 14, fontWeight: '700' },
-  segTextOn: { color: '#fff' },
-  stage: { backgroundColor: colors.violetSoft, borderRadius: 18, padding: 14, marginTop: -18, paddingTop: 34 },
+  segOn: { backgroundColor: colors.accent },
+  segText: { color: colors.accentDeep, fontSize: 14, fontWeight: '700' },
+  segTextOn: { color: colors.onAccent },
+  stage: { backgroundColor: colors.accentSoft, borderRadius: 18, padding: 14, marginTop: -18, paddingTop: 34 },
   tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between' },
   tile: {
     width: '47.5%',
@@ -165,24 +171,24 @@ const styles = StyleSheet.create({
     borderRadius: radius.card,
     backgroundColor: colors.surface,
     elevation: 3,
-    shadowColor: '#1a0533',
+    shadowColor: '#000000',
     shadowOpacity: 0.1,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },
   },
   tileWide: { width: '23%' }, // all four in one row when there is room (a phone held across)
   tilesWide: { gap: 6 },
-  tileOn: { backgroundColor: colors.violet },
+  tileOn: { backgroundColor: colors.accent },
   tileSoon: { opacity: 0.6 },
   tileLabel: { color: colors.ink, fontSize: 15, fontWeight: '700', marginTop: 8 },
-  tileLabelOn: { color: '#fff' },
+  tileLabelOn: { color: colors.onAccent },
   tileNote: { color: colors.mute, fontSize: 11, fontWeight: '700', marginTop: 1 },
   tileLock: { position: 'absolute', top: 8, right: 8 },
   mini: { alignSelf: 'center', gap: 4, paddingVertical: 4 },
   miniRow: { flexDirection: 'row', gap: 4 },
   miniCell: { width: 54, height: 54, borderRadius: 9, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
-  miniFirst: { backgroundColor: '#f3edff' },
-  miniOn: { backgroundColor: colors.ink },
+  miniFirst: { backgroundColor: colors.firstCell },
+  miniOn: { backgroundColor: colors.playing },
   miniText: { color: colors.ink, fontSize: 17, fontWeight: '800' },
   strumRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center', paddingVertical: 8 },
   strumTile: { width: 58, height: 58, borderRadius: 12, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
@@ -197,4 +203,4 @@ const styles = StyleSheet.create({
   tileCompact: { paddingTop: 8, paddingBottom: 6 },
   tileLabelCompact: { fontSize: 13, marginTop: 4 },
   tileNoteCompact: { fontSize: 10 },
-});
+}));

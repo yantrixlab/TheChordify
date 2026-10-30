@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { errorMessage, getPricing } from '../api';
 import { useAuth } from '../auth/AuthContext';
 import { Icon } from '../components/Icons';
 import { AppBar, Note } from '../components/Ui';
-import { colors, radius, shadow } from '../theme';
+import { radius, shadow, makeStyles, useColors } from '../theme';
 
 const money = (price) => {
   try {
@@ -18,6 +18,8 @@ const PERIOD = { monthly: 'month', yearly: 'year', weekly: 'week', quarterly: '3
 
 /** The plans and what each includes, the same as the website's pricing page. Subscribing inside the app comes with the Play Store's own billing. */
 export default function PremiumScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const { plan: mine } = useAuth();
   const [data, setData] = useState(null);
@@ -35,7 +37,7 @@ export default function PremiumScreen() {
       <AppBar title="Premium" />
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}>
         <Note>{error}</Note>
-        {!data && !error ? <ActivityIndicator color={colors.violet} style={styles.loading} /> : null}
+        {!data && !error ? <ActivityIndicator color={colors.accent} style={styles.loading} /> : null}
         {data
           ? data.plans.map((plan) => {
               const price = plan.prices.find((p) => p.period === 'monthly') || plan.prices[0];
@@ -54,7 +56,7 @@ export default function PremiumScreen() {
                     const detail = f.kind === 'limit' ? (rule.value === null ? 'unlimited' : `up to ${rule.value}`) : '';
                     return (
                       <View key={f.key} style={styles.feature}>
-                        <Icon name="check" size={18} color={colors.violet} strokeWidth={2.6} />
+                        <Icon name="check" size={18} color={colors.accent} strokeWidth={2.6} />
                         <Text style={styles.featureText}>
                           {f.label}
                           {detail ? ` (${detail})` : ''}
@@ -72,19 +74,19 @@ export default function PremiumScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { padding: 16, gap: 14 },
   loading: { marginTop: 40 },
   card: { padding: 18, borderRadius: radius.card, backgroundColor: colors.surface, gap: 8 },
-  featured: { borderWidth: 2, borderColor: colors.violet },
+  featured: { borderWidth: 2, borderColor: colors.accent },
   head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   name: { color: colors.ink, fontSize: 22, fontWeight: '800' },
-  current: { overflow: 'hidden', paddingHorizontal: 10, paddingVertical: 3, borderRadius: radius.pill, backgroundColor: colors.violet, color: '#fff', fontSize: 12.5, fontWeight: '700' },
-  badge: { overflow: 'hidden', paddingHorizontal: 10, paddingVertical: 3, borderRadius: radius.pill, backgroundColor: colors.violetSoft, color: colors.violetDeep, fontSize: 12.5, fontWeight: '700' },
+  current: { overflow: 'hidden', paddingHorizontal: 10, paddingVertical: 3, borderRadius: radius.pill, backgroundColor: colors.accent, color: colors.onAccent, fontSize: 12.5, fontWeight: '700' },
+  badge: { overflow: 'hidden', paddingHorizontal: 10, paddingVertical: 3, borderRadius: radius.pill, backgroundColor: colors.accentSoft, color: colors.accentDeep, fontSize: 12.5, fontWeight: '700' },
   desc: { color: colors.mute, fontSize: 14.5, lineHeight: 20 },
-  price: { color: colors.violetDeep, fontSize: 18, fontWeight: '800', marginVertical: 4 },
+  price: { color: colors.accentDeep, fontSize: 18, fontWeight: '800', marginVertical: 4 },
   feature: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   featureText: { flex: 1, color: colors.ink, fontSize: 14.5, lineHeight: 20 },
   foot: { color: colors.mute, fontSize: 13, lineHeight: 19, textAlign: 'center', paddingHorizontal: 12, marginTop: 6 },
-});
+}));

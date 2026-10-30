@@ -1,10 +1,10 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, FlatList, PanResponder, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Animated, Easing, FlatList, PanResponder, Pressable, Text, useWindowDimensions, View } from 'react-native';
 import { chordNotes } from 'chordsuno-shared/chordShapes';
 import ChordDiagram from './ChordDiagram';
 import { Icon } from './Icons';
 import { choiceFor, chordSequence, chordsUsed, stepPick, transposeChord, usePicks } from '../lib/diagrams';
-import { colors } from '../theme';
+import { makeStyles, useColors } from '../theme';
 
 const ITEM = 176; // room for one diagram in the sliding row
 const ANCHOR = 0.3; // where the playing chord sits across the row
@@ -18,6 +18,8 @@ const labelOf = (raw, transpose) => (raw === 'N' ? 'rest' : transposeChord(raw, 
 
 /** One diagram with the arrows that change which way of playing the chord is shown (when the plan has that). */
 const Slot = memo(function Slot({ raw, transpose, capo, instrument, picks, arrows, on, scale, compact }) {
+  const colors = useColors();
+  const styles = useStyles();
   const fingered = raw === 'N' ? 'N' : transposeChord(raw, transpose - capo); // the shape to finger: Transpose, undone by Capo
   const choice = choiceFor(instrument, fingered, picks);
   const label = labelOf(raw, transpose);
@@ -53,6 +55,7 @@ const fontFor = (label, size) => {
 
 /** One beat: a square cell with its own outline (the chord written there, if any); a bar starts after a wider gap marked by a dark line. */
 const StripCell = memo(function StripCell({ t, label, bar, on, size, onSeek }) {
+  const styles = useStyles();
   const rest = label === 'rest';
   return (
     <View style={{ width: size + GAP + (bar ? BAR_GAP : 0), height: size + PAD * 2 }}>
@@ -84,6 +87,7 @@ const StripCell = memo(function StripCell({ t, label, bar, on, size, onSeek }) {
  * `shift` (their finger), and the diagrams drawn are the ones around where they have got to (`center`).
  */
 const ChordRow = memo(function ChordRow({ sequence, current, browse, center, shift, instrument, transpose, capo, arrows, picks, width, fit }) {
+  const styles = useStyles();
   const compact = fit > 0; // a short area (a phone held across): smaller diagrams, no arrows, so the row fits
   const padLeft = Math.max(0, width * ANCHOR - ITEM / 2);
   const anchor = browse ? browse.frozen : current;
@@ -131,6 +135,7 @@ const ChordRow = memo(function ChordRow({ sequence, current, browse, center, shi
  * playing chord, and from then on follows the song again.
  */
 function ChordArea({ sequence, current, instrument, transpose, capo, arrows, picks, width }) {
+  const styles = useStyles();
   const last = sequence.length - 1;
   const drag = useRef(new Animated.Value(0)).current; // how far the row has been moved from where it was when the person started (px)
   const dragAt = useRef(0);
@@ -235,6 +240,7 @@ function ChordArea({ sequence, current, instrument, transpose, capo, arrows, pic
  *  marked. Both step straight to the playing place, with no animation, so they stay on the beat even on a slow phone; both can be swiped
  *  to look ahead, and both come back to the playing place by themselves. */
 export function DiagramsView({ chart, active, instrument, transpose, capo, arrows, onSeek, width: given }) {
+  const styles = useStyles();
   const window = useWindowDimensions();
   const width = given || window.width; // the width of the space it has (less than the screen when the phone is held across)
   const picks = usePicks();
@@ -281,6 +287,7 @@ const StripList = memo(function StripList({ listRef, items, markerX, width, size
 
 /** The dark square on the playing beat: it never moves, the strip steps beneath it. */
 const Marker = memo(function Marker({ label, markerX, size }) {
+  const styles = useStyles();
   return (
     <View pointerEvents="none" style={[styles.marker, { left: markerX, top: PAD, width: size, height: size }]}>
       <Text style={[styles.beatChord, styles.beatTextOn, { fontSize: fontFor(label, size) }, label === 'rest' && styles.markerRest]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>
@@ -380,6 +387,7 @@ function BeatStrip({ chart, active, transpose, onSeek, width }) {
 
 /** "Summary": every chord of the song with its diagram, most used first. */
 export function SummaryView({ chart, instrument, transpose, capo, arrows, bottomInset, width }) {
+  const styles = useStyles();
   const columns = width && width >= 560 ? 4 : SUMMARY_COLUMNS;
   const picks = usePicks();
   const used = useMemo(() => chordsUsed(chordSequence(chart).sequence), [chart]);
@@ -402,7 +410,7 @@ export function SummaryView({ chart, instrument, transpose, capo, arrows, bottom
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   view: { flex: 1, justifyContent: 'space-between' },
   area: { flex: 1, justifyContent: 'center' },
   row: { flexGrow: 0, overflow: 'hidden', paddingVertical: 30 },
@@ -416,13 +424,13 @@ const styles = StyleSheet.create({
   arrow: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.soft, alignItems: 'center', justifyContent: 'center' },
   arrowCount: { color: colors.mute, fontSize: 13, fontWeight: '700', minWidth: 34, textAlign: 'center' },
   barLine: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, borderRadius: 2, backgroundColor: colors.ink },
-  beat: { alignItems: 'center', justifyContent: 'center', borderRadius: 9, borderWidth: 1.5, borderColor: '#d9cdf0', backgroundColor: '#f6f2ff', paddingHorizontal: 1 },
-  beatHas: { backgroundColor: '#fff', borderColor: '#bda9ea' },
-  beatOn: { backgroundColor: colors.ink, borderColor: colors.ink },
+  beat: { alignItems: 'center', justifyContent: 'center', borderRadius: 9, borderWidth: 1.5, borderColor: colors.cellLine, backgroundColor: colors.cell, paddingHorizontal: 1 },
+  beatHas: { backgroundColor: colors.cellHas, borderColor: colors.cellHasLine },
+  beatOn: { backgroundColor: colors.playing, borderColor: colors.playing },
   beatChord: { color: colors.ink, fontWeight: '700', maxWidth: '100%', includeFontPadding: false },
-  beatTextOn: { color: '#fff' },
+  beatTextOn: { color: colors.onPlaying },
   beatRest: { color: colors.mute, fontWeight: '400' },
-  marker: { position: 'absolute', alignItems: 'center', justifyContent: 'center', borderRadius: 9, backgroundColor: colors.ink, paddingHorizontal: 1, elevation: 6 },
+  marker: { position: 'absolute', alignItems: 'center', justifyContent: 'center', borderRadius: 9, backgroundColor: colors.playing, paddingHorizontal: 1, elevation: 6 },
   markerRest: { fontWeight: '400' },
   summaryCell: { flex: 1 / SUMMARY_COLUMNS, alignItems: 'center', marginBottom: 12 },
-});
+}));

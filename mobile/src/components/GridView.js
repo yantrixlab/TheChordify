@@ -1,7 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { FlatList, Pressable, Text, useWindowDimensions, View } from 'react-native';
 import { transposeChord } from '../lib/diagrams';
-import { colors, sectionColor } from '../theme';
+import { sectionColor, makeStyles, useColors } from '../theme';
 
 const GAP = 4; // between two cells
 const PAD = 12; // least room at each side of the grid
@@ -35,6 +35,7 @@ function layoutItems(chart, barH, pair) {
 }
 
 const Cell = memo(function Cell({ chord, transpose, on, first, size }) {
+  const styles = useStyles();
   const rest = chord === 'N';
   const name = chord && !rest ? transposeChord(chord, transpose) : chord;
   return (
@@ -51,6 +52,7 @@ const Cell = memo(function Cell({ chord, transpose, on, first, size }) {
 });
 
 const Bar = memo(function Bar({ row, transpose, activeK, onSeek, size, second }) {
+  const styles = useStyles();
   return (
     <View style={[styles.barCells, second && { marginLeft: BAR_SEP }]}>
       {row.chords.map((chord, k) => (
@@ -67,6 +69,8 @@ const Bar = memo(function Bar({ row, transpose, activeK, onSeek, size, second })
  * the playing beat is lit black and kept in view; a tap jumps to a beat.
  */
 export function GridView({ chart, active, transpose, onSeek, bottomInset, width: given }) {
+  const colors = useColors();
+  const styles = useStyles();
   const screen = useWindowDimensions();
   const width = given || screen.width; // the width of the space it has (less than the screen when the phone is held across)
   const list = useRef(null);
@@ -93,7 +97,7 @@ export function GridView({ chart, active, transpose, onSeek, bottomInset, width:
   const renderItem = useCallback(
     ({ item }) =>
       item.type === 'label' ? (
-        <View style={[styles.label, { backgroundColor: sectionColor(item.label) }]}>
+        <View style={[styles.label, { backgroundColor: sectionColor(item.label, colors) }]}>
           <Text style={styles.labelText}>{item.label}</Text>
         </View>
       ) : (
@@ -103,7 +107,7 @@ export function GridView({ chart, active, transpose, onSeek, bottomInset, width:
           ))}
         </View>
       ),
-    [cell, transpose, onSeek, size],
+    [cell, transpose, onSeek, size, colors, styles],
   );
 
   return (
@@ -124,16 +128,16 @@ export function GridView({ chart, active, transpose, onSeek, bottomInset, width:
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   label: { height: LABEL_H - 8, marginTop: 8, borderRadius: 8, justifyContent: 'center', paddingHorizontal: 12, alignSelf: 'flex-start' },
-  labelText: { color: '#1a0533', fontSize: 13, fontWeight: '800' },
+  labelText: { color: colors.onPart, fontSize: 13, fontWeight: '800' },
   bar: { flexDirection: 'row', paddingVertical: ROW_PAD },
   barCells: { flexDirection: 'row', gap: GAP },
   cell: { borderRadius: 10, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2 },
-  cellFirst: { backgroundColor: colors.violetSoft, borderColor: colors.violetSoft },
-  cellOn: { backgroundColor: colors.ink, borderColor: colors.ink },
+  cellFirst: { backgroundColor: colors.firstCell, borderColor: colors.firstCell },
+  cellOn: { backgroundColor: colors.playing, borderColor: colors.playing },
   cellChord: { color: colors.ink, fontWeight: '800' },
-  cellChordOn: { color: '#fff' },
+  cellChordOn: { color: colors.onPlaying },
   cellRest: { color: colors.faint },
   cellDot: { color: colors.faint, fontSize: 18 },
-});
+}));

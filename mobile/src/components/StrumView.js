@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { cellAt } from '../lib/grid';
-import { colors, radius } from '../theme';
+import { radius, makeStyles, useColors } from '../theme';
 
 const SUB_NAMES = { 2: ['', '&'], 4: ['', 'e', '&', 'a'] };
 
@@ -37,6 +37,8 @@ function slotAt(chart, time, sub, count) {
 
 /** "Strum": the pattern as arrows (down, up, or a beat to skip), with the slot that is playing lit. */
 export function StrumView({ result, chart, time, bottomInset, width: given }) {
+  const colors = useColors();
+  const styles = useStyles();
   const screen = useWindowDimensions();
   const width = given || screen.width;
   const list = useMemo(() => strumPatterns(result), [result]);
@@ -103,8 +105,8 @@ export function StrumView({ result, chart, time, bottomInset, width: given }) {
           const on = i === lit;
           return (
             <View key={i} style={[styles.tile, { width: tile }, slot === '-' && styles.tileRest, on && styles.tileOn]}>
-              {slot === 'D' || slot === 'U' ? <Arrow down={slot === 'D'} color={on ? '#fff' : colors.violetDeep} /> : <Text style={[styles.rest, on && { color: '#fff' }]}>·</Text>}
-              <Text style={[styles.count, on && { color: '#fff' }]}>{count}</Text>
+              {slot === 'D' || slot === 'U' ? <Arrow down={slot === 'D'} color={on ? colors.onAccent : colors.accentDeep} /> : <Text style={[styles.rest, on && { color: colors.onAccent }]}>·</Text>}
+              <Text style={[styles.count, on && { color: colors.onAccent }]}>{count}</Text>
             </View>
           );
         })}
@@ -126,21 +128,21 @@ export function StrumView({ result, chart, time, bottomInset, width: given }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   content: { padding: 16, gap: 14 },
   tabs: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  tab: { overflow: 'hidden', paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.pill, backgroundColor: colors.soft, color: colors.violetDeep, fontSize: 14, fontWeight: '700' },
-  tabOn: { backgroundColor: colors.violet, color: '#fff' },
+  tab: { overflow: 'hidden', paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.pill, backgroundColor: colors.soft, color: colors.accentDeep, fontSize: 14, fontWeight: '700' },
+  tabOn: { backgroundColor: colors.accent, color: colors.onAccent },
   pill: { alignSelf: 'flex-start', overflow: 'hidden', paddingHorizontal: 10, paddingVertical: 3, borderRadius: radius.pill, backgroundColor: colors.soft, color: colors.mute, fontSize: 12.5, fontWeight: '700' },
-  pillHeard: { backgroundColor: '#dcfce7', color: '#166534' },
+  pillHeard: { backgroundColor: colors.okBg, color: colors.okText },
   tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   tile: { height: 74, borderRadius: 12, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, alignItems: 'center', justifyContent: 'center', gap: 2 },
   tileRest: { opacity: 0.55 },
-  tileOn: { backgroundColor: colors.violet, borderColor: colors.violet, opacity: 1 },
+  tileOn: { backgroundColor: colors.accent, borderColor: colors.accent, opacity: 1 },
   rest: { color: colors.faint, fontSize: 26, lineHeight: 26 },
   count: { color: colors.mute, fontSize: 13, fontWeight: '700' },
   text: { color: colors.ink, fontSize: 15, lineHeight: 22 },
   how: { color: colors.mute, fontSize: 14, lineHeight: 21 },
   bold: { color: colors.ink, fontWeight: '800' },
   note: { color: colors.faint, fontSize: 12.5, lineHeight: 18 },
-});
+}));

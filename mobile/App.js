@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Linking, StatusBar, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, StatusBar, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { getAppConfig } from './src/api';
 import { AuthProvider, useAuth } from './src/auth/AuthContext';
 import { Button } from './src/components/Ui';
 import { VERSION_CODE } from './src/config';
 import Navigation from './src/navigation';
-import { colors } from './src/theme';
+import { makeStyles, ThemeProvider, useColors, useTheme } from './src/theme';
 
 // An old version the server no longer supports is asked to update before anything else (a way to retire a broken release).
 function useUpdateNeeded() {
@@ -21,6 +21,8 @@ function useUpdateNeeded() {
 }
 
 function Root() {
+  const colors = useColors();
+  const styles = useStyles();
   const { ready } = useAuth();
   const update = useUpdateNeeded();
   if (update) {
@@ -36,26 +38,37 @@ function Root() {
     return (
       <View style={styles.center}>
         <Text style={styles.title}>Chord Suno</Text>
-        <ActivityIndicator color={colors.violetSoft} style={{ marginTop: 18 }} />
+        <ActivityIndicator color={colors.accentSoft} style={{ marginTop: 18 }} />
       </View>
     );
   }
   return <Navigation />;
 }
 
-export default function App() {
+function Shell() {
+  const { colors, scheme } = useTheme();
   return (
-    <SafeAreaProvider>
-      <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
+    <>
+      <StatusBar barStyle={scheme === 'dark' ? 'light-content' : 'dark-content'} backgroundColor={colors.bg} />
       <AuthProvider>
         <Root />
       </AuthProvider>
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <Shell />
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg, paddingHorizontal: 32 },
-  title: { color: '#fff', fontSize: 30, fontWeight: '800', letterSpacing: -0.5, textAlign: 'center' },
+  title: { color: colors.ink, fontSize: 30, fontWeight: '800', letterSpacing: -0.5, textAlign: 'center' },
   sub: { color: colors.mute, fontSize: 15, lineHeight: 22, textAlign: 'center', marginTop: 10 },
-});
+}));

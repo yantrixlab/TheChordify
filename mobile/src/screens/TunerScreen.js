@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { freqFromMidi, noteLabel } from 'chordsuno-shared/tools/pitch';
 import { useAuth } from '../auth/AuthContext';
@@ -7,11 +7,10 @@ import { Icon } from '../components/Icons';
 import { Segmented, Sheet, Stepper } from '../components/Sheet';
 import { AppBar, Button, Centered, Note } from '../components/Ui';
 import { INSTRUMENTS, useTuner } from '../tools/useTuner';
-import { colors, radius } from '../theme';
+import { radius, makeStyles, useColors } from '../theme';
 
 const BOARD_H = 300;
 const LED = 21;
-const OK = '#16a34a';
 const pretty = (name) => name.replace('#', '♯');
 const SENS = [
   { id: '25', label: 'Low' },
@@ -25,6 +24,8 @@ const TOLS = [
 ];
 
 export default function TunerScreen({ navigation }) {
+  const colors = useColors();
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const { can } = useAuth();
   const { prefs, setPrefs, instrument, strings, target, setTarget, ui, note, start, stop, resetDone, playTone, silentText } = useTuner();
@@ -87,7 +88,7 @@ export default function TunerScreen({ navigation }) {
               {chromatic ? 'Any note' : `${instrument.name} · ${tuningName}`}
             </Text>
             <Text style={styles.a4}>{prefs.a4}Hz</Text>
-            <Icon name="down" size={20} color={colors.violetDeep} />
+            <Icon name="down" size={20} color={colors.accentDeep} />
           </Pressable>
         </View>
 
@@ -105,7 +106,7 @@ export default function TunerScreen({ navigation }) {
               const isLock = ui.lock === i;
               return (
                 <View key={`${midi}-${i}`} style={styles.lane}>
-                  <View style={[styles.wire, { width: Math.max(2, Math.min(5, 5.4 - (midi - 40) * 0.1)) }, isLock && ui.ok && { backgroundColor: OK }]} />
+                  <View style={[styles.wire, { width: Math.max(2, Math.min(5, 5.4 - (midi - 40) * 0.1)) }, isLock && ui.ok && { backgroundColor: colors.ok }]} />
                   <View style={[styles.zone, { height: Math.max(14, prefs.tol * 2 * k) }]} />
                   <Animated.View style={{ transform: [{ translateY: lanes.current[i] }] }}>
                     <Pressable
@@ -134,18 +135,18 @@ export default function TunerScreen({ navigation }) {
         </View>
 
         <View style={styles.read}>
-          <Text style={[styles.bigNote, ui.ok && { color: OK }]}>
+          <Text style={[styles.bigNote, ui.ok && { color: colors.ok }]}>
             {ui.lock >= 0 && note ? pretty(note.name) : '–'}
             {ui.lock >= 0 && note ? <Text style={styles.sup}>{note.octave}</Text> : null}
           </Text>
           <Text style={styles.centsText}>{centsText || ' '}</Text>
           <Text style={styles.hz}>{hz || ' '}</Text>
-          <Text style={[styles.hint, ui.ok && { color: OK }]}>{hint || (doneCount > 0 && doneCount === ui.done.length ? 'All strings in tune!' : ' ')}</Text>
+          <Text style={[styles.hint, ui.ok && { color: colors.ok }]}>{hint || (doneCount > 0 && doneCount === ui.done.length ? 'All strings in tune!' : ' ')}</Text>
         </View>
 
         <View style={styles.pad}>
           <View style={styles.meter}>
-            <View style={[styles.meterFill, { width: `${ui.level}%` }, ui.open && { backgroundColor: colors.violet }]} />
+            <View style={[styles.meterFill, { width: `${ui.level}%` }, ui.open && { backgroundColor: colors.accent }]} />
           </View>
           <Text style={styles.status}>{ui.status}</Text>
           {ui.silent ? <Note>{silentText}</Note> : null}
@@ -202,7 +203,7 @@ export default function TunerScreen({ navigation }) {
                 accessibilityRole="button"
               >
                 <Text style={[styles.optionText, prefs.tuning === i && styles.optionOn]}>{t.name}</Text>
-                {prefs.tuning === i ? <Icon name="check" size={20} color={colors.violet} /> : null}
+                {prefs.tuning === i ? <Icon name="check" size={20} color={colors.accent} /> : null}
               </Pressable>
             ))}
           </>
@@ -219,27 +220,27 @@ export default function TunerScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.bg },
   pad: { paddingHorizontal: 16 },
   tuningRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 14 },
-  tuningText: { flex: 1, color: colors.violetDeep, fontSize: 17, fontWeight: '800' },
-  a4: { color: colors.violetDeep, fontSize: 16 },
+  tuningText: { flex: 1, color: colors.accentDeep, fontSize: 17, fontWeight: '800' },
+  a4: { color: colors.accentDeep, fontSize: 16 },
   board: { flexDirection: 'row', paddingHorizontal: 8, marginTop: 4 },
   lane: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  wire: { position: 'absolute', top: 0, bottom: 0, width: 3, backgroundColor: '#b9aee0', borderRadius: 2 },
-  zone: { position: 'absolute', left: 6, right: 6, borderRadius: 8, backgroundColor: '#7c3aed1a' },
-  node: { width: 54, height: 54, borderRadius: 27, backgroundColor: colors.surface, borderWidth: 4, borderColor: '#b9aee0', alignItems: 'center', justifyContent: 'center' },
-  nodeTarget: { borderColor: colors.violetDeep },
-  nodeNear: { borderColor: colors.violet },
-  nodeOk: { borderColor: OK, backgroundColor: '#dcfce7' },
+  wire: { position: 'absolute', top: 0, bottom: 0, width: 3, backgroundColor: colors.diagramLine, borderRadius: 2 },
+  zone: { position: 'absolute', left: 6, right: 6, borderRadius: 8, backgroundColor: `${colors.accent}1A` },
+  node: { width: 54, height: 54, borderRadius: 27, backgroundColor: colors.surface, borderWidth: 4, borderColor: colors.diagramLine, alignItems: 'center', justifyContent: 'center' },
+  nodeTarget: { borderColor: colors.accentDeep },
+  nodeNear: { borderColor: colors.accent },
+  nodeOk: { borderColor: colors.ok, backgroundColor: colors.okBg },
   nodeText: { color: colors.ink, fontSize: 18, fontWeight: '800', lineHeight: 20 },
   nodeOctave: { color: colors.mute, fontSize: 10, fontWeight: '700', marginTop: -2 },
   led: { flexDirection: 'row', justifyContent: 'center', gap: 4, marginTop: 14, paddingHorizontal: 16 },
   ledSeg: { flex: 1, height: 18, borderRadius: 4, backgroundColor: colors.line },
-  ledMid: { backgroundColor: '#c9bfe0' },
-  ledOn: { backgroundColor: colors.violet },
-  ledOk: { backgroundColor: OK },
+  ledMid: { backgroundColor: colors.diagramLine },
+  ledOn: { backgroundColor: colors.accent },
+  ledOk: { backgroundColor: colors.ok },
   read: { alignItems: 'center', paddingVertical: 10 },
   bigNote: { color: colors.ink, fontSize: 64, fontWeight: '800', letterSpacing: -2, lineHeight: 72 },
   sup: { fontSize: 24, fontWeight: '700', color: colors.mute },
@@ -251,19 +252,19 @@ const styles = StyleSheet.create({
   status: { color: colors.mute, fontSize: 13.5, textAlign: 'center', marginTop: 8 },
   progress: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 },
   progressText: { color: colors.ink, fontSize: 14.5, fontWeight: '700' },
-  reset: { color: colors.violetDeep, fontSize: 14.5, fontWeight: '700' },
-  auto: { marginTop: 10, padding: 10, borderRadius: 12, backgroundColor: colors.violetSoft },
-  autoText: { color: colors.violetDeep, fontSize: 13.5, fontWeight: '600', textAlign: 'center' },
+  reset: { color: colors.accentDeep, fontSize: 14.5, fontWeight: '700' },
+  auto: { marginTop: 10, padding: 10, borderRadius: 12, backgroundColor: colors.accentSoft },
+  autoText: { color: colors.accentDeep, fontSize: 13.5, fontWeight: '600', textAlign: 'center' },
   go: { marginTop: 16 },
   privacy: { color: colors.faint, fontSize: 12, textAlign: 'center', marginTop: 12, lineHeight: 17 },
   gateTitle: { color: colors.ink, fontSize: 20, fontWeight: '800', marginTop: 14, textAlign: 'center' },
   gateButton: { marginTop: 18 },
   label: { color: colors.ink, fontSize: 15, fontWeight: '800', marginTop: 16, marginBottom: 8 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { overflow: 'hidden', paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.pill, backgroundColor: colors.soft, color: colors.violetDeep, fontSize: 14, fontWeight: '700' },
-  chipOn: { backgroundColor: colors.violet, color: '#fff' },
+  chip: { overflow: 'hidden', paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.pill, backgroundColor: colors.soft, color: colors.accentDeep, fontSize: 14, fontWeight: '700' },
+  chipOn: { backgroundColor: colors.accent, color: colors.onAccent },
   option: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 46 },
   optionText: { color: colors.ink, fontSize: 15.5 },
-  optionOn: { color: colors.violetDeep, fontWeight: '800' },
+  optionOn: { color: colors.accentDeep, fontWeight: '800' },
   done: { marginTop: 18 },
-});
+}));

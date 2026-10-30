@@ -1,4 +1,5 @@
-import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
+import { useMemo } from 'react';
+import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Icon } from '../components/Icons';
@@ -15,12 +16,11 @@ import TunerScreen from '../screens/TunerScreen';
 import MetronomeScreen from '../screens/MetronomeScreen';
 import PracticeScreen from '../screens/PracticeScreen';
 import ChordDetectorScreen from '../screens/ChordDetectorScreen';
-import { colors } from '../theme';
+import { useColors, useTheme } from '../theme';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
-const theme = { ...DefaultTheme, colors: { ...DefaultTheme.colors, background: colors.bg, card: colors.surface, primary: colors.violet, border: colors.line, text: colors.ink } };
 
 // The bottom bar: Discover, Search, My Library, Toolkit, Premium.
 const TABS = [
@@ -37,12 +37,13 @@ const renderIcon = (name) => {
 };
 
 function Tabs() {
+  const colors = useColors();
   return (
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
         tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.line, height: 64, paddingBottom: 8, paddingTop: 6 },
-        tabBarActiveTintColor: colors.violet,
+        tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.mute,
         tabBarLabelStyle: { fontSize: 11.5, fontWeight: '600' },
         lazy: true,
@@ -61,6 +62,14 @@ const linking = {
 };
 
 export default function Navigation() {
+  const { colors, scheme } = useTheme();
+  const theme = useMemo(
+    () => ({
+      ...(scheme === 'dark' ? DarkTheme : DefaultTheme),
+      colors: { ...(scheme === 'dark' ? DarkTheme : DefaultTheme).colors, background: colors.bg, card: colors.surface, primary: colors.accent, border: colors.line, text: colors.ink },
+    }),
+    [colors, scheme],
+  );
   return (
     <NavigationContainer theme={theme} linking={linking}>
       <Stack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>

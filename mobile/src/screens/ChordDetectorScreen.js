@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, Share, StyleSheet, Switch, Text, View } from 'react-native';
+import { Pressable, ScrollView, Share, Switch, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { chordKeyLabel, chordNotes } from 'chordsuno-shared/chordShapes';
 import { ChordListener } from 'chordsuno-shared/tools/listener';
@@ -14,7 +14,7 @@ import { Slider } from '../components/Slider';
 import { AppBar, Button, Centered, Note } from '../components/Ui';
 import { shapesFor } from '../lib/diagrams';
 import { getJson, setJson } from '../lib/storage';
-import { colors, radius } from '../theme';
+import { radius, makeStyles, useColors } from '../theme';
 
 const KEY = 'chord-detector-prefs';
 const TYPES = { basic: ['', 'm'], sevenths: ['', 'm', '7', 'm7', 'maj7'], all: undefined };
@@ -27,6 +27,8 @@ const TYPE_OPTIONS = [
 /** Live chord detection: play a chord and its name appears, with the notes it is made of and a diagram. The listening is the
  *  website's own code (lib/tools/listener.ts and chroma.ts), reading the phone's microphone. */
 export default function ChordDetectorScreen({ navigation }) {
+  const colors = useColors();
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const { can } = useAuth();
   const [prefs, setPrefsState] = useState({ sens: 55, types: 'basic', shape: true, ...(getJson(KEY, {}) || {}) });
@@ -141,7 +143,7 @@ export default function ChordDetectorScreen({ navigation }) {
         {shapes.length > 0 ? (
           <View style={styles.shape}>
             <Pressable onPress={() => setShapeIndex(index - 1)} disabled={index === 0} style={[styles.arrow, index === 0 && styles.off]} accessibilityRole="button" accessibilityLabel="Previous way to play">
-              <Icon name="back" size={24} color={colors.violetDeep} />
+              <Icon name="back" size={24} color={colors.accentDeep} />
             </Pressable>
             <View style={styles.shapeBody}>
               <ChordDiagram shape={shapes[index]} label={ui.chord} scale={1.1} />
@@ -150,7 +152,7 @@ export default function ChordDetectorScreen({ navigation }) {
               </Text>
             </View>
             <Pressable onPress={() => setShapeIndex(index + 1)} disabled={index >= shapes.length - 1} style={[styles.arrow, index >= shapes.length - 1 && styles.off]} accessibilityRole="button" accessibilityLabel="Next way to play">
-              <Icon name="forward" size={24} color={colors.violetDeep} />
+              <Icon name="forward" size={24} color={colors.accentDeep} />
             </Pressable>
           </View>
         ) : null}
@@ -171,7 +173,7 @@ export default function ChordDetectorScreen({ navigation }) {
         </View>
 
         <View style={styles.meter}>
-          <View style={[styles.meterFill, { width: `${ui.level}%` }, ui.chroma && { backgroundColor: colors.violet }]} />
+          <View style={[styles.meterFill, { width: `${ui.level}%` }, ui.chroma && { backgroundColor: colors.accent }]} />
         </View>
         <Text style={styles.status}>{ui.status}</Text>
         {ui.silent ? <Note>{SILENT_MIC_TEXT}</Note> : null}
@@ -186,11 +188,11 @@ export default function ChordDetectorScreen({ navigation }) {
         <Slider value={prefs.sens} min={10} max={95} step={5} onChange={(v) => setPrefs({ sens: v })} label="Microphone sensitivity" />
         <View style={styles.switchRow}>
           <Text style={styles.switchText}>Show a guitar diagram</Text>
-          <Switch value={prefs.shape} onValueChange={(shape) => setPrefs({ shape })} trackColor={{ true: colors.violet, false: colors.line }} thumbColor="#fff" />
+          <Switch value={prefs.shape} onValueChange={(shape) => setPrefs({ shape })} trackColor={{ true: colors.accent, false: colors.line }} thumbColor="#fff" />
         </View>
         <View style={styles.switchRow}>
           <Text style={styles.switchText}>Hold the chord on screen</Text>
-          <Switch value={hold} onValueChange={setHold} trackColor={{ true: colors.violet, false: colors.line }} thumbColor="#fff" />
+          <Switch value={hold} onValueChange={setHold} trackColor={{ true: colors.accent, false: colors.line }} thumbColor="#fff" />
         </View>
 
         <View style={styles.historyHead}>
@@ -222,29 +224,29 @@ export default function ChordDetectorScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { padding: 16 },
   card: { alignItems: 'center', padding: 20, borderRadius: radius.card, backgroundColor: colors.surface },
   name: { color: colors.ink, fontSize: 72, fontWeight: '800', letterSpacing: -2, lineHeight: 80 },
   kind: { color: colors.mute, fontSize: 15.5, marginTop: 2 },
   notes: { flexDirection: 'row', gap: 8, marginTop: 12, minHeight: 32 },
-  note: { overflow: 'hidden', paddingHorizontal: 12, paddingVertical: 4, borderRadius: radius.pill, backgroundColor: colors.violetSoft, color: colors.violetDeep, fontSize: 16, fontWeight: '800' },
+  note: { overflow: 'hidden', paddingHorizontal: 12, paddingVertical: 4, borderRadius: radius.pill, backgroundColor: colors.accentSoft, color: colors.accentDeep, fontSize: 16, fontWeight: '800' },
   conf: { alignSelf: 'stretch', height: 6, borderRadius: 3, backgroundColor: colors.soft, overflow: 'hidden', marginTop: 14 },
-  confFill: { height: 6, backgroundColor: colors.violet },
+  confFill: { height: 6, backgroundColor: colors.accent },
   confText: { color: colors.mute, fontSize: 12.5, marginTop: 4 },
   shape: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 14 },
   shapeBody: { alignItems: 'center' },
   shapeCount: { color: colors.mute, fontSize: 13, fontWeight: '700', marginTop: 8 },
-  arrow: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.violetSoft, alignItems: 'center', justifyContent: 'center' },
+  arrow: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' },
   off: { opacity: 0.35 },
   bars: { flexDirection: 'row', gap: 4, marginTop: 16, alignItems: 'flex-end' },
   barCol: { flex: 1, alignItems: 'center' },
   barTrack: { height: 72, justifyContent: 'flex-end', alignSelf: 'stretch' },
-  barFill: { borderRadius: 4, backgroundColor: '#c9bfe0' },
-  barIn: { backgroundColor: colors.violet },
+  barFill: { borderRadius: 4, backgroundColor: colors.diagramLine },
+  barIn: { backgroundColor: colors.accent },
   barLabel: { color: colors.faint, fontSize: 11, fontWeight: '700', marginTop: 4 },
-  barLabelIn: { color: colors.violetDeep },
+  barLabelIn: { color: colors.accentDeep },
   meter: { height: 8, borderRadius: 4, backgroundColor: colors.soft, overflow: 'hidden', marginTop: 16 },
   meterFill: { height: 8, backgroundColor: colors.faint },
   status: { color: colors.mute, fontSize: 13.5, textAlign: 'center', marginTop: 8 },
@@ -255,10 +257,10 @@ const styles = StyleSheet.create({
   switchText: { color: colors.ink, fontSize: 15.5 },
   historyHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   historyActions: { flexDirection: 'row', gap: 18, marginTop: 10 },
-  link: { color: colors.violetDeep, fontSize: 14.5, fontWeight: '700' },
+  link: { color: colors.accentDeep, fontSize: 14.5, fontWeight: '700' },
   empty: { color: colors.mute, fontSize: 14 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { overflow: 'hidden', paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill, backgroundColor: colors.violetSoft, color: colors.violetDeep, fontSize: 15, fontWeight: '800' },
+  chip: { overflow: 'hidden', paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill, backgroundColor: colors.accentSoft, color: colors.accentDeep, fontSize: 15, fontWeight: '800' },
   gateTitle: { color: colors.ink, fontSize: 20, fontWeight: '800', marginTop: 14, textAlign: 'center' },
   gateButton: { marginTop: 18 },
-});
+}));

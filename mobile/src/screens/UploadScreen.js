@@ -1,17 +1,19 @@
 import { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { errorCodes, isErrorWithCode, pick, types } from '@react-native-documents/picker';
 import { errorMessage, startExtractUpload } from '../api';
 import { useAuth } from '../auth/AuthContext';
 import { Icon } from '../components/Icons';
 import { AppBar, Button, Centered, Note } from '../components/Ui';
-import { colors } from '../theme';
+import { makeStyles, toolCovers, useColors } from '../theme';
 
 const MAX_BYTES = 50 * 1024 * 1024; // the server's limit
 const ALLOWED = /\.(mp3|wav|flac|m4a)$/i;
 
 /** Import music: pick an audio file on the phone, send it to be analysed, and go on to the waiting screen. Only the file picked is seen. */
 export default function UploadScreen({ navigation }) {
+  const colors = useColors();
+  const styles = useStyles();
   const { can, user } = useAuth();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -75,10 +77,10 @@ export default function UploadScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.bg },
-  icon: { width: 96, height: 96, borderRadius: 24, backgroundColor: '#ef6f6f', alignItems: 'center', justifyContent: 'center' },
+  icon: { width: 96, height: 96, borderRadius: 24, backgroundColor: toolCovers.upload[1], alignItems: 'center', justifyContent: 'center' },
   title: { color: colors.ink, fontSize: 20, fontWeight: '800', marginTop: 18, textAlign: 'center' },
   text: { color: colors.mute, fontSize: 15, lineHeight: 22, textAlign: 'center', marginTop: 8 },
   button: { marginTop: 22, alignSelf: 'stretch' },
-});
+}));

@@ -1,13 +1,15 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
 import { errorMessage, getRating, getSimilar, saveRating } from '../api';
 import { Button, Note } from './Ui';
 import { Sheet } from './Sheet';
 import { SongRow } from './Songs';
-import { colors } from '../theme';
+import { makeStyles, useColors } from '../theme';
 
 /** What people think of the chords of this song, and the person's own stars and few words. */
 export function RateSheet({ visible, sessionId, onClose }) {
+  const colors = useColors();
+  const styles = useStyles();
   const [summary, setSummary] = useState(null);
   const [stars, setStars] = useState(0);
   const [comment, setComment] = useState('');
@@ -61,6 +63,8 @@ export function RateSheet({ visible, sessionId, onClose }) {
 
 /** Songs like this one, each with the reason it is there. */
 export function SimilarSheet({ visible, sessionId, onPick, onClose }) {
+  const colors = useColors();
+  const styles = useStyles();
   const [songs, setSongs] = useState(null);
   useEffect(() => {
     if (!visible) return;
@@ -69,7 +73,7 @@ export function SimilarSheet({ visible, sessionId, onPick, onClose }) {
   }, [visible, sessionId]);
   return (
     <Sheet visible={visible} title="Songs like this" onClose={onClose} scroll>
-      {songs === null ? <ActivityIndicator color={colors.violet} style={styles.loading} /> : null}
+      {songs === null ? <ActivityIndicator color={colors.accent} style={styles.loading} /> : null}
       {songs && songs.length === 0 ? <Text style={styles.summary}>No similar songs yet.</Text> : null}
       {(songs || []).map((song) => (
         <View key={song.videoId}>
@@ -81,12 +85,12 @@ export function SimilarSheet({ visible, sessionId, onPick, onClose }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   summary: { color: colors.mute, fontSize: 15, textAlign: 'center', marginBottom: 6 },
   stars: { flexDirection: 'row', justifyContent: 'center', gap: 10, marginVertical: 12 },
   star: { fontSize: 44, color: colors.line },
   starOn: { color: colors.gold },
   input: { minHeight: 84, maxHeight: 140, borderRadius: 14, backgroundColor: colors.soft, color: colors.ink, padding: 14, fontSize: 15, textAlignVertical: 'top', marginBottom: 8 },
   loading: { marginVertical: 30 },
-  why: { marginLeft: 144, marginTop: -6, marginBottom: 8, color: colors.violetDeep, fontSize: 12, fontWeight: '700' },
-});
+  why: { marginLeft: 144, marginTop: -6, marginBottom: 8, color: colors.accentDeep, fontSize: 12, fontWeight: '700' },
+}));

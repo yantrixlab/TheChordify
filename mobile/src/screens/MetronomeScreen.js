@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Switch, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Metronome, TapTempo, clampBpm, defaultAccents, tempoName } from 'chordsuno-shared/tools/metronome';
 import { useAuth } from '../auth/AuthContext';
@@ -8,7 +8,7 @@ import { Sheet, Stepper } from '../components/Sheet';
 import { Slider } from '../components/Slider';
 import { AppBar, Button, Centered } from '../components/Ui';
 import { getJson, setJson } from '../lib/storage';
-import { colors, radius } from '../theme';
+import { radius, makeStyles, useColors } from '../theme';
 
 const SIGNATURES = ['2/4', '3/4', '4/4', '5/4', '6/4', '7/4', '3/8', '6/8', '7/8', '9/8', '12/8'];
 const SOUNDS = [
@@ -42,10 +42,11 @@ function load() {
   return fresh();
 }
 
-const LEVEL_COLORS = ['#e6e0f0', '#a78bfa', '#5b21b6']; // silent, normal, accent
 
 /** The metronome. The click engine is the website's (lib/tools/metronome.ts): it keeps time by the audio clock, not by timers. */
 export default function MetronomeScreen({ navigation }) {
+  const colors = useColors();
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const { can } = useAuth();
   const [state, setStateRaw] = useState(load);
@@ -200,7 +201,7 @@ export default function MetronomeScreen({ navigation }) {
             </Pressable>
           </View>
           <View style={styles.pad}>
-            <Slider value={state.bpm} min={20} max={300} onChange={setBpm} label="Tempo" trackColor="#ffffff33" fillColor="#fff" />
+            <Slider value={state.bpm} min={20} max={300} onChange={setBpm} label="Tempo" trackColor={`${colors.onHero}33`} fillColor={colors.onHero} />
           </View>
           <View style={styles.quick}>
             {QUICK.map((q) => (
@@ -214,7 +215,7 @@ export default function MetronomeScreen({ navigation }) {
         <View style={styles.beats}>
           {beatDots.map((level, i) => (
             <Pressable key={i} onPress={() => cycleAccent(i)} accessibilityRole="button" accessibilityLabel={`Beat ${i + 1}: ${['silent', 'normal', 'accent'][level]}. Press to change.`} style={styles.beatWrap}>
-              <View style={[styles.beat, { backgroundColor: LEVEL_COLORS[level], height: 18 + level * 12 }, running && now.beat === i && (now.audible ? styles.beatNow : styles.beatSilent)]} />
+              <View style={[styles.beat, { backgroundColor: [colors.line, `${colors.accent}88`, colors.accent][level], height: 18 + level * 12 }, running && now.beat === i && (now.audible ? styles.beatNow : styles.beatSilent)]} />
             </Pressable>
           ))}
         </View>
@@ -262,7 +263,7 @@ export default function MetronomeScreen({ navigation }) {
             <Text style={styles.switchTitle}>Speed trainer</Text>
             <Text style={styles.switchHint}>Gets a little faster every few bars, up to a target.</Text>
           </View>
-          <Switch value={state.trainer.on} onValueChange={(on) => setState((s) => ({ ...s, trainer: { ...s.trainer, on } }))} trackColor={{ true: colors.violet, false: colors.line }} thumbColor="#fff" />
+          <Switch value={state.trainer.on} onValueChange={(on) => setState((s) => ({ ...s, trainer: { ...s.trainer, on } }))} trackColor={{ true: colors.accent, false: colors.line }} thumbColor="#fff" />
         </View>
         {state.trainer.on ? (
           <View style={styles.sub}>
@@ -277,7 +278,7 @@ export default function MetronomeScreen({ navigation }) {
             <Text style={styles.switchTitle}>Silent bars</Text>
             <Text style={styles.switchHint}>Plays some bars, then goes quiet, to test your own timing.</Text>
           </View>
-          <Switch value={state.gap.on} onValueChange={(on) => setState((s) => ({ ...s, gap: { ...s.gap, on } }))} trackColor={{ true: colors.violet, false: colors.line }} thumbColor="#fff" />
+          <Switch value={state.gap.on} onValueChange={(on) => setState((s) => ({ ...s, gap: { ...s.gap, on } }))} trackColor={{ true: colors.accent, false: colors.line }} thumbColor="#fff" />
         </View>
         {state.gap.on ? (
           <View style={styles.sub}>
@@ -317,6 +318,7 @@ export default function MetronomeScreen({ navigation }) {
 }
 
 function Row({ label, value, min, max, step = 1, onChange }) {
+  const styles = useStyles();
   return (
     <View style={styles.row}>
       <Text style={styles.rowLabel}>{label}</Text>
@@ -325,20 +327,20 @@ function Row({ label, value, min, max, step = 1, onChange }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.bg },
-  hero: { backgroundColor: colors.violetDeep, paddingTop: 20, paddingBottom: 22, alignItems: 'center' },
-  sig: { color: '#ffffffcc', fontSize: 20, fontWeight: '700', letterSpacing: 2 },
+  hero: { backgroundColor: colors.hero, paddingTop: 20, paddingBottom: 22, alignItems: 'center' },
+  sig: { color: `${colors.onHero}CC`, fontSize: 20, fontWeight: '700', letterSpacing: 2 },
   bpmRow: { flexDirection: 'row', alignItems: 'center', gap: 20, marginTop: 8 },
-  round: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#ffffff26', alignItems: 'center', justifyContent: 'center' },
-  roundText: { color: '#fff', fontSize: 34, lineHeight: 38, fontWeight: '300' },
+  round: { width: 60, height: 60, borderRadius: 30, backgroundColor: `${colors.onHero}26`, alignItems: 'center', justifyContent: 'center' },
+  roundText: { color: colors.onHero, fontSize: 34, lineHeight: 38, fontWeight: '300' },
   bpmBox: { alignItems: 'center', minWidth: 150 },
-  bpm: { color: '#fff', fontSize: 78, fontWeight: '800', letterSpacing: -3, textAlign: 'center', padding: 0, minWidth: 150 },
-  bpmUnit: { color: '#ffffffb3', fontSize: 14, fontWeight: '600', marginTop: -4 },
+  bpm: { color: colors.onHero, fontSize: 78, fontWeight: '800', letterSpacing: -3, textAlign: 'center', padding: 0, minWidth: 150 },
+  bpmUnit: { color: `${colors.onHero}B3`, fontSize: 14, fontWeight: '600', marginTop: -4 },
   pad: { paddingHorizontal: 20, alignSelf: 'stretch' },
   quick: { flexDirection: 'row', gap: 8, marginTop: 8 },
-  quickChip: { overflow: 'hidden', paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill, backgroundColor: '#ffffff26', color: '#fff', fontSize: 14, fontWeight: '700' },
-  quickOn: { backgroundColor: '#fff', color: colors.violetDeep },
+  quickChip: { overflow: 'hidden', paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill, backgroundColor: `${colors.onHero}26`, color: colors.onHero, fontSize: 14, fontWeight: '700' },
+  quickOn: { backgroundColor: colors.onHero, color: colors.hero },
   beats: { flexDirection: 'row', justifyContent: 'center', alignItems: 'flex-end', gap: 10, paddingHorizontal: 20, marginTop: 22, height: 64 },
   beatWrap: { flex: 1, maxWidth: 52, height: 64, justifyContent: 'flex-end' },
   beat: { width: '100%', borderRadius: 10 },
@@ -346,15 +348,15 @@ const styles = StyleSheet.create({
   beatSilent: { backgroundColor: colors.faint },
   beatHint: { color: colors.mute, fontSize: 13, textAlign: 'center', marginTop: 8, paddingHorizontal: 24 },
   go: { marginTop: 22 },
-  tap: { marginTop: 14, height: 84, borderRadius: radius.card, backgroundColor: colors.violetSoft, alignItems: 'center', justifyContent: 'center' },
-  tapText: { color: colors.violetDeep, fontSize: 20, fontWeight: '800' },
+  tap: { marginTop: 14, height: 84, borderRadius: radius.card, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' },
+  tapText: { color: colors.accentDeep, fontSize: 20, fontWeight: '800' },
   tapHint: { color: colors.mute, fontSize: 12.5, marginTop: 2 },
   gateTitle: { color: colors.ink, fontSize: 20, fontWeight: '800', marginTop: 14, textAlign: 'center' },
   gateButton: { marginTop: 18 },
   label: { color: colors.ink, fontSize: 15, fontWeight: '800', marginTop: 16, marginBottom: 8 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { overflow: 'hidden', paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.pill, backgroundColor: colors.soft, color: colors.violetDeep, fontSize: 14, fontWeight: '700' },
-  chipOn: { backgroundColor: colors.violet, color: '#fff' },
+  chip: { overflow: 'hidden', paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.pill, backgroundColor: colors.soft, color: colors.accentDeep, fontSize: 14, fontWeight: '700' },
+  chipOn: { backgroundColor: colors.accent, color: colors.onAccent },
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 18 },
   switchText: { flex: 1 },
   switchTitle: { color: colors.ink, fontSize: 15.5, fontWeight: '800' },
@@ -367,4 +369,4 @@ const styles = StyleSheet.create({
   presetInfo: { color: colors.mute, fontSize: 13 },
   saveRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8, marginBottom: 12 },
   saveInput: { flex: 1, height: 46, borderRadius: 12, backgroundColor: colors.soft, color: colors.ink, paddingHorizontal: 14, fontSize: 15 },
-});
+}));

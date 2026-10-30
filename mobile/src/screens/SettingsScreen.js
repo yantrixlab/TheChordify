@@ -6,11 +6,20 @@ import { useAuth } from '../auth/AuthContext';
 import { Icon } from '../components/Icons';
 import { AppBar, Button, Note } from '../components/Ui';
 import { LINKS, VERSION_NAME } from '../config';
-import { colors, radius } from '../theme';
+import { radius, makeStyles, useColors, useTheme } from '../theme';
+
+const MODES = [
+  { id: 'system', label: 'System' },
+  { id: 'light', label: 'Light' },
+  { id: 'dark', label: 'Dark' },
+];
 
 /** Settings and account: who is signed in (or the sign-in), the legal links and deleting the account. */
 export default function SettingsScreen({ navigation }) {
+  const colors = useColors();
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
+  const { mode, setMode } = useTheme();
   const { ready, user, config, signInWithGoogle, signInAsReviewer, signOut, deleteAccount } = useAuth();
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
@@ -48,7 +57,7 @@ export default function SettingsScreen({ navigation }) {
         {!ready ? null : user ? (
           <View style={styles.card}>
             <View style={styles.who}>
-              {user.picture ? <Image source={{ uri: user.picture }} style={styles.avatar} /> : <View style={[styles.avatar, styles.avatarEmpty]}><Icon name="user" size={30} color={colors.violet} /></View>}
+              {user.picture ? <Image source={{ uri: user.picture }} style={styles.avatar} /> : <View style={[styles.avatar, styles.avatarEmpty]}><Icon name="user" size={30} color={colors.accent} /></View>}
               <View style={styles.whoText}>
                 <Text style={styles.name} numberOfLines={1}>
                   {user.name}
@@ -77,6 +86,18 @@ export default function SettingsScreen({ navigation }) {
           </View>
         )}
 
+        <View style={[styles.card, styles.gap]}>
+          <Text style={styles.appearance}>Appearance</Text>
+          <View style={styles.modes}>
+            {MODES.map((m) => (
+              <Pressable key={m.id} onPress={() => setMode(m.id)} style={[styles.mode, mode === m.id && styles.modeOn]} accessibilityRole="button" accessibilityState={{ selected: mode === m.id }}>
+                <Text style={[styles.modeText, mode === m.id && styles.modeTextOn]}>{m.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+          <Text style={styles.modeHint}>{mode === 'system' ? "Follows your phone's light or dark setting." : mode === 'dark' ? 'Easy on the eyes on stage and at night.' : 'Bright, like sheet music on paper.'}</Text>
+        </View>
+
         <View style={styles.list}>
           <Link title="Privacy Policy" url={LINKS.privacy} />
           <Link title="Terms of Use" url={LINKS.terms} />
@@ -98,33 +119,42 @@ export default function SettingsScreen({ navigation }) {
 }
 
 function Link({ title, url }) {
+  const colors = useColors();
+  const styles = useStyles();
   return (
-    <Pressable onPress={() => Linking.openURL(url).catch(() => {})} style={styles.link} accessibilityRole="link" android_ripple={{ color: '#7c3aed22' }}>
+    <Pressable onPress={() => Linking.openURL(url).catch(() => {})} style={styles.link} accessibilityRole="link" android_ripple={{ color: colors.ripple }}>
       <Text style={styles.linkText}>{title}</Text>
       <Icon name="forward" size={20} color={colors.faint} />
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { padding: 16 },
   card: { padding: 18, borderRadius: radius.card, backgroundColor: colors.surface },
   who: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   whoText: { flex: 1 },
-  avatar: { width: 60, height: 60, borderRadius: 30, backgroundColor: colors.violetSoft },
+  avatar: { width: 60, height: 60, borderRadius: 30, backgroundColor: colors.accentSoft },
   avatarEmpty: { alignItems: 'center', justifyContent: 'center' },
   name: { color: colors.ink, fontSize: 18, fontWeight: '800' },
   email: { color: colors.mute, fontSize: 14, marginTop: 1 },
-  plan: { color: colors.violetDeep, fontSize: 13, fontWeight: '700', marginTop: 4 },
+  plan: { color: colors.accentDeep, fontSize: 13, fontWeight: '700', marginTop: 4 },
   big: { color: colors.ink, fontSize: 20, fontWeight: '800' },
   sub: { color: colors.mute, fontSize: 14.5, lineHeight: 21, marginTop: 6 },
   gap: { marginTop: 16 },
   reviewer: { marginTop: 22, gap: 10 },
   input: { height: 46, borderRadius: 12, backgroundColor: colors.soft, color: colors.ink, paddingHorizontal: 14, fontSize: 15 },
+  appearance: { color: colors.ink, fontSize: 16, fontWeight: '800' },
+  modes: { flexDirection: 'row', backgroundColor: colors.soft, borderRadius: 14, padding: 4, marginTop: 12 },
+  mode: { flex: 1, height: 40, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  modeOn: { backgroundColor: colors.accent },
+  modeText: { color: colors.accentDeep, fontSize: 14.5, fontWeight: '700' },
+  modeTextOn: { color: colors.onAccent },
+  modeHint: { color: colors.mute, fontSize: 13, marginTop: 10 },
   list: { marginTop: 18, borderRadius: radius.card, backgroundColor: colors.surface, overflow: 'hidden' },
   link: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, height: 54, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line },
   linkText: { color: colors.ink, fontSize: 15.5, fontWeight: '500' },
   deleteText: { color: colors.danger },
   version: { color: colors.faint, fontSize: 12.5, textAlign: 'center', marginTop: 20 },
-});
+}));

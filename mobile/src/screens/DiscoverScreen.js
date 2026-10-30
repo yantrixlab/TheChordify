@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { TOOLS } from 'chordsuno-shared/tools/catalog';
 import { getLibrary, getTrending } from '../api';
@@ -8,12 +8,15 @@ import { Icon } from '../components/Icons';
 import { SongCard } from '../components/Songs';
 import { Art, AppBar, SectionHeader } from '../components/Ui';
 import { useOpenSong } from '../lib/useOpenSong';
-import { colors, radius, shadow } from '../theme';
+import { coverOf, radius, shadow, makeStyles, toolCovers, useColors } from '../theme';
 
-const Gap = () => <View style={styles.gap} />;
+function Gap() {
+  const styles = useStyles();
+  return <View style={styles.gap} />;
+}
 
 // The tools and, last, importing a song from the phone.
-const TILES = [...TOOLS, { id: 'upload', name: 'Import music', cover: ['#f29a9a', '#ef6f6f'] }];
+const TILES = [...TOOLS, { id: 'upload', name: 'Import music', cover: toolCovers.upload }].map((t) => ({ ...t, cover: coverOf(t.id, t.cover) }));
 
 /** The artists behind the songs this person played, most played first: [{ name, thumbnail }]. */
 function topArtists(items) {
@@ -31,6 +34,8 @@ function topArtists(items) {
 }
 
 export default function DiscoverScreen({ navigation }) {
+  const colors = useColors();
+  const styles = useStyles();
   const { user } = useAuth();
   const openSong = useOpenSong();
   const [shelves, setShelves] = useState(null);
@@ -82,7 +87,7 @@ export default function DiscoverScreen({ navigation }) {
           { icon: 'settings', label: 'Settings', onPress: () => navigation.navigate('Settings') },
         ]}
       />
-      <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.violet} />} contentContainerStyle={styles.content}>
+      <ScrollView refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />} contentContainerStyle={styles.content}>
         <View style={styles.hero}>
           <Text style={styles.heroLine}>{first ? `Hi ${first},` : 'Hear every chord.'}</Text>
           <Text style={[styles.heroLine, styles.heroBold]}>{first ? 'what will you play today?' : 'Play every song.'}</Text>
@@ -137,7 +142,7 @@ export default function DiscoverScreen({ navigation }) {
           </View>
         ) : null}
 
-        {shelves === null ? <ActivityIndicator color={colors.violet} style={styles.loading} /> : null}
+        {shelves === null ? <ActivityIndicator color={colors.accent} style={styles.loading} /> : null}
         {(shelves || []).map((shelf) => (
           <View key={shelf.id} style={styles.section}>
             <SectionHeader title={shelf.title} />
@@ -161,7 +166,7 @@ export default function DiscoverScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.bg },
   content: { paddingBottom: 28 },
   hero: { paddingHorizontal: 20, paddingTop: 26, paddingBottom: 24, alignItems: 'center' },
@@ -181,4 +186,4 @@ const styles = StyleSheet.create({
   about: { color: colors.mute, fontSize: 13.5, paddingHorizontal: 16, marginTop: -6, marginBottom: 12 },
   loading: { marginTop: 40 },
   empty: { color: colors.mute, fontSize: 15, textAlign: 'center', marginTop: 40, paddingHorizontal: 32 },
-});
+}));

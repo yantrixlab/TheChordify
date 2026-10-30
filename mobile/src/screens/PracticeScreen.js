@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, Switch, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { chordKeyLabel, chordNotes, getAllGuitarShapes } from 'chordsuno-shared/chordShapes';
 import { ChordListener } from 'chordsuno-shared/tools/listener';
@@ -14,7 +14,7 @@ import { Segmented } from '../components/Sheet';
 import { Slider } from '../components/Slider';
 import { AppBar, Button, Centered, Note } from '../components/Ui';
 import { getJson, setJson } from '../lib/storage';
-import { colors, radius } from '../theme';
+import { radius, makeStyles, useColors } from '../theme';
 
 const KEY = 'practice-prefs';
 const BEST = 'practice-best';
@@ -88,6 +88,8 @@ function shapeLabel(shape) {
 
 /** Practice your chords. The beat, the listening and the chord shapes are the website's own code (lib/tools, chordShapes). */
 export default function PracticeScreen({ navigation }) {
+  const colors = useColors();
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const { can } = useAuth();
   const [prefs, setPrefsState] = useState(() => {
@@ -769,7 +771,7 @@ export default function PracticeScreen({ navigation }) {
               </View>
               <View style={styles.switchRow}>
                 <Text style={styles.switchText}>Metronome click</Text>
-                <Switch value={prefs.click} onValueChange={(click) => setPrefs({ click })} trackColor={{ true: colors.violet, false: colors.line }} thumbColor="#fff" />
+                <Switch value={prefs.click} onValueChange={(click) => setPrefs({ click })} trackColor={{ true: colors.accent, false: colors.line }} thumbColor="#fff" />
               </View>
             </>
           )}
@@ -813,7 +815,7 @@ export default function PracticeScreen({ navigation }) {
                 <Text style={styles.switchText}>Speed trainer</Text>
                 <Text style={styles.hint}>Gets {prefs.trainer.step} BPM faster every {prefs.trainer.every} bars, up to {prefs.trainer.target}.</Text>
               </View>
-              <Switch value={prefs.trainer.on} onValueChange={(on) => setPrefs((p) => ({ trainer: { ...p.trainer, on } }))} trackColor={{ true: colors.violet, false: colors.line }} thumbColor="#fff" />
+              <Switch value={prefs.trainer.on} onValueChange={(on) => setPrefs((p) => ({ trainer: { ...p.trainer, on } }))} trackColor={{ true: colors.accent, false: colors.line }} thumbColor="#fff" />
             </View>
           ) : null}
 
@@ -836,7 +838,7 @@ export default function PracticeScreen({ navigation }) {
                     accessibilityRole="button"
                     accessibilityHint="Long press to remove"
                   >
-                    <Text style={[styles.myChipText, c === pickedChord && { color: '#fff' }]}>{pretty(c)}</Text>
+                    <Text style={[styles.myChipText, c === pickedChord && { color: colors.onAccent }]}>{pretty(c)}</Text>
                   </Pressable>
                 ))}
               </View>
@@ -867,7 +869,7 @@ export default function PracticeScreen({ navigation }) {
           {prefs.mode === 'quiz' ? (
             <View style={styles.switchRow}>
               <Text style={styles.switchText}>Quiz me on every chord</Text>
-              <Switch value={prefs.quizAny} onValueChange={(quizAny) => setPrefs({ quizAny })} trackColor={{ true: colors.violet, false: colors.line }} thumbColor="#fff" />
+              <Switch value={prefs.quizAny} onValueChange={(quizAny) => setPrefs({ quizAny })} trackColor={{ true: colors.accent, false: colors.line }} thumbColor="#fff" />
             </View>
           ) : null}
           {['listen', 'minute'].includes(prefs.mode) ? <Text style={styles.privacy}>The microphone is used only while a drill runs, and the sound never leaves your phone.</Text> : null}
@@ -878,40 +880,40 @@ export default function PracticeScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.bg },
   pad: { paddingHorizontal: 16 },
   flex: { flex: 1 },
   gap: { marginTop: 14 },
   modes: { paddingHorizontal: 12, paddingVertical: 12, gap: 8 },
-  mode: { overflow: 'hidden', paddingHorizontal: 16, paddingVertical: 9, borderRadius: radius.pill, backgroundColor: colors.soft, color: colors.violetDeep, fontSize: 14.5, fontWeight: '700' },
-  modeOn: { backgroundColor: colors.violet, color: '#fff' },
+  mode: { overflow: 'hidden', paddingHorizontal: 16, paddingVertical: 9, borderRadius: radius.pill, backgroundColor: colors.soft, color: colors.accentDeep, fontSize: 14.5, fontWeight: '700' },
+  modeOn: { backgroundColor: colors.accent, color: colors.onAccent },
   blurb: { color: colors.mute, fontSize: 14, lineHeight: 20, paddingHorizontal: 16, marginBottom: 12 },
   exHead: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   exName: { color: colors.ink, fontSize: 52, fontWeight: '800', letterSpacing: -1 },
   exLong: { color: colors.ink, fontSize: 17, fontWeight: '700' },
   notes: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 6 },
-  note: { overflow: 'hidden', paddingHorizontal: 10, paddingVertical: 3, borderRadius: radius.pill, backgroundColor: colors.violetSoft, color: colors.violetDeep, fontSize: 14, fontWeight: '800' },
+  note: { overflow: 'hidden', paddingHorizontal: 10, paddingVertical: 3, borderRadius: radius.pill, backgroundColor: colors.accentSoft, color: colors.accentDeep, fontSize: 14, fontWeight: '800' },
   gallery: { gap: 12, paddingVertical: 14 },
   shapeCard: { alignItems: 'center', padding: 6, borderRadius: 16, borderWidth: 2, borderColor: 'transparent' },
-  shapeUse: { borderColor: colors.violet },
+  shapeUse: { borderColor: colors.accent },
   shapeLabel: { color: colors.mute, fontSize: 12.5, fontWeight: '700', marginTop: 6 },
   hint: { color: colors.mute, fontSize: 13, lineHeight: 18, marginTop: 6 },
   label: { color: colors.ink, fontSize: 15, fontWeight: '800', marginTop: 16, marginBottom: 8 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
-  chip: { overflow: 'hidden', paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.pill, backgroundColor: colors.soft, color: colors.violetDeep, fontSize: 14, fontWeight: '700' },
-  chipOn: { backgroundColor: colors.violet, color: '#fff' },
-  myChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.pill, backgroundColor: colors.violetSoft },
-  myChipText: { color: colors.violetDeep, fontSize: 15, fontWeight: '800' },
+  chip: { overflow: 'hidden', paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.pill, backgroundColor: colors.soft, color: colors.accentDeep, fontSize: 14, fontWeight: '700' },
+  chipOn: { backgroundColor: colors.accent, color: colors.onAccent },
+  myChip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.pill, backgroundColor: colors.accentSoft },
+  myChipText: { color: colors.accentDeep, fontSize: 15, fontWeight: '800' },
   strip: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 6 },
-  stripChord: { overflow: 'hidden', paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill, backgroundColor: colors.soft, color: colors.violetDeep, fontSize: 16, fontWeight: '800' },
-  stripOn: { backgroundColor: colors.violet, color: '#fff' },
+  stripChord: { overflow: 'hidden', paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill, backgroundColor: colors.soft, color: colors.accentDeep, fontSize: 16, fontWeight: '800' },
+  stripOn: { backgroundColor: colors.accent, color: colors.onAccent },
   stripDone: { opacity: 0.5 },
   cards: { flexDirection: 'row', gap: 12, marginTop: 10, alignItems: 'flex-start' },
   nowCard: { flex: 3, alignItems: 'center', padding: 14, borderRadius: 18, backgroundColor: colors.surface, borderWidth: 2, borderColor: colors.line },
   nextCard: { flex: 2, alignItems: 'center', padding: 12, borderRadius: 18, backgroundColor: colors.soft },
-  good: { borderColor: '#16a34a', backgroundColor: '#f0fdf4' },
-  miss: { borderColor: colors.danger, backgroundColor: '#fef2f2' },
+  good: { borderColor: colors.ok, backgroundColor: colors.okBg },
+  miss: { borderColor: colors.danger, backgroundColor: colors.errorBg },
   cardLabel: { color: colors.mute, fontSize: 11.5, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' },
   nowName: { color: colors.ink, fontSize: 48, fontWeight: '800', letterSpacing: -1 },
   nextName: { color: colors.ink, fontSize: 30, fontWeight: '800' },
@@ -919,30 +921,30 @@ const styles = StyleSheet.create({
   badgeMiss: { backgroundColor: colors.danger },
   beats: { flexDirection: 'row', justifyContent: 'center', gap: 10, marginTop: 16 },
   dot: { width: 16, height: 16, borderRadius: 8, backgroundColor: colors.line },
-  dotFirst: { backgroundColor: '#c9bfe0' },
-  dotNow: { backgroundColor: colors.violet, transform: [{ scale: 1.3 }] },
+  dotFirst: { backgroundColor: colors.diagramLine },
+  dotNow: { backgroundColor: colors.accent, transform: [{ scale: 1.3 }] },
   bpmRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 22, marginTop: 14 },
-  round: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.violetSoft, alignItems: 'center', justifyContent: 'center' },
-  roundText: { color: colors.violetDeep, fontSize: 28, lineHeight: 32 },
+  round: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' },
+  roundText: { color: colors.accentDeep, fontSize: 28, lineHeight: 32 },
   bpm: { color: colors.ink, fontSize: 34, fontWeight: '800', minWidth: 130, textAlign: 'center' },
   bpmUnit: { color: colors.mute, fontSize: 14, fontWeight: '700' },
   minute: { alignItems: 'center', marginTop: 16 },
   clock: { color: colors.ink, fontSize: 56, fontWeight: '800' },
-  countNum: { color: colors.violetDeep, fontSize: 44, fontWeight: '800', marginTop: 4 },
+  countNum: { color: colors.accentDeep, fontSize: 44, fontWeight: '800', marginTop: 4 },
   countLabel: { color: colors.mute, fontSize: 14, fontWeight: '700' },
   stats: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 16 },
   stat: { minWidth: 92, paddingVertical: 10, paddingHorizontal: 12, borderRadius: 14, backgroundColor: colors.surface, alignItems: 'center' },
   statV: { color: colors.ink, fontSize: 19, fontWeight: '800' },
   statK: { color: colors.mute, fontSize: 12, marginTop: 2 },
-  skip: { color: colors.violetDeep, fontSize: 15, fontWeight: '700', textAlign: 'center', marginTop: 14 },
+  skip: { color: colors.accentDeep, fontSize: 15, fontWeight: '700', textAlign: 'center', marginTop: 14 },
   quizCard: { alignItems: 'center', justifyContent: 'center', minHeight: 230, marginTop: 10, borderRadius: 18, backgroundColor: colors.surface },
   options: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 14 },
-  option: { width: '48%', height: 56, borderRadius: 14, backgroundColor: colors.violetSoft, alignItems: 'center', justifyContent: 'center' },
-  optionText: { color: colors.violetDeep, fontSize: 20, fontWeight: '800' },
-  optRight: { backgroundColor: '#bbf7d0' },
-  optWrong: { backgroundColor: '#fecaca' },
+  option: { width: '48%', height: 56, borderRadius: 14, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' },
+  optionText: { color: colors.accentDeep, fontSize: 20, fontWeight: '800' },
+  optRight: { backgroundColor: colors.okSoft },
+  optWrong: { backgroundColor: colors.badSoft },
   meter: { height: 8, borderRadius: 4, backgroundColor: colors.soft, overflow: 'hidden', marginTop: 14 },
-  meterFill: { height: 8, backgroundColor: colors.violet },
+  meterFill: { height: 8, backgroundColor: colors.accent },
   switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 14 },
   switchText: { color: colors.ink, fontSize: 15.5, fontWeight: '700' },
   saveRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10 },
@@ -951,4 +953,4 @@ const styles = StyleSheet.create({
   hidden: { height: 0, opacity: 0 },
   gateTitle: { color: colors.ink, fontSize: 20, fontWeight: '800', marginTop: 14, textAlign: 'center' },
   gateButton: { marginTop: 18 },
-});
+}));

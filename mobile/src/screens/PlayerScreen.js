@@ -23,7 +23,7 @@ import { buzz } from '../lib/buzz';
 import { buildChart, cellAt, clock, trimPickup } from '../lib/grid';
 import { METER_MAX, METER_MIN, isOwn, loadMeter, ownMeter, saveMeter } from '../lib/meter';
 import { getJson, setJson } from '../lib/storage';
-import { colors, radius } from '../theme';
+import { radius, makeStyles, useColors } from '../theme';
 
 const VIEWS = [
   { id: 'diagrams', label: 'Diagrams' },
@@ -75,6 +75,8 @@ const LiveGrid = memo(function LiveGrid({ store, ...rest }) {
 });
 
 export default function PlayerScreen({ route, navigation }) {
+  const colors = useColors();
+  const styles = useStyles();
   const { sessionId, song } = route.params;
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
@@ -449,7 +451,7 @@ export default function PlayerScreen({ route, navigation }) {
     />
   ) : audioUrl ? (
     <View style={styles.audio}>
-      <Icon name="upload" size={30} color="#c4b5fd" />
+      <Icon name="upload" size={30} color={colors.panelAccent} />
       <Text style={styles.audioText}>Playing your file</Text>
       <Video
         ref={video}
@@ -467,7 +469,7 @@ export default function PlayerScreen({ route, navigation }) {
         style={styles.hiddenVideo}
       />
     </View>
-  ) : null), [videoId, audioUrl, playing, counting, volume, tempoPct, mediaWidth, mediaHeight, onState]);
+  ) : null), [videoId, audioUrl, playing, counting, volume, tempoPct, mediaWidth, mediaHeight, onState, styles, colors]);
   const key = result && result.key ? transposeChord(result.key, transpose) : '';
   const transposeLocked = !can('transpose_capo');
 
@@ -659,6 +661,7 @@ export default function PlayerScreen({ route, navigation }) {
 
 /** Beats per bar, a beat in between each beat (pulse x2) and the beat a bar starts on: for a song the analysis counted wrong. */
 function BarSheet({ chart, meter, onChange, onReset, own }) {
+  const styles = useStyles();
   return (
     <View>
       <Text style={styles.sheetHint}>If the bars in the chart look wrong, regroup the beats. The choice is kept for this song.</Text>
@@ -686,6 +689,7 @@ function BarSheet({ chart, meter, onChange, onReset, own }) {
 }
 
 function Details({ result, transpose, chart, sections }) {
+  const styles = useStyles();
   const totals = new Map();
   (result.chords || []).forEach((seg) => {
     if (seg.chord !== 'N') totals.set(seg.chord, (totals.get(seg.chord) || 0) + seg.end - seg.start);
@@ -718,7 +722,7 @@ function Details({ result, transpose, chart, sections }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   top: { overflow: 'hidden' },
   topInner: { position: 'absolute', left: 0, right: 0, top: 0 },
   screen: { flex: 1, backgroundColor: colors.bg },
@@ -726,8 +730,8 @@ const styles = StyleSheet.create({
   main: { flex: 1 },
   body: { flex: 1, overflow: 'hidden' },
   by: { color: colors.mute, fontSize: 14 },
-  audio: { flex: 1, backgroundColor: '#1a0533', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  audioText: { color: '#c4b5fd', fontSize: 14, fontWeight: '700' },
+  audio: { flex: 1, backgroundColor: colors.panel, alignItems: 'center', justifyContent: 'center', gap: 6 },
+  audioText: { color: colors.panelAccent, fontSize: 14, fontWeight: '700' },
   hiddenVideo: { width: 0, height: 0 },
   sheetHint: { color: colors.mute, fontSize: 14.5, lineHeight: 21, marginBottom: 6 },
   sheetSub: { color: colors.mute, fontSize: 14, textAlign: 'center', marginBottom: 8 },
@@ -738,5 +742,5 @@ const styles = StyleSheet.create({
   detailValue: { color: colors.ink, fontSize: 15, fontWeight: '700' },
   detailHead: { color: colors.ink, fontSize: 16, fontWeight: '800', marginTop: 18, marginBottom: 10 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { overflow: 'hidden', paddingHorizontal: 12, paddingVertical: 5, borderRadius: radius.pill, backgroundColor: colors.violetSoft, color: colors.violetDeep, fontSize: 15, fontWeight: '800' },
-});
+  chip: { overflow: 'hidden', paddingHorizontal: 12, paddingVertical: 5, borderRadius: radius.pill, backgroundColor: colors.accentSoft, color: colors.accentDeep, fontSize: 15, fontWeight: '800' },
+}));

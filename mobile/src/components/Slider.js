@@ -1,9 +1,11 @@
 import { useRef, useState } from 'react';
-import { PanResponder, StyleSheet, View } from 'react-native';
-import { colors } from '../theme';
+import { PanResponder, View } from 'react-native';
+import { makeStyles, useColors } from '../theme';
 
 /** A slider you drag or tap: `value` between `min` and `max`, `onChange` with the new value (whole numbers by `step`). */
-export function Slider({ value, min, max, step = 1, onChange, label, trackColor = colors.soft, fillColor = colors.violet }) {
+export function Slider({ value, min, max, step = 1, onChange, label, trackColor, fillColor }) {
+  const colors = useColors();
+  const styles = useStyles();
   const [width, setWidth] = useState(0);
   const box = useRef({ width: 0, min, max, step, onChange });
   box.current = { width, min, max, step, onChange };
@@ -38,17 +40,17 @@ export function Slider({ value, min, max, step = 1, onChange, label, trackColor 
       accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
       onAccessibilityAction={(e) => onChange(Math.min(max, Math.max(min, value + (e.nativeEvent.actionName === 'increment' ? step : -step))))}
     >
-      <View style={[styles.track, { backgroundColor: trackColor }]} pointerEvents="none">
-        <View style={[styles.fill, { width: `${ratio * 100}%`, backgroundColor: fillColor }]} />
+      <View style={[styles.track, { backgroundColor: trackColor || colors.soft }]} pointerEvents="none">
+        <View style={[styles.fill, { width: `${ratio * 100}%`, backgroundColor: fillColor || colors.accent }]} />
       </View>
       <View style={[styles.thumb, { left: ratio * Math.max(0, width - 28) }]} pointerEvents="none" />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   hit: { height: 44, justifyContent: 'center' },
   track: { height: 8, borderRadius: 4, overflow: 'hidden' },
   fill: { height: 8, borderRadius: 4 },
-  thumb: { position: 'absolute', width: 28, height: 28, borderRadius: 14, backgroundColor: '#fff', borderWidth: 3, borderColor: colors.violet },
-});
+  thumb: { position: 'absolute', width: 28, height: 28, borderRadius: 14, backgroundColor: colors.surface, borderWidth: 3, borderColor: colors.accent },
+}));

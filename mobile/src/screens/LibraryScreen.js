@@ -9,7 +9,7 @@ import { LevelRing } from '../components/LevelRing';
 import { AppBar, Button, Centered, Note } from '../components/Ui';
 import { SongRow } from '../components/Songs';
 import { useOpenSong } from '../lib/useOpenSong';
-import { colors, radius } from '../theme';
+import { radius, makeStyles, useColors } from '../theme';
 
 const TABS = [
   { id: 'history', label: 'Recent' },
@@ -21,6 +21,7 @@ const num = (n) => Number(n || 0).toLocaleString();
 const date = (seconds) => new Date(seconds * 1000).toLocaleDateString(undefined, { dateStyle: 'medium' });
 
 function ProfileCard({ user, profile }) {
+  const styles = useStyles();
   const percent = profile && profile.levelSpan > 0 ? Math.round((100 * profile.intoLevel) / profile.levelSpan) : 0;
   const stars = profile && profile.stars > 0 ? ` ${'★'.repeat(Math.min(profile.stars, 8))}${profile.stars > 8 ? `+${profile.stars - 8}` : ''}` : '';
   return (
@@ -71,6 +72,7 @@ function ProfileCard({ user, profile }) {
 }
 
 function Badge({ badge }) {
+  const styles = useStyles();
   const pct = badge.threshold > 0 ? Math.round((100 * badge.progress) / badge.threshold) : 0;
   return (
     <View style={[styles.badge, badge.earned && styles.badgeEarned]}>
@@ -101,6 +103,7 @@ function Badge({ badge }) {
 }
 
 function Reward({ reward }) {
+  const styles = useStyles();
   const extra = reward.repeatEvery > 0 ? ` Comes again every ${reward.repeatEvery} levels.` : reward.kind === 'perk' && reward.value ? ` ${reward.value}.` : '';
   return (
     <View style={[styles.reward, !reward.unlocked && styles.dim]}>
@@ -117,6 +120,8 @@ function Reward({ reward }) {
 }
 
 export default function LibraryScreen({ navigation }) {
+  const colors = useColors();
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const openSong = useOpenSong();
@@ -199,7 +204,7 @@ export default function LibraryScreen({ navigation }) {
           renderItem={({ item }) => (item.type === 'song' ? <SongRow song={item.song} onPress={openSong} /> : item.type === 'badge' ? <Badge badge={item.b} /> : <Reward reward={item.r} />)}
           ListEmptyComponent={
             data === null && !error ? (
-              <ActivityIndicator color={colors.violet} style={styles.loading} />
+              <ActivityIndicator color={colors.accent} style={styles.loading} />
             ) : (
               <Text style={styles.empty}>{tab === 'favorites' ? 'Tap the heart in a song to keep it here.' : tab === 'history' ? 'Songs you play will show up here.' : ''}</Text>
             )
@@ -211,19 +216,19 @@ export default function LibraryScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.bg },
   profile: { margin: 16, padding: 18, borderRadius: 20, backgroundColor: colors.surface },
   profileTop: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   profileText: { flex: 1 },
   name: { color: colors.ink, fontSize: 20, fontWeight: '800' },
   level: { color: colors.mute, fontSize: 14.5, marginTop: 4 },
-  levelNum: { color: colors.violetDeep, fontWeight: '800', letterSpacing: 0.6 },
+  levelNum: { color: colors.accentDeep, fontWeight: '800', letterSpacing: 0.6 },
   xpTop: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 16 },
   xpMain: { color: colors.ink, fontSize: 14, fontWeight: '800' },
   xpNext: { color: colors.mute, fontSize: 13.5 },
   bar: { height: 10, borderRadius: 5, backgroundColor: colors.soft, overflow: 'hidden', marginTop: 8 },
-  barFill: { height: 10, borderRadius: 5, backgroundColor: colors.violet },
+  barFill: { height: 10, borderRadius: 5, backgroundColor: colors.accent },
   nextReward: { color: colors.mute, fontSize: 13, marginTop: 8 },
   stats: { flexDirection: 'row', marginTop: 16, paddingTop: 14, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
   stat: { flex: 1, alignItems: 'center' },
@@ -231,30 +236,30 @@ const styles = StyleSheet.create({
   statLabel: { color: colors.mute, fontSize: 12, marginTop: 2 },
   tabs: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, paddingBottom: 12 },
   tab: { paddingHorizontal: 16, height: 38, borderRadius: radius.pill, backgroundColor: colors.soft, justifyContent: 'center' },
-  tabOn: { backgroundColor: colors.violet },
-  tabText: { color: colors.violetDeep, fontSize: 14, fontWeight: '700' },
-  tabTextOn: { color: '#fff' },
+  tabOn: { backgroundColor: colors.accent },
+  tabText: { color: colors.accentDeep, fontSize: 14, fontWeight: '700' },
+  tabTextOn: { color: colors.onAccent },
   big: { color: colors.ink, fontSize: 22, fontWeight: '800' },
   sub: { color: colors.mute, fontSize: 15, lineHeight: 22, textAlign: 'center', marginTop: 8 },
   signIn: { marginTop: 20 },
   loading: { marginTop: 40 },
   empty: { color: colors.mute, fontSize: 15, textAlign: 'center', marginTop: 32, paddingHorizontal: 32 },
   badge: { flexDirection: 'row', gap: 14, marginHorizontal: 16, marginBottom: 12, padding: 14, borderRadius: 18, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line },
-  badgeEarned: { borderColor: '#f6d58e', backgroundColor: '#fffaf0' },
+  badgeEarned: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
   badgeIcon: { width: 58, height: 58, borderRadius: 29, backgroundColor: colors.soft, alignItems: 'center', justifyContent: 'center' },
-  badgeIconEarned: { backgroundColor: '#fde68a' },
+  badgeIconEarned: { backgroundColor: colors.accentSoft },
   badgeEmoji: { fontSize: 28 },
   badgeText: { flex: 1 },
   badgeName: { color: colors.ink, fontSize: 15.5, fontWeight: '800' },
   badgeDesc: { color: colors.mute, fontSize: 13.5, lineHeight: 19, marginTop: 2 },
-  badgeEarnedText: { color: '#b45309', fontSize: 12.5, fontWeight: '700', marginTop: 8 },
+  badgeEarnedText: { color: colors.accentDeep, fontSize: 12.5, fontWeight: '700', marginTop: 8 },
   meter: { height: 6, borderRadius: 3, backgroundColor: colors.soft, overflow: 'hidden', marginTop: 10 },
-  meterFill: { height: 6, backgroundColor: colors.violet },
+  meterFill: { height: 6, backgroundColor: colors.accent },
   badgeProgress: { color: colors.mute, fontSize: 12, fontWeight: '700', marginTop: 5 },
   dim: { opacity: 0.55 },
   reward: { flexDirection: 'row', alignItems: 'center', gap: 14, marginHorizontal: 16, marginBottom: 10, padding: 14, borderRadius: 18, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line },
   swatch: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.soft, alignItems: 'center', justifyContent: 'center' },
   swatchText: { fontSize: 22, color: colors.gold },
-  lvl: { overflow: 'hidden', paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill, backgroundColor: colors.soft, color: colors.violetDeep, fontSize: 12, fontWeight: '800' },
-  lvlOn: { backgroundColor: '#d1fae5', color: '#065f46' },
-});
+  lvl: { overflow: 'hidden', paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill, backgroundColor: colors.soft, color: colors.accentDeep, fontSize: 12, fontWeight: '800' },
+  lvlOn: { backgroundColor: colors.okSoft, color: colors.okText },
+}));
