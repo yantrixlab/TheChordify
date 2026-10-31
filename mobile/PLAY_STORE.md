@@ -97,8 +97,9 @@ Questions? yantrixlab@gmail.com
 
 Ready in `mobile/store/`:
 
-- [x] `play-icon-512.png` — app icon, 512×512.
+- [x] `play-icon-512.png` — app icon, 512×512 (the guitar pick on warm charcoal).
 - [x] `play-feature-graphic-1024x500.png` — feature graphic.
+- Both, the launcher icons (adaptive, themed, old square and round), the splash icon and the website's favicon, share image and header mark all come from one picture, `store/brand/pick-512.png`. Rebuild them with `python mobile/scripts/make-brand-assets.py`. That picture is only 512 px, so a larger or vector original would make them crisper. Be sure you own the rights to it: Play rejects an icon that copies another app's.
 - [x] **Phone screenshots** (1080×1920, in `mobile/store/screenshots/`, framed with a caption from OnePlus captures): a song's chord diagrams with the beat strip, the chord grid, the Toolkit, the tuner, chord practice, My Library. Play accepts 2 to 8, PNG or JPEG, 16:9 or 9:16, each side 320–3840 px. The two song shots show a third-party music video in the player panel; if Play's review objects, retake them with an imported file (the panel then shows "Playing your file") or a video you own.
 - [ ] 7-inch and 10-inch tablet screenshots: optional, but recommended; the app works on tablets.
 
