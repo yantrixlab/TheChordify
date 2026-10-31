@@ -6,6 +6,7 @@ import { useAuth } from '../auth/AuthContext';
 import { Icon } from '../components/Icons';
 import { Segmented, Sheet, Stepper } from '../components/Sheet';
 import { AppBar, Button, Centered, Note } from '../components/Ui';
+import { PlanGate } from '../components/PlanGate';
 import { INSTRUMENTS, useTuner } from '../tools/useTuner';
 import { radius, makeStyles, useColors } from '../theme';
 
@@ -59,9 +60,7 @@ export default function TunerScreen({ navigation }) {
       <View style={styles.screen}>
         <AppBar title="Tuner" backIcon="close" onBack={() => navigation.goBack()} />
         <Centered>
-          <Icon name="premium" size={48} color={colors.gold} filled />
-          <Text style={styles.gateTitle}>The tuner is part of Premium</Text>
-          <Button title="See the plans" onPress={() => navigation.navigate('Tabs', { screen: 'Premium' })} style={styles.gateButton} />
+          <PlanGate title="The tuner is part of Premium" navigation={navigation} />
         </Centered>
       </View>
     );
@@ -257,8 +256,6 @@ const useStyles = makeStyles((colors) => ({
   autoText: { color: colors.accentDeep, fontSize: 13.5, fontWeight: '600', textAlign: 'center' },
   go: { marginTop: 16 },
   privacy: { color: colors.faint, fontSize: 12, textAlign: 'center', marginTop: 12, lineHeight: 17 },
-  gateTitle: { color: colors.ink, fontSize: 20, fontWeight: '800', marginTop: 14, textAlign: 'center' },
-  gateButton: { marginTop: 18 },
   label: { color: colors.ink, fontSize: 15, fontWeight: '800', marginTop: 16, marginBottom: 8 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { overflow: 'hidden', paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.pill, backgroundColor: colors.soft, color: colors.accentDeep, fontSize: 14, fontWeight: '700' },

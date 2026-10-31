@@ -80,7 +80,7 @@ Chord Suno finds the chords of any song and shows them to you beat by beat, in t
 • Keep a library: the songs you played and the ones you favourited, on any device.
 • Earn XP, levels and badges as you practise.
 
-Some tools (the tuner, metronome, live chord detection and exports) are part of Chord Suno Premium. Plans you have on chordsuno.com carry over when you sign in.
+Some tools (the tuner, metronome, live chord detection and exports) are part of a Chord Suno plan. If you already have one, sign in with the same Google account to use it.
 
 Sign in with Google to keep your library. You can delete your account and all its data at any time, in the app.
 
@@ -89,7 +89,7 @@ Chord Suno plays songs through YouTube's own player. By using it you also agree 
 Questions? yantrixlab@gmail.com
 ```
 
-*(Every line above is in the 1.0 app. Describing features that are missing is a policy violation, so when something is added or removed, change this text with it. Do not say you can subscribe in the app until Play Billing is in.)*
+*(Every line above is in the 1.0 app. Describing features that are missing is a policy violation, so when something is added or removed, change this text with it. Do not say you can subscribe in the app until Play Billing is in. Never mention buying, prices, offers, discounts or the website's checkout here, in the app or in the screenshots: Google Play's Payments policy bans steering people to a payment method other than Play's (listing text, buttons, links, messages and sign-up flows all count) unless the app is enrolled in one of Google's alternative-billing programs.)*
 
 **Category**: Music & Audio · **Tags**: music learning, guitar, ukulele · **Contact email**: yantrixlab@gmail.com · **Website**: https://chordsuno.com · **Privacy policy**: https://chordsuno.com/privacy/
 
@@ -162,7 +162,8 @@ The app uses the YouTube embedded player under the YouTube API Services Terms. K
 
 ## 9. Known gaps in 1.0
 
-- **No in-app purchases yet.** The tuner, metronome, live chord detector, ukulele diagrams and the PDF/MIDI exports are Premium on the website, so a free account sees a lock on them, and the Premium screen only lists the plans (it says subscribing in the app is coming). A plan someone bought on the website carries over when they sign in. Do not add a link or button there that sends people to the website's checkout: Google Play does not allow steering people to outside payments for digital features. Subscriptions inside the app need Play Billing (phase 7). Until then the app is honest about it, but a new free user cannot unlock those tools from the phone: consider doing the billing before the production release.
+- **No in-app purchases yet (a companion app).** The tuner, metronome, live chord detector, ukulele diagrams and the PDF/MIDI exports are part of paid plans, so a free account sees a lock on them. A person who already has a plan signs in with Google and it unlocks. Nothing in the app, the listing or the screenshots says how or where to buy: the Premium tab lists what each plan includes (no prices, no offers, no badges, no buttons that lead to a payment) and the locked-feature screens offer Sign in (signed out) or Plan details (signed in). Do not add a link, button, price or message about buying on the website. Google Play's Payments policy treats that as steering unless the app is enrolled in an alternative-billing program, and the rules differ by country (the US, the EEA, the UK, Japan and Australia have programs; India's allows an alternative billing system only alongside Google Play Billing). I could not find a rule in the policy text that clearly exempts an app whose paid features are bought elsewhere, so Google could still ask for Play Billing; the next release should add it (Play Billing, with the plan checked on the server by purchase token).
+- In Play Console, answer the in-app purchase and payments questions as an app with no purchases of its own, and give the reviewers the sign-in details in App access (see §6) without mentioning payment.
 - The tuner, metronome, chord practice, live chord detector, importing a song and the exports are in the app. Offline mode and lyrics are not (they are "soon" on the website too).
 - Imported songs play from the file on our server; the tuner, detector and practice listen on the device only.
 - No crash reporting or analytics in the app. Consider adding crash reporting before wide release (and update the Data safety form and the Privacy Policy when you do).

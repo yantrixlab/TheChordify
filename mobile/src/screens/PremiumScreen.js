@@ -4,24 +4,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { errorMessage, getPricing } from '../api';
 import { useAuth } from '../auth/AuthContext';
 import { Icon } from '../components/Icons';
-import { AppBar, Note } from '../components/Ui';
+import { AppBar, Button, Note } from '../components/Ui';
 import { radius, shadow, makeStyles, useColors } from '../theme';
 
-const money = (price) => {
-  try {
-    return new Intl.NumberFormat(undefined, { style: 'currency', currency: price.currency }).format(price.amountMinor / 100);
-  } catch {
-    return `${price.currency} ${(price.amountMinor / 100).toFixed(2)}`;
-  }
-};
-const PERIOD = { monthly: 'month', yearly: 'year', weekly: 'week', quarterly: '3 months', daily: 'day' };
-
-/** The plans and what each includes, the same as the website's pricing page. Subscribing inside the app comes with the Play Store's own billing. */
-export default function PremiumScreen() {
+/**
+ * What each plan includes, for comparison. There are no prices, no offers and no way to buy here: the app does not sell plans yet, and
+ * Google Play does not allow an app to send people to another way of paying. Somebody who already has a plan signs in to use it.
+ */
+export default function PremiumScreen({ navigation }) {
   const colors = useColors();
   const styles = useStyles();
   const insets = useSafeAreaInsets();
-  const { plan: mine } = useAuth();
+  const { plan: mine, user } = useAuth();
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
 
@@ -37,20 +31,25 @@ export default function PremiumScreen() {
       <AppBar title="Premium" />
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}>
         <Note>{error}</Note>
+        {!user ? (
+          <View style={[styles.card, shadow]}>
+            <Text style={styles.name}>Already have a plan?</Text>
+            <Text style={styles.desc}>Sign in with the same Google account and it is ready to use here.</Text>
+            <Button title="Sign in" onPress={() => navigation.navigate('Settings')} />
+          </View>
+        ) : null}
         {!data && !error ? <ActivityIndicator color={colors.accent} style={styles.loading} /> : null}
         {data
           ? data.plans.map((plan) => {
-              const price = plan.prices.find((p) => p.period === 'monthly') || plan.prices[0];
               const included = features.filter((f) => plan.entitlements[f.key] && plan.entitlements[f.key].enabled);
               const current = plan.code === mineCode;
               return (
                 <View key={plan.id} style={[styles.card, shadow, plan.featured && styles.featured]}>
                   <View style={styles.head}>
                     <Text style={styles.name}>{plan.name}</Text>
-                    {current ? <Text style={styles.current}>Your plan</Text> : plan.badge ? <Text style={styles.badge}>{plan.badge}</Text> : null}
+                    {current ? <Text style={styles.current}>Your plan</Text> : null}
                   </View>
                   <Text style={styles.desc}>{plan.description}</Text>
-                  <Text style={styles.price}>{plan.isFree || !price ? 'Free' : `${money(price)} / ${PERIOD[price.period] || price.period}`}</Text>
                   {included.map((f) => {
                     const rule = plan.entitlements[f.key];
                     const detail = f.kind === 'limit' ? (rule.value === null ? 'unlimited' : `up to ${rule.value}`) : '';
@@ -68,7 +67,6 @@ export default function PremiumScreen() {
               );
             })
           : null}
-        {data ? <Text style={styles.foot}>Plans you can use on chordsuno.com carry over when you sign in here. Subscribing from inside the app is coming with Google Play billing.</Text> : null}
       </ScrollView>
     </View>
   );
@@ -83,10 +81,7 @@ const useStyles = makeStyles((colors) => ({
   head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   name: { color: colors.ink, fontSize: 22, fontWeight: '800' },
   current: { overflow: 'hidden', paddingHorizontal: 10, paddingVertical: 3, borderRadius: radius.pill, backgroundColor: colors.accent, color: colors.onAccent, fontSize: 12.5, fontWeight: '700' },
-  badge: { overflow: 'hidden', paddingHorizontal: 10, paddingVertical: 3, borderRadius: radius.pill, backgroundColor: colors.accentSoft, color: colors.accentDeep, fontSize: 12.5, fontWeight: '700' },
   desc: { color: colors.mute, fontSize: 14.5, lineHeight: 20 },
-  price: { color: colors.accentDeep, fontSize: 18, fontWeight: '800', marginVertical: 4 },
   feature: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   featureText: { flex: 1, color: colors.ink, fontSize: 14.5, lineHeight: 20 },
-  foot: { color: colors.mute, fontSize: 13, lineHeight: 19, textAlign: 'center', paddingHorizontal: 12, marginTop: 6 },
 }));

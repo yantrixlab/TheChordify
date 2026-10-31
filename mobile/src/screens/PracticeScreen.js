@@ -9,10 +9,10 @@ import { strumShape } from 'chordsuno-shared/tools/strum';
 import { MicError, NoiseGate, SILENT_MIC_TEXT, SilenceWatch, levelPercent, openMic } from '../audio/engine';
 import { useAuth } from '../auth/AuthContext';
 import ChordDiagram from '../components/ChordDiagram';
-import { Icon } from '../components/Icons';
 import { Segmented } from '../components/Sheet';
 import { Slider } from '../components/Slider';
 import { AppBar, Button, Centered, Note } from '../components/Ui';
+import { PlanGate } from '../components/PlanGate';
 import { getJson, setJson } from '../lib/storage';
 import { radius, makeStyles, useColors } from '../theme';
 
@@ -505,9 +505,7 @@ export default function PracticeScreen({ navigation }) {
       <View style={styles.screen}>
         <AppBar title="Practice your chords" backIcon="close" onBack={() => navigation.goBack()} />
         <Centered>
-          <Icon name="premium" size={48} color={colors.gold} filled />
-          <Text style={styles.gateTitle}>Chord practice is not in your plan</Text>
-          <Button title="See the plans" onPress={() => navigation.navigate('Tabs', { screen: 'Premium' })} style={styles.gateButton} />
+          <PlanGate title="Chord practice is not in your plan" navigation={navigation} />
         </Centered>
       </View>
     );
@@ -951,6 +949,4 @@ const useStyles = makeStyles((colors) => ({
   saveInput: { flex: 1, height: 46, borderRadius: 12, backgroundColor: colors.soft, color: colors.ink, paddingHorizontal: 14, fontSize: 15 },
   privacy: { color: colors.faint, fontSize: 12, textAlign: 'center', marginTop: 16, lineHeight: 17 },
   hidden: { height: 0, opacity: 0 },
-  gateTitle: { color: colors.ink, fontSize: 20, fontWeight: '800', marginTop: 14, textAlign: 'center' },
-  gateButton: { marginTop: 18 },
 }));

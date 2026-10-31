@@ -3,10 +3,10 @@ import { Alert, Pressable, ScrollView, Switch, Text, TextInput, View } from 'rea
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Metronome, TapTempo, clampBpm, defaultAccents, tempoName } from 'chordsuno-shared/tools/metronome';
 import { useAuth } from '../auth/AuthContext';
-import { Icon } from '../components/Icons';
 import { Sheet, Stepper } from '../components/Sheet';
 import { Slider } from '../components/Slider';
 import { AppBar, Button, Centered } from '../components/Ui';
+import { PlanGate } from '../components/PlanGate';
 import { getJson, setJson } from '../lib/storage';
 import { radius, makeStyles, useColors } from '../theme';
 
@@ -166,9 +166,7 @@ export default function MetronomeScreen({ navigation }) {
       <View style={styles.screen}>
         <AppBar title="Metronome" backIcon="close" onBack={() => navigation.goBack()} />
         <Centered>
-          <Icon name="premium" size={48} color={colors.gold} filled />
-          <Text style={styles.gateTitle}>The metronome is part of Premium</Text>
-          <Button title="See the plans" onPress={() => navigation.navigate('Tabs', { screen: 'Premium' })} style={styles.gateButton} />
+          <PlanGate title="The metronome is part of Premium" navigation={navigation} />
         </Centered>
       </View>
     );
@@ -351,8 +349,6 @@ const useStyles = makeStyles((colors) => ({
   tap: { marginTop: 14, height: 84, borderRadius: radius.card, backgroundColor: colors.accentSoft, alignItems: 'center', justifyContent: 'center' },
   tapText: { color: colors.accentDeep, fontSize: 20, fontWeight: '800' },
   tapHint: { color: colors.mute, fontSize: 12.5, marginTop: 2 },
-  gateTitle: { color: colors.ink, fontSize: 20, fontWeight: '800', marginTop: 14, textAlign: 'center' },
-  gateButton: { marginTop: 18 },
   label: { color: colors.ink, fontSize: 15, fontWeight: '800', marginTop: 16, marginBottom: 8 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { overflow: 'hidden', paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.pill, backgroundColor: colors.soft, color: colors.accentDeep, fontSize: 14, fontWeight: '700' },

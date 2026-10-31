@@ -5,14 +5,14 @@ import { errorMessage, startExtractUpload } from '../api';
 import { useAuth } from '../auth/AuthContext';
 import { Icon } from '../components/Icons';
 import { AppBar, Button, Centered, Note } from '../components/Ui';
-import { makeStyles, toolCovers, useColors } from '../theme';
+import { PlanGate } from '../components/PlanGate';
+import { makeStyles, toolCovers } from '../theme';
 
 const MAX_BYTES = 50 * 1024 * 1024; // the server's limit
 const ALLOWED = /\.(mp3|wav|flac|m4a)$/i;
 
 /** Import music: pick an audio file on the phone, send it to be analysed, and go on to the waiting screen. Only the file picked is seen. */
 export default function UploadScreen({ navigation }) {
-  const colors = useColors();
   const styles = useStyles();
   const { can, user } = useAuth();
   const [busy, setBusy] = useState(false);
@@ -52,9 +52,7 @@ export default function UploadScreen({ navigation }) {
       <View style={styles.screen}>
         <AppBar title="Import music" backIcon="close" onBack={() => navigation.goBack()} />
         <Centered>
-          <Icon name="premium" size={48} color={colors.gold} filled />
-          <Text style={styles.title}>Importing songs is not in your plan</Text>
-          <Button title="See the plans" onPress={() => navigation.navigate('Tabs', { screen: 'Premium' })} style={styles.button} />
+          <PlanGate title="Importing songs is not in your plan" navigation={navigation} />
         </Centered>
       </View>
     );

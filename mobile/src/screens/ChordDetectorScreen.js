@@ -12,6 +12,7 @@ import { Icon } from '../components/Icons';
 import { Segmented } from '../components/Sheet';
 import { Slider } from '../components/Slider';
 import { AppBar, Button, Centered, Note } from '../components/Ui';
+import { PlanGate } from '../components/PlanGate';
 import { shapesFor } from '../lib/diagrams';
 import { getJson, setJson } from '../lib/storage';
 import { radius, makeStyles, useColors } from '../theme';
@@ -110,9 +111,7 @@ export default function ChordDetectorScreen({ navigation }) {
       <View style={styles.screen}>
         <AppBar title="Chord detector" backIcon="close" onBack={() => navigation.goBack()} />
         <Centered>
-          <Icon name="premium" size={48} color={colors.gold} filled />
-          <Text style={styles.gateTitle}>Live chord detection is part of Premium</Text>
-          <Button title="See the plans" onPress={() => navigation.navigate('Tabs', { screen: 'Premium' })} style={styles.gateButton} />
+          <PlanGate title="Live chord detection is part of Premium" navigation={navigation} />
         </Centered>
       </View>
     );
@@ -261,6 +260,4 @@ const useStyles = makeStyles((colors) => ({
   empty: { color: colors.mute, fontSize: 14 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { overflow: 'hidden', paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill, backgroundColor: colors.accentSoft, color: colors.accentDeep, fontSize: 15, fontWeight: '800' },
-  gateTitle: { color: colors.ink, fontSize: 20, fontWeight: '800', marginTop: 14, textAlign: 'center' },
-  gateButton: { marginTop: 18 },
 }));
