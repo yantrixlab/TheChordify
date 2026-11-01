@@ -20,7 +20,8 @@ export default function SettingsScreen({ navigation }) {
   const styles = useStyles();
   const insets = useSafeAreaInsets();
   const { mode, setMode } = useTheme();
-  const { ready, user, config, signInWithGoogle, signInAsReviewer, signOut, deleteAccount } = useAuth();
+  const { ready, user, config, plan, signInWithGoogle, signInAsReviewer, signOut, deleteAccount } = useAuth();
+  const planName = (plan && plan.plan && plan.plan.name) || user?.planName || 'Free'; // the live plan, as the My plan screen shows it; the saved user may not have it
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
   const [reviewer, setReviewer] = useState({ email: '', password: '' });
@@ -65,7 +66,7 @@ export default function SettingsScreen({ navigation }) {
                 <Text style={styles.email} numberOfLines={1}>
                   {user.email}
                 </Text>
-                <Text style={styles.plan}>{user.planName || 'Free'} plan</Text>
+                <Text style={styles.plan}>{planName} plan</Text>
               </View>
             </View>
             <Button title="Sign out" kind="quiet" busy={busy === 'out'} onPress={() => run('out', signOut)} style={styles.gap} />
