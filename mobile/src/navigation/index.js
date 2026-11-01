@@ -22,13 +22,13 @@ const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 
-// The bottom bar: Discover, Search, My Library, Toolkit, Premium.
+// The bottom bar: Discover, Search, My Library, Toolkit, My plan.
 const TABS = [
   { name: 'Discover', component: DiscoverScreen, icon: 'discover', label: 'Discover' },
   { name: 'Search', component: SearchScreen, icon: 'search', label: 'Search' },
   { name: 'Library', component: LibraryScreen, icon: 'library', label: 'My Library' },
   { name: 'Toolkit', component: ToolkitScreen, icon: 'toolkit', label: 'Toolkit' },
-  { name: 'Premium', component: PremiumScreen, icon: 'premium', label: 'Premium' },
+  { name: 'Premium', component: PremiumScreen, icon: 'premium', label: 'My plan' }, // the route keeps its old name; the screen shows only the person's own plan
 ];
 
 const renderIcon = (name) => {

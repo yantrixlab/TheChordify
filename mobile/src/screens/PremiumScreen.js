@@ -8,8 +8,9 @@ import { AppBar, Button, Note } from '../components/Ui';
 import { radius, shadow, makeStyles, useColors } from '../theme';
 
 /**
- * What each plan includes, for comparison. There are no prices, no offers and no way to buy here: the app does not sell plans yet, and
- * Google Play does not allow an app to send people to another way of paying. Somebody who already has a plan signs in to use it.
+ * "My plan": the plan on the signed-in person's account and what it includes. Nothing else: no other plans, no prices, no offers and no
+ * way to buy. The app does not sell plans yet, and Google Play does not allow an app to send people to another way of paying, so this
+ * screen must not compare plans, promote one, or lead to the website. Somebody who already has a plan signs in to use it.
  */
 export default function PremiumScreen({ navigation }) {
   const colors = useColors();
@@ -24,11 +25,14 @@ export default function PremiumScreen({ navigation }) {
   }, []);
 
   const features = data ? data.features.filter((f) => f.status === 'live') : [];
+  const rules = mine && mine.entitlements ? mine.entitlements : {};
   const mineCode = mine && mine.plan ? mine.plan.code : 'free';
+  const description = data ? (data.plans.find((p) => p.code === mineCode) || {}).description : '';
+  const included = features.filter((f) => rules[f.key] && rules[f.key].enabled);
 
   return (
     <View style={styles.screen}>
-      <AppBar title="Premium" />
+      <AppBar title="My plan" />
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}>
         <Note>{error}</Note>
         {!user ? (
@@ -37,36 +41,30 @@ export default function PremiumScreen({ navigation }) {
             <Text style={styles.desc}>Sign in with the same Google account and it is ready to use here.</Text>
             <Button title="Sign in" onPress={() => navigation.navigate('Settings')} />
           </View>
-        ) : null}
-        {!data && !error ? <ActivityIndicator color={colors.accent} style={styles.loading} /> : null}
-        {data
-          ? data.plans.map((plan) => {
-              const included = features.filter((f) => plan.entitlements[f.key] && plan.entitlements[f.key].enabled);
-              const current = plan.code === mineCode;
+        ) : !data && !error ? (
+          <ActivityIndicator color={colors.accent} style={styles.loading} />
+        ) : data ? (
+          <View style={[styles.card, shadow]}>
+            <View style={styles.head}>
+              <Text style={styles.name}>{(mine && mine.plan && mine.plan.name) || 'Free'}</Text>
+              <Text style={styles.current}>Your plan</Text>
+            </View>
+            {description ? <Text style={styles.desc}>{description}</Text> : null}
+            {included.map((f) => {
+              const rule = rules[f.key];
+              const detail = f.kind === 'limit' ? (rule.value === null || rule.value === undefined ? 'unlimited' : `up to ${rule.value}`) : '';
               return (
-                <View key={plan.id} style={[styles.card, shadow, plan.featured && styles.featured]}>
-                  <View style={styles.head}>
-                    <Text style={styles.name}>{plan.name}</Text>
-                    {current ? <Text style={styles.current}>Your plan</Text> : null}
-                  </View>
-                  <Text style={styles.desc}>{plan.description}</Text>
-                  {included.map((f) => {
-                    const rule = plan.entitlements[f.key];
-                    const detail = f.kind === 'limit' ? (rule.value === null ? 'unlimited' : `up to ${rule.value}`) : '';
-                    return (
-                      <View key={f.key} style={styles.feature}>
-                        <Icon name="check" size={18} color={colors.accent} strokeWidth={2.6} />
-                        <Text style={styles.featureText}>
-                          {f.label}
-                          {detail ? ` (${detail})` : ''}
-                        </Text>
-                      </View>
-                    );
-                  })}
+                <View key={f.key} style={styles.feature}>
+                  <Icon name="check" size={18} color={colors.accent} strokeWidth={2.6} />
+                  <Text style={styles.featureText}>
+                    {f.label}
+                    {detail ? ` (${detail})` : ''}
+                  </Text>
                 </View>
               );
-            })
-          : null}
+            })}
+          </View>
+        ) : null}
       </ScrollView>
     </View>
   );
@@ -77,7 +75,6 @@ const useStyles = makeStyles((colors) => ({
   content: { padding: 16, gap: 14 },
   loading: { marginTop: 40 },
   card: { padding: 18, borderRadius: radius.card, backgroundColor: colors.surface, gap: 8 },
-  featured: { borderWidth: 2, borderColor: colors.accent },
   head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   name: { color: colors.ink, fontSize: 22, fontWeight: '800' },
   current: { overflow: 'hidden', paddingHorizontal: 10, paddingVertical: 3, borderRadius: radius.pill, backgroundColor: colors.accent, color: colors.onAccent, fontSize: 12.5, fontWeight: '700' },

@@ -7,7 +7,7 @@ import { useColors } from '../theme';
 /**
  * What a tool or feature the person's plan leaves out shows, inside a centred box: what it is, and then
  *   - for somebody not signed in: a Sign in button, since they may already have a plan on their account;
- *   - for somebody signed in: the details of the plans.
+ *   - for somebody signed in: their own plan (My plan), and what it includes.
  * It never says how or where a plan is bought. The app does not sell plans yet, and Google Play does not allow an app that sells
  * through Play Billing, or through nothing at all, to send people to another way of paying. Keep it so.
  */
@@ -22,7 +22,7 @@ export function PlanGate({ title, navigation }) {
         {user ? "This isn't part of your current plan." : 'Already have a Chord Suno plan? Sign in with the same Google account to use it.'}
       </Text>
       <Button
-        title={user ? 'Plan details' : 'Sign in'}
+        title={user ? 'My plan' : 'Sign in'}
         onPress={() => (user ? navigation.navigate('Tabs', { screen: 'Premium' }) : navigation.navigate('Settings'))}
         style={styles.button}
       />
