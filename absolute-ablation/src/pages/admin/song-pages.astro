@@ -2,10 +2,10 @@
 import AdminLayout from "../../layouts/AdminLayout.astro";
 ---
 
-<AdminLayout perm="song_pages.manage"
+<AdminLayout perm="song_pages.manage|songs.edit|songs.reanalyse"
   title="Song pages"
   active="songpages"
-  lead="Choose which chordified songs get a public page that search engines can list. Only the songs you publish here are shown on the site's /songs/ pages and sitemap."
+  lead="Every chordified song. Publish the ones that should get a public page that search engines can list, fix a song's chords and strumming by hand, or run the detector on it again. Only the songs you publish are shown on the site's /songs/ pages and sitemap."
 >
   <div class="sp-filters">
     <div class="sp-seg" id="status" role="group" aria-label="Show">
@@ -90,7 +90,7 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
 </style>
 
 <script>
-  import { adminReady, adminFetch, el, say, number } from "../../lib/admin";
+  import { adminReady, adminFetch, can, el, say, number } from "../../lib/admin";
 
   const rows = document.getElementById("rows")!;
   const empty = document.getElementById("empty")!;
@@ -282,7 +282,8 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
     );
     const meta = el("div", "sp-meta");
     meta.append(el("span", `adm-pill ${song.published ? "ok" : ""}`, song.published ? "Published" : "Not published"));
-    if (!song.analysed) meta.append(el("span", "adm-pill warn", "Older analysis"));
+    if (song.edited) meta.append(el("span", "adm-pill violet", "Edited by hand"));
+    else if (!song.analysed) meta.append(el("span", "adm-pill warn", "Older analysis"));
     if (song.key) meta.append(el("i", "", song.key));
     if (song.tempo) meta.append(el("i", "", `${Math.round(song.tempo)} BPM`));
     meta.append(el("i", "", `${number(song.jams)} plays`));
@@ -332,7 +333,16 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
     const toggle = el("button", `adm-btn small ${song.published ? "ghost" : ""}`, song.published ? "Edit" : "Publish…");
     toggle.type = "button";
     toggle.addEventListener("click", () => (edit.hidden = !edit.hidden));
-    acts.append(toggle);
+    const publishes = can("song_pages.manage");
+    if (can("songs.edit")) {
+      const chords = el("a", "adm-btn small", "Edit chords");
+      chords.href = `/admin/song-edit/?v=${encodeURIComponent(song.videoId)}`;
+      chords.title = "Move chords between cells, change the strumming, go back to an earlier version";
+      chords.style.cssText = "display:inline-flex;align-items:center;text-decoration:none";
+      acts.append(chords);
+    }
+    if (publishes) acts.append(toggle);
+    else edit.remove();
     if (song.published) {
       const view = el("a", "adm-btn ghost small", "View page");
       view.href = `/songs/${song.slug}/`;
@@ -353,22 +363,22 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
           off.disabled = false;
         }
       });
-      acts.append(view, off);
+      acts.append(view);
+      if (publishes) acts.append(off);
     }
 
-    if (!song.analysed) {
-      // The song still opens as it was analysed. This runs the current detector on it again (it needs the audio from YouTube).
+    if (can("songs.reanalyse")) {
+      // Runs the current detector on the song again (it needs the audio from YouTube). The chords it replaces are kept as a version.
       const again = el("button", "adm-btn ghost small", "Re-analyse");
       again.type = "button";
-      again.title = "Run the latest chord detector on this song again";
+      again.title = "Run the latest chord detector on this song again; the version it replaces is kept";
       again.addEventListener("click", async () => {
+        const hand = song.edited ? " It replaces the changes made by hand too." : "";
+        if (!confirm(`Analyse “${song.title}” again?${hand} The current chords and strumming are kept as a version you can go back to. It takes a minute or two.`)) return;
         again.disabled = true;
         try {
-          await adminFetch("/api/extract/youtube", {
-            method: "POST",
-            body: JSON.stringify({ url: `https://www.youtube.com/watch?v=${song.videoId}`, title: song.title, artist: song.artist, thumbnail: song.thumbnail }),
-          });
-          say("msg", `“${song.title}” is being analysed again. It takes a minute or two; reload this page to see it marked as up to date.`, "ok");
+          await adminFetch(`/api/admin/songs/${encodeURIComponent(song.videoId)}/reanalyse`, { method: "POST" });
+          say("msg", `“${song.title}” is being analysed again. It takes a minute or two; open Edit chords to follow it, or reload this page afterwards.`, "ok");
         } catch (err) {
           say("msg", err instanceof Error ? err.message : "Could not start that.", "bad");
           again.disabled = false;

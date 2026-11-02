@@ -1,0 +1,909 @@
+---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+---
+
+<AdminLayout perm="songs.edit" title="Edit a song" active="songpages" lead="Fix the chords on the grid, change the strumming, or run the detector again. Listen while you work. Every save keeps the earlier version, so nothing is lost.">
+  <p id="se-error" class="adm-msg bad" role="alert" hidden></p>
+
+  <section id="se-progress" class="adm-card" hidden aria-live="polite">
+    <h2 id="se-progress-title">Analysing the song again</h2>
+    <p id="se-progress-stage" class="adm-hint">Starting…</p>
+    <div class="se-bar"><div id="se-progress-fill"></div></div>
+    <p id="se-progress-msg" class="adm-msg" role="status"></p>
+  </section>
+
+  <div id="se-root" hidden>
+    <section class="adm-card se-head">
+      <img id="se-thumb" class="se-thumb" alt="" width="120" height="68" />
+      <div class="se-title">
+        <h2 id="se-name"></h2>
+        <p id="se-artist" class="adm-hint" style="margin:0"></p>
+        <div id="se-pills" class="se-pills"></div>
+      </div>
+      <div class="se-actions">
+        <button id="se-undo" type="button" class="adm-btn ghost small" title="Undo (Ctrl+Z)">Undo</button>
+        <button id="se-redo" type="button" class="adm-btn ghost small" title="Redo (Ctrl+Y)">Redo</button>
+        <button id="se-revert" type="button" class="adm-btn ghost small">Discard changes</button>
+        <a id="se-open" class="adm-btn ghost small se-link" target="_blank" rel="noopener">Open in the player</a>
+        <button id="se-reanalyse" type="button" class="adm-btn danger small" hidden>Re-analyse</button>
+        <button id="se-save" type="button" class="adm-btn" disabled>Save changes</button>
+      </div>
+      <p id="se-msg" class="adm-msg" role="status" style="grid-column:1/-1;margin:0"></p>
+    </section>
+
+    <div class="se-body">
+      <aside class="se-side">
+        <div class="se-video"><div id="se-player"></div></div>
+        <div class="adm-row se-transport">
+          <button id="se-play" type="button" class="adm-btn ghost small">Play</button>
+          <button id="se-play-cell" type="button" class="adm-btn ghost small">From the selected cell</button>
+          <span id="se-time" class="adm-hint" style="margin:0">0:00</span>
+        </div>
+        <label class="adm-check" style="margin:8px 0 14px"><input id="se-follow" type="checkbox" checked /> Follow the song on the grid</label>
+
+        <div class="adm-card se-pick">
+          <h3 id="se-pick-title">Pick a cell</h3>
+          <p id="se-pick-now" class="adm-hint">Click a cell on the grid, then type a chord or pick one below.</p>
+          <form id="se-chord-form" class="adm-row" autocomplete="off">
+            <input id="se-chord" type="text" placeholder="A chord, e.g. Am7 or F#m/C#" aria-label="Chord for the selected cell" disabled />
+            <button id="se-set" type="submit" class="adm-btn small" disabled>Set</button>
+          </form>
+          <p id="se-chord-msg" class="adm-msg" role="status"></p>
+          <div class="adm-row" style="margin-bottom:10px">
+            <button id="se-rest" type="button" class="adm-btn ghost small" disabled>Rest 𝄽</button>
+            <button id="se-clear" type="button" class="adm-btn ghost small" disabled>Clear the cell</button>
+          </div>
+          <p class="se-chips-title">In the key <span id="se-key"></span></p>
+          <div id="se-chips-key" class="se-chips"></div>
+          <p class="se-chips-title">Used in this song</p>
+          <div id="se-chips-used" class="se-chips"></div>
+          <details class="adm-details" style="margin-top:12px"><summary>Shortcuts</summary>
+            <ul class="adm-hint se-keys">
+              <li>Arrow keys move; ↑ ↓ jump a bar</li>
+              <li>Type A–G to start a chord; Enter sets it</li>
+              <li>Delete clears the cell</li>
+              <li>Drag a chord to move it; onto a chord swaps; hold Alt to copy</li>
+              <li>Space plays and pauses; Ctrl+Z / Ctrl+Y undo and redo; Ctrl+S saves</li>
+            </ul>
+          </details>
+        </div>
+      </aside>
+
+      <section class="se-main">
+        <div class="se-tabs" role="tablist">
+          <button id="tab-chords" type="button" role="tab" class="is-on" aria-selected="true">Chords</button>
+          <button id="tab-strum" type="button" role="tab" aria-selected="false">Strumming</button>
+          <button id="tab-history" type="button" role="tab" aria-selected="false">Versions</button>
+        </div>
+
+        <div id="pane-chords">
+          <div class="adm-row se-tools">
+            <div class="se-seg" role="group" aria-label="Which chords to show">
+              <button id="view-simple" type="button" class="is-on">Simple chords</button>
+              <button id="view-detailed" type="button">Detailed chords</button>
+            </div>
+            <label class="adm-check"><input id="se-both" type="checkbox" checked /> Apply changes to both lists</label>
+            <span id="se-count" class="adm-hint" style="margin:0"></span>
+          </div>
+          <p id="se-view-note" class="adm-hint"></p>
+          <div id="se-grid" class="se-grid" aria-label="The chord grid"></div>
+        </div>
+
+        <div id="pane-strum" hidden>
+          <p class="adm-hint">Each pattern is one bar of strokes: ↓ down, ↑ up, or nothing. Click a stroke to change it. The first pattern is the main one. A pattern can belong to sections of the song.</p>
+          <div id="strum-list" class="se-strum"></div>
+          <div class="adm-row" style="margin-top:12px"><button id="strum-add" type="button" class="adm-btn ghost">Add a pattern</button></div>
+        </div>
+
+        <div id="pane-history" hidden>
+          <p class="adm-hint">Every save and re-analysis keeps a version. Going back keeps what you have now as a version too.</p>
+          <ul id="ver-list" class="se-versions"></ul>
+        </div>
+      </section>
+    </div>
+  </div>
+</AdminLayout>
+
+<style is:global>
+  .adm-main > #adm-app { max-width: 1320px; }
+  .se-head { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 14px 18px; align-items: center; }
+  .se-thumb { width: 120px; height: 68px; border-radius: 10px; object-fit: cover; background: #eee; }
+  .se-title h2 { margin: 0 0 2px; font-size: 19px; }
+  .se-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .se-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; align-items: center; }
+  .se-link { display: inline-flex; align-items: center; text-decoration: none; }
+  .se-body { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 20px; align-items: start; }
+  .se-side { position: sticky; top: 14px; display: grid; gap: 2px; }
+  .se-video { overflow: hidden; border-radius: 14px; background: #000; aspect-ratio: 16 / 9; margin-bottom: 10px; }
+  .se-video iframe { width: 100%; height: 100%; display: block; }
+  .se-transport { margin-bottom: 4px; }
+  .se-pick h3 { margin: 0 0 6px; font-size: 15px; }
+  .se-pick form input { height: 38px; }
+  .se-chips-title { margin: 12px 0 6px; font: 700 11.5px var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-mute); }
+  .se-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .se-chip { padding: 5px 11px; border: 1.5px solid var(--color-hairline); border-radius: 999px; background: #fff; font: 700 13px var(--font-sans); color: var(--color-ink); cursor: pointer; }
+  .se-chip:hover:not(:disabled) { border-color: var(--color-violet); color: var(--color-violet-deep); }
+  .se-chip:disabled { opacity: 0.5; cursor: not-allowed; }
+  .se-keys { margin: 8px 0 0; padding-left: 18px; line-height: 1.6; }
+  .se-tabs { display: flex; gap: 4px; margin-bottom: 14px; border-bottom: 1px solid var(--color-hairline); }
+  .se-tabs button { padding: 10px 16px; border: 0; border-bottom: 3px solid transparent; background: none; font: 700 14px var(--font-sans); color: var(--color-mute); cursor: pointer; }
+  .se-tabs button.is-on { color: var(--color-violet-deep); border-bottom-color: var(--color-violet); }
+  .se-tools { margin-bottom: 8px; gap: 16px; }
+  .se-seg { display: inline-flex; padding: 3px; border-radius: 12px; background: var(--color-violet-soft); }
+  .se-seg button { padding: 7px 14px; border: 0; border-radius: 9px; background: none; font: 700 13px var(--font-sans); color: var(--color-violet-deep); cursor: pointer; }
+  .se-seg button.is-on { background: #fff; box-shadow: 0 1px 3px #1a053322; }
+
+  .se-grid { display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: flex-start; padding-bottom: 40px; }
+  .se-sec { flex: 0 0 100%; margin-top: 8px; padding: 4px 12px; border-radius: 8px; font: 800 12.5px var(--font-sans); color: #1a0533; width: fit-content; }
+  .se-barbox { display: flex; gap: 4px; padding: 4px; border-radius: 12px; background: #fff; border: 1px solid var(--color-hairline); position: relative; }
+  .se-barbox > i { position: absolute; top: -9px; left: 8px; padding: 0 5px; background: #f7f3fd; font: 600 10px var(--font-mono); font-style: normal; color: var(--color-mute); }
+  .se-cell { position: relative; width: 52px; height: 52px; padding: 0; border: 1.5px solid #e6dff5; border-radius: 9px; background: #f8f5ff; font: 700 17px/1 var(--font-sans); color: var(--color-ink); cursor: pointer; display: grid; place-items: center; }
+  .se-cell[data-len="3"] { font-size: 14.5px; }
+  .se-cell[data-len="4"] { font-size: 12.5px; }
+  .se-cell[data-len="5"], .se-cell[data-len="6"], .se-cell[data-len="7"] { font-size: 10.5px; }
+  .se-cell.has { background: #fff; border-color: #c4b3ea; }
+  .se-cell.nobeat { opacity: 0.35; cursor: not-allowed; background: repeating-linear-gradient(45deg, #f3effb, #f3effb 4px, #fff 4px, #fff 8px); }
+  .se-cell.is-sel { outline: 3px solid var(--color-violet); outline-offset: 1px; }
+  .se-cell.is-play { background: #fde68a; border-color: #f59e0b; }
+  .se-cell.is-changed::after { content: ""; position: absolute; top: 3px; right: 3px; width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; }
+  .se-cell.is-over { background: #ede4ff; border-style: dashed; }
+  .se-cell.is-drag { opacity: 0.4; }
+  .se-cell.rest { color: var(--color-mute); font-weight: 400; }
+
+  .se-strum { display: grid; gap: 14px; }
+  .se-pat { padding: 16px 18px; border-radius: 16px; background: #fff; border: 1px solid var(--color-hairline); }
+  .se-pat header { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  .se-pat header h3 { margin: 0 auto 0 0; font-size: 15px; }
+  .se-slots { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 8px; }
+  .se-beat { display: flex; gap: 3px; padding: 4px; border-radius: 10px; background: #faf7ff; }
+  .se-slot { display: grid; justify-items: center; gap: 3px; }
+  .se-slot small { font: 600 10.5px var(--font-mono); color: var(--color-mute); min-height: 13px; }
+  .se-slot small.on { color: var(--color-violet-deep); font-weight: 800; }
+  .se-stroke { width: 36px; height: 40px; border: 1.5px solid #e6dff5; border-radius: 9px; background: #fff; font: 800 18px/1 var(--font-sans); color: #cbbfe6; cursor: pointer; }
+  .se-stroke[data-s="D"] { background: #5b21b6; border-color: #5b21b6; color: #fff; }
+  .se-stroke[data-s="U"] { background: #c4b5fd; border-color: #c4b5fd; color: #2e1065; }
+  .se-where { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; }
+  .se-pat-meta { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin-top: 10px; }
+  .se-pat select { width: auto; height: 34px; }
+
+  .se-versions { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .se-versions li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; padding: 14px 16px; border-radius: 14px; background: #fff; border: 1px solid var(--color-hairline); }
+  .se-versions li.is-current { border-color: var(--color-violet); box-shadow: 0 0 0 3px #7c3aed18; }
+  .se-versions strong { color: var(--color-ink); }
+  .se-bar { height: 10px; border-radius: 6px; background: var(--color-violet-soft); overflow: hidden; }
+  .se-bar div { height: 100%; width: 0; background: linear-gradient(90deg, #7c3aed, #f59e0b); transition: width 0.4s; }
+
+  @media (max-width: 1100px) {
+    .se-body { grid-template-columns: 1fr; }
+    .se-side { position: static; }
+    .se-head { grid-template-columns: auto minmax(0, 1fr); }
+    .se-actions { grid-column: 1 / -1; justify-content: flex-start; }
+  }
+</style>
+
+<script>
+  import { adminReady, adminFetch, el, say, when, can, adminInfo, number } from "../../lib/admin";
+  import * as E from "../../lib/songEdit";
+  import type { Seg, Bar, Cell, Stroke } from "../../lib/songEdit";
+
+  type Which = "simple" | "detailed";
+  type Op =
+    | { kind: "set"; bar: number; beat: number; chord: string }
+    | { kind: "clear"; bar: number; beat: number }
+    | { kind: "move"; from: [number, number]; to: [number, number] }
+    | { kind: "copy"; from: [number, number]; to: [number, number] };
+  interface Pattern { pattern: Stroke[]; sub: 2 | 4; where: string[]; kind: string; bars?: number; confidence?: number }
+  interface Strum { perBar: number; bpm?: number; patterns: Pattern[] }
+  interface Snapshot { simple: Seg[]; detailed: Seg[]; strum: Strum | null }
+
+  const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
+  const videoId = new URLSearchParams(location.search).get("v") ?? "";
+  const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v));
+
+  let song: any = null;
+  let token = "";
+  let bars: Bar[] = [];
+  let perBar = 4;
+  let duration = 0;
+  let current: Snapshot;
+  let loaded: Snapshot;
+  let view: Which = "simple";
+  let selected: [number, number] | null = null;
+  let undoStack: Snapshot[] = [];
+  let redoStack: Snapshot[] = [];
+  let cellsNow: Cell[][] = [];
+  let player: any = null;
+  let playing = false;
+  let playingCell: HTMLElement | null = null;
+  let timed: { bar: number; beat: number; time: number }[] = [];
+
+  const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+  const showError = (text: string) => {
+    const box = $("se-error");
+    box.textContent = text;
+    box.hidden = !text;
+  };
+  const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}${s % 1 ? "." + Math.floor((s % 1) * 10) : ""}`;
+  const cellsOf = (list: Seg[]) => E.place(list, bars, perBar, duration);
+  const bothOn = () => ($("se-both") as HTMLInputElement).checked;
+
+  // ---- loading --------------------------------------------------------------------------------------------------------------
+  async function load() {
+    song = await adminFetch(`/api/admin/songs/${encodeURIComponent(videoId)}/edit`);
+    token = song.token;
+    bars = song.bars;
+    perBar = song.beatsPerBar || 4;
+    duration = song.duration || 0;
+    const strum = song.strum && song.strum.patterns ? { perBar: song.strum.perBar || perBar, bpm: song.strum.bpm, patterns: clone(song.strum.patterns) } : null;
+    loaded = { simple: clone(song.chords), detailed: clone(song.chordsDetailed), strum };
+    current = clone(loaded);
+    undoStack = [];
+    redoStack = [];
+    selected = null;
+    timed = [];
+    E.place(current.simple, bars, perBar, duration).flat().forEach((c) => c.time !== null && timed.push({ bar: c.bar, beat: c.beat, time: c.time }));
+    $("se-thumb").setAttribute("src", `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg`);
+    $("se-name").textContent = song.title;
+    $("se-artist").textContent = song.artist;
+    ($("se-open") as HTMLAnchorElement).href = `/play/?session=${encodeURIComponent(song.sessionId)}`;
+    $("se-reanalyse").hidden = !song.canReanalyse;
+    renderAll();
+    $("se-root").hidden = false;
+    startPlayer();
+  }
+
+  // ---- the header -----------------------------------------------------------------------------------------------------------
+  function pill(text: string, kind = ""): HTMLElement {
+    return el("span", `adm-pill ${kind}`.trim(), text);
+  }
+  function renderHead() {
+    const box = $("se-pills");
+    box.replaceChildren();
+    if (song.key) box.append(pill(`Key ${song.key}`, "violet"));
+    if (song.tempo) box.append(pill(`${Math.round(song.tempo)} BPM`));
+    box.append(pill(`${bars.length} bars · ${perBar}/4`));
+    const d = song.detector;
+    box.append(pill(d.analysisVersion === d.current ? "Latest detector" : `Detector v${d.analysisVersion ?? "?"} (latest v${d.current})`, d.analysisVersion === d.current ? "ok" : "warn"));
+    if (song.edited) box.append(pill(`Edited by ${song.edited.by || "an editor"} · ${when(song.edited.at)}`, "warn"));
+    const changes = dirtyCells();
+    const strumChanged = !same(current.strum, loaded.strum);
+    const dirty = changes > 0 || strumChanged || !same(current.simple, loaded.simple) || !same(current.detailed, loaded.detailed);
+    const save = $("se-save") as HTMLButtonElement;
+    save.disabled = !dirty;
+    save.textContent = dirty ? `Save changes${changes ? ` (${changes})` : ""}` : "Save changes";
+    ($("se-undo") as HTMLButtonElement).disabled = undoStack.length === 0;
+    ($("se-redo") as HTMLButtonElement).disabled = redoStack.length === 0;
+    ($("se-revert") as HTMLButtonElement).disabled = !dirty;
+    $("se-count").textContent = changes ? `${changes} cell${changes === 1 ? "" : "s"} changed` : "No changes yet";
+  }
+  const dirtyCells = () => E.differences(loaded[view], current[view], bars, perBar, duration);
+
+  // ---- the grid -------------------------------------------------------------------------------------------------------------
+  const PART: Record<string, string> = { intro: "#fde68a", verse: "#bfdbfe", chorus: "#bbf7d0", bridge: "#fed7aa", outro: "#e9d5ff", instrumental: "#fbcfe8", break: "#e5e7eb" };
+  function renderGrid() {
+    const list = current[view];
+    cellsNow = cellsOf(list);
+    const before = E.flat(loaded[view], cellsOf(loaded[view]));
+    const original = new Map(before.map((c) => [`${c.bar}:${c.beat}`, c.chord]));
+    const sectionAt = new Map<number, string>();
+    for (const s of song.sections || []) if (s.startBar !== null && s.startBar !== undefined && s.label && s.label !== "Silence") sectionAt.set(s.startBar, s.label);
+    const out: HTMLElement[] = [];
+    cellsNow.forEach((row, b) => {
+      if (sectionAt.has(b)) {
+        const label = sectionAt.get(b)!;
+        const chip = el("div", "se-sec", label);
+        chip.style.background = PART[label.split(" ")[0].toLowerCase()] ?? "#c7d2fe";
+        out.push(chip);
+      }
+      const box = el("div", "se-barbox");
+      box.append(el("i", "", String(b + 1)));
+      row.forEach((cell, k) => {
+        const chord = cell.seg === null ? null : list[cell.seg].chord;
+        const btn = el("button", "se-cell");
+        btn.type = "button";
+        btn.dataset.bar = String(b);
+        btn.dataset.beat = String(k);
+        if (cell.time === null) {
+          btn.classList.add("nobeat");
+          btn.disabled = true;
+          btn.setAttribute("aria-label", `Bar ${b + 1}, beat ${k + 1}: no beat`);
+        } else {
+          btn.title = `Bar ${b + 1} · beat ${k + 1} · ${clock(cell.time)}`;
+          btn.setAttribute("aria-label", `Bar ${b + 1}, beat ${k + 1}: ${chord ?? "empty"}`);
+          if (chord) {
+            const shown = chord === "N" ? "𝄽" : chord;
+            btn.textContent = shown;
+            btn.dataset.len = String(Math.min(shown.length, 7));
+            btn.classList.add("has");
+            if (chord === "N") btn.classList.add("rest");
+            btn.draggable = true;
+          }
+          if ((original.get(`${b}:${k}`) ?? null) !== chord) btn.classList.add("is-changed");
+          if (selected && selected[0] === b && selected[1] === k) btn.classList.add("is-sel");
+        }
+        box.append(btn);
+      });
+      out.push(box);
+    });
+    $("se-grid").replaceChildren(...out);
+    playingCell = null;
+    renderNote();
+  }
+  function renderNote() {
+    $("se-view-note").textContent =
+      view === "simple"
+        ? "These are the chords everybody sees. Cells with an orange dot differ from the last saved version."
+        : "The detailed chords (7ths, suspended, slash chords) are what the Detail switch shows. Typing a plain chord here also sets it in the simple list when both lists are ticked.";
+  }
+
+  // ---- changing things (with undo) -----------------------------------------------------------------------------------------
+  function remember() {
+    undoStack.push(clone(current));
+    if (undoStack.length > 100) undoStack.shift();
+    redoStack = [];
+  }
+  function runOp(segs: Seg[], cells: Cell[][], op: Op, which: Which): Seg[] {
+    if (op.kind === "set") return E.setChord(segs, cells, op.bar, op.beat, which === "simple" && view === "detailed" ? E.simplify(op.chord) : op.chord);
+    if (op.kind === "clear") return E.clearChord(segs, cells, op.bar, op.beat);
+    if (op.kind === "move") return E.moveChord(segs, cells, op.from, op.to);
+    return E.copyChord(segs, cells, op.from, op.to);
+  }
+  function apply(op: Op) {
+    const targets: Which[] = bothOn() ? [view, view === "simple" ? "detailed" : "simple"] : [view];
+    const next = clone(current);
+    let moved = false;
+    for (const which of targets) {
+      const result = runOp(current[which], cellsOf(current[which]), op, which);
+      if (result !== current[which]) moved = true;
+      next[which] = result;
+    }
+    if (!moved) return;
+    remember();
+    current = next;
+    renderAll();
+  }
+  function undo() {
+    const back = undoStack.pop();
+    if (!back) return;
+    redoStack.push(clone(current));
+    current = back;
+    renderAll();
+  }
+  function redo() {
+    const fwd = redoStack.pop();
+    if (!fwd) return;
+    undoStack.push(clone(current));
+    current = fwd;
+    renderAll();
+  }
+
+  // ---- the picked cell ------------------------------------------------------------------------------------------------------
+  function chordIn(which: Which, bar: number, beat: number): string | null {
+    const cell = cellsOf(current[which])[bar]?.[beat];
+    return cell && cell.seg !== null ? current[which][cell.seg].chord : null;
+  }
+  function renderPick() {
+    const input = $("se-chord") as HTMLInputElement;
+    const has = !!selected && cellsNow[selected[0]]?.[selected[1]]?.time !== null;
+    input.disabled = !has;
+    ($("se-set") as HTMLButtonElement).disabled = !has;
+    ($("se-rest") as HTMLButtonElement).disabled = !has;
+    const here = has && selected ? chordIn(view, selected[0], selected[1]) : null;
+    ($("se-clear") as HTMLButtonElement).disabled = !has || here === null;
+    if (has && selected) {
+      const t = cellsNow[selected[0]][selected[1]].time!;
+      $("se-pick-title").textContent = `Bar ${selected[0] + 1} · beat ${selected[1] + 1}`;
+      const s = chordIn("simple", selected[0], selected[1]);
+      const d = chordIn("detailed", selected[0], selected[1]);
+      $("se-pick-now").textContent = `${clock(t)} · simple: ${s ?? "nothing starts here"} · detailed: ${d ?? "nothing starts here"}`;
+      if (document.activeElement !== input) input.value = here && here !== "N" ? here : "";
+    } else {
+      $("se-pick-title").textContent = "Pick a cell";
+      $("se-pick-now").textContent = "Click a cell on the grid, then type a chord or pick one below.";
+      input.value = "";
+    }
+    $("se-key").textContent = song.key ? `of ${song.key}` : "";
+    const chip = (name: string): HTMLButtonElement => {
+      const b = el("button", "se-chip", name);
+      b.type = "button";
+      b.disabled = !has;
+      b.addEventListener("click", () => setSelected(name));
+      return b;
+    };
+    $("se-chips-key").replaceChildren(...E.keyChords(song.key).map(chip));
+    $("se-chips-used").replaceChildren(...E.used(current[view]).slice(0, 14).map(([name]) => chip(name)));
+  }
+  function setSelected(text: string) {
+    if (!selected) return;
+    const chord = E.normalizeChord(text);
+    if (!chord) {
+      say("se-chord-msg", `“${text}” is not a chord. Use a note from A to G, then a kind, for example C, Am7, Fsus4 or D/F#.`, "bad");
+      return;
+    }
+    say("se-chord-msg", "", "");
+    apply({ kind: "set", bar: selected[0], beat: selected[1], chord });
+  }
+  function select(bar: number, beat: number) {
+    selected = [bar, beat];
+    renderGrid();
+    renderPick();
+  }
+  function renderAll() {
+    renderHead();
+    renderGrid();
+    renderPick();
+    renderStrum();
+    renderVersions();
+  }
+
+  // grid: click, drag and drop
+  const grid = $("se-grid");
+  const at = (target: EventTarget | null): [number, number] | null => {
+    const b = (target as HTMLElement | null)?.closest<HTMLElement>(".se-cell");
+    return b && b.dataset.bar !== undefined && !b.disabled ? [Number(b.dataset.bar), Number(b.dataset.beat)] : null;
+  };
+  grid.addEventListener("click", (e) => {
+    const c = at(e.target);
+    if (c) select(c[0], c[1]);
+  });
+  grid.addEventListener("dblclick", () => ($("se-chord") as HTMLInputElement).focus());
+  let dragFrom: [number, number] | null = null;
+  grid.addEventListener("dragstart", (e) => {
+    const c = at(e.target);
+    if (!c) return;
+    dragFrom = c;
+    (e.target as HTMLElement).classList.add("is-drag");
+    e.dataTransfer!.effectAllowed = "copyMove";
+    e.dataTransfer!.setData("text/plain", c.join(","));
+  });
+  grid.addEventListener("dragend", () => {
+    dragFrom = null;
+    grid.querySelectorAll(".is-drag, .is-over").forEach((n) => n.classList.remove("is-drag", "is-over"));
+  });
+  grid.addEventListener("dragover", (e) => {
+    if (!dragFrom || !at(e.target)) return;
+    e.preventDefault();
+    e.dataTransfer!.dropEffect = e.altKey ? "copy" : "move";
+    grid.querySelectorAll(".is-over").forEach((n) => n.classList.remove("is-over"));
+    (e.target as HTMLElement).closest(".se-cell")!.classList.add("is-over");
+  });
+  grid.addEventListener("drop", (e) => {
+    const to = at(e.target);
+    if (!dragFrom || !to) return;
+    e.preventDefault();
+    const from = dragFrom;
+    dragFrom = null;
+    selected = to;
+    apply({ kind: e.altKey ? "copy" : "move", from, to });
+  });
+
+  $("se-chord-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    setSelected(($("se-chord") as HTMLInputElement).value);
+  });
+  $("se-rest").addEventListener("click", () => selected && apply({ kind: "set", bar: selected[0], beat: selected[1], chord: "N" }));
+  $("se-clear").addEventListener("click", () => selected && apply({ kind: "clear", bar: selected[0], beat: selected[1] }));
+  $("se-undo").addEventListener("click", undo);
+  $("se-redo").addEventListener("click", redo);
+  $("view-simple").addEventListener("click", () => switchView("simple"));
+  $("view-detailed").addEventListener("click", () => switchView("detailed"));
+  function switchView(which: Which) {
+    view = which;
+    $("view-simple").classList.toggle("is-on", which === "simple");
+    $("view-detailed").classList.toggle("is-on", which === "detailed");
+    renderAll();
+  }
+  $("se-revert").addEventListener("click", () => {
+    if (!confirm("Throw away every change you have not saved?")) return;
+    remember();
+    current = clone(loaded);
+    renderAll();
+  });
+
+  // keyboard
+  document.addEventListener("keydown", (e) => {
+    if ($("se-root").hidden) return;
+    const typing = (e.target as HTMLElement | null)?.closest("input, textarea, select, dialog");
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+      e.preventDefault();
+      save();
+      return;
+    }
+    if (typing) return;
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+      e.preventDefault();
+      e.shiftKey ? redo() : undo();
+      return;
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
+      e.preventDefault();
+      redo();
+      return;
+    }
+    if ($("pane-chords").hidden) return;
+    if (e.key === " " && player) {
+      e.preventDefault();
+      togglePlay();
+      return;
+    }
+    if (!selected) return;
+    const flatCells = cellsNow.flat().filter((c) => c.time !== null);
+    const i = flatCells.findIndex((c) => c.bar === selected![0] && c.beat === selected![1]);
+    const go = (n: number) => {
+      const c = flatCells[Math.max(0, Math.min(flatCells.length - 1, n))];
+      if (c) {
+        select(c.bar, c.beat);
+        grid.querySelector(".is-sel")?.scrollIntoView({ block: "nearest" });
+      }
+    };
+    if (e.key === "ArrowRight") go(i + 1);
+    else if (e.key === "ArrowLeft") go(i - 1);
+    else if (e.key === "ArrowDown") go(i + perBar);
+    else if (e.key === "ArrowUp") go(i - perBar);
+    else if (e.key === "Delete" || e.key === "Backspace") apply({ kind: "clear", bar: selected[0], beat: selected[1] });
+    else if (e.key === "Enter") ($("se-chord") as HTMLInputElement).focus();
+    else if (/^[a-gA-G]$/.test(e.key) && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      const input = $("se-chord") as HTMLInputElement;
+      input.focus();
+      input.value = e.key.toUpperCase();
+    } else return;
+    e.preventDefault();
+  });
+
+  // ---- the video ------------------------------------------------------------------------------------------------------------
+  function loadYouTube(): Promise<any> {
+    const w = window as any;
+    if (w.YT && w.YT.Player) return Promise.resolve(w.YT);
+    return new Promise((resolve) => {
+      const previous = w.onYouTubeIframeAPIReady;
+      w.onYouTubeIframeAPIReady = () => {
+        previous?.();
+        resolve(w.YT);
+      };
+      if (!document.querySelector('script[src*="youtube.com/iframe_api"]')) {
+        const s = document.createElement("script");
+        s.src = "https://www.youtube.com/iframe_api";
+        document.head.append(s);
+      }
+    });
+  }
+  async function startPlayer() {
+    if (player) return;
+    const YT = await loadYouTube();
+    player = new YT.Player("se-player", {
+      videoId,
+      width: "100%",
+      height: "100%",
+      playerVars: { playsinline: 1, rel: 0, modestbranding: 1 },
+      events: {
+        onStateChange: (e: any) => {
+          playing = e.data === 1;
+          $("se-play").textContent = playing ? "Pause" : "Play";
+          if (playing) requestAnimationFrame(tick);
+        },
+      },
+    });
+  }
+  function togglePlay() {
+    if (!player) return;
+    playing ? player.pauseVideo() : player.playVideo();
+  }
+  $("se-play").addEventListener("click", togglePlay);
+  $("se-play-cell").addEventListener("click", () => {
+    if (!player || !selected) return;
+    const t = cellsNow[selected[0]]?.[selected[1]]?.time;
+    if (t === null || t === undefined) return;
+    player.seekTo(Math.max(0, t - 0.05), true);
+    player.playVideo();
+  });
+  function tick() {
+    if (!player || !playing) return;
+    const t = player.getCurrentTime?.() ?? 0;
+    $("se-time").textContent = clock(t);
+    // the cell that is playing: the last one whose beat has begun
+    let lo = 0;
+    let hi = timed.length - 1;
+    let found = -1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (timed[mid].time <= t + 0.03) {
+        found = mid;
+        lo = mid + 1;
+      } else hi = mid - 1;
+    }
+    if (found >= 0) {
+      const c = timed[found];
+      const node = grid.querySelector<HTMLElement>(`.se-cell[data-bar="${c.bar}"][data-beat="${c.beat}"]`);
+      if (node && node !== playingCell) {
+        playingCell?.classList.remove("is-play");
+        node.classList.add("is-play");
+        playingCell = node;
+        if (($("se-follow") as HTMLInputElement).checked && !$("pane-chords").hidden) {
+          const r = node.getBoundingClientRect();
+          if (r.top < 120 || r.bottom > window.innerHeight - 60) node.scrollIntoView({ block: "center", behavior: "smooth" });
+        }
+      }
+    }
+    requestAnimationFrame(tick);
+  }
+
+  // ---- strumming ------------------------------------------------------------------------------------------------------------
+  const sectionKinds = (): string[] => {
+    const kinds = new Set<string>();
+    for (const s of song.sections || []) if (s.label && s.label !== "Silence") kinds.add(String(s.label).replace(/\s*\d+$/, ""));
+    for (const p of current.strum?.patterns ?? []) p.where.forEach((w) => kinds.add(w));
+    return [...kinds];
+  };
+  function setStrum(next: Strum | null) {
+    remember();
+    current.strum = next;
+    renderHead();
+    renderStrum();
+  }
+  function renderStrum() {
+    const box = $("strum-list");
+    const strum = current.strum;
+    if (!strum || strum.patterns.length === 0) {
+      box.replaceChildren(el("p", "adm-hint", "This song has no strumming pattern. Add one, or leave it without."));
+      return;
+    }
+    const kinds = sectionKinds();
+    box.replaceChildren(
+      ...strum.patterns.map((p, n) => {
+        const card = el("article", "se-pat");
+        const head = el("header");
+        head.append(el("h3", "", n === 0 ? "Main pattern" : `Pattern ${n + 1}`), pill(p.kind === "edited" ? "Set by an editor" : p.kind === "heard" ? "Heard in the song" : p.kind === "guess" ? "Best guess" : "Suggested", p.kind === "edited" ? "warn" : ""));
+        const tool = (label: string, on: () => void, kind = "ghost", disabled = false) => {
+          const b = el("button", `adm-btn small ${kind}`, label);
+          b.type = "button";
+          b.disabled = disabled;
+          b.addEventListener("click", on);
+          head.append(b);
+        };
+        tool("Up", () => move(n, -1), "ghost", n === 0);
+        tool("Down", () => move(n, 1), "ghost", n === strum.patterns.length - 1);
+        tool("Duplicate", () => {
+          const copy = clone(strum);
+          copy.patterns.splice(n + 1, 0, { ...clone(p), kind: "edited" });
+          setStrum(copy);
+        }, "ghost", strum.patterns.length >= 8);
+        tool("Delete", () => {
+          if (!confirm("Delete this strumming pattern?")) return;
+          const copy = clone(strum);
+          copy.patterns.splice(n, 1);
+          setStrum(copy.patterns.length ? copy : null);
+        }, "danger");
+        card.append(head);
+
+        // the strokes, grouped by beat
+        const slots = el("div", "se-slots");
+        const names = E.slotNames(p.sub);
+        for (let beat = 0; beat < strum.perBar; beat++) {
+          const group = el("div", "se-beat");
+          for (let s = 0; s < p.sub; s++) {
+            const i = beat * p.sub + s;
+            const slot = el("div", "se-slot");
+            slot.append(el("small", s === 0 ? "on" : "", s === 0 ? String(beat + 1) : names[s]));
+            const b = el("button", "se-stroke", p.pattern[i] === "D" ? "↓" : p.pattern[i] === "U" ? "↑" : "–");
+            b.type = "button";
+            b.dataset.s = p.pattern[i];
+            b.setAttribute("aria-label", `Beat ${beat + 1} ${names[s] || "on the beat"}: ${p.pattern[i] === "D" ? "down" : p.pattern[i] === "U" ? "up" : "nothing"}`);
+            b.addEventListener("click", () => {
+              const copy = clone(strum);
+              copy.patterns[n].pattern[i] = E.nextStroke(p.pattern[i]);
+              copy.patterns[n].kind = "edited";
+              setStrum(copy);
+            });
+            slot.append(b);
+            group.append(slot);
+          }
+          slots.append(group);
+        }
+        card.append(slots);
+        card.append(el("p", "adm-hint", p.pattern.map((s) => (s === "D" ? "↓" : s === "U" ? "↑" : "–")).join(" ")));
+
+        const meta = el("div", "se-pat-meta");
+        const res = el("select");
+        res.setAttribute("aria-label", "Strokes to a beat");
+        for (const [value, text] of [["2", "Eighths (2 to a beat)"], ["4", "Sixteenths (4 to a beat)"]]) {
+          const o = el("option", "", text);
+          o.value = value;
+          res.append(o);
+        }
+        res.value = String(p.sub);
+        res.addEventListener("change", () => {
+          const to = Number(res.value) as 2 | 4;
+          if (!confirm(`Switch this pattern to ${to === 4 ? "sixteenths" : "eighths"}? The strokes are spread out or thinned to fit.`)) {
+            res.value = String(p.sub);
+            return;
+          }
+          const copy = clone(strum);
+          copy.patterns[n] = { ...copy.patterns[n], pattern: E.resample(p.pattern, p.sub, to), sub: to, kind: "edited" };
+          setStrum(copy);
+        });
+        meta.append(res);
+        card.append(meta);
+
+        const where = el("div", "se-where");
+        where.append(el("small", "adm-hint", "Plays in:"));
+        for (const kind of kinds) {
+          const label = el("label", "adm-check");
+          const box = el("input");
+          box.type = "checkbox";
+          box.checked = p.where.includes(kind);
+          box.addEventListener("change", () => {
+            const copy = clone(strum);
+            const set = new Set(copy.patterns[n].where);
+            box.checked ? set.add(kind) : set.delete(kind);
+            copy.patterns[n].where = [...set];
+            copy.patterns[n].kind = "edited";
+            setStrum(copy);
+          });
+          label.append(box, kind);
+          where.append(label);
+        }
+        if (kinds.length === 0) where.append(el("small", "adm-hint", "the whole song"));
+        card.append(where);
+        return card;
+      }),
+    );
+  }
+  function move(n: number, by: number) {
+    const strum = current.strum;
+    if (!strum) return;
+    const copy = clone(strum);
+    const [item] = copy.patterns.splice(n, 1);
+    copy.patterns.splice(n + by, 0, item);
+    setStrum(copy);
+  }
+  $("strum-add").addEventListener("click", () => {
+    const strum = current.strum ?? { perBar, bpm: song.tempo || 0, patterns: [] };
+    if (strum.patterns.length >= 8) return say("se-msg", "A song can have at most 8 strumming patterns.", "bad");
+    const copy = clone(strum);
+    copy.patterns.push({ pattern: E.defaultPattern(copy.perBar, 2), sub: 2, where: [], kind: "edited" });
+    setStrum(copy);
+  });
+
+  // ---- tabs -----------------------------------------------------------------------------------------------------------------
+  function tab(name: "chords" | "strum" | "history") {
+    for (const t of ["chords", "strum", "history"]) {
+      $(`pane-${t}`).hidden = t !== name;
+      $(`tab-${t}`).classList.toggle("is-on", t === name);
+      $(`tab-${t}`).setAttribute("aria-selected", String(t === name));
+    }
+  }
+  for (const t of ["chords", "strum", "history"] as const) $(`tab-${t}`).addEventListener("click", () => tab(t));
+
+  // ---- saving ---------------------------------------------------------------------------------------------------------------
+  let saving = false;
+  async function save() {
+    if (saving || ($("se-save") as HTMLButtonElement).disabled) return;
+    const body: any = { token };
+    if (!same(current.simple, loaded.simple)) body.chords = current.simple;
+    if (!same(current.detailed, loaded.detailed)) body.chordsDetailed = current.detailed;
+    if (!same(current.strum, loaded.strum)) {
+      body.strumChanged = true;
+      body.strum = current.strum;
+    }
+    saving = true;
+    ($("se-save") as HTMLButtonElement).disabled = true;
+    say("se-msg", "Saving…", "");
+    try {
+      const res = await adminFetch(`/api/admin/songs/${encodeURIComponent(videoId)}/edit`, { method: "PUT", body: JSON.stringify(body) });
+      // the server tidies what it keeps (sharps, one chord running into the next): show exactly that
+      await load();
+      say("se-msg", res.changed ? "Saved. The website and the app show it now. The earlier version is kept under Versions." : "Nothing had changed.", "ok");
+    } catch (err) {
+      const text = err instanceof Error ? err.message : "Could not save.";
+      say("se-msg", text, "bad");
+      ($("se-save") as HTMLButtonElement).disabled = false;
+    } finally {
+      saving = false;
+    }
+  }
+  $("se-save").addEventListener("click", save);
+  window.addEventListener("beforeunload", (e) => {
+    if (!$("se-root").hidden && !$("se-save").hasAttribute("disabled")) e.preventDefault();
+  });
+
+  // ---- versions -------------------------------------------------------------------------------------------------------------
+  function renderVersions() {
+    const list = $("ver-list");
+    const inUse = song.versions.find((v: any) => v.token === token)?.id; // the newest one that matches; an older identical one is not "in use"
+    list.replaceChildren(
+      ...song.versions.map((v: any) => {
+        const li = el("li");
+        const isCurrent = v.id === inUse;
+        if (isCurrent) li.classList.add("is-current");
+        const info = el("div");
+        info.append(el("strong", "", v.summary));
+        info.append(el("div", "adm-hint", `${when(v.at)}${v.by ? ` · ${v.by}` : ""}`));
+        const right = el("div", "adm-row");
+        if (isCurrent) right.append(pill("In use now", "ok"));
+        else if (can("songs.edit")) {
+          const b = el("button", "adm-btn small ghost", "Go back to this");
+          b.type = "button";
+          b.addEventListener("click", async () => {
+            const unsaved = !$("se-save").hasAttribute("disabled");
+            if (!confirm(`Put this version back${unsaved ? " (your unsaved changes are lost)" : ""}? What the song has now is kept as a version too.`)) return;
+            b.disabled = true;
+            try {
+              await adminFetch(`/api/admin/songs/${encodeURIComponent(videoId)}/restore`, { method: "POST", body: JSON.stringify({ versionId: v.id, token }) });
+              await load();
+              say("se-msg", "Went back to that version.", "ok");
+            } catch (err) {
+              say("se-msg", err instanceof Error ? err.message : "Could not restore it.", "bad");
+              b.disabled = false;
+            }
+          });
+          right.append(b);
+        }
+        li.append(info, right);
+        return li;
+      }),
+    );
+    if (song.versions.length === 0) list.append(el("li", "", "No versions yet: the first save keeps the original analysis."));
+  }
+
+  // ---- re-analysing ---------------------------------------------------------------------------------------------------------
+  let polling = 0;
+  function showProgress(job: any) {
+    $("se-progress").hidden = false;
+    $("se-progress-stage").textContent = job.stage || (job.status === "queued" ? "Waiting for its turn…" : "Working…");
+    $("se-progress-fill").style.width = `${Math.max(3, job.progress || 0)}%`;
+  }
+  async function watch() {
+    window.clearInterval(polling);
+    polling = window.setInterval(async () => {
+      try {
+        const job = await adminFetch(`/api/job/${encodeURIComponent(song.sessionId)}`);
+        if (job.status === "done") {
+          window.clearInterval(polling);
+          $("se-progress").hidden = true;
+          await load();
+          say("se-msg", "The song was analysed again. The version it replaced is kept under Versions.", "ok");
+        } else if (job.status === "error") {
+          window.clearInterval(polling);
+          showProgress({ stage: "", progress: 0 });
+          say("se-progress-msg", job.error || "The analysis failed.", "bad");
+          $("se-progress-stage").textContent = "It did not work. The song is as it was.";
+        } else showProgress(job);
+      } catch {
+        // keep trying
+      }
+    }, 2000);
+  }
+  $("se-reanalyse").addEventListener("click", async () => {
+    const unsaved = !$("se-save").hasAttribute("disabled");
+    const edited = !!song.edited;
+    if (!confirm(`Analyse “${song.title}” again?\n\nThe new chords and strumming replace the ones now${edited ? ", including the changes made by hand" : ""}${unsaved ? " and your unsaved changes" : ""}. The current version is kept under Versions, so you can go back. It downloads the song from YouTube and takes a minute or two.`)) return;
+    try {
+      const out = await adminFetch(`/api/admin/songs/${encodeURIComponent(videoId)}/reanalyse`, { method: "POST" });
+      say("se-progress-msg", "", "");
+      showProgress({ stage: out.status === "queued" ? "Queued" : "Starting", progress: 3 });
+      watch();
+    } catch (err) {
+      say("se-msg", err instanceof Error ? err.message : "Could not start it.", "bad");
+    }
+  });
+
+  // ---- start ----------------------------------------------------------------------------------------------------------------
+  adminReady().then(async () => {
+    if (!videoId) {
+      showError("No song was chosen. Open this page from the Song pages list.");
+      return;
+    }
+    try {
+      await load();
+      if (song.job && ["queued", "downloading", "analyzing"].includes(song.job.status)) {
+        showProgress(song.job);
+        watch();
+      }
+    } catch (err) {
+      showError(err instanceof Error ? err.message : "Could not load that song.");
+    }
+  });
+  // a few pieces of text the page reads from the layout helpers
+  void adminInfo;
+  void number;
+</script>

@@ -2035,10 +2035,10 @@ import SongRating from "../components/SongRating.astro";
     const shown = slots.map((s) => (s === "-" ? "–" : s)).join(" ");
     const pill = document.getElementById("sm-pill")!;
     const kind = cur.kind;
-    pill.textContent = kind === "heard" ? "Heard in the song" : kind === "guess" ? "Best guess" : "Suggested";
-    pill.classList.toggle("is-heard", kind === "heard");
+    pill.textContent = kind === "heard" ? "Heard in the song" : kind === "edited" ? "Checked by hand" : kind === "guess" ? "Best guess" : "Suggested";
+    pill.classList.toggle("is-heard", kind === "heard" || kind === "edited");
     const where = whereText(cur);
-    strumLabel.textContent = `${strumEasyOn ? "EASY VERSION" : kind === "heard" ? "MAIN PATTERN" : kind === "guess" ? "BEST GUESS" : "SUGGESTED PATTERN"}${where && !strumEasyOn ? ` · ${where.toUpperCase()}` : ""}  ·  ${shown}`;
+    strumLabel.textContent = `${strumEasyOn ? "EASY VERSION" : kind === "heard" || kind === "edited" ? "MAIN PATTERN" : kind === "guess" ? "BEST GUESS" : "SUGGESTED PATTERN"}${where && !strumEasyOn ? ` · ${where.toUpperCase()}` : ""}  ·  ${shown}`;
     strumTiles.style.setProperty("--cols", String(Math.min(slots.length, 8)));
     slots.forEach((kindOf, i) => {
       const tile = el_("div", `sm-tile${kindOf === "-" ? " is-rest" : kindOf === "D" ? " is-down" : " is-up"}`);
@@ -2057,10 +2057,12 @@ import SongRating from "../components/SongRating.astro";
     const several = strumList.length > 1;
     strumText.innerHTML = strumEasyOn
       ? `One down-strum on every beat (${beats}): the simplest way to play this song, at its ${feel} ${bpm} BPM.`
-      : kind === "heard"
+      : kind === "heard" || kind === "edited"
         ? several
           ? `${where ? `Played in the ${where}` : "One of the ways this song is played"}, at the song’s ${feel} ${bpm} BPM groove. The song does not strum the same way all through, so switch patterns to see the others.`
-          : `The pattern the recording keeps coming back to, at the song’s ${feel} ${bpm} BPM groove.`
+          : kind === "edited"
+            ? `The strumming for this song, checked by hand, at the song’s ${feel} ${bpm} BPM groove.`
+            : `The pattern the recording keeps coming back to, at the song’s ${feel} ${bpm} BPM groove.`
         : kind === "guess"
           ? `The strumming here is not steady enough to be sure, so this is our best guess from the beats that stand out, at the song’s ${feel} ${bpm} BPM feel.`
           : `We could not hear one clear strum, so this is a typical ${strum.perBar}-beat pattern for the song’s ${feel} ${bpm} BPM feel.`;
@@ -2071,7 +2073,7 @@ import SongRating from "../components/SongRating.astro";
     strumNote.textContent =
       kind === "typical"
         ? "A suggestion for this time signature, not a pattern heard in the song."
-        : `${kind === "guess" ? "A rough reading of the recording. " : "Worked out from the recording. "}Down and up strokes cannot be heard, so the usual picture is shown: the hand keeps moving down and up, so strokes on the beat are down-strums and strokes on the “&” up-strums. Lighter strokes and muted ones may be missing.`;
+        : `${kind === "guess" ? "A rough reading of the recording. " : kind === "edited" ? "Checked and set by hand. " : "Worked out from the recording. "}Down and up strokes cannot be heard, so the usual picture is shown: the hand keeps moving down and up, so strokes on the beat are down-strums and strokes on the “&” up-strums. Lighter strokes and muted ones may be missing.`;
   }
 
   /** Lights the slot (an eighth or sixteenth note) that is playing, from the bars the grid is drawn from. */

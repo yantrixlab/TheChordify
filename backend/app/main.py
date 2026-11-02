@@ -32,6 +32,7 @@ from .search import RateLimiter, SearchUnavailable, clean_query, find_video, rad
 from .sections_ai import status as section_model_status
 from .similar import shelf as similar_shelf
 from .songpages import SongPages
+from . import songedit
 from .store import SongStore
 from . import trending as trending_shelves
 from . import youtube
@@ -205,8 +206,11 @@ def _refine_sections(session_id: str, result: dict, upgrade, cleanup: Optional[s
     try:
         sections = upgrade()
         if sections:
-            result = {**result, "sections": sections, "sectionsSource": "model"}
-            _save_result(session_id, result)
+            result = {**(_load_saved_result(session_id) or result), "sections": sections, "sectionsSource": "model"}  # on top of what is saved now, so a hand edit is kept
+            if result.get("edited"):
+                catalog.save_result(session_id, result)  # an edited song keeps the stamp of the detector that made it
+            else:
+                _save_result(session_id, result)
             _set_job(session_id, result=result)
     except Exception as exc:
         log.warning("Refining the sections failed for %s: %s", session_id, exc)
@@ -235,7 +239,7 @@ def _load_cached_result(key: str) -> Optional[dict]:
         log.warning("Could not read the saved result %s: %s", key, exc)
         return None
     # Results from an older detector (e.g. before the timing-drift fix) are re-analysed.
-    return result if result and result.get("analysisVersion") == ANALYSIS_VERSION else None
+    return result if result and (result.get("analysisVersion") == ANALYSIS_VERSION or result.get("edited")) else None  # an edited song stays as edited
 
 
 def _load_saved_result(key: str) -> Optional[dict]:
@@ -1739,7 +1743,7 @@ def add_jam(video_id: str, request: Request) -> dict:
 _new_song_limiter = RateLimiter(limit=max(NEW_SONGS_PER_HOUR, 1), window=3600.0)
 
 
-def _enqueue(request: Request, session_id: str, task) -> dict:
+def _enqueue(request: Request, session_id: str, task, staff: bool = False) -> dict:
     """Starts a new analysis in line. One visitor may only start so many new songs an hour, and the line has a length
     limit; joining a job that is already waiting or running costs nothing."""
     existing = _get_job(session_id)
@@ -1747,7 +1751,7 @@ def _enqueue(request: Request, session_id: str, task) -> dict:
         return {"sessionId": session_id, "status": existing["status"]}
 
     caller = request.client.host if request.client else "unknown"
-    limited = NEW_SONGS_PER_HOUR > 0 and not _is_admin(request)
+    limited = NEW_SONGS_PER_HOUR > 0 and not _is_admin(request) and not staff
     if limited and not _new_song_limiter.allow(caller):
         minutes = max(1, int(_new_song_limiter.retry_after(caller) // 60) + 1)
         raise HTTPException(
@@ -1764,7 +1768,7 @@ def _enqueue(request: Request, session_id: str, task) -> dict:
     daily = PlanStore.limit(plan, "songs_per_day")
     owner = user["id"] if user else f"ip:{caller}"
     today = _today()
-    if daily is not None and not _is_admin(request) and plans.usage(owner, today, "songs") >= daily:
+    if daily is not None and not staff and not _is_admin(request) and plans.usage(owner, today, "songs") >= daily:
         if limited:
             _new_song_limiter.refund(caller)
         raise HTTPException(
@@ -1783,7 +1787,8 @@ def _enqueue(request: Request, session_id: str, task) -> dict:
             _new_song_limiter.refund(caller)
         _JOBS.pop(session_id, None)
         raise HTTPException(status_code=503, detail="We're very busy right now. Please try again in a few minutes.")
-    plans.add_usage(owner, today, "songs")
+    if not staff:
+        plans.add_usage(owner, today, "songs")
     return {"sessionId": session_id, "status": "queued"}
 
 
@@ -1904,7 +1909,7 @@ class SongPageBody(BaseModel):
 def admin_song_pages(
     request: Request, search: str = "", page: int = 1, pageSize: int = 25, status: str = "all", since: float = 0, until: float = 0
 ) -> dict:
-    _require_perm(request, "song_pages.manage")
+    _require_perm(request, "song_pages.manage", "songs.edit", "songs.reanalyse")
     if status not in ("all", "published", "unpublished"):
         status = "all"
     return song_pages.admin_list(search.strip()[:80], max(page, 1), min(max(pageSize, 1), 100), status, max(since, 0), max(until, 0))
@@ -1927,6 +1932,172 @@ def admin_unpublish_song_page(video_id: str, request: Request) -> dict:
     if not is_video_id(video_id):
         raise HTTPException(status_code=404, detail="Unknown song")
     return {"ok": song_pages.unpublish(video_id)}
+
+
+# ---- editing a chordified song from the admin ----------------------------------------------------------------------------
+#
+# The editor page loads a song's chords, beats and strumming, the editor changes them, and the whole lists are sent back with the
+# fingerprint they were loaded with; a save on top of somebody else's change is refused. Every save keeps the earlier state as a version
+# (songedit.py), an edited song is never re-analysed by itself, and a re-analysis keeps the version it replaces.
+
+
+class SongEditBody(BaseModel):
+    token: str
+    chords: Optional[list[dict]] = None
+    chordsDetailed: Optional[list[dict]] = None
+    strumChanged: bool = False
+    strum: Optional[dict] = None
+
+
+class RestoreBody(BaseModel):
+    versionId: str
+    token: str
+
+
+def _editable_song(video_id: str) -> tuple[str, dict, dict]:
+    """(session id, catalog entry, saved result) of a chordified YouTube song, or the right error."""
+    if not is_video_id(video_id):
+        raise HTTPException(status_code=404, detail="Unknown song")
+    rows, _ = catalog.db.run("SELECT session_id FROM songs WHERE video_id = ?", (video_id,))
+    song = catalog.get_song(video_id)
+    if not rows or not song:
+        raise HTTPException(status_code=404, detail="That song is not in the catalog")
+    session_id = rows[0]["session_id"]
+    result = catalog.load_result(session_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="That song has no saved analysis to edit")
+    return session_id, song, result
+
+
+def _who(actor: _Actor) -> str:
+    return actor.user["email"] if actor.user else "the admin token"
+
+
+def _after_song_edit(video_id: str, session_id: str, result: dict) -> None:
+    """What hangs on a song's chords: the catalog (main chords and key on the search cards), and the copy the job queue still holds."""
+    _record_song(video_id, session_id, result, {})
+    if _get_job(session_id):
+        _set_job(session_id, result=result)
+
+
+@app.get("/api/admin/songs/{video_id}/edit")
+def admin_song_edit(video_id: str, request: Request) -> dict:
+    actor = _require_perm(request, "songs.edit")
+    session_id, song, result = _editable_song(video_id)
+    job = _get_job(session_id) or {}
+    return {
+        "videoId": video_id,
+        "sessionId": session_id,
+        "title": result.get("title") or song["title"],
+        "artist": result.get("artist") or song["artist"],
+        "duration": result.get("duration") or song["duration"],
+        "tempo": result.get("tempo"),
+        "key": result.get("key", ""),
+        "beatsPerBar": result.get("beatsPerBar", 4),
+        "bars": result.get("bars", []),
+        "sections": result.get("sections", []),
+        "chords": result.get("chords", []),
+        "chordsDetailed": result.get("chordsDetailed") or result.get("chords", []),
+        "strum": result.get("strum"),
+        "edited": result.get("edited"),
+        "token": songedit.token(result),
+        "detector": {"analysisVersion": result.get("analysisVersion"), "current": ANALYSIS_VERSION, "engine": result.get("engine")},
+        "versions": songedit.version_list(songedit.load_versions(catalog, session_id)),
+        "job": {"status": job.get("status"), "progress": job.get("progress"), "stage": job.get("stage"), "error": job.get("error")} if job.get("status") in ("queued", "downloading", "analyzing", "error") else None,
+        "canReanalyse": actor.is_super or roles_module.allows(actor.perms, "songs.reanalyse"),
+    }
+
+
+@app.put("/api/admin/songs/{video_id}/edit")
+def admin_song_save(video_id: str, body: SongEditBody, request: Request) -> dict:
+    actor = _require_perm(request, "songs.edit")
+    session_id, song, result = _editable_song(video_id)
+    if body.token != songedit.token(result):
+        raise HTTPException(status_code=409, detail="This song was changed by somebody else (or re-analysed) since you opened it. Reload the page to see the latest version; your changes here are not saved.")
+    if body.chords is None and body.chordsDetailed is None and not body.strumChanged:
+        raise HTTPException(status_code=400, detail="There is nothing to save.")
+    duration = float(result.get("duration") or song["duration"] or 0)
+    try:
+        chords = songedit.clean_chords(body.chords, duration, "chords") if body.chords is not None else None
+        detailed = songedit.clean_chords(body.chordsDetailed, duration, "detailed chords") if body.chordsDetailed is not None else None
+        strum = songedit.clean_strum(body.strum, int(result.get("beatsPerBar") or 4), result.get("strum")) if body.strumChanged else None
+    except songedit.EditError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    who = _who(actor)
+    new = songedit.apply_edit(result, chords=chords, detailed=detailed, strum_set=body.strumChanged, strum=strum, by=who)
+    if songedit.token(new) == songedit.token(result):
+        return {"changed": False, "token": songedit.token(result), "versions": songedit.version_list(songedit.load_versions(catalog, session_id)), "edited": result.get("edited")}
+    summary = songedit.describe_change(result, new)
+    if not songedit.load_versions(catalog, session_id):
+        songedit.add_version(catalog, session_id, result, "Original analysis", "")  # the first edit keeps what the detector made
+    catalog.save_result(session_id, new)  # as it is (an older detector's stamp stays; "edited" keeps it from being re-analysed)
+    songedit.add_version(catalog, session_id, new, summary, who)
+    _after_song_edit(video_id, session_id, new)
+    _audit(actor, f"edited the song {video_id}: {summary}")
+    return {
+        "changed": True, "token": songedit.token(new), "edited": new["edited"], "key": new.get("key", ""),
+        "versions": songedit.version_list(songedit.load_versions(catalog, session_id)),
+    }
+
+
+@app.post("/api/admin/songs/{video_id}/restore")
+def admin_song_restore(video_id: str, body: RestoreBody, request: Request) -> dict:
+    """Puts an earlier version's chords and strumming back (the state it replaces is kept as a version too)."""
+    actor = _require_perm(request, "songs.edit")
+    session_id, _song, result = _editable_song(video_id)
+    if body.token != songedit.token(result):
+        raise HTTPException(status_code=409, detail="This song changed since you opened it. Reload the page first.")
+    versions = songedit.load_versions(catalog, session_id)
+    version = songedit.find_version(versions, body.versionId)
+    if not version:
+        raise HTTPException(status_code=404, detail="No such version")
+    who = _who(actor)
+    new = songedit.restore(result, version, who)
+    if songedit.token(new) == songedit.token(result):
+        raise HTTPException(status_code=400, detail="That is already the version in use.")
+    if songedit.token(result) not in {v["token"] for v in versions}:
+        songedit.add_version(catalog, session_id, result, "Before going back to an earlier version", who)
+    catalog.save_result(session_id, new)
+    songedit.add_version(catalog, session_id, new, f"Went back to “{version['summary']}”", who)
+    _after_song_edit(video_id, session_id, new)
+    _audit(actor, f"restored the song {video_id} to the version “{version['summary']}”")
+    return {"token": songedit.token(new), "edited": new["edited"], "versions": songedit.version_list(songedit.load_versions(catalog, session_id))}
+
+
+@app.post("/api/admin/songs/{video_id}/reanalyse")
+def admin_song_reanalyse(video_id: str, request: Request) -> dict:
+    """Runs the chord detector on the song again (it downloads the audio from YouTube, like any new song). The finished analysis replaces the
+    song's chords and strumming, including any hand edits; the version it replaces is kept first, so it can be restored."""
+    actor = _require_perm(request, "songs.reanalyse")
+    session_id, song, result = _editable_song(video_id)
+    existing = _get_job(session_id)
+    if existing and existing.get("status") in ("queued", "downloading", "analyzing"):
+        return {"sessionId": session_id, "status": existing["status"]}
+    who = _who(actor)
+    versions = songedit.load_versions(catalog, session_id)
+    if songedit.token(result) not in {v["token"] for v in versions}:
+        songedit.add_version(catalog, session_id, result, "Before re-analysis", who)
+    url = f"https://www.youtube.com/watch?v={video_id}"
+    meta = {
+        "title": (result.get("title") or song["title"] or "")[:200],
+        "artist": (result.get("artist") or song["artist"] or "")[:200],
+        "album": "",
+        "thumbnail": song["thumbnail"] if str(song.get("thumbnail", "")).startswith("https://") else "",
+        "duration": float(result.get("duration") or song["duration"] or 0),
+    }
+
+    def task() -> None:
+        _run_youtube_job(session_id, url, meta)
+        job = _get_job(session_id) or {}
+        if job.get("status") == "done" and job.get("result"):
+            try:
+                songedit.add_version(catalog, session_id, job["result"], "Re-analysed with the latest detector", who)
+            except Exception as exc:
+                log.warning("Could not keep the re-analysis of %s as a version: %s", video_id, exc)
+
+    out = _enqueue(request, session_id, task, staff=True)
+    _audit(actor, f"started a re-analysis of the song {video_id}")
+    return out
 
 
 _PAGE_HEADERS = {"Cache-Control": "public, max-age=300"}

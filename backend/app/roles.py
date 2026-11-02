@@ -58,6 +58,8 @@ PERMISSION_GROUPS: list[dict] = [
     {"group": "Content", "items": [
         ("ratings.view", "See ratings and comments", "What people said about songs' chords."),
         ("song_pages.manage", "Manage song pages", "Publish and unpublish the pages that search engines see."),
+        ("songs.edit", "Edit song chords and strumming", "Change the chords in the grid and the strumming patterns of a chordified song, and go back to an earlier version."),
+        ("songs.reanalyse", "Re-analyse songs", "Run the chord detector on a song again. It replaces the song's chords; the earlier version is kept so it can be restored."),
     ]},
     {"group": "Server", "items": [
         ("youtube.manage", "Manage YouTube accounts", "The accounts the server downloads with, and the download test."),
@@ -68,7 +70,7 @@ PERMISSIONS: list[str] = [item[0] for group in PERMISSION_GROUPS for item in gro
 _KNOWN = set(PERMISSIONS)
 
 # What the built-in editor starts with (the admin can change it).
-DEFAULT_EDITOR = ["overview.view", "users.view", "ratings.view", "song_pages.manage"]
+DEFAULT_EDITOR = ["overview.view", "users.view", "ratings.view", "song_pages.manage", "songs.edit"]
 
 BUILTIN = ("admin", "editor", "user")
 _KEY = re.compile(r"^[a-z][a-z0-9_-]{1,31}$")

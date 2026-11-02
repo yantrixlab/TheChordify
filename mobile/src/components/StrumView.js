@@ -69,10 +69,12 @@ export function StrumView({ result, chart, time, bottomInset, width: given }) {
 
   const text = easy
     ? `One down-strum on every beat (${beats}): the simplest way to play this song, at its ${feel} ${bpm} BPM.`
-    : kind === 'heard'
+    : kind === 'heard' || kind === 'edited'
       ? several
         ? `${where ? `Played in the ${where}` : 'One of the ways this song is played'}, at the song’s ${feel} ${bpm} BPM groove. The song does not strum the same way all through, so switch patterns to see the others.`
-        : `The pattern the recording keeps coming back to, at the song’s ${feel} ${bpm} BPM groove.`
+        : kind === 'edited'
+          ? `The strumming for this song, checked by hand, at the song’s ${feel} ${bpm} BPM groove.`
+          : `The pattern the recording keeps coming back to, at the song’s ${feel} ${bpm} BPM groove.`
       : kind === 'guess'
         ? `The strumming here is not steady enough to be sure, so this is our best guess from the beats that stand out, at the song’s ${feel} ${bpm} BPM feel.`
         : `We could not hear one clear strum, so this is a typical ${perBar}-beat pattern for the song’s ${feel} ${bpm} BPM feel.`;
@@ -97,7 +99,7 @@ export function StrumView({ result, chart, time, bottomInset, width: given }) {
           </Text>
         ))}
       </View>
-      <Text style={[styles.pill, kind === 'heard' && styles.pillHeard]}>{kind === 'heard' ? 'Heard in the song' : kind === 'guess' ? 'Best guess' : 'Suggested'}</Text>
+      <Text style={[styles.pill, (kind === 'heard' || kind === 'edited') && styles.pillHeard]}>{kind === 'heard' ? 'Heard in the song' : kind === 'edited' ? 'Checked by hand' : kind === 'guess' ? 'Best guess' : 'Suggested'}</Text>
       <View style={styles.tiles}>
         {slots.map((slot, i) => {
           const within = i % sub;
@@ -122,7 +124,7 @@ export function StrumView({ result, chart, time, bottomInset, width: given }) {
       <Text style={styles.note}>
         {kind === 'typical'
           ? 'A suggestion for this time signature, not a pattern heard in the song.'
-          : `${kind === 'guess' ? 'A rough reading of the recording. ' : 'Worked out from the recording. '}Down and up strokes cannot be heard, so the usual picture is shown: the hand keeps moving down and up, so strokes on the beat are down-strums and strokes on the “&” up-strums.`}
+          : `${kind === 'guess' ? 'A rough reading of the recording. ' : kind === 'edited' ? 'Checked and set by hand. ' : 'Worked out from the recording. '}Down and up strokes cannot be heard, so the usual picture is shown: the hand keeps moving down and up, so strokes on the beat are down-strums and strokes on the “&” up-strums.`}
       </Text>
     </ScrollView>
   );

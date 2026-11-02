@@ -494,13 +494,19 @@ def _strum_html(strum: Optional[dict], title: str) -> str:
         kind = p.get("kind") or "typical"
         where = " and ".join(_esc(w) for w in (p.get("where") or []))
         shown = " ".join("–" if c == "-" else c for c in pattern)
-        word = "MAIN PATTERN" if kind == "heard" else "BEST GUESS" if kind == "guess" else "SUGGESTED PATTERN"
+        word = "MAIN PATTERN" if kind in ("heard", "edited") else "BEST GUESS" if kind == "guess" else "SUGGESTED PATTERN"
         if len(found) > 1:
             word = f"PATTERN {n + 1}"
-        pill = "Heard in the song" if kind == "heard" else "Best guess" if kind == "guess" else "Suggested"
+        pill = "Heard in the song" if kind == "heard" else "Checked by hand" if kind == "edited" else "Best guess" if kind == "guess" else "Suggested"
         intro = (
-            (f"Played in the {where}, at the song's {feel} {bpm} BPM groove." if where else f"The pattern the recording keeps coming back to, at the song's {feel} {bpm} BPM groove.")
-            if kind == "heard"
+            (
+                f"Played in the {where}, at the song's {feel} {bpm} BPM groove."
+                if where
+                else f"The strumming for this song, checked by hand, at the song's {feel} {bpm} BPM groove."
+                if kind == "edited"
+                else f"The pattern the recording keeps coming back to, at the song's {feel} {bpm} BPM groove."
+            )
+            if kind in ("heard", "edited")
             else (
                 f"The strumming here is not steady enough to be sure, so this is our best guess from the beats that stand out, at the song's {feel} {bpm} BPM feel."
                 if kind == "guess"
@@ -508,7 +514,7 @@ def _strum_html(strum: Optional[dict], title: str) -> str:
             )
         )
         blocks.append(
-            f'<div class="sm-one"><div class="sm-ttl"><span class="sm-pill{" is-heard" if kind == "heard" else ""}">{pill}</span></div>'
+            f'<div class="sm-one"><div class="sm-ttl"><span class="sm-pill{" is-heard" if kind in ("heard", "edited") else ""}">{pill}</span></div>'
             f'<p class="sm-label">{word}{" · " + where.upper() if where else ""}  ·  {_esc(shown)}</p>'
             f'<div class="sm-tiles" style="--cols:{min(len(pattern), 8)}" role="list" aria-label="Strums in one bar">{_strum_tiles(pattern, sub)}</div>'
             f'<p class="sm-text">{intro}</p></div>'
@@ -600,6 +606,10 @@ class SongPages:
                 tuple(keys) + (f'%"analysisVersion": {self._version}%',),
             )
             current = {f["key"] for f in fresh}
+            by_hand, _ = self._db.run(f"SELECT key FROM results WHERE key IN ({marks}) AND data LIKE ?", tuple(keys) + ('%"edited": %',))
+            edited = {f["key"] for f in by_hand}
+        else:
+            edited = set()
         songs = []
         for r in rows:
             sug = self.suggestion(r)
@@ -622,6 +632,7 @@ class SongPages:
                     "suggestedSlug": sug["slug"],
                     "publishedAt": r["page_published_at"],
                     "analysed": r["session_id"] in current,
+                    "edited": r["session_id"] in edited,  # an editor changed its chords or strumming by hand
                 }
             )
         return {"songs": songs, "total": total[0]["n"], "published": self.count()}
