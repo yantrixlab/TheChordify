@@ -40,6 +40,7 @@ PERMISSION_GROUPS: list[dict] = [
         ("users.block", "Block and unblock people", "A blocked person is signed out at once and cannot sign in."),
         ("users.create", "Create accounts and set passwords", "Make staff accounts with an email and password; reset a password."),
         ("users.roles", "Change a person's role", "Only to roles that have no more power than your own."),
+        ("users.plans", "Give, renew and end subscription plans", "Give a person a plan for a period without a payment, extend it, or end it; stop a paid plan renewing."),
     ]},
     {"group": "Roles", "items": [
         ("roles.manage", "Manage roles and permissions", "Create roles and choose what each can do (never more than your own role can)."),

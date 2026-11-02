@@ -25,6 +25,7 @@ from .accounts import AccountStore, SignInError
 from . import roles as roles_module
 from .roles import RoleError, RoleStore
 from .billing import Razorpay, RazorpayError, entity_summary
+from . import plans as plans_module
 from .plans import FREE_CODE, PERIODS, PlanStore
 from .engagement import BADGE_RULES, DEFAULT_CONFIG, REWARD_KINDS, Engagement
 from .jobs import JobQueue
@@ -689,6 +690,7 @@ def _subscription_view(sub: Optional[dict]) -> Optional[dict]:
         "status": sub["status"], "cancelAtPeriodEnd": sub["cancelAtPeriodEnd"], "currentEnd": sub["currentEnd"] or None,
         "priceId": sub["priceId"], "period": price["period"] if price else "", "intervalCount": price["intervalCount"] if price else 1,
         "amountMinor": price["amountMinor"] if price else 0, "currency": price["currency"] if price else "INR",
+        "gift": bool(sub.get("manual")),  # given by the team, not paid for: nothing renews and nothing is charged
     }
 
 
@@ -782,8 +784,7 @@ def delete_my_account(request: Request, response: Response) -> dict:
         raise HTTPException(status_code=400, detail="An administrator's account is removed by taking it off the admin list first.")
     if (user.get("role") or "user") != "user":
         raise HTTPException(status_code=400, detail="A staff account is removed by an administrator, who first changes it to a general user.")
-    _plan, sub = plans.effective(user["id"])
-    if sub:
+    for sub in plans.live_paid(user["id"]):  # a plan the team gave costs nothing and has nothing to cancel
         try:
             razorpay.cancel_subscription(sub["razorpaySubscriptionId"], at_cycle_end=False)
             plans.mark_cancelling(sub["razorpaySubscriptionId"])
@@ -808,7 +809,8 @@ def delete_my_account(request: Request, response: Response) -> dict:
 def billing_cancel(request: Request) -> dict:
     """Stops renewals. A person keeps the plan until the end of the period they have paid for."""
     user = _require_user(request, changes=True)
-    plan, sub = plans.effective(user["id"])
+    paid = plans.live_paid(user["id"])  # what the person pays for, even while the team has given them a plan on top
+    sub = paid[0] if paid else None
     if not sub:
         raise HTTPException(status_code=404, detail="You do not have a subscription to cancel.")
     if sub["cancelAtPeriodEnd"]:
@@ -955,16 +957,133 @@ def admin_users(request: Request, search: str = "", page: int = 1, pageSize: int
     xps = engagement.xp_of([u["id"] for u in users])
     levels = engagement.levels_of(xps)
     names = {r["key"]: r["name"] for r in role_store.list()}
+    current = plans.effective_many([u["id"] for u in users])
     out = []
     for u in users:
         env_admin = u["email"] in _ADMIN_EMAILS
         shown = "admin" if env_admin else u["role"]
+        plan, sub = current[u["id"]]
         out.append({
             **u, "role": shown, "roleName": names.get(shown, shown), "isEnvAdmin": env_admin, "isAdmin": shown == "admin",
             "xp": xps.get(u["id"], 0), "level": levels.get(u["id"], 1),
             "canManage": _may_manage(actor, u),
+            # the plan they have right now (not the code saved on the account, which lags when a plan runs out)
+            "plan": plan["code"], "planName": plan["name"], "planIsFree": plan["isFree"],
+            "planSource": "free" if not sub else "gift" if sub["manual"] else "paid",
+            "planEnd": (sub["currentEnd"] or None) if sub else None,
+            "planRenewalOff": bool(sub and sub["cancelAtPeriodEnd"] and not sub["manual"]),
         })
-    return {"users": out, "total": total, "page": page, "pageSize": size}
+    return {"users": out, "total": total, "page": page, "pageSize": size, "canGivePlans": actor.is_super or roles_module.allows(actor.perms, "users.plans")}
+
+
+# ---- giving, renewing and ending a person's plan -------------------------------------------------------------------------
+#
+# A plan the team gives is a subscription row that nobody pays for and nothing renews (plans.py "manual_"): the website, the app and the
+# limits read it like any other, it wins over what the person pays for while it runs, and the paid plan is there again when it ends.
+# Plans are not privileges, so any person may be given one (an administrator too); the permission is what matters.
+
+
+class PlanBody(BaseModel):
+    action: str  # give | extend | end | stop_renewal
+    planId: str = ""
+    unit: str = ""  # days | months | years | lifetime | until
+    amount: int = 0
+    until: float = 0  # unit "until": the moment the plan ends, in seconds
+
+
+_UNIT_LIMITS = {"days": 3650, "months": 120, "years": 10}
+
+
+def _plan_end(body: PlanBody, start: float) -> float:
+    """When a plan given for this length ends (0: no end date)."""
+    if body.unit == "lifetime":
+        return 0.0
+    if body.unit == "until":
+        if not body.until or body.until < time.time() + 60:
+            raise HTTPException(status_code=400, detail="Pick an end date in the future.")
+        if body.until > time.time() + 50 * 365 * 86400:
+            raise HTTPException(status_code=400, detail="Pick an end date within 50 years, or choose no end date.")
+        return float(body.until)
+    limit = _UNIT_LIMITS.get(body.unit)
+    if not limit:
+        raise HTTPException(status_code=400, detail="Choose how long: days, months, years, until a date, or no end date.")
+    if not 1 <= body.amount <= limit:
+        raise HTTPException(status_code=400, detail=f"Choose between 1 and {limit} {body.unit}.")
+    return plans_module.add_period(start, body.unit, body.amount)
+
+
+def _plan_state(target: dict) -> dict:
+    """What the plan dialog shows: the plan a person has, where it comes from, what they pay for, and their history."""
+    uid = target["id"]
+    plan, sub = plans.effective(uid)
+    gift = plans.live_manual(uid)
+    paid = plans.live_paid(uid)
+    names = {p["id"]: p["name"] for p in plans.list_plans()}
+
+    def short(s: Optional[dict]) -> Optional[dict]:
+        return {"planId": s["planId"], "planName": names.get(s["planId"], ""), "end": s["currentEnd"] or None, "renewalOff": s["cancelAtPeriodEnd"], "status": s["status"]} if s else None
+
+    return {
+        "user": {"id": uid, "email": target["email"], "name": target["name"]},
+        "current": {"planId": plan["id"], "planName": plan["name"], "isFree": plan["isFree"], "source": "free" if not sub else "gift" if sub["manual"] else "paid", "end": (sub["currentEnd"] or None) if sub else None},
+        "gift": short(gift),
+        "paid": short(paid[0] if paid else None),
+        "plans": [{"id": p["id"], "name": p["name"], "active": p["active"]} for p in plans.list_plans() if not p["isFree"]],
+        "history": plans.history(uid),
+    }
+
+
+@app.get("/api/admin/users/{user_id}/plan")
+def admin_user_plan(user_id: str, request: Request) -> dict:
+    _require_perm(request, "users.plans")
+    target = accounts.get_user(user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="No such user")
+    return _plan_state(target)
+
+
+@app.post("/api/admin/users/{user_id}/plan")
+def admin_user_plan_change(user_id: str, body: PlanBody, request: Request) -> dict:
+    actor = _require_perm(request, "users.plans")
+    target = accounts.get_user(user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="No such user")
+    now = time.time()
+    if body.action == "give":
+        plan = plans.get_plan(body.planId)
+        if not plan or plan["isFree"]:
+            raise HTTPException(status_code=400, detail="Choose one of the paid plans.")
+        end = _plan_end(body, now)
+        plans.give_plan(user_id, plan["id"], end)
+        _audit(actor, f"gave {target['email']} the {plan['name']} plan {'with no end date' if not end else 'until ' + time.strftime('%Y-%m-%d', time.gmtime(end))}")
+    elif body.action == "extend":
+        live = plans.live_manual(user_id)
+        if not live:
+            raise HTTPException(status_code=400, detail="They have no plan from the team running now. Give them a plan instead.")
+        if not live["currentEnd"] and body.unit != "lifetime":
+            raise HTTPException(status_code=400, detail="That plan has no end date, so there is nothing to extend.")
+        end = _plan_end(body, live["currentEnd"] or now)
+        if end and end <= (live["currentEnd"] or 0):
+            raise HTTPException(status_code=400, detail="That date is not later than the plan's current end. To shorten a plan, end it and give it again.")
+        plans.extend_manual(live, end)
+        _audit(actor, f"extended {target['email']}'s plan {'to no end date' if not end else 'to ' + time.strftime('%Y-%m-%d', time.gmtime(end))}")
+    elif body.action == "end":
+        if not plans.end_manual(user_id):
+            raise HTTPException(status_code=400, detail="They have no plan from the team running now.")
+        _audit(actor, f"ended the plan the team gave {target['email']}")
+    elif body.action == "stop_renewal":
+        paid = [s for s in plans.live_paid(user_id) if not s["cancelAtPeriodEnd"]]
+        if not paid:
+            raise HTTPException(status_code=400, detail="They do not have a paid plan that is renewing.")
+        try:
+            razorpay.cancel_subscription(paid[0]["razorpaySubscriptionId"], at_cycle_end=True)
+        except RazorpayError as exc:
+            raise HTTPException(status_code=502, detail=str(exc))
+        plans.mark_cancelling(paid[0]["razorpaySubscriptionId"])
+        _audit(actor, f"stopped the renewal of {target['email']}'s paid plan")
+    else:
+        raise HTTPException(status_code=400, detail="Unknown action.")
+    return _plan_state(target)
 
 
 @app.post("/api/admin/users/{user_id}/disabled")

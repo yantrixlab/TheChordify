@@ -11,6 +11,7 @@ export interface Rule {
 export interface Subscription {
   status: string;
   cancelAtPeriodEnd: boolean;
+  gift?: boolean; // given by the team: nothing renews and nothing is charged
   currentEnd: number | null;
   priceId: string;
   period: string;

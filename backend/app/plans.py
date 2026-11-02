@@ -176,12 +176,38 @@ def _slug_ok(text: str) -> bool:
     return bool(text) and all(c.isalnum() or c in "-_" for c in text)
 
 
+MANUAL_PREFIX = "manual_"  # a plan an admin gave (no payment): its "razorpay id" is made up, so it can never match a webhook
+
+
+def is_manual(razorpay_id: str) -> bool:
+    return str(razorpay_id or "").startswith(MANUAL_PREFIX)
+
+
 def grants_access(sub: dict, now: float) -> bool:
-    """Whether a subscription gives its plan right now. A cancelled one still does until the period that was paid for ends."""
+    """Whether a subscription gives its plan right now. A cancelled one still does until the period that was paid for ends.
+    A plan an admin gave runs until its end date (0: no end), and stops the moment an admin ends it."""
     status = sub["status"]
+    if sub.get("manual"):
+        return status == "active" and (not sub["currentEnd"] or sub["currentEnd"] > now)
     if status in ("active", "pending"):  # "pending" is a failed renewal Razorpay is still retrying
         return True
     return status in ("cancelled", "completed", "expired") and sub["currentEnd"] > now
+
+
+def add_period(start: float, unit: str, amount: int) -> float:
+    """A moment `amount` days, months or years after `start` (calendar months: 31 Jan + 1 month is the last day of February), at the same time of day."""
+    import calendar
+    from datetime import datetime, timedelta, timezone
+
+    when = datetime.fromtimestamp(start, tz=timezone.utc)
+    if unit == "days":
+        return (when + timedelta(days=amount)).timestamp()
+    months = amount * (12 if unit == "years" else 1)
+    index = when.year * 12 + (when.month - 1) + months
+    year, month = divmod(index, 12)
+    month += 1
+    day = min(when.day, calendar.monthrange(year, month)[1])
+    return when.replace(year=year, month=month, day=day).timestamp()
 
 
 def months_in(period: str, interval: int) -> float:
@@ -572,13 +598,31 @@ class PlanStore:
         free = next(p for p in plans.values() if p["code"] == FREE_CODE)
         if not user_id:
             return free, None
-        now = time.time()
         rows, _ = self._db.run("SELECT * FROM subscriptions WHERE user_id = ? ORDER BY updated_at DESC", (user_id,))
-        for row in rows:
-            sub = self._sub(row)
-            if grants_access(sub, now) and row["plan_id"] in plans:
-                return plans[row["plan_id"]], sub
+        return self._pick(rows, plans, free, time.time())
+
+    def _pick(self, rows: list[dict], plans: dict, free: dict, now: float) -> tuple[dict, Optional[dict]]:
+        """The plan one person's subscription rows (newest first) give right now. A plan an admin gave comes first: it is a decision
+        somebody made on purpose, and when it ends the person falls back to whatever they pay for."""
+        subs = [self._sub(r) for r in rows]
+        for sub in sorted(subs, key=lambda s: not s["manual"]):  # stable: newest first within each kind
+            if grants_access(sub, now) and sub["planId"] in plans:
+                return plans[sub["planId"]], sub
         return free, None
+
+    def effective_many(self, user_ids: list[str]) -> dict[str, tuple[dict, Optional[dict]]]:
+        """effective() for a page of people in two queries."""
+        plans = {p["id"]: p for p in self.list_plans()}
+        free = next(p for p in plans.values() if p["code"] == FREE_CODE)
+        if not user_ids:
+            return {}
+        marks = ", ".join("?" for _ in user_ids)
+        rows, _ = self._db.run(f"SELECT * FROM subscriptions WHERE user_id IN ({marks}) ORDER BY updated_at DESC", tuple(user_ids))
+        by_user: dict[str, list] = {}
+        for r in rows:
+            by_user.setdefault(r["user_id"], []).append(r)
+        now = time.time()
+        return {uid: self._pick(by_user.get(uid, []), plans, free, now) for uid in user_ids}
 
     # ----- subscriptions -----------------------------------------------------------------------------------------
 
@@ -588,8 +632,73 @@ class PlanStore:
             "id": row["id"], "userId": row["user_id"], "planId": row["plan_id"], "priceId": row["price_id"],
             "razorpaySubscriptionId": row["razorpay_subscription_id"], "status": row["status"], "currentStart": row["current_start"],
             "currentEnd": row["current_end"], "cancelAtPeriodEnd": bool(row["cancel_at_period_end"]), "paidCount": row["paid_count"],
-            "createdAt": row["created_at"], "updatedAt": row["updated_at"],
+            "createdAt": row["created_at"], "updatedAt": row["updated_at"], "manual": is_manual(row["razorpay_subscription_id"]),
         }
+
+    # ----- plans an admin gives ----------------------------------------------------------------------------------
+
+    def live_manual(self, user_id: str) -> Optional[dict]:
+        """The plan an admin gave this person that is running now, if any."""
+        now = time.time()
+        rows, _ = self._db.run("SELECT * FROM subscriptions WHERE user_id = ? AND razorpay_subscription_id LIKE ? ORDER BY updated_at DESC", (user_id, MANUAL_PREFIX + "%"))
+        return next((s for s in map(self._sub, rows) if grants_access(s, now)), None)
+
+    def live_paid(self, user_id: str) -> list[dict]:
+        """The subscriptions this person pays for (through Razorpay) that give a plan right now, newest first."""
+        now = time.time()
+        rows, _ = self._db.run("SELECT * FROM subscriptions WHERE user_id = ? AND razorpay_subscription_id NOT LIKE ? ORDER BY updated_at DESC", (user_id, MANUAL_PREFIX + "%"))
+        return [s for s in map(self._sub, rows) if grants_access(s, now)]
+
+    def end_manual(self, user_id: str) -> int:
+        """Stops every plan an admin gave this person, now. The rows stay as history."""
+        now = time.time()
+        _, changed = self._db.run(
+            "UPDATE subscriptions SET status = 'cancelled', current_end = ?, updated_at = ? WHERE user_id = ? AND razorpay_subscription_id LIKE ? AND status = 'active'",
+            (now, now, user_id, MANUAL_PREFIX + "%"),
+        )
+        self.sync_user_plan(user_id)
+        return changed
+
+    def give_plan(self, user_id: str, plan_id: str, end: float) -> dict:
+        """Gives a plan until `end` (0: no end date), replacing any plan an admin gave before. It starts now and never renews by itself."""
+        self.end_manual(user_id)
+        sub_id, now = uuid.uuid4().hex, time.time()
+        self._db.run(
+            """
+            INSERT INTO subscriptions (id, user_id, plan_id, price_id, razorpay_subscription_id, status, current_start, current_end, cancel_at_period_end, paid_count, created_at, updated_at)
+            VALUES (?, ?, ?, '', ?, 'active', ?, ?, 1, 0, ?, ?)
+            """,
+            (sub_id, user_id, plan_id, MANUAL_PREFIX + sub_id, now, end, now, now),
+        )
+        self.sync_user_plan(user_id)
+        return self.live_manual(user_id)  # type: ignore[return-value]
+
+    def extend_manual(self, sub: dict, end: float) -> dict:
+        """Moves the end date of a plan an admin gave."""
+        self._db.run("UPDATE subscriptions SET current_end = ?, updated_at = ? WHERE id = ?", (end, time.time(), sub["id"]))
+        self.sync_user_plan(sub["userId"])
+        return self.live_manual(sub["userId"])  # type: ignore[return-value]
+
+    def history(self, user_id: str, limit: int = 8) -> list[dict]:
+        """A person's subscriptions, newest first, with what each plan was and whether it is running now."""
+        rows, _ = self._db.run(
+            """
+            SELECT s.*, p.name AS plan_name, pr.period AS period, pr.interval_count AS interval_count, pr.amount_minor AS amount_minor, pr.currency AS currency
+            FROM subscriptions s LEFT JOIN plans p ON p.id = s.plan_id LEFT JOIN plan_prices pr ON pr.id = s.price_id
+            WHERE s.user_id = ? ORDER BY s.created_at DESC LIMIT ?
+            """,
+            (user_id, limit),
+        )
+        now = time.time()
+        out = []
+        for r in rows:
+            sub = self._sub(r)
+            out.append({
+                "id": sub["id"], "planName": r["plan_name"] or "", "manual": sub["manual"], "status": sub["status"], "start": sub["currentStart"] or sub["createdAt"],
+                "end": sub["currentEnd"], "running": grants_access(sub, now), "renewalOff": sub["cancelAtPeriodEnd"],
+                "period": r["period"], "intervalCount": r["interval_count"], "amountMinor": r["amount_minor"], "currency": r["currency"],
+            })
+        return out
 
     def create_subscription(self, user_id: str, plan_id: str, price_id: str, razorpay_id: str, status: str = "created") -> dict:
         sub_id, now = uuid.uuid4().hex, time.time()
@@ -667,6 +776,7 @@ class PlanStore:
             SELECT s.status AS status, s.current_end AS current_end, pr.period AS period, pr.interval_count AS interval_count,
                    pr.amount_minor AS amount_minor, pr.currency AS currency
             FROM subscriptions s JOIN plan_prices pr ON pr.id = s.price_id
+            WHERE s.razorpay_subscription_id NOT LIKE 'manual_%'
             """
         )
         now, active, monthly = time.time(), 0, 0.0

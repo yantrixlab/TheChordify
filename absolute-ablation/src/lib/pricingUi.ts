@@ -247,7 +247,7 @@ export function renderPricing(root: HTMLElement, initial: PricingData, options: 
     const text = el("div");
     text.append(el("strong", "", `You are on ${mine.plan.name}`));
     const date = sub.currentEnd ? new Date(sub.currentEnd * 1000).toLocaleDateString([], { dateStyle: "long" }) : "";
-    text.append(el("span", "", sub.cancelAtPeriodEnd ? `Renewal is off. Your plan ends on ${date}, then you are back on Free.` : sub.status === "pending" ? "Your last payment did not go through; Razorpay is trying again." : date ? `Renews on ${date}.` : "Your plan is active."));
+    text.append(el("span", "", sub.gift ? (date ? `This plan was given to you and runs until ${date}.` : "This plan was given to you and has no end date.") : sub.cancelAtPeriodEnd ?`Renewal is off. Your plan ends on ${date}, then you are back on Free.` : sub.status === "pending" ? "Your last payment did not go through; Razorpay is trying again." : date ? `Renews on ${date}.` : "Your plan is active."));
     box.append(text);
     if (!sub.cancelAtPeriodEnd) {
       const cancel = el("button", "pr-cancel", "Cancel subscription");
