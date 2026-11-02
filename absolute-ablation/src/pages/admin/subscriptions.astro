@@ -2,7 +2,7 @@
 import AdminLayout from "../../layouts/AdminLayout.astro";
 ---
 
-<AdminLayout title="Subscriptions" active="subscriptions" lead="Everyone who has subscribed to a paid plan, newest activity first. Razorpay keeps these in step by webhook.">
+<AdminLayout perm="subscriptions.view" title="Subscriptions" active="subscriptions" lead="Everyone who has subscribed to a paid plan, newest activity first. Razorpay keeps these in step by webhook.">
   <div id="tiles" class="ov-tiles"></div>
   <div class="adm-table-wrap">
     <table class="adm-table">

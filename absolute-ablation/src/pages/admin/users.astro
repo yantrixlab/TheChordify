@@ -2,9 +2,25 @@
 import AdminLayout from "../../layouts/AdminLayout.astro";
 ---
 
-<AdminLayout title="Users" active="users" lead="Everyone who has signed in with Google, newest first.">
+<AdminLayout perm="users.view" title="Users" active="users" lead="Everyone who has signed in or has an account, newest first. A person's role decides what they can do in this admin.">
+  <section id="add-card" class="adm-card" hidden>
+    <details id="add-details">
+      <summary class="us-add-title">Add a staff account</summary>
+      <p class="adm-hint" style="margin-top:10px">Makes an account that can sign in to this admin with an email and a password. If its owner later signs in with Google using the same email, the two are joined and the role stays. People who sign up on the website are general users and need no account here.</p>
+      <form id="add-form" class="us-add">
+        <label class="adm-field"><span>Email</span><input id="add-email" type="text" inputmode="email" autocomplete="off" placeholder="name@example.com" required /></label>
+        <label class="adm-field"><span>Name</span><input id="add-name" type="text" autocomplete="off" placeholder="Optional" /></label>
+        <label class="adm-field"><span>Password</span><input id="add-password" type="password" autocomplete="new-password" placeholder="At least 10 characters" required /></label>
+        <label class="adm-field"><span>Role</span><select id="add-role" required><option value="" selected disabled>Choose a role…</option></select></label>
+        <div class="us-add-go"><button id="add-go" type="submit" class="adm-btn">Create account</button></div>
+      </form>
+      <p id="add-msg" class="adm-msg" role="status"></p>
+    </details>
+  </section>
+
   <div class="adm-row us-bar">
     <input id="search" type="search" placeholder="Search by name or email" aria-label="Search users" autocomplete="off" />
+    <select id="role-filter" aria-label="Show one role"><option value="">All roles</option></select>
     <span id="count" class="adm-hint" role="status" style="margin:0"></span>
   </div>
   <div class="adm-table-wrap" style="margin-top:14px">
@@ -12,6 +28,7 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
       <thead>
         <tr>
           <th>Person</th>
+          <th>Role</th>
           <th>Level</th>
           <th>Plan</th>
           <th>Joined</th>
@@ -31,14 +48,33 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
     <button id="next" type="button" class="adm-btn ghost small">Older →</button>
   </div>
   <p id="msg" class="adm-msg" role="status"></p>
+
+  <dialog id="pw-dialog" class="adm-dialog" aria-labelledby="pw-title">
+    <form id="pw-form" method="dialog">
+      <h2 id="pw-title">Set a password</h2>
+      <p id="pw-who" class="adm-hint"></p>
+      <label class="adm-field"><span>New password</span><input id="pw-new" type="password" autocomplete="new-password" minlength="10" required /><small>At least 10 characters. Whoever had the old password is signed out.</small></label>
+      <p id="pw-msg" class="adm-msg" role="status"></p>
+      <div class="adm-row" style="justify-content:flex-end">
+        <button id="pw-cancel" type="button" class="adm-btn ghost">Cancel</button>
+        <button id="pw-save" type="submit" class="adm-btn">Save password</button>
+      </div>
+    </form>
+  </dialog>
 </AdminLayout>
 
 <style is:global>
   .us-bar #search { max-width: 360px; }
+  .us-bar select { width: auto; min-width: 160px; }
+  .us-add-title { cursor: pointer; font-size: 16px; font-weight: 700; color: var(--color-ink); }
+  .us-add { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; margin-top: 14px; align-items: end; }
+  .us-add-go { display: flex; }
+  .us-role-select { height: 32px !important; width: auto !important; min-width: 130px; padding: 0 8px !important; font-size: 13px !important; border-radius: 10px !important; }
+  .us-lock { font-size: 12.5px; color: var(--color-mute); }
 </style>
 
 <script>
-  import { adminReady, adminFetch, el, say, when, day, number } from "../../lib/admin";
+  import { adminReady, adminFetch, el, say, when, day, number, can, adminInfo } from "../../lib/admin";
 
   const rows = document.getElementById("rows")!;
   const empty = document.getElementById("empty")!;
@@ -47,11 +83,14 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
   const prev = document.getElementById("prev") as HTMLButtonElement;
   const next = document.getElementById("next") as HTMLButtonElement;
   const search = document.getElementById("search") as HTMLInputElement;
+  const roleFilter = document.getElementById("role-filter") as HTMLSelectElement;
 
   const SIZE = 25;
   let page = 1;
   let query = "";
+  let roleKey = "";
   let latest = 0; // so a slow answer to an old search cannot overwrite a newer one
+  let roles: any[] = [];
 
   function avatar(user: any): HTMLElement {
     const box = el("span", "adm-avatar");
@@ -68,63 +107,187 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
     return box;
   }
 
+  const fail = (err: unknown, fallback: string) => say("msg", err instanceof Error ? err.message : fallback, "bad");
+
+  // ---- the password dialog
+  const pwDialog = document.getElementById("pw-dialog") as HTMLDialogElement;
+  let pwFor: any = null;
+  document.getElementById("pw-cancel")!.addEventListener("click", () => pwDialog.close());
+  document.getElementById("pw-form")!.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const save = document.getElementById("pw-save") as HTMLButtonElement;
+    const input = document.getElementById("pw-new") as HTMLInputElement;
+    save.disabled = true;
+    try {
+      await adminFetch(`/api/admin/users/${encodeURIComponent(pwFor.id)}/password`, { method: "POST", body: JSON.stringify({ password: input.value }) });
+      pwDialog.close();
+      say("msg", `A new password is set for ${pwFor.email}. They are signed out everywhere.`, "ok");
+    } catch (err) {
+      say("pw-msg", err instanceof Error ? err.message : "Could not set the password.", "bad");
+    } finally {
+      save.disabled = false;
+    }
+  });
+  function askPassword(user: any) {
+    pwFor = user;
+    document.getElementById("pw-who")!.textContent = `For ${user.name || user.email} (${user.email}).`;
+    (document.getElementById("pw-new") as HTMLInputElement).value = "";
+    say("pw-msg", "", "");
+    pwDialog.showModal();
+  }
+
   function row(user: any): HTMLElement {
     const tr = el("tr");
     const who = el("div", "who");
     const names = el("div");
-    const strong = el("strong", "", user.name || user.email);
-    if (user.isAdmin) strong.append(" ", el("span", "adm-pill violet", "Admin"));
-    names.append(strong, el("small", "", user.email));
+    names.append(el("strong", "", user.name || user.email), el("small", "", user.email));
     who.append(avatar(user), names);
     const cell = (...nodes: (Node | string)[]) => {
       const td = el("td");
       td.append(...nodes);
       return td;
     };
-    const personCell = cell(who);
+
+    const rolePill = el("span", `adm-pill ${user.role === "admin" ? "violet" : user.role === "user" ? "" : "warn"}`, user.roleName);
+    const roleCell = cell(rolePill);
+    if (user.isEnvAdmin) roleCell.append(" ", el("small", "us-lock", "set in server settings"));
+    if (user.hasPassword) roleCell.append(" ", el("span", "adm-pill", "password"));
+
     const status = el("span", `adm-pill ${user.disabled ? "bad" : "ok"}`, user.disabled ? "Blocked" : "Active");
-    const toggle = el("button", `adm-btn small ${user.disabled ? "ghost" : "danger"}`, user.disabled ? "Unblock" : "Block");
-    toggle.type = "button";
-    toggle.addEventListener("click", async () => {
-      if (!user.disabled && !confirm(`Block ${user.email}? They are signed out at once and cannot sign in again until you unblock them.`)) return;
-      toggle.disabled = true;
-      try {
-        await adminFetch(`/api/admin/users/${encodeURIComponent(user.id)}/disabled`, { method: "POST", body: JSON.stringify({ disabled: !user.disabled }) });
-        say("msg", `${user.email} is now ${user.disabled ? "unblocked" : "blocked"}.`, "ok");
-        await load();
-      } catch (err) {
-        say("msg", err instanceof Error ? err.message : "Could not change that.", "bad");
-        toggle.disabled = false;
+
+    const actions = el("td", "acts");
+    if (user.canManage) {
+      // change the role
+      if (can("users.roles")) {
+        const select = el("select", "us-role-select");
+        select.setAttribute("aria-label", `Role of ${user.email}`);
+        for (const r of roles.filter((r) => r.grantable || r.key === user.role)) {
+          const option = el("option", "", r.name);
+          option.value = r.key;
+          option.disabled = !r.grantable;
+          select.append(option);
+        }
+        select.value = user.role;
+        select.addEventListener("change", async () => {
+          const chosen = roles.find((r) => r.key === select.value);
+          if (!confirm(`Make ${user.email} ${chosen ? chosen.name : select.value}?${select.value === "user" ? " Their password is removed and they lose all access to this admin." : ""}`)) {
+            select.value = user.role;
+            return;
+          }
+          select.disabled = true;
+          try {
+            await adminFetch(`/api/admin/users/${encodeURIComponent(user.id)}/role`, { method: "PUT", body: JSON.stringify({ role: select.value }) });
+            say("msg", `${user.email} is now ${chosen ? chosen.name : select.value}.`, "ok");
+            await load();
+          } catch (err) {
+            fail(err, "Could not change the role.");
+            select.value = user.role;
+            select.disabled = false;
+          }
+        });
+        actions.append(select);
       }
-    });
-    const actions = cell(toggle);
-    actions.className = "acts";
+      // a password, for staff
+      if (can("users.create") && user.role !== "user") {
+        const pw = el("button", "adm-btn small ghost", user.hasPassword ? "Reset password" : "Set password");
+        pw.type = "button";
+        pw.addEventListener("click", () => askPassword(user));
+        actions.append(pw);
+      }
+      // block
+      if (can("users.block")) {
+        const toggle = el("button", `adm-btn small ${user.disabled ? "ghost" : "danger"}`, user.disabled ? "Unblock" : "Block");
+        toggle.type = "button";
+        toggle.addEventListener("click", async () => {
+          if (!user.disabled && !confirm(`Block ${user.email}? They are signed out at once and cannot sign in again until you unblock them.`)) return;
+          toggle.disabled = true;
+          try {
+            await adminFetch(`/api/admin/users/${encodeURIComponent(user.id)}/disabled`, { method: "POST", body: JSON.stringify({ disabled: !user.disabled }) });
+            say("msg", `${user.email} is now ${user.disabled ? "unblocked" : "blocked"}.`, "ok");
+            await load();
+          } catch (err) {
+            fail(err, "Could not change that.");
+            toggle.disabled = false;
+          }
+        });
+        actions.append(toggle);
+      }
+    } else {
+      const me = adminInfo()?.user;
+      actions.append(el("span", "us-lock", me && me.id === user.id ? "You" : user.isEnvAdmin ? "Fixed" : "Above your role"));
+    }
+
     const level = el("td");
     level.append(el("span", "adm-pill violet", `Lv ${user.level}`), ` ${number(user.xp)} XP`);
     const plan = el("td");
     plan.append(el("span", "adm-pill", user.plan));
     const sign = cell(String(number(user.logins)));
     sign.className = "num";
-    tr.append(personCell, level, plan, cell(day(user.createdAt)), cell(when(user.lastLoginAt)), sign, cell(status), actions);
+    tr.append(cell(who), roleCell, level, plan, cell(day(user.createdAt)), cell(when(user.lastLoginAt)), sign, cell(status), actions);
     return tr;
   }
 
   async function load() {
     const mine = ++latest;
     try {
-      const data = await adminFetch(`/api/admin/users?search=${encodeURIComponent(query)}&page=${page}&pageSize=${SIZE}`);
+      const data = await adminFetch(`/api/admin/users?search=${encodeURIComponent(query)}&page=${page}&pageSize=${SIZE}&role=${encodeURIComponent(roleKey)}`);
       if (mine !== latest) return;
       rows.replaceChildren(...data.users.map(row));
       const pages = Math.max(1, Math.ceil(data.total / SIZE));
-      countEl.textContent = `${number(data.total)} ${query ? "match" + (data.total === 1 ? "" : "es") : data.total === 1 ? "person" : "people"}`;
+      countEl.textContent = `${number(data.total)} ${query || roleKey ? "match" + (data.total === 1 ? "" : "es") : data.total === 1 ? "person" : "people"}`;
       pageEl.textContent = `Page ${page} of ${pages}`;
       prev.disabled = page <= 1;
       next.disabled = page >= pages;
       empty.hidden = data.users.length > 0;
-      empty.textContent = query ? `Nobody matches “${query}”.` : "Nobody has signed in yet.";
+      empty.textContent = query || roleKey ? "Nobody matches." : "Nobody has signed in yet.";
     } catch (err) {
-      say("msg", err instanceof Error ? err.message : "Could not load the users.", "bad");
+      fail(err, "Could not load the users.");
     }
+  }
+
+  async function loadRoles() {
+    try {
+      roles = (await adminFetch("/api/admin/roles")).roles;
+    } catch {
+      roles = [];
+    }
+    for (const r of roles) {
+      const option = el("option", "", r.name);
+      option.value = r.key;
+      roleFilter.append(option);
+    }
+    // adding an account: only staff roles this person may give
+    const addRole = document.getElementById("add-role") as HTMLSelectElement;
+    for (const r of roles.filter((r) => r.key !== "user" && r.grantable)) {
+      const option = el("option", "", r.name + (r.permissions.length === 0 && r.key !== "admin" ? " (no permissions yet)" : ""));
+      option.value = r.key;
+      addRole.append(option);
+    }
+  }
+
+  // ---- adding an account (set up once the person is let in, when their permissions are known)
+  function setupAdd() {
+    if (!can("users.create")) return;
+    document.getElementById("add-card")!.hidden = false;
+    document.getElementById("add-form")!.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const go = document.getElementById("add-go") as HTMLButtonElement;
+      const val = (id: string) => (document.getElementById(id) as HTMLInputElement).value;
+      go.disabled = true;
+      try {
+        const made = await adminFetch("/api/admin/users", {
+          method: "POST",
+          body: JSON.stringify({ email: val("add-email"), name: val("add-name"), password: val("add-password"), role: val("add-role") }),
+        });
+        say("add-msg", `Created ${made.user.email} as ${made.user.roleName}. They can sign in at /admin/ with that email and password.`, "ok");
+        (document.getElementById("add-form") as HTMLFormElement).reset();
+        await load();
+      } catch (err) {
+        say("add-msg", err instanceof Error ? err.message : "Could not create the account.", "bad");
+      } finally {
+        go.disabled = false;
+      }
+    });
   }
 
   let timer: number | undefined;
@@ -136,6 +299,11 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
       load();
     }, 250);
   });
+  roleFilter.addEventListener("change", () => {
+    roleKey = roleFilter.value;
+    page = 1;
+    load();
+  });
   prev.addEventListener("click", () => {
     page -= 1;
     load();
@@ -145,5 +313,9 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
     load();
   });
 
-  adminReady().then(load);
+  adminReady().then(async () => {
+    setupAdd();
+    await loadRoles();
+    await load();
+  });
 </script>

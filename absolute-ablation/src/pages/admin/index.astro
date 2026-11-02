@@ -2,18 +2,18 @@
 import AdminLayout from "../../layouts/AdminLayout.astro";
 ---
 
-<AdminLayout title="Overview" active="overview" lead="How the site is doing, and anything that needs your attention.">
+<AdminLayout perm="overview.view" title="Overview" active="overview" lead="How the site is doing, and anything that needs your attention.">
   <ul id="notes" class="adm-list" aria-label="Things to look at"></ul>
   <div id="tiles" class="ov-tiles" aria-busy="true"></div>
   <section class="adm-card">
     <h2>Jump to</h2>
     <div class="adm-row" style="margin-top:10px">
-      <a class="adm-btn ghost" href="/admin/users/" style="display:inline-grid;place-items:center;text-decoration:none">Users</a>
-      <a class="adm-btn ghost" href="/admin/plans/" style="display:inline-grid;place-items:center;text-decoration:none">Subscription plans</a>
-      <a class="adm-btn ghost" href="/admin/features/" style="display:inline-grid;place-items:center;text-decoration:none">Features &amp; limits</a>
-      <a class="adm-btn ghost" href="/admin/subscriptions/" style="display:inline-grid;place-items:center;text-decoration:none">Subscriptions</a>
-      <a class="adm-btn ghost" href="/admin/youtube/" style="display:inline-grid;place-items:center;text-decoration:none">YouTube accounts</a>
-      <a class="adm-btn ghost" href="/admin/youtube-test/" style="display:inline-grid;place-items:center;text-decoration:none">Download test</a>
+      <a class="adm-btn ghost" data-perm="users.view" href="/admin/users/" style="display:inline-grid;place-items:center;text-decoration:none">Users</a>
+      <a class="adm-btn ghost" data-perm="plans.view" href="/admin/plans/" style="display:inline-grid;place-items:center;text-decoration:none">Subscription plans</a>
+      <a class="adm-btn ghost" data-perm="features.view" href="/admin/features/" style="display:inline-grid;place-items:center;text-decoration:none">Features &amp; limits</a>
+      <a class="adm-btn ghost" data-perm="subscriptions.view" href="/admin/subscriptions/" style="display:inline-grid;place-items:center;text-decoration:none">Subscriptions</a>
+      <a class="adm-btn ghost" data-perm="youtube.manage" href="/admin/youtube/" style="display:inline-grid;place-items:center;text-decoration:none">YouTube accounts</a>
+      <a class="adm-btn ghost" data-perm="youtube.manage" href="/admin/youtube-test/" style="display:inline-grid;place-items:center;text-decoration:none">Download test</a>
     </div>
   </section>
 </AdminLayout>

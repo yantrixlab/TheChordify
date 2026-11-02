@@ -1,15 +1,32 @@
-// Shared bits of the admin pages: asking the server as an admin, getting past the sign-in gate, and small helpers for
-// drawing rows. An admin is somebody signed in with a Google account the server lists in ADMIN_EMAILS; the admin token
-// (ADMIN_TOKEN) still works as a way in that does not depend on Google.
+// Shared bits of the admin pages: asking the server as staff, getting past the sign-in gate, and small helpers for drawing rows.
+// Staff are people whose role has some permissions: signed in with Google or with an email and password (an administrator is also
+// anybody in ADMIN_EMAILS). The admin token (ADMIN_TOKEN) still works as a way in that does not depend on either. The server
+// decides what each person may do; the pages only hide what the person's role cannot use.
 import { API_BASE } from "./api";
 import { getAuthConfig, renderGoogleButton } from "./auth";
 import type { AuthUser } from "./auth";
 
 export interface AdminInfo {
   admin: true;
-  via: "google" | "token";
+  via: "session" | "token";
   user: AuthUser | null;
+  role: string;
+  roleName: string;
+  isSuper: boolean; // an administrator: every permission, always
+  permissions: string[];
+  hasPassword: boolean;
 }
+
+let me: AdminInfo | null = null;
+
+/** Whether the signed-in person's role allows `permission` ("x.manage" covers "x.view"). Administrators can do everything. */
+export function can(permission: string): boolean {
+  if (!me) return false;
+  if (me.isSuper) return true;
+  return me.permissions.includes(permission) || (permission.endsWith(".view") && me.permissions.includes(permission.slice(0, -5) + ".manage"));
+}
+
+export const adminInfo = (): AdminInfo | null => me;
 
 export class AdminError extends Error {
   status: number;
@@ -55,13 +72,38 @@ export function adminReady(): Promise<AdminInfo> {
 }
 
 function enter(info: AdminInfo) {
+  me = info;
   document.getElementById("adm-gate")!.hidden = true;
-  document.getElementById("adm-app")!.hidden = false;
   const who = document.getElementById("adm-who");
   if (who) {
-    who.textContent = info.user ? `${info.user.name || info.user.email}` : "Admin token";
+    who.textContent = info.user ? `${info.user.name || info.user.email} · ${info.roleName}` : "Admin token";
     who.title = info.user ? info.user.email : "Signed in with the admin token";
   }
+
+  // The menu and any link that carries data-perm show only what this role can use.
+  document.querySelectorAll<HTMLElement>("[data-perm]").forEach((node) => {
+    const needed = (node.dataset.perm ?? "").split("|").filter(Boolean);
+    node.hidden = needed.length > 0 && !needed.some(can);
+  });
+  const changePassword = document.getElementById("adm-password-open");
+  if (changePassword) changePassword.hidden = !info.hasPassword;
+
+  // A page needs a permission: without it nothing on it runs (the server would refuse anyway), and the person is shown where they can go.
+  const page = document.getElementById("adm-app")!;
+  const needed = (page.dataset.perm ?? "").split("|").filter(Boolean);
+  if (needed.length > 0 && !needed.some(can)) {
+    const first = document.querySelector<HTMLAnchorElement>(".adm-nav a:not([hidden])");
+    if (page.dataset.home === "1" && first && first.getAttribute("href") !== location.pathname) {
+      location.replace(first.href); // the front page is not for this role: go to the first page that is
+      return;
+    }
+    document.getElementById("adm-denied")!.hidden = false;
+    return;
+  }
+  const manage = (page.dataset.manage ?? "").split("|").filter(Boolean);
+  const readonly = document.getElementById("adm-readonly");
+  if (readonly) readonly.hidden = manage.length === 0 || manage.some(can);
+  page.hidden = false;
   resolveReady(info);
 }
 
@@ -93,6 +135,26 @@ export async function startAdmin() {
 
   if (await check()) return;
   gate.hidden = false;
+
+  // Email and password (staff accounts an administrator made)
+  const passwordForm = document.getElementById("adm-login-form") as HTMLFormElement;
+  const loginEmail = document.getElementById("adm-login-email") as HTMLInputElement;
+  const loginPassword = document.getElementById("adm-login-password") as HTMLInputElement;
+  const loginButton = document.getElementById("adm-login-go") as HTMLButtonElement;
+  passwordForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    loginButton.disabled = true;
+    say("Signing in…", false);
+    try {
+      await adminFetch("/api/admin/auth/login", { method: "POST", body: JSON.stringify({ email: loginEmail.value, password: loginPassword.value }) });
+      loginPassword.value = "";
+      if (!(await check())) say("That account has no access to the admin.");
+    } catch (err) {
+      say(err instanceof Error ? err.message : "Could not sign in.");
+    } finally {
+      loginButton.disabled = false;
+    }
+  });
 
   // Google sign-in, if the server has it
   const slot = document.getElementById("adm-google")!;

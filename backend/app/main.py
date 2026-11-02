@@ -22,6 +22,8 @@ from pydantic import BaseModel
 from .engine import analyze
 from . import accounts as accounts_module
 from .accounts import AccountStore, SignInError
+from . import roles as roles_module
+from .roles import RoleError, RoleStore
 from .billing import Razorpay, RazorpayError, entity_summary
 from .plans import FREE_CODE, PERIODS, PlanStore
 from .engagement import BADGE_RULES, DEFAULT_CONFIG, REWARD_KINDS, Engagement
@@ -58,6 +60,7 @@ youtube.keep_failures(lambda: catalog.load_result("meta:failures"), lambda data:
 _TRENDING_KEY = "meta:trending"  # not a valid song id, so it can never be asked for as a result
 trending_shelves.start(lambda: catalog.load_result(_TRENDING_KEY), lambda data: catalog.save_result(_TRENDING_KEY, data))
 accounts = AccountStore(catalog.db)
+role_store = RoleStore(catalog.db)
 engagement = Engagement(catalog.db)
 plans = PlanStore(catalog.db)
 razorpay = Razorpay.from_env()  # payments: RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_SECRET
@@ -437,7 +440,8 @@ def _session_user(request: Request) -> Optional[dict]:
 def _public_user(user: dict) -> dict:
     return {
         "id": user["id"], "email": user["email"], "name": user["name"], "picture": user["picture"], "plan": user["plan"],
-        "isAdmin": user["email"] in _ADMIN_EMAILS,
+        "role": "admin" if user["email"] in _ADMIN_EMAILS else user.get("role") or "user",
+        "isAdmin": _staff_actor_for(user) is not None,  # may open the admin (an administrator, or a role with some permissions)
     }
 
 
@@ -453,36 +457,86 @@ def _origin_ok(request: Request) -> bool:
     return origin in allowed or re.match(r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$", origin) is not None
 
 
-def _admin_via(request: Request) -> Optional[str]:
-    """"google" for a signed-in admin, "token" for the admin token, else None."""
+class _Actor:
+    """Somebody acting in the admin: how they got in, who they are, their role and what that role may do."""
+
+    __slots__ = ("via", "user", "role", "perms", "is_super")
+
+    def __init__(self, via: str, user: Optional[dict], role: str, perms: frozenset, is_super: bool) -> None:
+        self.via, self.user, self.role, self.perms, self.is_super = via, user, role, perms, is_super
+
+
+_ALL_PERMISSIONS = frozenset(roles_module.PERMISSIONS)
+
+
+def _staff_actor_for(user: dict) -> Optional[_Actor]:
+    """The admin access of a signed-in person, or None for somebody who has none. Accounts in ADMIN_EMAILS and the Admin role have
+    everything; any other role has what it was given."""
+    if user["email"] in _ADMIN_EMAILS or user.get("role") == "admin":
+        return _Actor("session", user, "admin", _ALL_PERMISSIONS, True)
+    try:
+        perms = frozenset(role_store.permissions(user.get("role") or "user"))
+    except Exception as exc:
+        log.warning("Could not read the permissions of role %s: %s", user.get("role"), exc)
+        return None
+    return _Actor("session", user, user.get("role") or "user", perms, False) if perms else None
+
+
+def _actor(request: Request) -> Optional[_Actor]:
     user = _session_user(request)
-    if user and user["email"] in _ADMIN_EMAILS:
-        return "google"
+    if user:
+        actor = _staff_actor_for(user)
+        if actor:
+            return actor
     given = request.headers.get("x-admin-token", "")
     if _ADMIN_TOKEN and hmac.compare_digest(given.encode("utf-8"), _ADMIN_TOKEN.encode("utf-8")):
-        return "token"
+        return _Actor("token", None, "admin", _ALL_PERMISSIONS, True)
     return None
 
 
-def _require_admin(request: Request) -> None:
-    if not _ADMIN_TOKEN and not _ADMIN_EMAILS:
+def _admin_enabled() -> bool:
+    if _ADMIN_TOKEN or _ADMIN_EMAILS:
+        return True
+    try:
+        return accounts.has_staff()
+    except Exception:
+        return False
+
+
+def _require_perm(request: Request, *needed: str) -> _Actor:
+    """Lets a request through when the person is staff and their role has any one of the `needed` permissions (none named: any staff
+    member). Administrators pass everything. Answers 404 when there is no admin at all, 401 when nobody is signed in and 403 when the
+    role is not allowed."""
+    if not _admin_enabled():
         raise HTTPException(status_code=404, detail="Not found")  # the admin is switched off
-    via = _admin_via(request)
-    if via is None:
+    actor = _actor(request)
+    if actor is None:
         # Only the ones that fail count towards the limit, so guessing the token gets nowhere but an admin at work is never held up.
         caller = request.client.host if request.client else "unknown"
         if not _admin_limiter.allow(caller):
             raise HTTPException(status_code=429, detail="Too many attempts. Wait a minute.")
         if request.headers.get("x-admin-token"):
             raise HTTPException(status_code=401, detail="Wrong admin token")
-        raise HTTPException(status_code=401, detail="Sign in with an admin Google account")
-    if via == "google" and request.method not in ("GET", "HEAD", "OPTIONS") and not _origin_ok(request):
+        raise HTTPException(status_code=401, detail="Sign in to the admin")
+    if actor.via == "session" and request.method not in ("GET", "HEAD", "OPTIONS") and not _origin_ok(request):
         raise HTTPException(status_code=403, detail="This request came from another site")
+    if needed and not actor.is_super and not any(roles_module.allows(actor.perms, n) for n in needed):
+        raise HTTPException(status_code=403, detail="Your role is not allowed to do that.")
+    return actor
+
+
+def _require_admin(request: Request) -> _Actor:
+    """Administrators only (the Admin role, ADMIN_EMAILS or the admin token)."""
+    actor = _require_perm(request)
+    if not actor.is_super:
+        raise HTTPException(status_code=403, detail="Only an administrator can do that.")
+    return actor
 
 
 def _is_admin(request: Request) -> bool:
-    """True for an admin (the owner trying things is not held to the visitor limits)."""
-    return _admin_via(request) is not None
+    """True for an administrator (the owner trying things is not held to the visitor limits)."""
+    actor = _actor(request)
+    return actor is not None and actor.is_super
 
 
 # ---- sign-in (Google only) ----------------------------------------------------------------------------------------------
@@ -521,10 +575,10 @@ def sign_in_with_google(body: GoogleBody, request: Request, response: Response) 
     return _signed_in(user, request, response, body.mobile)
 
 
-def _start_session(user: dict, request: Request, response: Response) -> str:
-    token = accounts.start_session(user["id"])
+def _start_session(user: dict, request: Request, response: Response, days: int = accounts_module.SESSION_DAYS) -> str:
+    token = accounts.start_session(user["id"], days)
     response.set_cookie(
-        _SESSION_COOKIE, token, max_age=accounts_module.SESSION_DAYS * 86400,
+        _SESSION_COOKIE, token, max_age=days * 86400,
         httponly=True, samesite="lax", secure=request.url.scheme == "https", path="/",
     )
     return token
@@ -722,6 +776,8 @@ def delete_my_account(request: Request, response: Response) -> dict:
     user = _require_user(request, changes=True)
     if user["email"] in _ADMIN_EMAILS:
         raise HTTPException(status_code=400, detail="An administrator's account is removed by taking it off the admin list first.")
+    if (user.get("role") or "user") != "user":
+        raise HTTPException(status_code=400, detail="A staff account is removed by an administrator, who first changes it to a general user.")
     _plan, sub = plans.effective(user["id"])
     if sub:
         try:
@@ -844,15 +900,24 @@ class DisabledBody(BaseModel):
 
 @app.get("/api/admin/me")
 def admin_me(request: Request) -> dict:
-    _require_admin(request)
-    via = _admin_via(request)
-    user = _session_user(request)
-    return {"admin": True, "via": via, "user": _public_user(user) if user else None}
+    """Who is in the admin and what they may do (the pages show only what their role allows; the server checks every request again)."""
+    actor = _require_perm(request)
+    role = role_store.get(actor.role)
+    return {
+        "admin": True,
+        "via": actor.via,
+        "user": _public_user(actor.user) if actor.user else None,
+        "role": actor.role,
+        "roleName": role["name"] if role else actor.role,
+        "isSuper": actor.is_super,
+        "permissions": [p for p in roles_module.PERMISSIONS if actor.is_super or roles_module.allows(actor.perms, p)],
+        "hasPassword": bool(actor.user and actor.user.get("hasPassword")),
+    }
 
 
 @app.get("/api/admin/overview")
 def admin_overview(request: Request) -> dict:
-    _require_admin(request)
+    _require_perm(request, "overview.view")
     accounts_now = youtube.list_accounts()
     return {
         "users": accounts.count_users(),
@@ -878,24 +943,326 @@ def admin_overview(request: Request) -> dict:
 
 
 @app.get("/api/admin/users")
-def admin_users(request: Request, search: str = "", page: int = 1, pageSize: int = 25) -> dict:
-    _require_admin(request)
+def admin_users(request: Request, search: str = "", page: int = 1, pageSize: int = 25, role: str = "") -> dict:
+    actor = _require_perm(request, "users.view")
     size = min(max(pageSize, 1), 100)
     page = max(page, 1)
-    users, total = accounts.list_users(search=search[:100], limit=size, offset=(page - 1) * size)
+    users, total = accounts.list_users(search=search[:100], limit=size, offset=(page - 1) * size, role=role[:32])
     xps = engagement.xp_of([u["id"] for u in users])
     levels = engagement.levels_of(xps)
-    return {
-        "users": [{**u, "isAdmin": u["email"] in _ADMIN_EMAILS, "xp": xps.get(u["id"], 0), "level": levels.get(u["id"], 1)} for u in users],
-        "total": total, "page": page, "pageSize": size,
-    }
+    names = {r["key"]: r["name"] for r in role_store.list()}
+    out = []
+    for u in users:
+        env_admin = u["email"] in _ADMIN_EMAILS
+        shown = "admin" if env_admin else u["role"]
+        out.append({
+            **u, "role": shown, "roleName": names.get(shown, shown), "isEnvAdmin": env_admin, "isAdmin": shown == "admin",
+            "xp": xps.get(u["id"], 0), "level": levels.get(u["id"], 1),
+            "canManage": _may_manage(actor, u),
+        })
+    return {"users": out, "total": total, "page": page, "pageSize": size}
 
 
 @app.post("/api/admin/users/{user_id}/disabled")
 def admin_block_user(user_id: str, body: DisabledBody, request: Request) -> dict:
-    _require_admin(request)
-    if not accounts.set_disabled(user_id, body.disabled):
+    actor = _require_perm(request, "users.block")
+    target = accounts.get_user(user_id)
+    if not target:
         raise HTTPException(status_code=404, detail="No such user")
+    if body.disabled:
+        if actor.user and actor.user["id"] == user_id:
+            raise HTTPException(status_code=400, detail="You cannot block yourself.")
+        _guard_target(actor, target)
+        if target["role"] == "admin":
+            _ensure_admin_left(user_id)
+    accounts.set_disabled(user_id, body.disabled)
+    _audit(actor, f"{'blocked' if body.disabled else 'unblocked'} {target['email']}")
+    return {"ok": True}
+
+
+# ---- roles, staff accounts and passwords ---------------------------------------------------------------------------------
+#
+# The rules that keep this safe, whatever a role's permissions are:
+#   - nobody can give a role (or a person) more than they have themselves, and nobody but an administrator can touch an administrator;
+#   - nobody changes their own role or blocks themselves;
+#   - the site always keeps an administrator (ADMIN_EMAILS and the admin token count);
+#   - only staff (a role with permissions) can sign in to the admin with a password; general users sign in with Google only.
+
+_staff_ip_limiter = RateLimiter(limit=10, window=60.0)
+_staff_fails: dict[str, list[float]] = {}
+_STAFF_MAX_FAILS = 5
+_STAFF_LOCK_SECONDS = 15 * 60
+
+
+def _audit(actor: _Actor, what: str) -> None:
+    """One line in the server log for every change to people, roles and passwords: who, how and what."""
+    who = actor.user["email"] if actor.user else "the admin token"
+    log.info("admin audit: %s (%s) %s", who, actor.role, what)
+
+
+def _role_perms(key: str) -> set[str]:
+    role = role_store.get(key)
+    return set(role["permissions"]) if role else set()
+
+
+def _may_manage(actor: _Actor, target: dict) -> bool:
+    """Whether this actor may change (the role, password or block state of) this person."""
+    if target["email"] in _ADMIN_EMAILS:
+        return False  # set in the server's environment
+    if actor.user and actor.user["id"] == target["id"]:
+        return False
+    if actor.is_super:
+        return True
+    return target["role"] != "admin" and roles_module.covers(actor.perms, _role_perms(target["role"]))
+
+
+def _guard_target(actor: _Actor, target: dict) -> None:
+    if target["email"] in _ADMIN_EMAILS:
+        raise HTTPException(status_code=403, detail="That account is an administrator set in the server's settings (ADMIN_EMAILS); it cannot be changed here.")
+    if not _may_manage(actor, target) and not (actor.user and actor.user["id"] == target["id"]):
+        raise HTTPException(status_code=403, detail="That person can do more than you can, so you cannot change them.")
+
+
+def _ensure_admin_left(excluding_user_id: str) -> None:
+    left = len(_ADMIN_EMAILS) + (1 if _ADMIN_TOKEN else 0) + accounts.count_role("admin", excluding_user_id)
+    if left < 1:
+        raise HTTPException(status_code=400, detail="That would leave the site without an administrator.")
+
+
+def _grantable_role(actor: _Actor, key: str) -> dict:
+    """The role to give somebody, or an error when it does not exist or has more power than the actor."""
+    role = role_store.get(key)
+    if not role:
+        raise HTTPException(status_code=400, detail="There is no such role.")
+    if key == "admin" and not actor.is_super:
+        raise HTTPException(status_code=403, detail="Only an administrator can make somebody an administrator.")
+    if not actor.is_super and not roles_module.covers(actor.perms, role["permissions"]):
+        raise HTTPException(status_code=403, detail="That role can do more than your own role can, so you cannot give it.")
+    return role
+
+
+def _role_problem(exc: RoleError) -> HTTPException:
+    return HTTPException(status_code=400, detail=str(exc))
+
+
+class StaffLoginBody(BaseModel):
+    email: str
+    password: str
+
+
+class NewAccountBody(BaseModel):
+    email: str
+    name: str = ""
+    password: str
+    role: str
+
+
+class RoleChangeBody(BaseModel):
+    role: str
+
+
+class PasswordBody(BaseModel):
+    password: str
+
+
+class OwnPasswordBody(BaseModel):
+    current: str
+    new: str
+
+
+class RoleBody(BaseModel):
+    name: str
+    description: str = ""
+    permissions: list[str] = []
+
+
+class RoleEditBody(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    permissions: Optional[list[str]] = None
+
+
+@app.post("/api/admin/auth/login")
+def admin_password_login(body: StaffLoginBody, request: Request, response: Response) -> dict:
+    """The admin's own sign-in, with an email and a password. Only staff accounts get in; the answer never says whether the email exists,
+    five wrong passwords lock that email for 15 minutes, and every attempt counts against the caller's address."""
+    if not _admin_enabled():
+        raise HTTPException(status_code=404, detail="Not found")
+    if not _origin_ok(request):
+        raise HTTPException(status_code=403, detail="This request came from another site")
+    caller = request.client.host if request.client else "unknown"
+    if not _staff_ip_limiter.allow(caller):
+        raise HTTPException(status_code=429, detail="Too many attempts. Wait a minute.")
+    email = body.email.strip().lower()[:200]
+    now = time.time()
+    fails = [t for t in _staff_fails.get(email, []) if now - t < _STAFF_LOCK_SECONDS]
+    if len(fails) >= _STAFF_MAX_FAILS:
+        raise HTTPException(status_code=429, detail="Too many wrong attempts for this account. Try again in 15 minutes.")
+    row = accounts.password_row(email) if email else None
+    right = roles_module.verify_password(body.password[:400], row["password_hash"] if row else "")  # takes the same time either way
+    user = accounts.get_user(row["id"]) if row and right else None
+    actor = _staff_actor_for(user) if user and not user["disabled"] else None
+    if actor is None:
+        _staff_fails[email] = fails + [now]
+        if len(_staff_fails) > 5000:
+            _staff_fails.clear()
+        raise HTTPException(status_code=401, detail="That email or password is not right.")
+    _staff_fails.pop(email, None)
+    accounts.touch_login(user["id"])
+    _start_session(user, request, response, accounts_module.STAFF_SESSION_DAYS)
+    log.info("admin audit: %s signed in to the admin with a password", email)
+    return {"ok": True}
+
+
+@app.get("/api/admin/permissions")
+def admin_permissions(request: Request) -> dict:
+    _require_perm(request)
+    return {"groups": roles_module.catalog(), "all": roles_module.PERMISSIONS}
+
+
+@app.get("/api/admin/roles")
+def admin_roles(request: Request) -> dict:
+    actor = _require_perm(request, "roles.manage", "users.roles", "users.create", "users.view")
+    counts = accounts.role_counts()
+    out = []
+    for role in role_store.list():
+        out.append({
+            **role,
+            "users": counts.get(role["key"], 0),
+            # may this actor give the role to somebody, and may they edit it
+            "grantable": True if actor.is_super else (role["key"] != "admin" and roles_module.covers(actor.perms, role["permissions"])),
+            "editable": (not role["locked"]) and (actor.is_super or roles_module.covers(actor.perms, role["permissions"])),
+        })
+    return {"roles": out, "envAdmins": len(_ADMIN_EMAILS), "canManage": actor.is_super or roles_module.allows(actor.perms, "roles.manage")}
+
+
+@app.post("/api/admin/roles")
+def admin_create_role(body: RoleBody, request: Request) -> dict:
+    actor = _require_perm(request, "roles.manage")
+    wanted = roles_module.clean(body.permissions)
+    if not actor.is_super and not roles_module.covers(actor.perms, wanted):
+        raise HTTPException(status_code=403, detail="A role cannot have permissions that you do not have yourself.")
+    try:
+        role = role_store.create(body.name, body.description, wanted)
+    except RoleError as exc:
+        raise _role_problem(exc) from exc
+    _audit(actor, f"created the role {role['key']} with {len(role['permissions'])} permissions")
+    return {"role": role}
+
+
+@app.put("/api/admin/roles/{key}")
+def admin_update_role(key: str, body: RoleEditBody, request: Request) -> dict:
+    actor = _require_perm(request, "roles.manage")
+    current = role_store.get(key)
+    if not current:
+        raise HTTPException(status_code=404, detail="No such role.")
+    if not actor.is_super:
+        if not roles_module.covers(actor.perms, current["permissions"]):
+            raise HTTPException(status_code=403, detail="That role can do more than your own role can, so you cannot change it.")
+        if body.permissions is not None and not roles_module.covers(actor.perms, roles_module.clean(body.permissions)):
+            raise HTTPException(status_code=403, detail="A role cannot have permissions that you do not have yourself.")
+    try:
+        role = role_store.update(key, body.name, body.description, body.permissions)
+    except RoleError as exc:
+        raise _role_problem(exc) from exc
+    _audit(actor, f"changed the role {key}: now {len(role['permissions'])} permissions")
+    return {"role": role}
+
+
+@app.delete("/api/admin/roles/{key}")
+def admin_delete_role(key: str, request: Request) -> dict:
+    actor = _require_perm(request, "roles.manage")
+    current = role_store.get(key)
+    if not current:
+        raise HTTPException(status_code=404, detail="No such role.")
+    if not actor.is_super and not roles_module.covers(actor.perms, current["permissions"]):
+        raise HTTPException(status_code=403, detail="That role can do more than your own role can, so you cannot delete it.")
+    try:
+        role_store.delete(key)
+    except RoleError as exc:
+        raise _role_problem(exc) from exc
+    moved = accounts.move_role(key, "user")  # whoever had it becomes a general user, with no admin access
+    _audit(actor, f"deleted the role {key}; {moved} people became general users")
+    return {"deleted": key, "movedToUser": moved}
+
+
+@app.post("/api/admin/users")
+def admin_create_account(body: NewAccountBody, request: Request) -> dict:
+    """A staff account with an email and a password (it can sign in to the admin with them; if its owner later signs in with Google using
+    the same email, the two are linked and the role stays)."""
+    actor = _require_perm(request, "users.create")
+    email = body.email.strip().lower()
+    if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email) or len(email) > 200:
+        raise HTTPException(status_code=400, detail="That is not an email address.")
+    problem = roles_module.check_password_rules(body.password, email)
+    if problem:
+        raise HTTPException(status_code=400, detail=problem)
+    if body.role == "user":
+        raise HTTPException(status_code=400, detail="Choose a staff role. General users sign in with Google, so they need no password.")
+    role = _grantable_role(actor, body.role)
+    if not role["permissions"] and role["key"] != "admin":
+        raise HTTPException(status_code=400, detail="That role has no permissions yet, so the account could not do anything. Give the role some first.")
+    if accounts.email_taken(email):
+        raise HTTPException(status_code=409, detail="Somebody with that email already has an account. Change their role instead, then set a password.")
+    user = accounts.create_staff(email, body.name or email.split("@")[0], roles_module.hash_password(body.password), role["key"])
+    _audit(actor, f"created the {role['key']} account {email}")
+    return {"user": {**user, "roleName": role["name"]}}
+
+
+@app.put("/api/admin/users/{user_id}/role")
+def admin_set_role(user_id: str, body: RoleChangeBody, request: Request) -> dict:
+    actor = _require_perm(request, "users.roles")
+    target = accounts.get_user(user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="No such user")
+    if actor.user and actor.user["id"] == user_id:
+        raise HTTPException(status_code=400, detail="You cannot change your own role.")
+    _guard_target(actor, target)
+    role = _grantable_role(actor, body.role)
+    if target["role"] == "admin" and role["key"] != "admin":
+        _ensure_admin_left(user_id)
+    accounts.set_role(user_id, role["key"])
+    if role["key"] == "user":
+        accounts.set_password(user_id, "")  # a general user has no password and no way in with one
+    _audit(actor, f"changed {target['email']} from {target['role']} to {role['key']}")
+    return {"ok": True, "role": role["key"], "roleName": role["name"]}
+
+
+@app.post("/api/admin/users/{user_id}/password")
+def admin_set_password(user_id: str, body: PasswordBody, request: Request) -> dict:
+    """Sets (or resets) a staff member's password; whoever had the old one is signed out."""
+    actor = _require_perm(request, "users.create")
+    target = accounts.get_user(user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="No such user")
+    if (target["role"] or "user") == "user":
+        raise HTTPException(status_code=400, detail="Only staff have passwords. Give the person a staff role first.")
+    _guard_target(actor, target)
+    problem = roles_module.check_password_rules(body.password, target["email"])
+    if problem:
+        raise HTTPException(status_code=400, detail=problem)
+    accounts.set_password(user_id, roles_module.hash_password(body.password))
+    _audit(actor, f"set a new password for {target['email']}")
+    return {"ok": True}
+
+
+@app.post("/api/admin/me/password")
+def admin_change_own_password(body: OwnPasswordBody, request: Request, response: Response) -> dict:
+    """Somebody changes their own password (they stay signed in here; every other sign-in of theirs ends)."""
+    actor = _require_perm(request)
+    if not actor.user:
+        raise HTTPException(status_code=400, detail="The admin token has no password to change.")
+    row = accounts.password_row(actor.user["email"])
+    if not row or row["id"] != actor.user["id"]:
+        raise HTTPException(status_code=400, detail="This account signs in with Google and has no password to change. An administrator can set one for you.")
+    if not roles_module.verify_password(body.current[:400], row["password_hash"]):
+        raise HTTPException(status_code=403, detail="The current password is not right.")
+    problem = roles_module.check_password_rules(body.new, actor.user["email"])
+    if problem:
+        raise HTTPException(status_code=400, detail=problem)
+    accounts.set_password(actor.user["id"], roles_module.hash_password(body.new))
+    _start_session(actor.user, request, response, accounts_module.STAFF_SESSION_DAYS)  # this browser stays in
+    _audit(actor, "changed their own password")
     return {"ok": True}
 
 
@@ -906,7 +1273,7 @@ def _fail(exc: Exception) -> HTTPException:
 @app.get("/api/admin/billing")
 def admin_billing(request: Request) -> dict:
     """Everything the plans pages need: Razorpay's state, the feature catalogue, and every plan with its prices and rules."""
-    _require_admin(request)
+    _require_perm(request, "plans.view", "features.view")
     return {
         "razorpay": {**razorpay.status(), "webhookUrl": str(request.base_url).rstrip("/") + "/api/billing/webhook"},
         "features": plans.list_features(),
@@ -918,7 +1285,7 @@ def admin_billing(request: Request) -> dict:
 
 @app.post("/api/admin/plans")
 def admin_create_plan(body: PlanBody, request: Request) -> dict:
-    _require_admin(request)
+    _require_perm(request, "plans.manage")
     try:
         return {"plan": plans.save_plan(body.fields())}
     except (ValueError, LookupError) as exc:
@@ -927,7 +1294,7 @@ def admin_create_plan(body: PlanBody, request: Request) -> dict:
 
 @app.put("/api/admin/plans/{plan_id}")
 def admin_update_plan(plan_id: str, body: PlanBody, request: Request) -> dict:
-    _require_admin(request)
+    _require_perm(request, "plans.manage")
     try:
         return {"plan": plans.save_plan(body.fields(), plan_id)}
     except (ValueError, LookupError) as exc:
@@ -936,7 +1303,7 @@ def admin_update_plan(plan_id: str, body: PlanBody, request: Request) -> dict:
 
 @app.delete("/api/admin/plans/{plan_id}")
 def admin_delete_plan(plan_id: str, request: Request) -> dict:
-    _require_admin(request)
+    _require_perm(request, "plans.manage")
     try:
         plans.delete_plan(plan_id)
     except (ValueError, LookupError) as exc:
@@ -946,7 +1313,7 @@ def admin_delete_plan(plan_id: str, request: Request) -> dict:
 
 @app.post("/api/admin/plans/{plan_id}/prices")
 def admin_add_price(plan_id: str, body: PriceBody, request: Request) -> dict:
-    _require_admin(request)
+    _require_perm(request, "plans.manage")
     try:
         return {"price": plans.save_price(plan_id, body.fields())}
     except (ValueError, LookupError) as exc:
@@ -955,7 +1322,7 @@ def admin_add_price(plan_id: str, body: PriceBody, request: Request) -> dict:
 
 @app.put("/api/admin/plans/{plan_id}/prices/{price_id}")
 def admin_update_price(plan_id: str, price_id: str, body: PriceBody, request: Request) -> dict:
-    _require_admin(request)
+    _require_perm(request, "plans.manage")
     try:
         return {"price": plans.save_price(plan_id, body.fields(), price_id)}
     except (ValueError, LookupError) as exc:
@@ -964,7 +1331,7 @@ def admin_update_price(plan_id: str, price_id: str, body: PriceBody, request: Re
 
 @app.delete("/api/admin/prices/{price_id}")
 def admin_delete_price(price_id: str, request: Request) -> dict:
-    _require_admin(request)
+    _require_perm(request, "plans.manage")
     try:
         plans.delete_price(price_id)
     except (ValueError, LookupError) as exc:
@@ -975,7 +1342,7 @@ def admin_delete_price(price_id: str, request: Request) -> dict:
 @app.post("/api/admin/prices/{price_id}/razorpay")
 def admin_create_razorpay_plan(price_id: str, request: Request) -> dict:
     """Creates this price as a Razorpay plan, so it can be subscribed to, and remembers the id Razorpay gives it."""
-    _require_admin(request)
+    _require_perm(request, "plans.manage")
     price = plans.get_price(price_id)
     plan = plans.get_plan(price["planId"]) if price else None
     if not price or not plan:
@@ -995,7 +1362,7 @@ def admin_create_razorpay_plan(price_id: str, request: Request) -> dict:
 
 @app.post("/api/admin/features")
 def admin_add_feature(body: FeatureBody, request: Request) -> dict:
-    _require_admin(request)
+    _require_perm(request, "features.manage")
     try:
         return {"feature": plans.save_feature(body.fields())}
     except (ValueError, LookupError) as exc:
@@ -1004,7 +1371,7 @@ def admin_add_feature(body: FeatureBody, request: Request) -> dict:
 
 @app.put("/api/admin/features/{key}")
 def admin_update_feature(key: str, body: FeatureBody, request: Request) -> dict:
-    _require_admin(request)
+    _require_perm(request, "features.manage")
     try:
         return {"feature": plans.save_feature({**body.fields(), "key": key}, key)}
     except (ValueError, LookupError) as exc:
@@ -1013,7 +1380,7 @@ def admin_update_feature(key: str, body: FeatureBody, request: Request) -> dict:
 
 @app.delete("/api/admin/features/{key}")
 def admin_delete_feature(key: str, request: Request) -> dict:
-    _require_admin(request)
+    _require_perm(request, "features.manage")
     try:
         plans.delete_feature(key)
     except (ValueError, LookupError) as exc:
@@ -1024,7 +1391,7 @@ def admin_delete_feature(key: str, request: Request) -> dict:
 @app.put("/api/admin/plans/{plan_id}/features/{key}")
 def admin_set_plan_feature(plan_id: str, key: str, body: CellBody, request: Request) -> dict:
     """One cell of the grid: whether a plan includes a feature, and its limit."""
-    _require_admin(request)
+    _require_perm(request, "features.manage")
     try:
         return {"rule": plans.set_plan_feature(plan_id, key, body.enabled, body.value)}
     except (ValueError, LookupError) as exc:
@@ -1033,7 +1400,7 @@ def admin_set_plan_feature(plan_id: str, key: str, body: CellBody, request: Requ
 
 @app.get("/api/admin/subscriptions")
 def admin_subscriptions(request: Request, page: int = 1, pageSize: int = 25) -> dict:
-    _require_admin(request)
+    _require_perm(request, "subscriptions.view")
     size = min(max(pageSize, 1), 100)
     page = max(page, 1)
     items, total = plans.list_subscriptions(limit=size, offset=(page - 1) * size)
@@ -1163,7 +1530,7 @@ class RewardsBody(BaseModel):
 
 @app.get("/api/admin/rewards")
 def admin_rewards(request: Request) -> dict:
-    _require_admin(request)
+    _require_perm(request, "rewards.view")
     return {
         "config": engagement.config(), "defaults": DEFAULT_CONFIG, "badgeCounts": engagement.badge_counts(),
         "badgeRules": BADGE_RULES, "rewardKinds": REWARD_KINDS,
@@ -1172,7 +1539,7 @@ def admin_rewards(request: Request) -> dict:
 
 @app.put("/api/admin/rewards")
 def admin_save_rewards(body: RewardsBody, request: Request) -> dict:
-    _require_admin(request)
+    _require_perm(request, "rewards.manage")
     try:
         return {"config": engagement.save_config(body.config)}
     except ValueError as exc:
@@ -1181,7 +1548,7 @@ def admin_save_rewards(body: RewardsBody, request: Request) -> dict:
 
 @app.post("/api/admin/rewards/reset")
 def admin_reset_rewards(request: Request) -> dict:
-    _require_admin(request)
+    _require_perm(request, "rewards.manage")
     return {"config": engagement.reset_config()}
 
 
@@ -1193,7 +1560,7 @@ class AccountBody(BaseModel):
 @app.get("/api/admin/youtube")
 def admin_youtube_status(request: Request, test: bool = False) -> dict:
     """What the server has for YouTube (the accounts and their health); with ?test=1 also tries each one for real."""
-    _require_admin(request)
+    _require_perm(request, "youtube.manage")
     return {
         **youtube.diagnose(test=test),
         "queue": job_queue.stats(),
@@ -1204,7 +1571,7 @@ def admin_youtube_status(request: Request, test: bool = False) -> dict:
 
 @app.post("/api/admin/youtube/accounts")
 def admin_add_account(body: AccountBody, request: Request) -> dict:
-    _require_admin(request)
+    _require_perm(request, "youtube.manage")
     try:
         return youtube.add_account(body.cookies, body.label)
     except ValueError as exc:
@@ -1213,7 +1580,7 @@ def admin_add_account(body: AccountBody, request: Request) -> dict:
 
 @app.delete("/api/admin/youtube/accounts/{account_id}")
 def admin_remove_account(account_id: str, request: Request) -> dict:
-    _require_admin(request)
+    _require_perm(request, "youtube.manage")
     if not youtube.remove_account(account_id):
         raise HTTPException(status_code=404, detail="No such account (accounts set in the environment cannot be removed here)")
     return {"removed": account_id}
@@ -1221,7 +1588,7 @@ def admin_remove_account(account_id: str, request: Request) -> dict:
 
 @app.post("/api/admin/youtube/accounts/{account_id}/reset")
 def admin_reset_account(account_id: str, request: Request) -> dict:
-    _require_admin(request)
+    _require_perm(request, "youtube.manage")
     youtube.reset_account(account_id)
     return {"reset": account_id}
 
@@ -1339,7 +1706,7 @@ def rate_song(session_id: str, body: RatingBody, request: Request) -> dict:
 
 @app.get("/api/admin/ratings")
 def admin_ratings(request: Request, page: int = 1, pageSize: int = 25, stars: int = 0, comments: bool = False) -> dict:
-    _require_admin(request)
+    _require_perm(request, "ratings.view")
     size = min(max(pageSize, 1), 100)
     page = max(page, 1)
     items, total = catalog.list_ratings(limit=size, offset=(page - 1) * size, stars=stars if 1 <= stars <= 5 else 0, only_comments=comments)
@@ -1537,7 +1904,7 @@ class SongPageBody(BaseModel):
 def admin_song_pages(
     request: Request, search: str = "", page: int = 1, pageSize: int = 25, status: str = "all", since: float = 0, until: float = 0
 ) -> dict:
-    _require_admin(request)
+    _require_perm(request, "song_pages.manage")
     if status not in ("all", "published", "unpublished"):
         status = "all"
     return song_pages.admin_list(search.strip()[:80], max(page, 1), min(max(pageSize, 1), 100), status, max(since, 0), max(until, 0))
@@ -1545,7 +1912,7 @@ def admin_song_pages(
 
 @app.put("/api/admin/song-pages/{video_id}")
 def admin_publish_song_page(video_id: str, body: SongPageBody, request: Request) -> dict:
-    _require_admin(request)
+    _require_perm(request, "song_pages.manage")
     if not is_video_id(video_id):
         raise HTTPException(status_code=404, detail="Unknown song")
     done = song_pages.publish(video_id, title=body.title, artist=body.artist, slug=body.slug, intro=body.intro)
@@ -1556,7 +1923,7 @@ def admin_publish_song_page(video_id: str, body: SongPageBody, request: Request)
 
 @app.delete("/api/admin/song-pages/{video_id}")
 def admin_unpublish_song_page(video_id: str, request: Request) -> dict:
-    _require_admin(request)
+    _require_perm(request, "song_pages.manage")
     if not is_video_id(video_id):
         raise HTTPException(status_code=404, detail="Unknown song")
     return {"ok": song_pages.unpublish(video_id)}

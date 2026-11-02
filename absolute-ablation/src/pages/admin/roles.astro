@@ -1,0 +1,238 @@
+---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+---
+
+<AdminLayout perm="roles.manage" title="Roles & permissions" active="roles" lead="Choose what each role can do in this admin. Tick a box to give a role that permission; the change reaches everybody with that role the next time they open a page.">
+  <section class="adm-card">
+    <h2>How roles work</h2>
+    <ul class="adm-list" style="margin-top:10px">
+      <li><span class="adm-pill violet">Admin</span><span>Can do everything, always. It cannot be changed. Accounts listed in <code>ADMIN_EMAILS</code> (<span id="env-admins">…</span>) and the admin token are always administrators too, so you cannot lock yourself out.</span></li>
+      <li><span class="adm-pill warn">Staff roles</span><span>Editor, and any role you add. They can sign in to this admin with an email and a password (or Google) and can do only what is ticked.</span></li>
+      <li><span class="adm-pill">General user</span><span>The people who sign up on the website. No access to this admin, whatever happens.</span></li>
+      <li><span class="adm-pill ok">Safe by design</span><span>Nobody can give a role (or a person) more power than they have themselves, and nobody changes their own role.</span></li>
+    </ul>
+  </section>
+
+  <div class="adm-row" style="margin:6px 0 12px;justify-content:space-between">
+    <h2 style="margin:0;font-size:18px">Permissions by role</h2>
+    <div class="adm-row">
+      <button id="new-open" type="button" class="adm-btn ghost">New role</button>
+      <button id="save" type="button" class="adm-btn" disabled>Save changes</button>
+    </div>
+  </div>
+
+  <form id="new-form" class="adm-card ro-new" hidden>
+    <label class="adm-field"><span>Name</span><input id="new-name" type="text" maxlength="40" placeholder="For example: Support" required /></label>
+    <label class="adm-field"><span>What it is for</span><input id="new-desc" type="text" maxlength="200" placeholder="Optional" /></label>
+    <div class="adm-row"><button type="submit" class="adm-btn">Create role</button><button id="new-cancel" type="button" class="adm-btn ghost">Cancel</button></div>
+    <small class="adm-hint" style="margin:0;grid-column:1/-1">A new role starts with no permissions: tick what it should do below, then save.</small>
+  </form>
+
+  <div class="adm-table-wrap"><table id="matrix" class="adm-table ro-matrix"></table></div>
+  <p id="msg" class="adm-msg" role="status"></p>
+</AdminLayout>
+
+<style is:global>
+  .ro-new { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; align-items: end; }
+  .ro-matrix th, .ro-matrix td { white-space: normal; }
+  .ro-matrix thead th { vertical-align: bottom; min-width: 112px; text-align: center; }
+  .ro-matrix thead th:first-child { text-align: left; min-width: 260px; }
+  .ro-matrix .ro-head strong { display: block; font: 700 13px var(--font-sans); letter-spacing: 0; text-transform: none; color: var(--color-ink); }
+  .ro-matrix .ro-head small { display: block; margin-top: 2px; font: 500 11.5px var(--font-sans); letter-spacing: 0; text-transform: none; color: var(--color-mute); }
+  .ro-matrix .ro-head .ro-acts { display: flex; gap: 6px; justify-content: center; margin-top: 8px; }
+  .ro-matrix tr.ro-group td { padding: 9px 16px; background: #faf7ff; font: 700 11.5px var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-violet-deep); }
+  .ro-matrix td:first-child strong { display: block; color: var(--color-ink); font-size: 14px; }
+  .ro-matrix td:first-child small { display: block; margin-top: 2px; color: var(--color-mute); font-size: 12.5px; line-height: 1.4; }
+  .ro-matrix td.tick { text-align: center; }
+  .ro-matrix td.tick input { width: 19px; height: 19px; accent-color: var(--color-violet); cursor: pointer; }
+  .ro-matrix td.tick input:disabled { cursor: not-allowed; opacity: 0.55; }
+  .ro-matrix th.dirty { box-shadow: inset 0 -3px 0 #f59e0b; }
+</style>
+
+<script>
+  import { adminReady, adminFetch, el, say, adminInfo } from "../../lib/admin";
+
+  const matrix = document.getElementById("matrix")!;
+  const saveButton = document.getElementById("save") as HTMLButtonElement;
+  const newForm = document.getElementById("new-form") as HTMLFormElement;
+
+  let roles: any[] = [];
+  let envAdmins = 0;
+  let groups: any[] = [];
+  let state = new Map<string, Set<string>>(); // role key -> what is ticked now
+  let saved = new Map<string, Set<string>>(); // role key -> what is saved
+
+  const same = (a: Set<string>, b: Set<string>) => a.size === b.size && [...a].every((x) => b.has(x));
+  const dirtyRoles = () => roles.filter((r) => r.editable && !same(state.get(r.key)!, saved.get(r.key)!));
+
+  function refreshSave() {
+    const dirty = dirtyRoles();
+    saveButton.disabled = dirty.length === 0;
+    saveButton.textContent = dirty.length ? `Save changes (${dirty.length} role${dirty.length === 1 ? "" : "s"})` : "Save changes";
+    matrix.querySelectorAll<HTMLElement>("th[data-role]").forEach((th) => th.classList.toggle("dirty", dirty.some((r) => r.key === th.dataset.role)));
+  }
+
+  const mineHas = (permission: string) => {
+    const me = adminInfo();
+    return !!me && (me.isSuper || me.permissions.includes(permission) || (permission.endsWith(".view") && me.permissions.includes(permission.slice(0, -5) + ".manage")));
+  };
+
+  function draw() {
+    const head = el("tr");
+    head.append(el("th", "", "Permission"));
+    for (const role of roles) {
+      const th = el("th", "ro-head");
+      th.dataset.role = role.key;
+      th.append(el("strong", "", role.name), el("small", "", `${role.users} ${role.users === 1 ? "person" : "people"}`));
+      if (role.key === "admin") th.append(el("small", "", envAdmins ? `Everything · +${envAdmins} in server settings` : "Everything"));
+      if (role.key === "user") th.append(el("small", "", "Website signups"));
+      if (role.editable && !role.builtin) {
+        const acts = el("div", "ro-acts");
+        const rename = el("button", "adm-btn small ghost", "Rename");
+        rename.type = "button";
+        rename.addEventListener("click", async () => {
+          const name = prompt("New name for this role:", role.name);
+          if (!name || name.trim() === role.name) return;
+          try {
+            await adminFetch(`/api/admin/roles/${encodeURIComponent(role.key)}`, { method: "PUT", body: JSON.stringify({ name }) });
+            await load();
+          } catch (err) {
+            say("msg", err instanceof Error ? err.message : "Could not rename it.", "bad");
+          }
+        });
+        const remove = el("button", "adm-btn small danger", "Delete");
+        remove.type = "button";
+        remove.addEventListener("click", async () => {
+          const people = role.users ? ` ${role.users} ${role.users === 1 ? "person has" : "people have"} it and will become general users, with no access to this admin.` : "";
+          if (!confirm(`Delete the role “${role.name}”?${people}`)) return;
+          try {
+            await adminFetch(`/api/admin/roles/${encodeURIComponent(role.key)}`, { method: "DELETE" });
+            say("msg", `Deleted ${role.name}.`, "ok");
+            await load();
+          } catch (err) {
+            say("msg", err instanceof Error ? err.message : "Could not delete it.", "bad");
+          }
+        });
+        acts.append(rename, remove);
+        th.append(acts);
+      }
+      head.append(th);
+    }
+    const thead = el("thead");
+    thead.append(head);
+
+    const body = el("tbody");
+    for (const group of groups) {
+      const header = el("tr", "ro-group");
+      const cell = el("td", "", group.group);
+      cell.colSpan = roles.length + 1;
+      header.append(cell);
+      body.append(header);
+      for (const item of group.items) {
+        const tr = el("tr");
+        const label = el("td");
+        label.append(el("strong", "", item.label), el("small", "", item.hint));
+        tr.append(label);
+        for (const role of roles) {
+          const td = el("td", "tick");
+          const box = el("input");
+          box.type = "checkbox";
+          box.dataset.role = role.key;
+          box.dataset.permission = item.key;
+          box.setAttribute("aria-label", `${role.name}: ${item.label}`);
+          const ticked = state.get(role.key)!.has(item.key);
+          box.checked = ticked;
+          const impliedByManage = item.key.endsWith(".view") && state.get(role.key)!.has(item.key.slice(0, -5) + ".manage");
+          if (!role.editable) {
+            box.disabled = true;
+            box.title = role.key === "admin" ? "The Admin role always has everything" : role.key === "user" ? "General users never have admin access" : "You cannot change this role: it can do more than your own role";
+          } else if (!mineHas(item.key)) {
+            box.disabled = !ticked;
+            box.title = "You do not have this permission yourself, so you cannot give it";
+          } else if (impliedByManage) {
+            box.disabled = true;
+            box.title = "Included because this role can also change it";
+          }
+          box.addEventListener("change", () => {
+            const set = state.get(role.key)!;
+            if (box.checked) set.add(item.key);
+            else set.delete(item.key);
+            // "change" brings "see"
+            if (item.key.endsWith(".manage")) {
+              const view = item.key.slice(0, -7) + ".view";
+              const viewBox = matrix.querySelector<HTMLInputElement>(`input[data-role="${role.key}"][data-permission="${view}"]`);
+              if (viewBox) {
+                if (box.checked) {
+                  set.add(view);
+                  viewBox.checked = true;
+                  viewBox.disabled = true;
+                } else {
+                  viewBox.disabled = false;
+                }
+              }
+            }
+            refreshSave();
+          });
+          td.append(box);
+          tr.append(td);
+        }
+        body.append(tr);
+      }
+    }
+    matrix.replaceChildren(thead, body);
+    refreshSave();
+  }
+
+  async function load() {
+    const [r, p] = await Promise.all([adminFetch("/api/admin/roles"), adminFetch("/api/admin/permissions")]);
+    roles = r.roles;
+    envAdmins = r.envAdmins;
+    groups = p.groups;
+    document.getElementById("env-admins")!.textContent = `${r.envAdmins} set`;
+    state = new Map(roles.map((role) => [role.key, new Set<string>(role.permissions)]));
+    saved = new Map(roles.map((role) => [role.key, new Set<string>(role.permissions)]));
+    draw();
+  }
+
+  saveButton.addEventListener("click", async () => {
+    const dirty = dirtyRoles();
+    saveButton.disabled = true;
+    try {
+      for (const role of dirty) {
+        await adminFetch(`/api/admin/roles/${encodeURIComponent(role.key)}`, { method: "PUT", body: JSON.stringify({ permissions: [...state.get(role.key)!] }) });
+      }
+      say("msg", `Saved. ${dirty.map((r) => r.name).join(", ")} ${dirty.length === 1 ? "has" : "have"} the new permissions now.`, "ok");
+      await load();
+    } catch (err) {
+      say("msg", err instanceof Error ? err.message : "Could not save.", "bad");
+      refreshSave();
+    }
+  });
+
+  document.getElementById("new-open")!.addEventListener("click", () => {
+    newForm.hidden = !newForm.hidden;
+    if (!newForm.hidden) (document.getElementById("new-name") as HTMLInputElement).focus();
+  });
+  document.getElementById("new-cancel")!.addEventListener("click", () => (newForm.hidden = true));
+  newForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    try {
+      const made = await adminFetch("/api/admin/roles", {
+        method: "POST",
+        body: JSON.stringify({ name: (document.getElementById("new-name") as HTMLInputElement).value, description: (document.getElementById("new-desc") as HTMLInputElement).value, permissions: [] }),
+      });
+      newForm.reset();
+      newForm.hidden = true;
+      say("msg", `Created ${made.role.name}. Tick what it can do, then save.`, "ok");
+      await load();
+    } catch (err) {
+      say("msg", err instanceof Error ? err.message : "Could not create the role.", "bad");
+    }
+  });
+
+  window.addEventListener("beforeunload", (event) => {
+    if (dirtyRoles().length) event.preventDefault();
+  });
+
+  adminReady().then(() => load().catch((err) => say("msg", err instanceof Error ? err.message : "Could not load the roles.", "bad")));
+</script>

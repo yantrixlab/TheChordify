@@ -2,7 +2,7 @@
 import AdminLayout from "../../layouts/AdminLayout.astro";
 ---
 
-<AdminLayout
+<AdminLayout perm="plans.view" manage="plans.manage"
   title="Subscription plans"
   active="plans"
   lead="The plans people can subscribe to, how each is priced, and how it is charged through Razorpay. What each plan includes is set in Features & limits. Everything here shows on the pricing page as soon as you save."
