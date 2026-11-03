@@ -776,8 +776,9 @@ class PlanStore:
             SELECT s.status AS status, s.current_end AS current_end, pr.period AS period, pr.interval_count AS interval_count,
                    pr.amount_minor AS amount_minor, pr.currency AS currency
             FROM subscriptions s JOIN plan_prices pr ON pr.id = s.price_id
-            WHERE s.razorpay_subscription_id NOT LIKE 'manual_%'
-            """
+            WHERE s.razorpay_subscription_id NOT LIKE ?
+            """,
+            (MANUAL_PREFIX + "%",),  # a % never goes in the SQL text itself: Postgres reads it as a placeholder
         )
         now, active, monthly = time.time(), 0, 0.0
         for r in rows:

@@ -14,6 +14,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 from fastapi.testclient import TestClient  # noqa: E402
 
 from app import main  # noqa: E402
+import _pg_guard  # noqa: E402
+
+_pg_guard.install(main)
 
 client = TestClient(main.app, base_url="http://testserver")
 TOKEN = {"X-Admin-Token": os.environ["ADMIN_TOKEN"]}

@@ -16,6 +16,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 from fastapi.testclient import TestClient  # noqa: E402
 
 from app import main, plans as plans_module  # noqa: E402
+import _pg_guard  # noqa: E402
+
+_pg_guard.install(main)
 
 client = TestClient(main.app, base_url="http://testserver")
 TOKEN = {"X-Admin-Token": os.environ["ADMIN_TOKEN"]}
@@ -99,7 +102,7 @@ check("a plan with no end date cannot be extended", r.status_code == 400, r.text
 print("== replacing a plan keeps one gift at a time")
 r = post(a, {"action": "give", "planId": other["id"], "unit": "days", "amount": 10})
 check("giving another plan replaces the first", r.status_code == 200 and r.json()["current"]["planId"] == other["id"], r.text)
-rows, _ = main.catalog.db.run("SELECT status FROM subscriptions WHERE user_id = ? AND razorpay_subscription_id LIKE 'manual_%'", (a["id"],))
+rows, _ = main.catalog.db.run("SELECT status FROM subscriptions WHERE user_id = ? AND razorpay_subscription_id LIKE ?", (a["id"], "manual_%"))
 check("the old gift is kept as history, ended", sorted(x["status"] for x in rows) == ["active", "cancelled"], str(rows))
 check("history lists both", len(r.json()["history"]) == 2)
 

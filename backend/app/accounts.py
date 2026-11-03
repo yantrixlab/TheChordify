@@ -129,7 +129,7 @@ class AccountStore:
         now = time.time()
         taken, _ = self._db.run("SELECT 1 AS x FROM users WHERE google_sub = ?", (sub,))
         if not taken:
-            made, _ = self._db.run("SELECT id FROM users WHERE LOWER(email) = ? AND google_sub LIKE 'pw:%'", (email.lower(),))
+            made, _ = self._db.run("SELECT id FROM users WHERE LOWER(email) = ? AND google_sub LIKE ?", (email.lower(), "pw:%"))  # (a % never goes in the SQL text: Postgres reads it as a placeholder)
             if made:
                 rows, _ = self._db.run(
                     "UPDATE users SET google_sub = ?, picture = ?, logins = logins + 1, last_login_at = ? WHERE id = ? RETURNING *",
