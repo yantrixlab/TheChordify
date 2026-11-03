@@ -195,6 +195,96 @@ export function differences(original: Seg[], current: Seg[], bars: Bar[], perBar
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
+// sections (intro, verse, chorus...)
+//
+// A section is where it starts: it runs to the bar before the next one starts, and the last one to the end of the song, so the sections
+// always follow each other in order with no overlap and no gap (the player draws them the same way, and the server checks it again).
+// So bars never jump from one section to a far one: a bar changes section only at the edge, by moving where a section starts.
+// ---------------------------------------------------------------------------------------------------------------------
+
+export interface Section {
+  label: string;
+  startBar: number;
+  endBar: number;
+}
+
+type Start = { label: string; startBar: number };
+
+/** The sections as a list of starts, made whole again: sorted, one per bar, each running to the bar before the next. */
+function relayout(starts: Start[], bars: number): Section[] {
+  const sorted = [...starts].filter((s) => s.startBar >= 0 && s.startBar < bars).sort((a, b) => a.startBar - b.startBar);
+  const unique = sorted.filter((s, i) => i === 0 || s.startBar !== sorted[i - 1].startBar);
+  return unique.map((s, i) => ({ label: s.label, startBar: s.startBar, endBar: i + 1 < unique.length ? unique[i + 1].startBar - 1 : bars - 1 }));
+}
+
+/** The sections a song has (the "Silence" marker that has no bars is left out), in the form the editor works with. */
+export function realSections(raw: { label?: string; startBar?: number | null }[] | null | undefined, bars: number): Section[] {
+  return relayout(
+    (raw ?? []).filter((s) => s.startBar !== null && s.startBar !== undefined).map((s) => ({ label: String(s.label ?? ""), startBar: Number(s.startBar) })),
+    bars,
+  );
+}
+
+/** Which section a bar is in (-1: before the first one). */
+export const sectionIndexOf = (secs: Section[], bar: number): number => secs.findIndex((s) => bar >= s.startBar && bar <= s.endBar);
+
+export const sameSections = (a: Section[], b: Section[]): boolean => a.length === b.length && a.every((s, i) => s.label === b[i].label && s.startBar === b[i].startBar && s.endBar === b[i].endBar);
+
+export function renameSection(secs: Section[], index: number, label: string): Section[] {
+  const name = label.replace(/[<>]/g, "").replace(/\s+/g, " ").trim().slice(0, 40);
+  if (!secs[index] || !name || secs[index].label === name) return secs;
+  return secs.map((s, i) => (i === index ? { ...s, label: name } : s));
+}
+
+/** A new section over bars `first` to `last`. Sections it covers are replaced, and one it only partly covers keeps the bars outside it. */
+export function createSection(secs: Section[], first: number, last: number, label: string, bars: number): Section[] | null {
+  const name = label.replace(/[<>]/g, "").replace(/\s+/g, " ").trim().slice(0, 40);
+  const a = Math.max(0, Math.min(first, last));
+  const b = Math.min(bars - 1, Math.max(first, last));
+  if (!name || a > b) return null;
+  const starts: Start[] = [{ label: name, startBar: a }];
+  for (const s of secs) {
+    if (s.endBar < a || s.startBar > b) starts.push({ label: s.label, startBar: s.startBar });
+    else {
+      if (s.startBar < a) starts.push({ label: s.label, startBar: s.startBar }); // what is left before the new one
+      if (s.endBar > b) starts.push({ label: s.label, startBar: b + 1 }); // what is left after it
+    }
+  }
+  return relayout(starts, bars);
+}
+
+/** Moves where section `index` starts (the edge it shares with the one before it). Both keep at least one bar; null when that cannot be. */
+export function moveStart(secs: Section[], index: number, newStart: number, bars: number): Section[] | null {
+  if (index < 1 || !secs[index]) return null;
+  if (newStart <= secs[index - 1].startBar || newStart > secs[index].endBar || newStart === secs[index].startBar) return null;
+  return relayout(secs.map((s, i) => ({ label: s.label, startBar: i === index ? newStart : s.startBar })), bars);
+}
+
+/** Moves the selected bars (a run inside one section) into the section before or after it. Only bars at that edge can go, so the sections stay in order. */
+export function moveBars(secs: Section[], first: number, last: number, to: "previous" | "next", bars: number): Section[] | null {
+  const a = Math.min(first, last);
+  const b = Math.max(first, last);
+  const i = sectionIndexOf(secs, a);
+  if (i < 0 || sectionIndexOf(secs, b) !== i) return null; // across two sections
+  const s = secs[i];
+  if (to === "previous") return i >= 1 && a === s.startBar && b < s.endBar ? moveStart(secs, i, b + 1, bars) : null;
+  return i + 1 < secs.length && b === s.endBar && a > s.startBar ? moveStart(secs, i + 1, a, bars) : null;
+}
+
+/** Takes a section out, its bars going to the one before it or the one after it. */
+export function mergeSection(secs: Section[], index: number, into: "previous" | "next", bars: number): Section[] | null {
+  if (secs.length < 2 || !secs[index]) return null;
+  if (into === "previous" && index < 1) return null;
+  if (into === "next" && index + 1 >= secs.length) return null;
+  const starts = secs.filter((_, i) => i !== index).map((s, i) => ({ label: s.label, startBar: s.startBar }));
+  if (into === "next") {
+    const next = starts[index]; // after the removal the next section sits at `index`
+    next.startBar = secs[index].startBar;
+  }
+  return relayout(starts, bars);
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
 // strumming
 // ---------------------------------------------------------------------------------------------------------------------
 

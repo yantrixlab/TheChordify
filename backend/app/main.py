@@ -206,8 +206,9 @@ def _refine_sections(session_id: str, result: dict, upgrade, cleanup: Optional[s
     """Waits for the structure model (off the request path) and swaps its sections into the saved result."""
     try:
         sections = upgrade()
-        if sections:
-            result = {**(_load_saved_result(session_id) or result), "sections": sections, "sectionsSource": "model"}  # on top of what is saved now, so a hand edit is kept
+        latest = _load_saved_result(session_id) or result
+        if sections and not latest.get("sectionsEdited"):  # sections an editor has set by hand are not replaced by the model's
+            result = {**latest, "sections": sections, "sectionsSource": "model"}  # on top of what is saved now, so a hand edit is kept
             if result.get("edited"):
                 catalog.save_result(session_id, result)  # an edited song keeps the stamp of the detector that made it
             else:
@@ -2072,6 +2073,8 @@ class SongEditBody(BaseModel):
     chordsDetailed: Optional[list[dict]] = None
     strumChanged: bool = False
     strum: Optional[dict] = None
+    sectionsChanged: bool = False
+    sections: Optional[list[dict]] = None
 
 
 class RestoreBody(BaseModel):
@@ -2125,6 +2128,7 @@ def admin_song_edit(video_id: str, request: Request) -> dict:
         "chordsDetailed": result.get("chordsDetailed") or result.get("chords", []),
         "strum": result.get("strum"),
         "edited": result.get("edited"),
+        "sectionsEdited": bool(result.get("sectionsEdited")),
         "token": songedit.token(result),
         "detector": {"analysisVersion": result.get("analysisVersion"), "current": ANALYSIS_VERSION, "engine": result.get("engine")},
         "versions": songedit.version_list(songedit.load_versions(catalog, session_id)),
@@ -2139,17 +2143,18 @@ def admin_song_save(video_id: str, body: SongEditBody, request: Request) -> dict
     session_id, song, result = _editable_song(video_id)
     if body.token != songedit.token(result):
         raise HTTPException(status_code=409, detail="This song was changed by somebody else (or re-analysed) since you opened it. Reload the page to see the latest version; your changes here are not saved.")
-    if body.chords is None and body.chordsDetailed is None and not body.strumChanged:
+    if body.chords is None and body.chordsDetailed is None and not body.strumChanged and not body.sectionsChanged:
         raise HTTPException(status_code=400, detail="There is nothing to save.")
     duration = float(result.get("duration") or song["duration"] or 0)
     try:
         chords = songedit.clean_chords(body.chords, duration, "chords") if body.chords is not None else None
         detailed = songedit.clean_chords(body.chordsDetailed, duration, "detailed chords") if body.chordsDetailed is not None else None
         strum = songedit.clean_strum(body.strum, int(result.get("beatsPerBar") or 4), result.get("strum")) if body.strumChanged else None
+        sections = songedit.clean_sections(body.sections, result.get("bars") or [], result.get("sections"), duration) if body.sectionsChanged else None
     except songedit.EditError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     who = _who(actor)
-    new = songedit.apply_edit(result, chords=chords, detailed=detailed, strum_set=body.strumChanged, strum=strum, by=who)
+    new = songedit.apply_edit(result, chords=chords, detailed=detailed, strum_set=body.strumChanged, strum=strum, sections=sections, by=who)
     if songedit.token(new) == songedit.token(result):
         return {"changed": False, "token": songedit.token(result), "versions": songedit.version_list(songedit.load_versions(catalog, session_id)), "edited": result.get("edited")}
     summary = songedit.describe_change(result, new)

@@ -211,8 +211,93 @@ def run(result, label):
     check("the edited version can be brought back", client.post(f"/api/admin/songs/{vid}/restore", headers=TOKEN, json={"versionId": next(v["id"] for v in vs if v["summary"].startswith("Edited")), "token": songedit.token(now)}).status_code == 200)
 
 
+def run_sections():
+    """Editing a song's sections: names, where each starts, new ones; they stay in order and cover the song."""
+    print("==== sections")
+    vid = "sectionTest"
+    result = synthetic(vid)
+    result["sections"] = [
+        {"label": "Intro", "start": 0.0, "end": 8.0, "startBar": 0, "endBar": 3},
+        {"label": "Verse 1", "start": 8.0, "end": 24.0, "startBar": 4, "endBar": 11},
+        {"label": "Chorus 1", "start": 24.0, "end": 40.0, "startBar": 12, "endBar": 19},
+    ]
+    seed(result)
+    sid = result["sessionId"]
+    url = f"/api/admin/songs/{vid}/edit"
+    data = client.get(url, headers=TOKEN).json()
+    base = {"token": data["token"], "sectionsChanged": True}
+    put = lambda sections, **extra: client.put(url, headers=TOKEN, json={**base, "sections": sections, **extra})  # noqa: E731
+    check("the sections come with the song and are not marked edited", len(data["sections"]) == 3 and data["sectionsEdited"] is False)
+
+    print("-- validation")
+    S = lambda label, start: {"label": label, "startBar": start}  # noqa: E731
+    check("no sections -> 400", put([]).status_code == 400)
+    check("the first section must start at bar 1 -> 400", put([S("Intro", 2), S("Verse 1", 8)]).status_code == 400)
+    check("out of order -> 400", put([S("Intro", 0), S("Verse 1", 9), S("Chorus 1", 5)]).status_code == 400)
+    check("two starting on the same bar -> 400", put([S("Intro", 0), S("Verse 1", 5), S("Chorus 1", 5)]).status_code == 400)
+    check("past the last bar -> 400", put([S("Intro", 0), S("Verse 1", 20)]).status_code == 400)
+    check("a negative bar -> 400", put([S("Intro", -1)]).status_code == 400)
+    check("a missing name -> 400", put([S("", 0)]).status_code == 400)
+    check("a name that is too long -> 400", put([S("x" * 41, 0)]).status_code == 400)
+    check("not a number -> 400", put([{"label": "Intro", "startBar": "two"}]).status_code == 400)
+    check("nothing but markers -> 400", put([{"label": "Silence", "startBar": None}]).status_code == 400)
+    check("nothing was changed by those", main.catalog.load_result(sid)["sections"] == result["sections"])
+
+    print("-- renaming and moving where a section starts")
+    r = put([S("Opening", 0), S("  Verse   one <b>", 6), S("Chorus 1", 12)])
+    check("saved", r.status_code == 200 and r.json()["changed"], r.text[:160])
+    saved = main.catalog.load_result(sid)
+    secs = saved["sections"]
+    check("names are tidied (spaces, markup)", [s["label"] for s in secs] == ["Opening", "Verse one b", "Chorus 1"], str([s["label"] for s in secs]))
+    check("each section runs to the bar before the next", [(s["startBar"], s["endBar"]) for s in secs] == [(0, 5), (6, 11), (12, 19)], str(secs))
+    check("times follow the bars, and a section whose first bar did not move keeps its time", [(s["start"], s["end"]) for s in secs] == [(0.0, 12.0), (12.0, 24.0), (24.0, 40.0)], str([(s["start"], s["end"]) for s in secs]))
+    check("the song is marked as having hand-set sections", saved["sectionsEdited"] is True and saved["sectionsSource"] == "edited" and saved["edited"])
+    vs = songedit.load_versions(main.catalog, sid)
+    check("the original is kept first, then the save, described as the sections", [v["summary"] for v in vs] == ["Original analysis", "Edited the sections"], str([v["summary"] for v in vs]))
+    check("the fingerprint changed, and it takes the sections into account", songedit.token(saved) != data["token"])
+    check("the chords were not touched", saved["chords"] == result["chords"])
+
+    print("-- a section made from the middle of another")
+    token = songedit.token(saved)
+    r = client.put(url, headers=TOKEN, json={"token": token, "sectionsChanged": True, "sections": [S("Opening", 0), S("Verse one b", 6), S("Bridge", 8), S("Verse one b", 10), S("Chorus 1", 12)]})
+    secs = main.catalog.load_result(sid)["sections"]
+    check("splitting one section in three works", r.status_code == 200 and [(s["label"], s["startBar"], s["endBar"]) for s in secs] == [("Opening", 0, 5), ("Verse one b", 6, 7), ("Bridge", 8, 9), ("Verse one b", 10, 11), ("Chorus 1", 12, 19)], str(secs))
+    check("their times come from the bars", [s["start"] for s in secs] == [0.0, 12.0, 16.0, 20.0, 24.0])
+    check("a stale save is refused", client.put(url, headers=TOKEN, json={"token": token, "sectionsChanged": True, "sections": [S("Only", 0)]}).status_code == 409)
+
+    print("-- the structure model cannot overwrite them")
+    stored = main.catalog.load_result(sid)
+    main._refine_sections(sid, stored, lambda: [{"label": "Model", "start": 0, "end": 40, "startBar": 0, "endBar": 19}])
+    check("a late refinement leaves hand-set sections alone", main.catalog.load_result(sid)["sections"] == secs)
+
+    print("-- going back")
+    first = songedit.load_versions(main.catalog, sid)[0]
+    now = main.catalog.load_result(sid)
+    r = client.post(f"/api/admin/songs/{vid}/restore", headers=TOKEN, json={"versionId": first["id"], "token": songedit.token(now)})
+    back = main.catalog.load_result(sid)
+    check("the original sections come back", r.status_code == 200 and back["sections"] == result["sections"], str(back["sections"]))
+    check("and they are no longer marked as hand-set", "sectionsEdited" not in back)
+
+    print("-- a song that starts with a silence marker")
+    vid2 = "sectionSil1"
+    silent = synthetic(vid2)
+    silent["sections"] = [
+        {"label": "Silence", "start": 0.0, "end": 0.0, "startBar": None, "endBar": None},
+        {"label": "Intro", "start": 4.0, "end": 24.0, "startBar": 2, "endBar": 11},
+        {"label": "Verse 1", "start": 24.0, "end": 40.0, "startBar": 12, "endBar": 19},
+    ]
+    seed(silent)
+    url2 = f"/api/admin/songs/{vid2}/edit"
+    d2 = client.get(url2, headers=TOKEN).json()
+    r = client.put(url2, headers=TOKEN, json={"token": d2["token"], "sectionsChanged": True, "sections": [{"label": "Silence", "startBar": None}, S("Hum", 0), S("Intro", 2), S("Verse 1", 12)]})
+    got = main.catalog.load_result(silent["sessionId"])["sections"]
+    check("the marker is kept as it was, and a section can claim the bars before the first", r.status_code == 200 and got[0]["startBar"] is None and [(s["label"], s["startBar"]) for s in got[1:]] == [("Hum", 0), ("Intro", 2), ("Verse 1", 12)], str(got))
+    check("the song's end does not move", got[-1]["end"] == 40.0)
+
+
 # ------------------------------------------------------------------------------------------------------------------------------------
 run(synthetic(), "a synthetic song")
+run_sections()
 
 print("==== permissions")
 vid = "abcdefghijk"

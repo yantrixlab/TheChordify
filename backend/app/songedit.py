@@ -171,9 +171,78 @@ def clean_strum(strum: Any, per_bar_fallback: int = 4, previous: Optional[dict] 
     }
 
 
+MAX_SECTIONS = 80
+MAX_LABEL = 40
+
+
+def clean_label(raw: Any) -> str:
+    """A section's name: one line, no markup, 1 to 40 characters."""
+    text = re.sub(r"[<>\x00-\x1f\x7f]", "", str(raw or ""))
+    text = " ".join(text.split())
+    if not 1 <= len(text) <= MAX_LABEL:
+        raise EditError(f"A section's name needs 1 to {MAX_LABEL} characters.")
+    return text
+
+
+def clean_sections(sections: Any, bars: list, previous: Optional[list], duration: float) -> list:
+    """The sections an editor sent, checked and completed: [{label, start, end, startBar, endBar}].
+
+    A section is where it starts: each runs to the bar before the next one starts and the last to the end of the song, so the sections
+    are always in order, never overlap and never leave a gap (the player draws them the same way). The first one starts at bar 1 unless the
+    song begins with a "Silence" marker (which the detector made and an editor cannot change: it is kept as it was). Times come from the
+    bars; a section whose first bar did not move keeps the exact time the detector gave it."""
+    if not isinstance(sections, list) or not sections:
+        raise EditError("A song needs at least one section.")
+    if len(sections) > MAX_SECTIONS:
+        raise EditError(f"A song can have at most {MAX_SECTIONS} sections.")
+    n = len(bars)
+    if n == 0:
+        raise EditError("This song has no bars, so it has no sections to edit.")
+    silence = [dict(s) for s in (previous or []) if isinstance(s, dict) and s.get("startBar") is None]
+    old_start = {int(s["startBar"]): float(s["start"]) for s in (previous or []) if isinstance(s, dict) and s.get("startBar") is not None and s.get("start") is not None}
+    old_end_of_last = next((float(s["end"]) for s in reversed(previous or []) if isinstance(s, dict) and s.get("startBar") is not None and s.get("end") is not None), None)
+
+    real = []
+    for s in sections:
+        if not isinstance(s, dict):
+            raise EditError("A section needs a name and a first bar.")
+        if s.get("startBar") is None:
+            continue  # a leading "Silence" marker: kept from the stored song, whatever was sent
+        try:
+            first = int(s["startBar"])
+        except (KeyError, TypeError, ValueError):
+            raise EditError("A section needs a first bar.") from None
+        if not 0 <= first < n:
+            raise EditError(f"A section starts at bar {first + 1}, but the song has {n} bars.")
+        real.append((first, clean_label(s.get("label"))))
+    if not real:
+        raise EditError("A song needs at least one section.")
+    if any(b[0] <= a[0] for a, b in zip(real, real[1:])):
+        raise EditError("Sections must follow each other in order, each starting on a later bar than the one before.")
+    if not silence and real[0][0] != 0:
+        raise EditError("The first section has to start at bar 1.")
+
+    def when(bar: int) -> float:
+        return old_start[bar] if bar in old_start else float(bars[bar]["start"])
+
+    out = list(silence)
+    for i, (first, label) in enumerate(real):
+        last = real[i + 1][0] - 1 if i + 1 < len(real) else n - 1
+        if i + 1 < len(real):
+            end = when(real[i + 1][0])
+        else:
+            end = old_end_of_last if old_end_of_last is not None else float(duration or bars[-1]["start"])  # the song's end does not move
+        out.append({"label": label, "start": when(first), "end": max(end, when(first)), "startBar": first, "endBar": last})
+    return out
+
+
 def token(result: dict) -> str:
-    """A short fingerprint of what an editor can change, so a save made on top of somebody else's change can be told apart."""
-    body = json.dumps({"c": result.get("chords"), "d": result.get("chordsDetailed"), "s": result.get("strum")}, sort_keys=True, separators=(",", ":"))
+    """A short fingerprint of what an editor can change, so a save made on top of somebody else's change can be told apart.
+    The sections count only once an editor has changed them (the detector's own refinement of them does not change the fingerprint)."""
+    parts = {"c": result.get("chords"), "d": result.get("chordsDetailed"), "s": result.get("strum")}
+    if result.get("sectionsEdited"):
+        parts["x"] = result.get("sections")
+    body = json.dumps(parts, sort_keys=True, separators=(",", ":"))
     return hashlib.sha1(body.encode("utf-8")).hexdigest()[:16]
 
 
@@ -194,11 +263,13 @@ def describe_change(before: dict, after: dict) -> str:
         parts.append(f"{d} detailed chord{'s' if d != 1 else ''}")
     if json.dumps(before.get("strum"), sort_keys=True) != json.dumps(after.get("strum"), sort_keys=True):
         parts.append("the strumming")
+    if json.dumps(before.get("sections"), sort_keys=True) != json.dumps(after.get("sections"), sort_keys=True):
+        parts.append("the sections")
     return "Edited " + " and ".join(parts) if parts else "Saved"
 
 
 def apply_edit(result: dict, *, chords: Optional[list] = None, detailed: Optional[list] = None, strum_set: bool = False,
-               strum: Optional[dict] = None, by: str = "") -> dict:
+               strum: Optional[dict] = None, sections: Optional[list] = None, by: str = "") -> dict:
     """The result with the editor's changes on it (the stored one is not touched)."""
     from .structure import estimate_key
 
@@ -212,6 +283,10 @@ def apply_edit(result: dict, *, chords: Optional[list] = None, detailed: Optiona
         new["chordsDetailed"] = detailed
     if strum_set:
         new["strum"] = strum
+    if sections is not None:
+        new["sections"] = sections
+        new["sectionsEdited"] = True  # the structure model's later refinement must not overwrite these (main._refine_sections)
+        new["sectionsSource"] = "edited"
     before = result.get("edited") or {}
     new["edited"] = {"at": time.time(), "by": by, "count": int(before.get("count") or 0) + 1}
     return new
@@ -223,7 +298,7 @@ def apply_edit(result: dict, *, chords: Optional[list] = None, detailed: Optiona
 
 
 def _state(result: dict) -> dict:
-    return {k: result.get(k) for k in ("chords", "chordsDetailed", "strum", "key")}
+    return {k: result.get(k) for k in ("chords", "chordsDetailed", "strum", "key", "sections", "sectionsEdited")}
 
 
 def load_versions(catalog: Any, session_id: str) -> list[dict]:
@@ -255,6 +330,12 @@ def restore(result: dict, version: dict, by: str) -> dict:
     for k in ("chords", "chordsDetailed", "strum", "key"):
         if version["data"].get(k) is not None or k == "strum":
             new[k] = version["data"].get(k)
+    if version["data"].get("sections") is not None:  # versions kept before sections could be edited have none: the sections stay as they are
+        new["sections"] = version["data"]["sections"]
+        if version["data"].get("sectionsEdited"):
+            new["sectionsEdited"] = True
+        else:
+            new.pop("sectionsEdited", None)
     before = result.get("edited") or {}
     new["edited"] = {"at": time.time(), "by": by, "count": int(before.get("count") or 0) + 1}
     return new
