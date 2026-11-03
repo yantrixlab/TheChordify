@@ -589,12 +589,20 @@ def _start_session(user: dict, request: Request, response: Response, days: int =
     return token
 
 
+def _full_user(user: dict) -> dict:
+    """The person as the menus draw them: who they are, the plan they have right now, and where they stand (level, XP, streak).
+    Signing in and asking "who am I" give the same answer, so the page looks the same straight after signing in as after a refresh."""
+    snap = engagement.snapshot(user["id"])
+    plan, _sub = plans.effective(user["id"])
+    return {**_public_user(user), "plan": plan["code"], "planName": plan["name"], **{k: snap[k] for k in ("level", "title", "ring", "stars", "xp", "intoLevel", "levelSpan", "nextLevelXp", "streak")}}
+
+
 def _signed_in(user: dict, request: Request, response: Response, mobile: bool) -> dict:
     """The answer to a sign-in. The website gets a cookie; an app gets the token in the answer, to send back as a bearer token."""
     if mobile:
-        return {"user": _public_user(user), "token": accounts.start_session(user["id"]), "expiresInDays": accounts_module.SESSION_DAYS}
+        return {"user": _full_user(user), "token": accounts.start_session(user["id"]), "expiresInDays": accounts_module.SESSION_DAYS}
     _start_session(user, request, response)
-    return {"user": _public_user(user)}
+    return {"user": _full_user(user)}
 
 
 # A login for the people who review the site for a payment service, who cannot use Google sign-in. It is on only while
@@ -640,9 +648,7 @@ def whoami(request: Request, response: Response) -> dict:
     user = _session_user(request)
     if not user:
         return {"user": None}
-    snap = engagement.snapshot(user["id"])
-    plan, _sub = plans.effective(user["id"])
-    return {"user": {**_public_user(user), "plan": plan["code"], "planName": plan["name"], **{k: snap[k] for k in ("level", "title", "ring", "stars", "xp", "intoLevel", "levelSpan", "nextLevelXp", "streak")}}}
+    return {"user": _full_user(user)}
 
 
 @app.post("/api/auth/logout")

@@ -79,7 +79,8 @@ export function updateUser(patch: Partial<AuthUser>) {
 let meInFlight: Promise<AuthUser | null> | null = null;
 
 /** The signed-in person, or null. Also refreshes the cached hint. The menu and the page both ask: they share one request. */
-export function getMe(): Promise<AuthUser | null> {
+export function getMe(fresh = false): Promise<AuthUser | null> {
+  if (fresh) meInFlight = null; // just signed in: an answer asked for before that may be about nobody
   meInFlight ??= (async () => {
     try {
       const res = await fetch(`${API_BASE}/api/auth/me`, { credentials: "include" });
@@ -156,8 +157,9 @@ async function sendCredential(credential: string): Promise<AuthUser> {
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(body.detail || "Sign-in did not work. Please try again.");
   remember(body.user);
+  const full = await getMe(true); // the server's own answer for who this is now (level, XP, plan): the same a refresh would show
   track("login", { method: "google" });
-  return body.user;
+  return full ?? body.user;
 }
 
 /** The sign-in for payment reviewers (it only works while the server has it switched on). Throws with a message that is safe to show. */
@@ -172,8 +174,9 @@ export async function signInAsReviewer(email: string, password: string): Promise
   if (res.status === 404) throw new Error("This sign-in is not switched on.");
   if (!res.ok) throw new Error(body.detail || "Sign-in did not work. Please try again.");
   remember(body.user);
+  const full = await getMe(true);
   track("login", { method: "reviewer" });
-  return body.user;
+  return full ?? body.user;
 }
 
 /**
