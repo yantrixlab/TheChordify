@@ -68,6 +68,7 @@ import Footer from "../components/Footer.astro";
   .sp-dg:hover { transform: translateY(-2px); border-color: #d8ccf0; box-shadow: 0 18px 30px -22px rgb(91 33 182 / 0.4); }
   .sp-dg-art { display: grid; place-items: center; min-height: 128px; }
   .sp-dg-art svg { display: block; width: 100%; max-width: 116px; height: auto; font-family: var(--font-sans); }
+  .sp-dg-art.is-keys svg { max-width: 140px; }
   .sp-dg figcaption { display: grid; gap: 2px; margin-top: 6px; }
   .sp-dg figcaption strong { font-size: 20px; font-weight: 750; letter-spacing: -0.02em; color: var(--color-ink); }
   .sp-dg-notes { font: 500 12px var(--font-mono); color: var(--color-mute); }
@@ -172,38 +173,65 @@ import Footer from "../components/Footer.astro";
 </style>
 
 <script>
-  // Draws the chord diagrams on a song page with the same shapes the player uses, and lets a chord show its other voicings.
-  import { getGuitarShapes, chordNotes } from "../lib/chordShapes";
+  // Draws the chord diagrams on a song page with the same shapes the player uses, for the instrument the visitor chose (guitar unless they
+  // chose another and their plan allows it), and lets a chord show its other ways of playing.
+  import { chordDrawing, chordNotes, type InstrumentId } from "../lib/chordShapes";
   import { diagramSvg } from "../lib/tools/diagram";
+  import { pianoSvg } from "../lib/pianoDiagram";
+  import { instrumentFor } from "../lib/instrument";
+  import { can, loadPlan } from "../lib/plan";
 
-  document.querySelectorAll<HTMLElement>(".sp-dg").forEach((card) => {
-    const chord = card.dataset.chord ?? "";
-    const art = card.querySelector<HTMLElement>(".sp-dg-art")!;
-    const notes = card.querySelector<HTMLElement>(".sp-dg-notes")!;
-    const nav = card.querySelector<HTMLElement>(".sp-dg-nav")!;
-    const label = nav.querySelector("span")!;
-    let shapes: ReturnType<typeof getGuitarShapes> = [];
-    try {
-      shapes = getGuitarShapes(chord);
-      notes.textContent = chordNotes(chord).join(" ");
-    } catch {
-      // a chord with no shape just shows its name
+  const cards = [...document.querySelectorAll<HTMLElement>(".sp-dg")].map((card) => ({
+    chord: card.dataset.chord ?? "",
+    art: card.querySelector<HTMLElement>(".sp-dg-art")!,
+    notes: card.querySelector<HTMLElement>(".sp-dg-notes")!,
+    nav: card.querySelector<HTMLElement>(".sp-dg-nav")!,
+    at: 0,
+    count: 0,
+    draw: () => {},
+  }));
+  const heading = document.querySelector<HTMLElement>("#diagrams h2");
+  const NAMES: Record<InstrumentId, string> = { guitar: "Guitar", piano: "Piano", ukulele: "Ukulele", mandolin: "Mandolin" };
+
+  function drawAll() {
+    const instrument = instrumentFor(can);
+    if (heading) heading.textContent = instrument === "guitar" ? "Chord diagrams" : `${NAMES[instrument]} chord diagrams`;
+    for (const card of cards) {
+      let drawing: ReturnType<typeof chordDrawing> | null = null;
+      try {
+        drawing = chordDrawing(instrument, card.chord);
+        card.notes.textContent = chordNotes(card.chord).join(" ");
+      } catch {
+        // a chord with no shape just shows its name
+      }
+      card.count = !drawing ? 0 : drawing.kind === "keys" ? drawing.voicings.length : drawing.shapes.length;
+      card.at = 0;
+      card.draw = () => {
+        if (!drawing || card.count === 0) {
+          card.art.innerHTML = "";
+          return;
+        }
+        card.art.classList.toggle("is-keys", drawing.kind === "keys");
+        card.art.innerHTML = drawing.kind === "keys" ? pianoSvg(drawing.voicings[card.at]) : diagramSvg(drawing.shapes[card.at]);
+        const label = card.nav.querySelector("span");
+        if (label) label.textContent = `${card.at + 1} / ${card.count}`;
+      };
+      card.nav.hidden = card.count < 2;
+      card.draw();
     }
-    let at = 0;
-    const draw = () => {
-      art.innerHTML = shapes.length ? diagramSvg(shapes[at]) : "";
-      label.textContent = `${at + 1} / ${shapes.length}`;
-    };
-    if (!shapes.length) return;
-    draw();
-    if (shapes.length > 1) {
-      nav.hidden = false;
-      nav.querySelectorAll<HTMLButtonElement>("button").forEach((button) =>
-        button.addEventListener("click", () => {
-          at = (at + Number(button.dataset.step) + shapes.length) % shapes.length;
-          draw();
-        }),
-      );
-    }
-  });
+  }
+
+  for (const card of cards) {
+    card.nav.querySelectorAll<HTMLButtonElement>("button").forEach((button) =>
+      button.addEventListener("click", () => {
+        if (card.count < 2) return;
+        card.at = (card.at + Number(button.dataset.step) + card.count) % card.count;
+        card.draw();
+      }),
+    );
+  }
+  drawAll();
+  window.addEventListener("plan-change", drawAll); // the plan decides whether the other instruments show
+  window.addEventListener("instrument-change", drawAll);
+  void loadPlan();
 </script>

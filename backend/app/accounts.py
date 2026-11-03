@@ -92,6 +92,7 @@ def _user(row: dict) -> dict:
         "role": row.get("role") or "user",
         "hasPassword": bool(row.get("password_hash")),
         "plan": row["plan_code"],
+        "instrument": row.get("instrument") or "",  # the instrument the person shows chords for ("" until they choose)
         "logins": row["logins"],
         "disabled": bool(row["disabled"]),
         "createdAt": row["created_at"],
@@ -109,7 +110,7 @@ class AccountStore:
     def _ensure_columns(self) -> None:
         """Adds the role and password columns to a users table made before they existed (nothing changes for people already there: they
         are general users with no password)."""
-        wanted = {"role": "TEXT NOT NULL DEFAULT 'user'", "password_hash": "TEXT NOT NULL DEFAULT ''"}
+        wanted = {"role": "TEXT NOT NULL DEFAULT 'user'", "password_hash": "TEXT NOT NULL DEFAULT ''", "instrument": "TEXT NOT NULL DEFAULT ''"}
         if getattr(self._db, "kind", "sqlite") == "postgres":
             for column, ddl in wanted.items():
                 self._db.run(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {column} {ddl}")
@@ -174,6 +175,10 @@ class AccountStore:
             (time.time() - 7 * 86400,),
         )
         return {"total": rows[0]["total"], "lastWeek": int(rows[0]["week"])}
+
+    def set_instrument(self, user_id: str, instrument: str) -> bool:
+        _, changed = self._db.run("UPDATE users SET instrument = ? WHERE id = ?", (instrument, user_id))
+        return changed > 0
 
     def set_disabled(self, user_id: str, disabled: bool) -> bool:
         _, changed = self._db.run("UPDATE users SET disabled = ? WHERE id = ?", (1 if disabled else 0, user_id))

@@ -22,6 +22,7 @@ import { transposeChord } from '../lib/diagrams';
 import { buzz } from '../lib/buzz';
 import { buildChart, cellAt, clock, trimPickup } from '../lib/grid';
 import { METER_MAX, METER_MIN, isOwn, loadMeter, ownMeter, saveMeter } from '../lib/meter';
+import { chooseInstrument as saveInstrument, instrumentFor, INSTRUMENTS as INSTRUMENT_LIST, useInstrument } from '../lib/instrument';
 import { getJson, setJson } from '../lib/storage';
 import { radius, makeStyles, useColors } from '../theme';
 
@@ -31,12 +32,7 @@ const VIEWS = [
   { id: 'grid', label: 'Grid' },
   { id: 'strum', label: 'Strum' },
 ];
-const INSTRUMENTS = [
-  { id: 'guitar', label: 'Guitar', feature: null },
-  { id: 'ukulele', label: 'Ukulele', feature: 'instruments_more' },
-  { id: 'piano', label: 'Piano', soon: true },
-  { id: 'mandolin', label: 'Mandolin', soon: true },
-];
+const INSTRUMENTS = INSTRUMENT_LIST; // guitar, piano, ukulele, mandolin: the other three are part of a plan ("instruments_more")
 const LOOPS = ['off', 'song', 'section'];
 
 const CLOCK_ASK = 250; // ms between two questions to the video about where it is
@@ -88,7 +84,7 @@ export default function PlayerScreen({ route, navigation }) {
   const [activeStore] = useState(createActive); // the playing cell of the chart (-1 before the first)
   const [favorite, setFavorite] = useState(false);
   const [view, setView] = useState(getJson('view', 'diagrams'));
-  const [instrument, setInstrument] = useState(getJson('instrument', 'guitar'));
+  const instrument = useInstrument(); // the person's choice: this phone's, or the account's from another device
   const [transpose, setTranspose] = useState(0);
   const [capo, setCapo] = useState(0);
   const [detailed, setDetailed] = useState(false);
@@ -162,8 +158,7 @@ export default function PlayerScreen({ route, navigation }) {
   const strumList = useMemo(() => strumPatterns(result), [result]);
   const videoId = result?.videoId || song?.videoId || (sessionId.startsWith('yt_') ? sessionId.slice(3) : '');
   const audioUrl = !videoId && result && result.audioUrl ? `${API_BASE}${result.audioUrl}` : ''; // a song somebody uploaded plays from its file
-  const ukuleleOk = can('instruments_more');
-  const shownInstrument = instrument === 'ukulele' && !ukuleleOk ? 'guitar' : instrument;
+  const shownInstrument = instrumentFor(instrument, can); // a plan without the other instruments shows the guitar (the choice is kept)
   const sections = useMemo(() => (chart ? chart.sections : []).filter((s) => s.end > s.start && s.startBar !== null && s.startBar !== undefined), [chart]);
 
   // Move the song (the YouTube video, or the file of an uploaded song) to a time.
@@ -375,14 +370,12 @@ export default function PlayerScreen({ route, navigation }) {
     setJson('view', id);
   };
   const chooseInstrument = (item) => {
-    if (item.soon) return;
     if (item.feature && !can(item.feature)) {
       setViewOpen(false);
       needsPlan();
       return;
     }
-    setInstrument(item.id);
-    setJson('instrument', item.id);
+    saveInstrument(item.id, !!user);
   };
 
   // Regroup the beats into bars again; the choice is kept for this song.

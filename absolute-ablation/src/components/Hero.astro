@@ -330,6 +330,7 @@ const sparkles = [
     transition: background-color 0.18s, color 0.18s, border-color 0.18s, box-shadow 0.18s;
   }
   .chip-btn:hover { border-color: var(--color-hairline-strong); color: var(--color-ink); }
+  .chip-btn.is-locked { opacity: 0.7; }
   .chip-btn[aria-pressed="true"] { color: #fff; border-color: transparent; background: linear-gradient(135deg, #5b21b6, #1a0533); box-shadow: 0 6px 14px -6px #5b21b6cc; }
 
   .trust { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 26px; margin: 34px 0 0; padding: 0; list-style: none; font-size: 13.5px; color: var(--color-body); }
@@ -382,6 +383,7 @@ const sparkles = [
 <script>
   import { startExtractFromUpload, getApiErrorMessage } from "../lib/api";
   import { can, loadPlan, nudge } from "../lib/plan";
+  import { INSTRUMENTS, instrumentFor, setInstrument } from "../lib/instrument";
   import { goToProcessing } from "../lib/backNav";
 
   // Tab switching (the look follows aria-selected)
@@ -426,13 +428,31 @@ const sparkles = [
   window.addEventListener("plan-change", applyUploadLock);
   void loadPlan();
 
-  // Instrument selector
-  document.querySelectorAll<HTMLButtonElement>(".instrument-btn").forEach((btn) => {
+  // Instrument selector: "Chords for". It is the person's own choice, kept on their account and this device, and it is what the player,
+  // the song pages and the app show, so choosing here changes every song they open next.
+  const instrumentButtons = document.querySelectorAll<HTMLButtonElement>(".instrument-btn");
+  function showInstrument() {
+    const shown = instrumentFor(can);
+    instrumentButtons.forEach((b) => {
+      const info = INSTRUMENTS.find((i) => i.id === b.dataset.inst);
+      b.setAttribute("aria-pressed", String(b.dataset.inst === shown));
+      b.classList.toggle("is-locked", !!info?.feature && !can(info.feature));
+    });
+  }
+  instrumentButtons.forEach((btn) => {
     btn.addEventListener("click", () => {
-      document.querySelectorAll<HTMLButtonElement>(".instrument-btn").forEach((b) => b.setAttribute("aria-pressed", "false"));
-      btn.setAttribute("aria-pressed", "true");
+      const info = INSTRUMENTS.find((i) => i.id === btn.dataset.inst);
+      if (!info) return;
+      if (info.feature && !can(info.feature)) {
+        nudge(`The ${info.label.toLowerCase()} view`);
+        return;
+      }
+      setInstrument(info.id);
     });
   });
+  window.addEventListener("instrument-change", showInstrument);
+  window.addEventListener("plan-change", showInstrument);
+  showInstrument();
 
   // Search: the results (songs only) open on their own page.
   const searchForm = document.getElementById("hero-search") as HTMLFormElement;

@@ -10,6 +10,7 @@ export interface AuthUser {
   picture: string;
   plan: string; // the plan code ("free", "premium"...)
   planName?: string;
+  instrument?: string; // the instrument they show chords for ("" until chosen)
   isAdmin: boolean;
   level?: number; // from the library: where they stand, for the menu
   title?: string;

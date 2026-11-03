@@ -2,6 +2,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import { Animated, Easing, FlatList, PanResponder, Pressable, Text, useWindowDimensions, View } from 'react-native';
 import { chordNotes } from 'chordsuno-shared/chordShapes';
 import ChordDiagram from './ChordDiagram';
+import PianoChord from './PianoChord';
 import { Icon } from './Icons';
 import { choiceFor, chordSequence, chordsUsed, stepPick, transposeChord, usePicks } from '../lib/diagrams';
 import { makeStyles, useColors } from '../theme';
@@ -27,7 +28,11 @@ const Slot = memo(function Slot({ raw, transpose, capo, instrument, picks, arrow
   return (
     <View style={styles.slot}>
       <View style={compact ? styles.liftCompact : on ? styles.liftOn : styles.lift}>
-        <ChordDiagram shape={choice ? choice.shape : null} label={label} notes={notes} scale={scale} active={on} />
+        {choice && choice.way.kind === 'keys' ? (
+          <PianoChord voicing={choice.way.voicing} label={label} scale={scale} active={on} />
+        ) : (
+          <ChordDiagram shape={choice ? choice.way.shape : null} label={label} notes={notes} scale={scale} active={on} />
+        )}
       </View>
       {compact ? null : arrows && choice && choice.count > 1 ? (
         <View style={styles.arrows}>

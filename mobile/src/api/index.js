@@ -73,6 +73,8 @@ export const getPricing = () => request('/api/pricing');
 export const getAuthConfig = () => request('/api/auth/config');
 export const getProfile = () => request('/api/me/profile');
 export const getMe = () => request('/api/auth/me');
+/** Remembers which instrument the signed-in person shows chords for (guitar, piano, ukulele or mandolin). */
+export const setMyInstrument = (instrument) => request('/api/me/instrument', { method: 'PUT', body: { instrument } });
 export const signInWithGoogle = (credential) => request('/api/auth/google', { method: 'POST', body: { credential, mobile: true } });
 export const signInAsReviewer = (email, password) => request('/api/auth/reviewer', { method: 'POST', body: { email, password, mobile: true } });
 export const signOut = () => request('/api/auth/logout', { method: 'POST' });

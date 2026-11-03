@@ -124,7 +124,7 @@ export const LANDING: Landing[] = [
       { q: "How accurate are the chords?", a: "The chords are worked out automatically, and the main chords of a song with clear harmony are usually right. Unusual voicings, key changes and heavy production can be off, so treat the chart as a very good starting point and trust your ear." },
       { q: "Does it work with any YouTube video?", a: "It works with music videos, official audio and most uploads of a song. A few videos cannot be downloaded (private, age-restricted or blocked in some regions); in that case try another upload of the same song." },
       { q: "Can I use my own audio file?", a: "Uploading your own song is part of some plans. Sign in and see the plans to check whether it is included in yours." },
-      { q: "Which instruments is it for?", a: "The chord names and timing work for any instrument. The chord diagrams in the player are for guitar and ukulele today; piano and mandolin diagrams are on the way." },
+      { q: "Which instruments is it for?", a: "The chord names and timing work for any instrument. The player draws every chord for guitar, piano, ukulele and mandolin: choose yours above the song details and it is remembered on your account, on every device." },
       { q: "Do I need an account?", a: "You can try a song without one. Sign in with Google to keep a library of the songs you play and your favourites." },
     ],
     cta: { heading: "Try it with your next song", text: "Paste a YouTube link and see its chords in about a minute.", label: "Get the chords of a song", href: "/#find" },
@@ -368,7 +368,7 @@ export const LANDING: Landing[] = [
         { chord: "Em", frets: ["0", "2", "2", "0"], notes: "E G B" },
         { chord: "Am", frets: ["2", "2", "3", "5"], notes: "A C E" },
       ],
-      note: "The chord diagrams in the player are drawn for guitar today. Mandolin shapes in the player are on our list; until then the chord names and timing work for any instrument, and the shapes above cover the chords of many songs.",
+      note: "In the player, choose Mandolin above the song details and every chord is drawn as a mandolin diagram (G D A E), with other ways to play it. Mandolin diagrams are part of the Premium plan; the shapes above are free for everyone.",
     },
     guides: [
       {
@@ -384,7 +384,7 @@ export const LANDING: Landing[] = [
       },
     ],
     faq: [
-      { q: "Does Chord Suno show mandolin chord diagrams?", a: "Not yet. The chord diagrams in the player are guitar diagrams. The chord names and their timing are right for a mandolin, and the common shapes are on this page. Mandolin diagrams in the player are planned." },
+      { q: "Does Chord Suno show mandolin chord diagrams?", a: "Yes. Open a song in the player and choose Mandolin: every chord is drawn as a four-string diagram in standard G D A E tuning, with other ways to play it. Mandolin diagrams are part of the Premium plan. The common mandolin shapes are free on this page." },
       { q: "Can I find the chords of a song for mandolin?", a: "Yes. Search for the song or paste a YouTube link and you get every chord on the beat. The names are the same on a mandolin." },
       { q: "What is the standard mandolin tuning?", a: "G D A E, from the lowest pair of strings to the highest, the same as a violin. The chord shapes on this page are for that tuning." },
       { q: "Can I change the key of a song for mandolin?", a: "Yes. Use transpose to move the song to a key such as G, D or A, where the chords are close and use open strings." },

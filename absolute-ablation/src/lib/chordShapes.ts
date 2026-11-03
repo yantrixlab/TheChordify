@@ -36,9 +36,35 @@ const QUALITIES: Quality[] = [
   { suffix: "dim7", intervals: [0, 3, 6, 9], name: "diminished 7th" },
   { suffix: "m7b5", intervals: [0, 3, 6, 10], name: "half-diminished" },
   { suffix: "5", intervals: [0, 7], name: "power chord" },
+  // Beyond the detector's own set: what an editor may type, and what the usual chord books list.
+  { suffix: "9", intervals: [0, 4, 7, 10, 14], name: "dominant 9th" },
+  { suffix: "m9", intervals: [0, 3, 7, 10, 14], name: "minor 9th" },
+  { suffix: "maj9", intervals: [0, 4, 7, 11, 14], name: "major 9th" },
+  { suffix: "add9", intervals: [0, 4, 7, 14], name: "add 9" },
+  { suffix: "madd9", intervals: [0, 3, 7, 14], name: "minor add 9" },
+  { suffix: "7sus4", intervals: [0, 5, 7, 10], name: "7th suspended 4th" },
+  { suffix: "7b5", intervals: [0, 4, 6, 10], name: "7th flat 5" },
+  { suffix: "7#5", intervals: [0, 4, 8, 10], name: "augmented 7th" },
+  { suffix: "7b9", intervals: [0, 4, 7, 10, 13], name: "7th flat 9" },
+  { suffix: "7#9", intervals: [0, 4, 7, 10, 15], name: "7th sharp 9" },
+  { suffix: "11", intervals: [0, 4, 7, 10, 14, 17], name: "dominant 11th" },
+  { suffix: "m11", intervals: [0, 3, 7, 10, 14, 17], name: "minor 11th" },
+  { suffix: "13", intervals: [0, 4, 7, 10, 14, 21], name: "dominant 13th" },
 ];
 
 const QUALITY_BY_SUFFIX = new Map(QUALITIES.map((q) => [q.suffix, q]));
+
+/** Other ways the same chord is written ("Amin", "A-7", "AM7", "Cø", "C+"), read as the suffix above. */
+const SUFFIX_ALIASES: Record<string, string> = {
+  min: "m", "-": "m", maj: "", M: "", major: "", minor: "m", mi: "m",
+  M7: "maj7", Maj7: "maj7", "maj 7": "maj7", "△7": "maj7", "Δ": "maj7", "Δ7": "maj7",
+  min7: "m7", mi7: "m7", "-7": "m7", dom7: "7",
+  mM7: "mMaj7", mmaj7: "mMaj7", minmaj7: "mMaj7", "m(maj7)": "mMaj7",
+  "+": "aug", "+5": "aug", "°": "dim", o: "dim", "°7": "dim7", o7: "dim7",
+  "ø": "m7b5", "ø7": "m7b5", m7b5: "m7b5", "m7-5": "m7b5", "m7(b5)": "m7b5",
+  sus: "sus4", "7sus": "7sus4", "+7": "7#5", aug7: "7#5", "7+5": "7#5", "7(b5)": "7b5", "7-5": "7b5", "7(b9)": "7b9", "7(#9)": "7#9",
+  "2": "sus2", "add2": "sus2", "(add9)": "add9", "m(add9)": "madd9", "6/9": "6", m69: "m6",
+};
 
 const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
@@ -52,7 +78,7 @@ function parseChord(chord: string): ParsedChord | null {
   const m = /^([A-G]#?)([^/]*)(?:\/([A-G]#?))?$/.exec(chord);
   if (!m) return null;
   const root = NOTE_NAMES.indexOf(m[1]);
-  const quality = QUALITY_BY_SUFFIX.get(m[2]);
+  const quality = QUALITY_BY_SUFFIX.get(m[2]) ?? QUALITY_BY_SUFFIX.get(SUFFIX_ALIASES[m[2]] ?? "\u0000");
   const bass = m[3] ? NOTE_NAMES.indexOf(m[3]) : root;
   if (root === -1 || !quality || bass === -1) return null;
   return { root, quality, bass };
@@ -400,9 +426,13 @@ export function getAllGuitarShapes(chord: string, max = 8): GuitarShape[] {
 // Standard tuning, G C E A (the G is the high one). Every shape is four fretted-or-open strings, so a diagram is the same
 // GuitarShape with four entries, in the order [G, C, E, A].
 
-const UKE_OPEN = [7, 0, 4, 9]; // G C E A as pitch classes
-const UKE_PITCH = [67, 60, 64, 69]; // G4 C4 E4 A4: the lowest sounding string is the C, not the G
-const UKE_MAX_FRET = 12;
+/** A four-string instrument, as far as chord shapes go: what each string plays open, and how far up the neck to look. */
+interface FourString {
+  open: number[]; // pitch classes, in the order the diagram lists the strings
+  pitch: number[]; // MIDI pitch of each open string, to tell which sounding note is the lowest
+  maxFret: number;
+  usual: Record<string, number[]>; // the shapes everybody learns first
+}
 
 /** The usual shapes everybody learns first: majors, minors and the dominant 7ths for all twelve notes. */
 const UKE_USUAL: Record<string, number[]> = {
@@ -450,30 +480,38 @@ function ukeShapeOf(frets: number[]): GuitarShape | null {
   const highest = pressed.length ? Math.max(...pressed) : 0;
   const lowest = pressed.length ? Math.min(...pressed) : 0;
   const baseFret = highest > FRET_ROWS ? lowest : 1;
-  return { frets: frets.map(String), fingers, ...(baseFret > 1 ? { baseFret } : {}) };
+  return { frets: frets.map((f) => (f < 0 ? "x" : String(f))), fingers, ...(baseFret > 1 ? { baseFret } : {}) };
 }
 
 /** Every way of playing the chord on four strings within four frets, with how easy each is (lower is easier). */
-function ukuleleVoicings(parsed: ParsedChord): { frets: number[]; score: number }[] {
+function fourStringVoicings(parsed: ParsedChord, inst: FourString, relaxed = false): { frets: number[]; score: number }[] {
   const { root, quality, bass } = parsed;
   const tones = new Set(quality.intervals.map((i) => (root + i) % 12));
-  const required = new Set(quality.intervals.filter((i) => !(i === 7 && quality.intervals.length > 3)).map((i) => (root + i) % 12));
+  const pcOf = (i: number) => (root + i) % 12;
+  let required = new Set(quality.intervals.filter((i) => !(i === 7 && quality.intervals.length > 3)).map(pcOf));
+  if (relaxed && required.size >= inst.open.length) {
+    // as many notes as strings, or more (a 9th, an 11th, a 13th): the root and the fifth are what players leave out, then the 9th
+    required = new Set(quality.intervals.filter((i) => i % 12 !== 0 && i !== 7).map(pcOf));
+    if (required.size > inst.open.length) required = new Set(quality.intervals.filter((i) => i % 12 !== 0 && i !== 7 && i < 13).map(pcOf));
+  }
   const slash = bass !== root;
   const out: { frets: number[]; score: number }[] = [];
-  const frets: number[] = [];
+  const frets: number[] = []; // -1 = muted (only tried when `relaxed`)
 
   const evaluate = () => {
-    const played = new Set(frets.map((f, s) => (UKE_OPEN[s] + f) % 12));
+    const sounding = frets.filter((f) => f >= 0).length;
+    if (sounding < (required.size < 3 ? 2 : 3)) return;
+    const played = new Set(frets.map((f, s) => (f < 0 ? -1 : (inst.open[s] + f) % 12)));
     for (const pc of required) if (!played.has(pc)) return;
     // A slash chord has its bass note in the shape; it is better still when that note is the lowest one that sounds.
     let bassPenalty = 0;
     if (slash) {
       if (!played.has(bass)) return;
-      let low = 0;
+      let low = frets.findIndex((f) => f >= 0);
       frets.forEach((f, s) => {
-        if (UKE_PITCH[s] + f < UKE_PITCH[low] + frets[low]) low = s;
+        if (f >= 0 && inst.pitch[s] + f < inst.pitch[low] + frets[low]) low = s;
       });
-      if ((UKE_OPEN[low] + frets[low]) % 12 !== bass) bassPenalty = 2.5;
+      if ((inst.open[low] + frets[low]) % 12 !== bass) bassPenalty = 2.5;
     }
     const fingers = ukeFingers(frets);
     if (!fingers) return;
@@ -481,17 +519,23 @@ function ukuleleVoicings(parsed: ParsedChord): { frets: number[]; score: number 
     const lowest = pressed.length ? Math.min(...pressed) : 0;
     const highest = pressed.length ? Math.max(...pressed) : 0;
     const open = frets.filter((f) => f === 0).length;
+    const muted = frets.length - sounding;
     let stretch = 0;
     for (let i = 1; i < frets.length; i++) if (frets[i] > 0 && frets[i - 1] > 0) stretch += Math.max(0, Math.abs(frets[i] - frets[i - 1]) - 2);
     const bar = fingers.filter((f) => f === "1").length > 1;
-    const score = lowest * 0.8 + (highest - lowest) * 0.5 + stretch * 1.5 + pressed.length * 0.3 - open * 1.2 + (bar ? 1.5 : 0) + bassPenalty;
+    const score = lowest * 0.8 + (highest - lowest) * 0.5 + stretch * 1.5 + pressed.length * 0.3 - open * 1.2 + (bar ? 1.5 : 0) + bassPenalty + muted * 1.5;
     out.push({ frets: [...frets], score });
   };
 
   const search = (string: number, lo: number, hi: number) => {
-    if (string === UKE_OPEN.length) return evaluate();
-    for (let fret = 0; fret <= UKE_MAX_FRET; fret++) {
-      if (!tones.has((UKE_OPEN[string] + fret) % 12)) continue;
+    if (string === inst.open.length) return evaluate();
+    if (relaxed) {
+      frets.push(-1);
+      search(string + 1, lo, hi);
+      frets.pop();
+    }
+    for (let fret = 0; fret <= inst.maxFret; fret++) {
+      if (!tones.has((inst.open[string] + fret) % 12)) continue;
       let nextLo = lo;
       let nextHi = hi;
       if (fret > 0) {
@@ -508,24 +552,38 @@ function ukuleleVoicings(parsed: ParsedChord): { frets: number[]; score: number 
   return out;
 }
 
-const ukeCache = new Map<string, GuitarShape[]>();
+const UKULELE: FourString = { open: [7, 0, 4, 9], pitch: [67, 60, 64, 69], maxFret: 12, usual: UKE_USUAL }; // G C E A (the G is the high one, so the lowest string is the C)
+
+/** The shapes every mandolin player learns first, in the order G D A E (the strings are doubled; a diagram shows one line for each pair). */
+const MANDO_USUAL: Record<string, number[]> = {
+  C: [0, 2, 3, 0], D: [2, 0, 0, 2], E: [1, 2, 2, 0], F: [2, 3, 3, 1], G: [0, 0, 2, 3], A: [2, 2, 4, 5],
+  Am: [2, 2, 3, 0], Dm: [2, 0, 0, 1], Em: [0, 2, 2, 0],
+  C7: [3, 2, 3, 3], D7: [2, 0, 3, 2], E7: [1, 0, 2, 0], G7: [0, 0, 2, 1],
+};
+const MANDOLIN: FourString = { open: [7, 2, 9, 4], pitch: [55, 62, 69, 76], maxFret: 12, usual: MANDO_USUAL }; // G3 D4 A4 E5, tuned in fifths like a violin
+
+const fourCache = new Map<string, GuitarShape[]>();
 
 /**
- * The ukulele fingerings of a chord: the usual one first (the shape everybody learns, where there is one, else the easiest the
- * search finds), then up to two other ways of playing it further up the neck, in order up the neck.
+ * The fingerings of a chord on a four-string instrument: the usual one first (the shape everybody learns, where there is one, else
+ * the easiest the search finds), then up to two other ways of playing it further up the neck, in order up the neck.
  */
-export function getUkuleleShapes(chord: string): GuitarShape[] {
-  const cached = ukeCache.get(chord);
+function fourStringShapes(id: string, inst: FourString, chord: string): GuitarShape[] {
+  const key = `${id}:${chord}`;
+  const cached = fourCache.get(key);
   if (cached) return cached;
   const parsed = parseChord(chord);
   if (!parsed) return [];
-  const found = ukuleleVoicings(parsed).sort((a, b) => a.score - b.score);
+  let found = fourStringVoicings(parsed, inst).sort((a, b) => a.score - b.score);
+  // A power chord, or a chord with more notes than the instrument has strings: leave out what players leave out, and mute a string if need be.
+  if (found.length === 0) found = fourStringVoicings(parsed, inst, true).sort((a, b) => a.score - b.score);
   if (found.length === 0) {
-    ukeCache.set(chord, []);
+    fourCache.set(key, []);
     return [];
   }
   const slash = parsed.bass !== parsed.root;
-  const known = slash ? undefined : UKE_USUAL[chord];
+  const name = formatChord(parsed); // "Amin" and "A" are written the way the table is
+  const known = slash ? undefined : inst.usual[name];
   const usualFrets = known ?? found[0].frets;
   const usual = ukeShapeOf(usualFrets);
   if (!usual) return [];
@@ -541,6 +599,92 @@ export function getUkuleleShapes(chord: string): GuitarShape[] {
     if (shape) picked.push({ shape, at });
   }
   const choices = [usual, ...picked.sort((a, b) => a.at - b.at).map((p) => p.shape)];
-  ukeCache.set(chord, choices);
+  fourCache.set(key, choices);
   return choices;
 }
+
+/** The ukulele fingerings of a chord (G C E A), the usual one first. */
+export const getUkuleleShapes = (chord: string): GuitarShape[] => fourStringShapes("uke", UKULELE, chord);
+
+/** The mandolin fingerings of a chord (G D A E), the usual one first. */
+export const getMandolinShapes = (chord: string): GuitarShape[] => fourStringShapes("mando", MANDOLIN, chord);
+
+// --- Piano -------------------------------------------------------------------------------
+// A chord on the keyboard is the keys to press. Notes are MIDI numbers (middle C is 60), lowest first.
+
+export interface PianoVoicing {
+  notes: number[]; // every key pressed, lowest first
+  root: number; // the pitch class (0-11) of the chord's root, to mark it
+  name: string; // "Root position", "1st inversion", "Bass E in the left hand"...
+}
+
+const INVERSION_NAMES = ["Root position", "1st inversion", "2nd inversion", "3rd inversion", "4th inversion"];
+export const MAX_PIANO_VOICINGS = 4;
+const pianoCache = new Map<string, PianoVoicing[]>();
+
+/**
+ * The ways to play a chord on a piano: root position first, then the inversions (each the same notes with the lowest one moved up
+ * an octave, which sound the same chord with a different bass). A chord over another bass note (C/E) has that note in the left hand,
+ * and, when the bass is one of the chord's own notes, the inversion that has it lowest.
+ */
+export function getPianoVoicings(chord: string): PianoVoicing[] {
+  const cached = pianoCache.get(chord);
+  if (cached) return cached;
+  const parsed = parseChord(chord);
+  if (!parsed) return [];
+  const { root, quality, bass } = parsed;
+  // The root sits between G below middle C and F# above it, so every chord is drawn around the middle of the keyboard.
+  const rootMidi = 60 + ((root + 5) % 12) - 5;
+  const closed = quality.intervals.map((i) => rootMidi + i).sort((a, b) => a - b);
+  const out: PianoVoicing[] = [];
+  const rotate = (notes: number[], times: number) => {
+    let n = [...notes];
+    for (let k = 0; k < times; k++) n = [...n.slice(1), n[0] + 12].sort((a, b) => a - b); // a 9th above the octave stays above it
+    return n;
+  };
+  const slash = bass !== root;
+  const lowestOfRight = closed[0];
+  if (slash) {
+    // the bass note, a good way below the right hand
+    let low = lowestOfRight - 5;
+    while (((low % 12) + 12) % 12 !== bass) low -= 1;
+    out.push({ notes: [low, ...closed], root, name: `Bass ${NOTE_NAMES[bass]} in the left hand` });
+    const index = closed.findIndex((n) => n % 12 === bass);
+    if (index > 0) out.push({ notes: rotate(closed, index), root, name: `${NOTE_NAMES[bass]} in the bass` });
+    else if (index === 0) out.push({ notes: closed, root, name: "Root position" });
+  } else {
+    for (let k = 0; k < closed.length && out.length < MAX_PIANO_VOICINGS; k++) out.push({ notes: rotate(closed, k), root, name: INVERSION_NAMES[k] });
+  }
+  pianoCache.set(chord, out);
+  return out;
+}
+
+/** Whether a MIDI note is a black key. */
+export const isBlackKey = (midi: number): boolean => [1, 3, 6, 8, 10].includes(((midi % 12) + 12) % 12);
+
+/** The note's name with sharps ("C#"), as everywhere else on the site. */
+export const midiName = (midi: number): string => NOTE_NAMES[((midi % 12) + 12) % 12];
+
+// --- One way to ask for any instrument ---------------------------------------------------
+
+export type InstrumentId = "guitar" | "piano" | "ukulele" | "mandolin";
+
+/** The ways to play a chord on an instrument: fret diagrams (guitar, ukulele, mandolin) or keys (piano). */
+export type ChordDrawing = { kind: "frets"; shapes: GuitarShape[] } | { kind: "keys"; voicings: PianoVoicing[] };
+
+export function chordDrawing(instrument: InstrumentId, chord: string): ChordDrawing {
+  if (instrument === "piano") return { kind: "keys", voicings: getPianoVoicings(chord) };
+  const shapes = instrument === "ukulele" ? getUkuleleShapes(chord) : instrument === "mandolin" ? getMandolinShapes(chord) : getGuitarShapes(chord);
+  return { kind: "frets", shapes };
+}
+
+/** What the strings of each fretted instrument are, lowest first, for labelling a diagram. */
+export const STRING_NAMES: Record<Exclude<InstrumentId, "piano">, string[]> = {
+  guitar: ["E", "A", "D", "G", "B", "E"],
+  ukulele: ["G", "C", "E", "A"],
+  mandolin: ["G", "D", "A", "E"],
+};
+
+/** Every chord quality the site can draw, for checks and for pickers. */
+export const CHORD_QUALITIES: { suffix: string; intervals: number[]; name: string }[] = QUALITIES.map((q) => ({ suffix: q.suffix, intervals: [...q.intervals], name: q.name }));
+export const CHORD_ROOTS: string[] = [...NOTE_NAMES];

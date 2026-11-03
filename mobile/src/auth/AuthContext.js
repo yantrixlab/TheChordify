@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { AppState } from 'react-native';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import * as api from '../api';
+import { adoptAccountInstrument } from '../lib/instrument';
 import { getJson, loadToken, saveToken, setJson } from '../lib/storage';
 
 const AuthContext = createContext(null);
@@ -71,6 +72,7 @@ export function AuthProvider({ children }) {
       api.setToken(token);
       await saveToken(token);
     }
+    adoptAccountInstrument(nextUser); // the instrument they chose on another device (after the token, so a choice made before signing in can be sent)
   }, []);
 
   const forget = useCallback(async () => {

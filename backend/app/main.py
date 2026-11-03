@@ -595,7 +595,7 @@ def _full_user(user: dict) -> dict:
     Signing in and asking "who am I" give the same answer, so the page looks the same straight after signing in as after a refresh."""
     snap = engagement.snapshot(user["id"])
     plan, _sub = plans.effective(user["id"])
-    return {**_public_user(user), "plan": plan["code"], "planName": plan["name"], **{k: snap[k] for k in ("level", "title", "ring", "stars", "xp", "intoLevel", "levelSpan", "nextLevelXp", "streak")}}
+    return {**_public_user(user), "plan": plan["code"], "planName": plan["name"], "instrument": user.get("instrument") or "", **{k: snap[k] for k in ("level", "title", "ring", "stars", "xp", "intoLevel", "levelSpan", "nextLevelXp", "streak")}}
 
 
 def _signed_in(user: dict, request: Request, response: Response, mobile: bool) -> dict:
@@ -1592,6 +1592,23 @@ def my_profile(request: Request, response: Response) -> dict:
     user = _require_user(request)
     response.headers["Cache-Control"] = "no-store"
     return {"user": _public_user(user), "profile": engagement.profile(user["id"])}
+
+
+INSTRUMENTS = ("guitar", "piano", "ukulele", "mandolin")  # the instruments chords can be shown for
+
+
+class InstrumentBody(BaseModel):
+    instrument: str
+
+
+@app.put("/api/me/instrument")
+def set_my_instrument(body: InstrumentBody, request: Request) -> dict:
+    """Remembers which instrument the signed-in person wants chords shown for, so the website and the app on every device agree."""
+    user = _require_user(request, changes=True)
+    if body.instrument not in INSTRUMENTS:
+        raise HTTPException(status_code=400, detail="Choose guitar, piano, ukulele or mandolin.")
+    accounts.set_instrument(user["id"], body.instrument)
+    return {"instrument": body.instrument}
 
 
 @app.get("/api/me/library")

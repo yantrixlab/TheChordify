@@ -1,4 +1,5 @@
-// A guitar chord diagram as SVG (strings, frets, barres, finger numbers), for the Toolkit pages.
+// A chord diagram as SVG (strings, frets, barres, finger numbers) for the guitar (six strings), the ukulele and the mandolin (four), for the
+// Toolkit pages and the song pages.
 import { getGuitarShape, getGuitarShapes, type GuitarShape } from "../chordShapes";
 
 export { getGuitarShape, getGuitarShapes };
@@ -22,14 +23,16 @@ export function diagramSvg(shape: GuitarShape, options: Options = {}): string {
   const line = options.line ?? "#c4b0e0";
   const label = options.label ?? "#ffffff";
   const base = shape.baseFret ?? 1;
-  const x = (i: number) => 22 + i * 15.2; // string 0 (lowest) .. 5
+  const n = shape.frets.length; // 6 on the guitar, 4 on the ukulele and the mandolin
+  const last = n - 1;
+  const x = (i: number) => 22 + (i * 76) / last; // string 0 (lowest) .. last, across the same width whatever the count
   const y = (r: number) => 34 + r * 19;
   const parts: string[] = [];
 
   // the nut, or the number of the first fret shown
-  parts.push(base === 1 ? `<rect x="${x(0) - 1}" y="31" width="${x(5) - x(0) + 2}" height="4.5" rx="1" fill="${ink}"/>` : `<text x="6" y="${y(0) + 14}" font-size="10" font-weight="700" fill="${ink}" font-family="inherit">${base}</text>`);
-  for (let r = 0; r <= ROWS; r++) parts.push(`<line x1="${x(0)}" x2="${x(5)}" y1="${y(r)}" y2="${y(r)}" stroke="${line}" stroke-width="${r === 0 && base === 1 ? 0 : 1}"/>`);
-  for (let i = 0; i < 6; i++) parts.push(`<line x1="${x(i)}" x2="${x(i)}" y1="${y(0)}" y2="${y(ROWS)}" stroke="${line}" stroke-width="${1 + (5 - i) * 0.05}"/>`);
+  parts.push(base === 1 ? `<rect x="${x(0) - 1}" y="31" width="${x(last) - x(0) + 2}" height="4.5" rx="1" fill="${ink}"/>` : `<text x="6" y="${y(0) + 14}" font-size="10" font-weight="700" fill="${ink}" font-family="inherit">${base}</text>`);
+  for (let r = 0; r <= ROWS; r++) parts.push(`<line x1="${x(0)}" x2="${x(last)}" y1="${y(r)}" y2="${y(r)}" stroke="${line}" stroke-width="${r === 0 && base === 1 ? 0 : 1}"/>`);
+  for (let i = 0; i < n; i++) parts.push(`<line x1="${x(i)}" x2="${x(i)}" y1="${y(0)}" y2="${y(ROWS)}" stroke="${line}" stroke-width="${1 + (last - i) * 0.05}"/>`);
 
   // open and muted strings above the nut
   shape.frets.forEach((fret, i) => {
@@ -59,5 +62,5 @@ export function diagramSvg(shape: GuitarShape, options: Options = {}): string {
     parts.push(`<circle cx="${x(p.string)}" cy="${cy}" r="6" fill="${dot}"/>`);
     if (p.finger) parts.push(`<text x="${x(p.string)}" y="${cy + 3.5}" font-size="9.5" font-weight="700" fill="${label}" text-anchor="middle" font-family="inherit">${p.finger}</text>`);
   }
-  return `<svg viewBox="0 0 120 138" role="img" aria-label="Guitar chord diagram" xmlns="http://www.w3.org/2000/svg">${parts.join("")}</svg>`;
+  return `<svg viewBox="0 0 120 138" role="img" aria-label="Chord diagram" xmlns="http://www.w3.org/2000/svg">${parts.join("")}</svg>`;
 }
