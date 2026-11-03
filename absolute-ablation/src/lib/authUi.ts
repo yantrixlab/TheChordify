@@ -80,7 +80,7 @@ export async function openSignIn() {
   close.addEventListener("click", closeSignIn);
 
   const mark = el("div", "au-mark");
-  mark.innerHTML = '<svg width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true"><path d="M5 11v4M9.5 7v12M14 4v18M18.5 8v10M23 11v4" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/></svg>';
+  mark.innerHTML = '<img src="/logo-mark.png" alt="" width="62" height="70" decoding="async" />'; // the brand's guitar pick, as in the header
   const title = el("h2", "au-title", "Welcome to Chord Suno");
   title.id = "au-title";
   const sub = el("p", "au-sub", "Sign in, or create your account, with Google. There is no password to remember.");
