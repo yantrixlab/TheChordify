@@ -52,7 +52,7 @@ export const TOOLS: ToolInfo[] = [
     feature: "chord_detector",
     name: "Live chord detection",
     href: "/toolkit/chord-detector/",
-    blurb: "Play any chord and watch its name appear, with the notes and a guitar diagram, as you play.",
+    blurb: "What chord is this? Play it and watch its name appear, with the notes and a diagram for your instrument, as you play.",
     points: ["Names 11 kinds of chord by ear", "Shows the notes it hears, live", "Keeps a history you can copy"],
     icon: '<rect x="9" y="2.8" width="6" height="11.2" rx="3"/><path d="M5.2 11.5a6.8 6.8 0 0 0 13.6 0M12 18.3v3"/>',
     hue: ["#0ea5e9", "#7c3aed"],

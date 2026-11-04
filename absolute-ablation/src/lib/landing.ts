@@ -25,6 +25,8 @@ export interface ChordTable {
   columns: string[]; // the strings of the instrument, low to high as they are tuned
   rows: { chord: string; frets: string[]; notes: string }[];
   note: string;
+  columnSuffix?: string; // after each column's name in the table head (" string" by default; "" for the notes of a piano chord)
+  more?: { label: string; href: string }; // a link under the note, to the full chart
 }
 export interface Landing {
   slug: string;
@@ -70,8 +72,8 @@ export const LANDING: Landing[] = [
   // ------------------------------------------------------------------------------------------------------------------------------
   {
     slug: "youtube-to-chords",
-    title: "YouTube to Chords: Get the Chords of Any Song — Chord Suno",
-    description: "Paste a YouTube link and get every chord of the song, synced to the beat, with its key and tempo. Free to start, no card needed.",
+    title: "YouTube to Chords: Find the Chords of Any Song — Chord Suno",
+    description: "How to find out what chords are in a song: paste a YouTube link and get every chord, synced to the beat, with its key and tempo. Free to start, no card needed.",
     nav: "YouTube to chords",
     eyebrow: "YouTube to chords",
     h1: "Turn any YouTube song into chords",
@@ -133,8 +135,8 @@ export const LANDING: Landing[] = [
   // ------------------------------------------------------------------------------------------------------------------------------
   {
     slug: "guitar-chord-finder",
-    title: "Guitar Chord Finder: Chords for Any Song, Free — Chord Suno",
-    description: "Find the guitar chords of any song from a YouTube link: chord diagrams, key, tempo and strumming pattern, synced to the music. Free to start.",
+    title: "Guitar Chord Finder from YouTube: Any Song, Free — Chord Suno",
+    description: "A guitar chord finder for any YouTube song: get the guitar chords with diagrams, key, tempo and strumming pattern, synced to the music. Free to start.",
     nav: "Guitar chord finder",
     eyebrow: "Guitar chord finder",
     h1: "Find the guitar chords of any song",
@@ -197,12 +199,12 @@ export const LANDING: Landing[] = [
   // ------------------------------------------------------------------------------------------------------------------------------
   {
     slug: "chord-detector",
-    title: "Chord Detector: Find the Chord You Play, Live — Chord Suno",
-    description: "A free chord detector for songs and for your instrument: paste a YouTube link, or play into your microphone and see the chord name live.",
+    title: "What Chord Is This? Free Chord Identifier — Chord Suno",
+    description: "Not sure what chord it is? Play into your microphone and the chord identifier names it live, or paste a YouTube link to find every chord in a song. Free to try.",
     nav: "Chord detector",
-    eyebrow: "Chord detector",
-    h1: "A chord detector for songs and for your instrument",
-    lead: "Detect the chords of a recorded song from a link, or play a chord on your own instrument and see its name appear as you play.",
+    eyebrow: "Chord identifier",
+    h1: "What chord is this? A chord identifier for songs and for your instrument",
+    lead: "Identify the chords of a recorded song from a link, or play a chord on your own instrument and see its name appear as you play.",
     primary: { label: "Try the live chord detector", href: "/toolkit/chord-detector/" },
     secondary: { label: "Detect a song's chords", href: "/#find" },
     chips: ["Live from your microphone", "Chords of any song", "Sound stays on your device", "Free to try"],
@@ -261,8 +263,8 @@ export const LANDING: Landing[] = [
   // ------------------------------------------------------------------------------------------------------------------------------
   {
     slug: "ukulele-chords",
-    title: "Ukulele Chords for Any Song: Chord Finder — Chord Suno",
-    description: "Get the chords of any song for ukulele: paste a YouTube link and follow the chord names on the beat. Plus the easy ukulele chords and a free tuner.",
+    title: "Ukulele (Uke) Chords for Any Song: Chord Finder — Chord Suno",
+    description: "Get the uke chords of any song: paste a YouTube link and follow the chord names on the beat. Plus the easy ukulele chords, a full chord chart and a free tuner.",
     nav: "Ukulele chords",
     eyebrow: "Ukulele chords",
     h1: "Ukulele chords for any song",
@@ -301,6 +303,7 @@ export const LANDING: Landing[] = [
         { chord: "Dm", frets: ["2", "2", "1", "0"], notes: "D F A" },
       ],
       note: "In the player, choose Ukulele above the song details and every chord is drawn as a ukulele diagram, with other ways to play it. Ukulele diagrams are part of the Premium plan; the shapes above are free for everyone.",
+      more: { label: "See the full ukulele chord chart: every major, minor and 7th chord", href: "/ukulele-chord-chart/" },
     },
     guides: [
       {
@@ -325,6 +328,77 @@ export const LANDING: Landing[] = [
       { q: "Is it free?", a: "It is free to start, with a daily allowance of new songs. See the plans for what the paid ones add." },
     ],
     cta: { heading: "Play your favourite song on ukulele", text: "Get its chords in about a minute, then transpose it to an easy key.", label: "Find chords for a song", href: "/#find" },
+  },
+
+
+  // ------------------------------------------------------------------------------------------------------------------------------
+  {
+    slug: "piano-chords",
+    title: "Piano Chords for Any Song: Chord Finder — Chord Suno",
+    description: "Get the chords of any song for piano: paste a YouTube link and see every chord on the beat, drawn on a keyboard with its inversions. Free to start.",
+    nav: "Piano chords",
+    eyebrow: "Piano chords",
+    h1: "Piano chords for any song",
+    lead: "Chord Suno works out the chords of a song and shows them on the beat. Choose Piano and every chord is drawn on a keyboard, with the keys to press named and the inversions one tap away.",
+    primary: { label: "Find chords for a song", href: "/#find" },
+    secondary: { label: "See the common chords", href: "#chords" },
+    chips: ["Keyboard chord diagrams", "Inversions of every chord", "Transpose to any key", "Free to start"],
+    demo: { song: "Your song, on piano", chords: ["C", "Am", "F", "G"], meta: "Key of C · 100 BPM" },
+    stepsHeading: "How to play a song on piano with Chord Suno",
+    steps: [
+      { title: "Get the chords", text: "Search for the song or paste a YouTube link. You get every chord in order, with its key and tempo." },
+      { title: "Choose Piano", text: "In the player, choose Piano above the song details. Every chord becomes a keyboard with the keys to press lit and named, and your choice is remembered on your account." },
+      { title: "Play along", text: "Follow the chords as they scroll with the music, slow the song down and loop the part you are learning. Step through the inversions to find the one that sits under your hand." },
+    ],
+    featuresHeading: "What helps a piano player",
+    features: [
+      { title: "Keyboard diagrams", text: "Each chord is drawn on a keyboard with the keys pressed and named, the root marked in a deeper colour.", icon: I.diagram },
+      { title: "Inversions", text: "The same chord with a different note at the bottom: root position, first and second inversion, so the changes stay close.", icon: I.shift },
+      { title: "Chords over a bass note", text: "A chord such as C/E shows the bass note for the left hand and the chord for the right.", icon: I.note },
+      { title: "Transpose", text: "Move a song to a key that suits your voice or your hands. The whole chart and every keyboard change at once.", icon: I.key },
+      { title: "Metronome and drills", text: "A free metronome with tap tempo, and chord-change drills with a beat, for clean changes.", icon: I.clock },
+      { title: "Slow down and loop", text: "Half speed and a loop on the part you cannot get yet.", icon: I.loop },
+    ],
+    chordTable: {
+      heading: "The keys of the common piano chords",
+      intro: "A triad is three notes: the root, the third and the fifth. Play them together, in any octave, and you have the chord. These are the chords most songs use.",
+      columns: ["Root", "Third", "Fifth"],
+      columnSuffix: "",
+      rows: [
+        { chord: "C", frets: ["C", "E", "G"], notes: "C E G" },
+        { chord: "G", frets: ["G", "B", "D"], notes: "G B D" },
+        { chord: "Am", frets: ["A", "C", "E"], notes: "A C E" },
+        { chord: "F", frets: ["F", "A", "C"], notes: "F A C" },
+        { chord: "D", frets: ["D", "F♯", "A"], notes: "D F♯ A" },
+        { chord: "Em", frets: ["E", "G", "B"], notes: "E G B" },
+        { chord: "A", frets: ["A", "C♯", "E"], notes: "A C♯ E" },
+        { chord: "Dm", frets: ["D", "F", "A"], notes: "D F A" },
+      ],
+      note: "In the player, choose Piano above the song details and every chord is drawn on a keyboard, with its inversions. Piano diagrams are part of the Premium plan; the notes above are free for everyone.",
+    },
+    guides: [
+      {
+        heading: "Playing any song on piano",
+        paragraphs: [
+          "A chord has the same name and the same notes on every instrument, so a song's chords from Chord Suno are the chords you play on a piano. Read the name, find the notes, and play them together with your right hand while your left hand plays the root.",
+          "Inversions make a song easier to play. Instead of jumping to the root position of every chord, pick the inversion nearest to where your hand already is. Chord Suno shows them one after the other, and remembers the one you choose for each chord.",
+        ],
+      },
+      {
+        heading: "Start with these four",
+        paragraphs: ["If you are new, learn C, Am, F and G first. They make the progression behind a long list of songs, and the keys sit close together."],
+        list: ["C and Am share two notes (C and E), so that change is a small move.", "F to G: keep C where it is and move the others up a step.", "Play with the metronome from the Toolkit at a slow tempo, then speed up."],
+      },
+    ],
+    faq: [
+      { q: "Does Chord Suno show piano chords?", a: "Yes. Open a song in the player and choose Piano: every chord is drawn on a keyboard with the keys to press named, and you can step through its inversions. Piano diagrams are part of the Premium plan. The chord names and the notes of the common chords are free on this page." },
+      { q: "Can I find the chords of a song for piano?", a: "Yes. Search for the song or paste a YouTube link and you get every chord on the beat. The names are the same on a piano." },
+      { q: "What are inversions?", a: "The same notes of a chord with a different one at the bottom. C is C E G in root position, E G C in first inversion and G C E in second. They sound like the same chord, and they let your hand stay in one place." },
+      { q: "How does it show a chord like C/E?", a: "A chord over a bass note has that note for the left hand, and the chord for the right hand. A second way shows the inversion that has the bass note lowest." },
+      { q: "Can I change the key of a song for piano?", a: "Yes. Use transpose to move the song to a key you like. The chord chart and every keyboard redraw to match." },
+      { q: "Is it free?", a: "It is free to start, with a daily allowance of new songs. See the plans for what the paid ones add." },
+    ],
+    cta: { heading: "Play your favourite song on piano", text: "Get its chords in about a minute, then choose Piano.", label: "Find chords for a song", href: "/#find" },
   },
 
   // ------------------------------------------------------------------------------------------------------------------------------

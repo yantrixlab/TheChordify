@@ -123,7 +123,7 @@ const jsonLd = [
                 <thead>
                   <tr>
                     <th scope="col">Chord</th>
-                    {page.chordTable.columns.map((c) => <th scope="col" class="num">{c} string</th>)}
+                    {page.chordTable.columns.map((c) => <th scope="col" class="num">{c}{page.chordTable?.columnSuffix ?? " string"}</th>)}
                     <th scope="col">Notes</th>
                   </tr>
                 </thead>
@@ -139,6 +139,7 @@ const jsonLd = [
               </table>
             </div>
             <p class="lp-note">{page.chordTable.note}</p>
+            {page.chordTable.more && <p class="lp-note"><a href={page.chordTable.more.href}>{page.chordTable.more.label} →</a></p>}
           </div>
         </section>
       )

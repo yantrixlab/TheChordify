@@ -875,7 +875,8 @@ class SongPages:
         ]
         return self._fill(
             template,
-            title=f"{title} Chords{(' — ' + artist) if artist else ''} | Chord Suno",
+            # "Key & BPM" is in the title when the page shows them: people search for "<song> bpm" and "<song> key" as much as for its chords
+            title=f"{title} Chords{', Key & BPM' if key and tempo else ''}{(' — ' + artist) if artist else ''} | Chord Suno",
             description=description[:300],
             path=f"/songs/{slug}/",
             image=thumb if thumb.startswith("https://") else f"https://i.ytimg.com/vi/{row['video_id']}/hqdefault.jpg",
