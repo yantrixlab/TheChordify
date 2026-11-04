@@ -1,0 +1,137 @@
+---
+// The page of one note on one instrument: every chord that starts on it (all 28 kinds), each with its notes, how it sounds and up to
+// three ways to play it, plus the chords of the key and the other notes.
+import ChordShell from "./ChordShell.astro";
+import ChordNav from "./ChordNav.astro";
+import ChordCard from "./ChordCard.astro";
+import { GROUPS, INSTRUMENTS, KINDS, ROOTS, chordLabel, chordPath, instrumentInfo, kindsOf, notePath, rootByName, type InstrumentKey, type Root } from "../../lib/chordCatalog";
+import { chartChord } from "../../lib/chordCharts";
+import { LESSONS } from "../../lib/lessons";
+
+interface Props {
+  instrument: InstrumentKey;
+  root: Root;
+}
+const { instrument, root } = Astro.props;
+const info = instrumentInfo(instrument);
+const lower = info.name.toLowerCase();
+const path = notePath(instrument, root);
+const url = `https://chordsuno.com${path}`;
+
+const chords = new Map(KINDS.map((k) => [k.id, chartChord(instrument, root, k, info.voicings)]));
+const major = chords.get("major")!;
+const minor = chords.get("minor")!;
+const first = major.voicings[0];
+
+const title = `${root.label} Chords on ${info.name}: Every ${root.short} Chord with Diagrams — Chord Suno`;
+const description = `Every ${root.short} chord on ${lower} with a diagram: ${["", "m", "7", "maj7", "m7", "sus4"].map((s) => root.short + s).join(", ")} and more, with the notes and other ways to play each.`;
+
+// the chords of the major key that starts on this note
+const DEGREES = [
+  { at: 0, suffix: "", roman: "I" },
+  { at: 2, suffix: "m", roman: "ii" },
+  { at: 4, suffix: "m", roman: "iii" },
+  { at: 5, suffix: "", roman: "IV" },
+  { at: 7, suffix: "", roman: "V" },
+  { at: 9, suffix: "m", roman: "vi" },
+  { at: 11, suffix: "dim", roman: "vii°" },
+];
+const rootIndex = ROOTS.findIndex((r) => r.name === root.name);
+const keyChords = DEGREES.map((d) => {
+  const r = ROOTS[(rootIndex + d.at) % 12];
+  const kind = KINDS.find((k) => k.suffix === d.suffix)!;
+  return { roman: d.roman, root: r, kind, label: chordLabel(r, kind) };
+});
+
+const how =
+  instrument === "piano"
+    ? `Press ${major.notes.split(" ").join(", ")} together: that is ${root.short} major.`
+    : `The usual shape for ${root.short} major, from the lowest string to the highest, is ${first?.frets ?? ""} (x means the string is not played, 0 means it is played open).`;
+const faq = [
+  { q: `What notes are in a ${root.short} chord?`, a: `${root.short} major is made of ${major.notes.split(" ").join(", ")} (the root, third and fifth), and ${root.short} minor of ${minor.notes.split(" ").join(", ")}. Every other chord on this page adds or changes notes from those.` },
+  { q: `How do you play ${root.short} on ${lower}?`, a: how },
+  { q: `Is ${root.label} the same chord?`, a: root.label.includes("/") ? `Yes. ${root.label.replace(" / ", " and ")} are two names for the same pitch, so their chords sound the same. Songs use whichever name fits their key.` : `${root.short} is a natural note, so it has a single name.` },
+];
+
+const jsonLd = [
+  { "@context": "https://schema.org", "@type": "WebPage", name: title, description, url, isPartOf: { "@type": "WebSite", name: "Chord Suno", url: "https://chordsuno.com/" } },
+  { "@context": "https://schema.org", "@type": "FAQPage", mainEntity: faq.map((f) => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })) },
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Chord Suno", item: "https://chordsuno.com/" },
+      { "@type": "ListItem", position: 2, name: `${info.name} chord chart`, item: `https://chordsuno.com${info.chartPath}` },
+      { "@type": "ListItem", position: 3, name: `${root.short} chords`, item: url },
+    ],
+  },
+];
+const chips = GROUPS.map((g) => ({ href: `#group-${g.id}`, label: g.title.split(",")[0].replace(" chords", "") }));
+---
+
+<ChordShell title={title} description={description} jsonLd={jsonLd}>
+  <header class="ch-hero">
+    <div class="ch-in">
+      <p class="ch-crumbs"><a href="/chords/">Chord charts</a> › <a href={info.chartPath}>{info.name}</a> › {root.short}</p>
+      <p class="ch-eyebrow">{info.name} chords</p>
+      <h1>{root.label} chords on {lower}</h1>
+      <p class="ch-lead">
+        Every {root.short} chord on {lower}: {KINDS.length} kinds, from {root.short} and {root.short}m to {root.short}7, {root.short}maj7, {root.short}sus4 and the extended chords, each with its notes and up to {info.voicings} ways to play it.
+        {how}
+      </p>
+      <a class="ch-btn" href="/#find">Find chords for a song</a>
+      <a class="ch-btn is-ghost" href={info.chartPath}>{info.name} chord chart</a>
+    </div>
+  </header>
+
+  <ChordNav instrument={instrument} rootSlug={root.slug} chips={chips} easy={true} here="note" />
+
+  {
+    GROUPS.map((group) => (
+      <section class="ch-in ch-sec" id={`group-${group.id}`}>
+        <h2>{group.title.replace(/^./, (c) => c)} on {root.short}</h2>
+        <p>{group.text}</p>
+        {kindsOf(group.id).map((kind) => <ChordCard instrument={instrument} chord={chords.get(kind.id)!} kind={kind} root={root} />)}
+      </section>
+    ))
+  }
+
+  <section class="ch-in ch-sec">
+    <h2>Chords in the key of {root.short} major</h2>
+    <p>
+      These seven chords belong together: a song in {root.short} major uses mostly these. The numbers are the Roman numerals players use, so a progression such as I–V–vi–IV can be moved to any key.
+    </p>
+    <ul class="ch-pillrow">
+      {keyChords.map((c) => <li><a href={chordPath(instrument, c.root, c.kind)}>{c.roman} · {c.label}</a></li>)}
+    </ul>
+    <p style="margin-top: 14px"><a href="/learn/chords-in-a-key/">How chords in a key work →</a></p>
+  </section>
+
+  <section class="ch-in ch-sec">
+    <h2>Other notes</h2>
+    <ul class="ch-pillrow">
+      {ROOTS.filter((r) => r.slug !== root.slug).map((r) => <li><a href={notePath(instrument, r)}>{r.label} chords</a></li>)}
+    </ul>
+  </section>
+
+  <section class="ch-in ch-sec">
+    <h2>Learn {lower} chords</h2>
+    <div class="ch-links">
+      {LESSONS.filter((l) => l.instruments.includes(instrument) || l.instruments.length === 0).slice(0, 3).map((l) => (
+        <a class="ch-link" href={`/learn/${l.slug}/`}><strong>{l.title}</strong><span>{l.summary}</span></a>
+      ))}
+    </div>
+  </section>
+
+  <section class="ch-in ch-sec ch-faq">
+    <h2>{root.short} chord questions</h2>
+    {faq.map((f) => <details><summary>{f.q}</summary><p>{f.a}</p></details>)}
+  </section>
+
+  <section class="ch-in ch-cta">
+    <h2>Play a song with {root.short} chords on {lower}</h2>
+    <p>Search for a song and see every chord on the beat, drawn for {lower} in the player.</p>
+    <a class="ch-btn" href="/#find">Find chords for a song</a>
+    <a class="ch-btn is-ghost" href="/chords/">All chord charts</a>
+  </section>
+</ChordShell>

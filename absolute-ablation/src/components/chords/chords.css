@@ -1,0 +1,100 @@
+/* The chord chart pages, the chord hub and the lessons. Global on purpose (the components share these classes); every name starts ch-, cn-, cc- or ls-. */
+.ch { background: var(--color-canvas); color: var(--color-body); padding-top: 64px; }
+.ch a { color: var(--color-violet-deep); }
+.ch-in { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+.ch-hero { padding: 40px 0 20px; background: linear-gradient(180deg, #f4efff, transparent); }
+.ch-crumbs { margin: 0 0 14px; font-size: 13px; color: var(--color-mute); }
+.ch-crumbs a { text-decoration: none; }
+.ch-eyebrow { margin: 0 0 10px; font: 700 12px var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-violet-deep); }
+.ch h1 { margin: 0 0 14px; max-width: 820px; font-size: clamp(30px, 5vw, 46px); line-height: 1.08; letter-spacing: -0.03em; color: var(--color-ink); }
+.ch-lead { max-width: 760px; margin: 0 0 22px; font-size: 17px; line-height: 1.65; }
+.ch h2 { margin: 0 0 8px; font-size: 26px; letter-spacing: -0.02em; color: var(--color-ink); }
+.ch h3 { margin: 0; font-size: 19px; color: var(--color-ink); }
+.ch-sec { padding-top: 44px; scroll-margin-top: 200px; }
+.ch-sec > p { max-width: 760px; margin: 0 0 18px; line-height: 1.65; }
+.ch-muted { color: var(--color-mute); }
+.ch-btn { display: inline-block; margin: 0 10px 10px 0; padding: 12px 22px; border-radius: 999px; background: linear-gradient(135deg, #7c3aed, #5b21b6); color: #fff !important; font-weight: 700; text-decoration: none; }
+.ch-btn.is-ghost { background: var(--color-violet-soft); color: var(--color-violet-deep) !important; }
+.ch-pillrow { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.ch-pillrow a { display: inline-block; padding: 7px 14px; border-radius: 999px; background: #fff; border: 1px solid var(--color-hairline); font-weight: 600; font-size: 14px; text-decoration: none; }
+.ch-pillrow a:hover { border-color: var(--color-violet); }
+.ch-faq { max-width: 860px; }
+.ch-faq details { padding: 14px 0; border-bottom: 1px solid var(--color-hairline); }
+.ch-faq summary { cursor: pointer; font-weight: 700; color: var(--color-ink); }
+.ch-faq p { margin: 10px 0 0; line-height: 1.7; }
+.ch-cta { padding: 56px 0 90px; }
+.ch-cta p { max-width: 640px; margin: 0 0 18px; line-height: 1.65; }
+
+/* the bar that stays under the site's header while a chart scrolls: instruments, the twelve notes, search, the kinds of chord */
+.cn { position: sticky; top: 64px; z-index: 40; background: rgba(255, 255, 255, 0.94); backdrop-filter: blur(10px); border-bottom: 1px solid var(--color-hairline); box-shadow: 0 6px 18px -14px #1a053380; }
+.cn-in { max-width: 1120px; margin: 0 auto; padding: 8px 24px 10px; display: grid; gap: 7px; }
+.cn-row { display: flex; align-items: center; gap: 6px; overflow-x: auto; scrollbar-width: none; white-space: nowrap; }
+.cn-row::-webkit-scrollbar { display: none; }
+.cn-label { flex: none; margin-right: 4px; font: 700 11px var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-mute); }
+.cn-pill { flex: none; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--color-hairline); background: #fff; font-weight: 650; font-size: 13.5px; text-decoration: none; color: var(--color-body) !important; }
+.cn-pill:hover { border-color: var(--color-violet); }
+.cn-pill[aria-current] { background: var(--color-violet); border-color: var(--color-violet); color: #fff !important; }
+.cn-root { min-width: 38px; text-align: center; padding: 5px 8px; }
+.cn-chip { flex: none; padding: 4px 11px; border-radius: 8px; background: #f4f1fb; font-weight: 600; font-size: 12.5px; text-decoration: none; color: var(--color-violet-deep) !important; }
+.cn-chip:hover { background: #e9e1f8; }
+.cn-top { flex-wrap: wrap; overflow: visible; gap: 8px 10px; }
+.cn-group { display: inline-flex; gap: 6px; }
+.cn-search { display: flex; gap: 6px; flex: 1 1 240px; max-width: 360px; }
+.cn-search input { flex: 1; min-width: 0; height: 36px; padding: 0 14px; border: 1.5px solid var(--color-hairline); border-radius: 999px; font: 500 14px var(--font-sans); background: #fff; }
+.cn-search input:focus { outline: none; border-color: var(--color-violet); box-shadow: 0 0 0 3px #7c3aed1f; }
+.cn-search button { height: 36px; padding: 0 16px; border: 0; border-radius: 999px; background: var(--color-violet); color: #fff; font-weight: 700; cursor: pointer; }
+.cn-easy { display: inline-flex; align-items: center; gap: 7px; font-size: 14px; font-weight: 600; color: var(--color-ink); cursor: pointer; }
+.cn-easy input { width: 17px; height: 17px; accent-color: var(--color-violet); }
+.cn-msg { font-size: 13px; color: var(--color-error); }
+
+/* chord cards: one diagram each (the charts) */
+.cc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(138px, 1fr)); gap: 14px; }
+.cc-card { margin: 0; padding: 12px 10px 14px; border-radius: 16px; background: #fff; border: 1px solid var(--color-hairline); box-shadow: 0 1px 2px #1a05330a; text-align: center; }
+.cc-grid-wide { grid-template-columns: repeat(auto-fill, minmax(184px, 1fr)); }
+.cc-card[hidden], .cc-voicing[hidden], .cc-chord[hidden] { display: none; }
+.cc-art svg { display: block; width: 100%; max-width: 104px; height: auto; margin: 0 auto; font-family: var(--font-sans); }
+.cc-card.is-keys .cc-art svg, .cc-keys .cc-art svg { max-width: 150px; }
+.cc-card figcaption { display: grid; gap: 2px; margin-top: 4px; }
+.cc-card strong { font-size: 17px; color: var(--color-ink); }
+.cc-card small { font-size: 12.5px; color: var(--color-mute); }
+.cc-frets { font: 600 11.5px var(--font-mono); letter-spacing: 0.08em; color: var(--color-violet-deep); }
+
+/* the page of a note: every chord, with its ways to play it */
+.cc-chord { margin: 0 0 18px; padding: 18px 20px 20px; border-radius: 18px; background: #fff; border: 1px solid var(--color-hairline); box-shadow: 0 1px 2px #1a05330a; scroll-margin-top: 200px; }
+.cc-chord:target { border-color: var(--color-violet); box-shadow: 0 0 0 3px #7c3aed26; }
+.cc-chord header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
+.cc-sym { font-weight: 600; color: var(--color-violet-deep); }
+.cc-facts { margin: 0; font: 600 12.5px var(--font-mono); color: var(--color-mute); }
+.cc-text { margin: 6px 0 14px; max-width: 760px; line-height: 1.6; }
+.cc-voicings { display: flex; flex-wrap: wrap; gap: 14px; }
+.cc-voicing { margin: 0; padding: 10px 12px 10px; min-width: 128px; border-radius: 14px; background: #faf8ff; text-align: center; }
+.cc-voicing figcaption { display: grid; gap: 2px; margin-top: 4px; font-size: 12.5px; color: var(--color-mute); }
+.cc-vl { font-weight: 700; color: var(--color-ink); }
+.cc-keys .cc-voicing { min-width: 170px; }
+
+/* the grid that lists every chord on a chart */
+.cg-wrap { overflow-x: auto; border-radius: 16px; background: #fff; border: 1px solid var(--color-hairline); }
+.cg { width: 100%; border-collapse: collapse; font-size: 14px; }
+.cg th, .cg td { padding: 8px 10px; text-align: center; border-bottom: 1px solid #f1eaf9; white-space: nowrap; }
+.cg thead th { background: #fcfaff; font: 700 11.5px var(--font-mono); letter-spacing: 0.04em; color: var(--color-mute); }
+.cg tbody th { text-align: left; font-weight: 700; color: var(--color-ink); }
+.cg td a { font-weight: 600; text-decoration: none; }
+.cg td a:hover { text-decoration: underline; }
+.cg tr:last-child th, .cg tr:last-child td { border-bottom: 0; }
+
+.ch-links { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+.ch-link { display: block; padding: 18px 20px; border-radius: 16px; background: #fff; border: 1px solid var(--color-hairline); text-decoration: none; box-shadow: 0 1px 2px #1a05330a; }
+.ch-link:hover { border-color: var(--color-violet); }
+.ch-link strong { display: block; margin-bottom: 4px; font-size: 17px; color: var(--color-ink); }
+.ch-link span { font-size: 14px; line-height: 1.5; color: var(--color-body); }
+
+@media (max-width: 640px) {
+  .ch-in, .cn-in { padding-left: 16px; padding-right: 16px; }
+  .ch-hero { padding-top: 24px; }
+  .cc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .cc-chord { padding: 14px 14px 16px; }
+  .cc-voicings { gap: 10px; }
+  .cn-search { max-width: none; flex-basis: 100%; }
+  .cn { position: static; } /* on a phone the bar would take too much of the screen: it scrolls with the page */
+  .cn-top .cn-label { display: none; }
+}

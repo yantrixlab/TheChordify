@@ -1,0 +1,61 @@
+---
+// /learn/: the lessons.
+import ChordShell from "../../components/chords/ChordShell.astro";
+import { LESSONS } from "../../lib/lessons";
+import { INSTRUMENTS } from "../../lib/chordCatalog";
+
+const title = "Learn Chords: Free Lessons for Guitar, Piano, Ukulele and Mandolin — Chord Suno";
+const description = "Free, short lessons on chords: how to read a chord diagram, the first guitar chords, barre chords, piano inversions, chords in a key, capo and strumming patterns.";
+const jsonLd = [
+  { "@context": "https://schema.org", "@type": "CollectionPage", name: title, description, url: "https://chordsuno.com/learn/" },
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Chord Suno", item: "https://chordsuno.com/" },
+      { "@type": "ListItem", position: 2, name: "Learn", item: "https://chordsuno.com/learn/" },
+    ],
+  },
+];
+const beginner = LESSONS.filter((l) => l.level === "Beginner");
+const next = LESSONS.filter((l) => l.level === "Next step");
+---
+
+<ChordShell title={title} description={description} jsonLd={jsonLd}>
+  <header class="ch-hero">
+    <div class="ch-in">
+      <p class="ch-eyebrow">Learn</p>
+      <h1>Learn chords, step by step</h1>
+      <p class="ch-lead">Short, plain lessons that take you from reading your first diagram to playing songs in any key. Each one links to the chord charts, and the player lets you practise with a real song.</p>
+      <a class="ch-btn" href="/learn/read-chord-diagrams/">Start here: reading a diagram</a>
+      <a class="ch-btn is-ghost" href="/chords/">Chord charts</a>
+    </div>
+  </header>
+
+  <section class="ch-in ch-sec">
+    <h2>Beginner</h2>
+    <div class="ch-links">
+      {beginner.map((l) => <a class="ch-link" href={`/learn/${l.slug}/`}><strong>{l.title}</strong><span>{l.summary} <small class="ch-muted">· {l.minutes} min</small></span></a>)}
+    </div>
+  </section>
+
+  <section class="ch-in ch-sec">
+    <h2>The next step</h2>
+    <div class="ch-links">
+      {next.map((l) => <a class="ch-link" href={`/learn/${l.slug}/`}><strong>{l.title}</strong><span>{l.summary} <small class="ch-muted">· {l.minutes} min</small></span></a>)}
+    </div>
+  </section>
+
+  <section class="ch-in ch-sec">
+    <h2>Look a chord up</h2>
+    <div class="ch-links">
+      {INSTRUMENTS.map((i) => <a class="ch-link" href={i.chartPath}><strong>{i.name} chord chart</strong><span>Every {i.name.toLowerCase()} chord with a diagram.</span></a>)}
+    </div>
+  </section>
+
+  <section class="ch-in ch-cta">
+    <h2>Practise with a real song</h2>
+    <p>Search for a song and play along: slow it down, loop the hard part and watch every chord on the beat.</p>
+    <a class="ch-btn" href="/#find">Find chords for a song</a>
+  </section>
+</ChordShell>

@@ -3,8 +3,10 @@ import Logo from "./Logo.astro";
 
 const navLinks = [
   { label: "Discover", href: "/#find" },
-  { label: "Features", href: "/#features" },
+  { label: "Features", href: "/#features", wide: true }, // wide: only where the bar has room (1024px and up); the phone menu lists every link
   { label: "Songs", href: "/songs/" },
+  { label: "Chords", href: "/chords/" },
+  { label: "Learn", href: "/learn/", wide: true },
   { label: "Toolkit", href: "/toolkit/" },
   { label: "Pricing", href: "/pricing/" },
   { label: "My library", href: "/library/", signedIn: true }, // only for someone who is signed in (the phone menu has its own link)
@@ -35,7 +37,7 @@ const navLinks = [
           <a
             href={link.href}
             role="listitem"
-            class="rounded-full"
+            class={`rounded-full${link.wide ? " nav-wide" : ""}`}
             data-auth-user={link.signedIn ? "" : undefined}
             hidden={link.signedIn}
             style="
@@ -249,6 +251,7 @@ const navLinks = [
   nav button[data-auth] { white-space: nowrap; }
   @media (max-width: 420px) { nav[aria-label="Main navigation"] > div { padding-left: 14px !important; padding-right: 14px !important; } }
   nav button[data-auth], #mobile-menu button[data-auth] { border: 1px solid transparent; font-family: inherit; cursor: pointer; }
+  @media (max-width: 1023px) { nav .nav-wide { display: none; } } /* a tablet's bar has room for fewer links; the phone menu lists them all */
 
   /* the account menu */
   .au-menu { position: relative; }

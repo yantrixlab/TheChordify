@@ -1,0 +1,52 @@
+---
+// /guitar-chords/: the notes, each with a page of every chord that starts on it. (The other instruments' addresses of this kind are their landing pages.)
+import ChordShell from "../../components/chords/ChordShell.astro";
+import ChordNav from "../../components/chords/ChordNav.astro";
+import { ROOTS, notePath, chordLabel, kindBySuffix } from "../../lib/chordCatalog";
+
+const title = "Guitar Chords A to G♯: Every Guitar Chord by Note — Chord Suno";
+const description = "Every guitar chord, note by note: a page for each of the twelve notes with all its chords (major, minor, 7th, sus and more), diagrams and other ways to play each.";
+const jsonLd = [
+  { "@context": "https://schema.org", "@type": "WebPage", name: title, description, url: "https://chordsuno.com/guitar-chords/" },
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Chord Suno", item: "https://chordsuno.com/" },
+      { "@type": "ListItem", position: 2, name: "Guitar chord chart", item: "https://chordsuno.com/guitar-chord-chart/" },
+      { "@type": "ListItem", position: 3, name: "Guitar chords by note", item: "https://chordsuno.com/guitar-chords/" },
+    ],
+  },
+];
+const sample = ["", "m", "7", "maj7", "m7", "sus4"].map((s) => kindBySuffix(s)!);
+---
+
+<ChordShell title={title} description={description} jsonLd={jsonLd}>
+  <header class="ch-hero">
+    <div class="ch-in">
+      <p class="ch-crumbs"><a href="/chords/">Chord charts</a> › <a href="/guitar-chord-chart/">Guitar</a> › By note</p>
+      <p class="ch-eyebrow">Guitar chords</p>
+      <h1>Guitar chords, note by note</h1>
+      <p class="ch-lead">Choose a note to see every chord that starts on it, with a diagram, its notes and other ways to play it. Or open the <a href="/guitar-chord-chart/">guitar chord chart</a> to see the chords most songs use on all twelve notes at once.</p>
+    </div>
+  </header>
+  <ChordNav instrument="guitar" easy={false} here="note" />
+  <section class="ch-in ch-sec">
+    <div class="ch-links">
+      {
+        ROOTS.map((r) => (
+          <a class="ch-link" href={notePath("guitar", r)}>
+            <strong>{r.label} chords</strong>
+            <span>{sample.map((k) => chordLabel(r, k)).join(" · ")} and 22 more</span>
+          </a>
+        ))
+      }
+    </div>
+  </section>
+  <section class="ch-in ch-cta">
+    <h2>Find the chords of a song</h2>
+    <p>Paste a YouTube link or search for a song: every chord is drawn for guitar, on the beat.</p>
+    <a class="ch-btn" href="/#find">Find chords for a song</a>
+    <a class="ch-btn is-ghost" href="/learn/beginner-guitar-chords/">The first guitar chords to learn</a>
+  </section>
+</ChordShell>

@@ -1,0 +1,12 @@
+---
+// /mandolin-chords/c/, /mandolin-chords/c-sharp/ ...: every chord of one note on this instrument.
+import NotePage from "../../components/chords/NotePage.astro";
+import { ROOTS, rootBySlug } from "../../lib/chordCatalog";
+
+export function getStaticPaths() {
+  return ROOTS.map((r) => ({ params: { note: r.slug } }));
+}
+const root = rootBySlug(Astro.params.note as string)!;
+---
+
+<NotePage instrument="mandolin" root={root} />

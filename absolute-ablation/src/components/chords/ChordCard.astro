@@ -1,0 +1,53 @@
+---
+// One chord on a chart. "compact" is a card with its usual shape (the charts, a grid of cards); the full form is a section with the
+// chord's name, its notes and formula, how it sounds, and every way to play it (the page of a note).
+import type { ChartChord } from "../../lib/chordCharts";
+import type { InstrumentKey, Kind, Root } from "../../lib/chordCatalog";
+
+interface Props {
+  instrument: InstrumentKey;
+  chord: ChartChord;
+  kind: Kind;
+  root: Root;
+  compact?: boolean;
+}
+const { instrument, chord, kind, root, compact = false } = Astro.props;
+const keys = instrument === "piano";
+const first = chord.voicings[0];
+---
+
+{
+  compact ? (
+    first && (
+      <figure class={`cc-card${keys ? " is-keys" : ""}`}>
+        <div class="cc-voicing" data-easy={first.easy ? "1" : "0"}>
+          <div class="cc-art" set:html={first.svg} />
+        </div>
+        <figcaption>
+          <strong>{chord.label}</strong>
+          <small>{chord.notes}</small>
+          {first.frets && <span class="cc-frets" title="The fret on each string, low to high (x is not played)">{first.frets}</span>}
+        </figcaption>
+      </figure>
+    )
+  ) : (
+    <article class={`cc-chord${keys ? " cc-keys" : ""}`} id={kind.id}>
+      <header>
+        <h3>{`${root.short} ${kind.name} `}<span class="cc-sym">{`(${chord.label})`}</span></h3>
+        <p class="cc-facts">{chord.notes} · {chord.formula}</p>
+      </header>
+      <p class="cc-text">{kind.text}</p>
+      <div class="cc-voicings">
+        {chord.voicings.map((v) => (
+          <figure class="cc-voicing" data-easy={v.easy ? "1" : "0"}>
+            <div class="cc-art" set:html={v.svg} />
+            <figcaption>
+              <span class="cc-vl">{v.label}</span>
+              {v.frets && <span class="cc-frets" title="The fret on each string, low to high (x is not played)">{v.frets}</span>}
+            </figcaption>
+          </figure>
+        ))}
+      </div>
+    </article>
+  )
+}

@@ -1,0 +1,96 @@
+---
+// The bar that stays under the site's header on a chart: the four instruments, the twelve notes, a search box ("F#m7" goes straight to
+// that chord), an "easy chords only" switch and, where there are many sections, links that jump to each.
+import { INSTRUMENTS, ROOTS, notePath, type InstrumentKey } from "../../lib/chordCatalog";
+
+interface Props {
+  instrument: InstrumentKey;
+  rootSlug?: string; // the note whose page this is
+  chips?: { href: string; label: string }[];
+  easy?: boolean; // offer "Easy chords only"
+  here?: "chart" | "note";
+}
+const { instrument, rootSlug, chips = [], easy = true, here = "chart" } = Astro.props;
+---
+
+<div class="cn" id="chord-nav" data-instrument={instrument}>
+  <div class="cn-in">
+    <div class="cn-row cn-top">
+      <span class="cn-label">Chords for</span>
+      <span class="cn-group" aria-label="Instrument">
+        {INSTRUMENTS.map((i) => <a class="cn-pill" href={i.chartPath} aria-current={i.key === instrument && here === "chart" ? "page" : undefined}>{i.name}</a>)}
+      </span>
+      <form class="cn-search" role="search" id="cn-form">
+        <input type="search" id="cn-q" placeholder="Find a chord: F#m7, Bbmaj7…" aria-label="Find a chord" autocomplete="off" />
+        <button type="submit">Find</button>
+      </form>
+      {easy && <label class="cn-easy"><input type="checkbox" id="cn-easy" /> Easy chords only</label>}
+      <span class="cn-msg" id="cn-msg" role="status"></span>
+    </div>
+    <div class="cn-row" aria-label="Note">
+      <span class="cn-label">Note</span>
+      {ROOTS.map((r) => <a class="cn-pill cn-root" href={notePath(instrument, r)} aria-current={r.slug === rootSlug ? "page" : undefined} title={`All ${r.label} chords`}>{r.short}</a>)}
+    </div>
+    {chips.length > 0 && (
+      <div class="cn-row" aria-label="Jump to">
+        <span class="cn-label">Jump to</span>
+        {chips.map((c) => <a class="cn-chip" href={c.href}>{c.label}</a>)}
+      </div>
+    )}
+  </div>
+</div>
+
+<script>
+  import { chordPath, resolveChord, type InstrumentKey } from "../../lib/chordCatalog";
+
+  const nav = document.getElementById("chord-nav");
+  if (nav) {
+    const instrument = nav.dataset.instrument as InstrumentKey;
+    const form = document.getElementById("cn-form") as HTMLFormElement;
+    const input = document.getElementById("cn-q") as HTMLInputElement;
+    const message = document.getElementById("cn-msg")!;
+
+    // search: a chord's name goes to its place on its note's page
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const hit = resolveChord(input.value);
+      if (!hit) {
+        message.textContent = input.value.trim() ? "That chord is not on the charts. Try a note and a kind, such as C, Am or G7." : "Type a chord, such as F#m7.";
+        return;
+      }
+      message.textContent = "";
+      const target = chordPath(instrument, hit.root, hit.kind);
+      const here = new URL(target, location.href);
+      if (here.pathname === location.pathname) location.hash = here.hash;
+      else location.href = target;
+    });
+    input.addEventListener("input", () => (message.textContent = ""));
+
+    // easy chords only: hide the ways to play that need a barre or sit high on the neck; a chord with none left is hidden too
+    const easy = document.getElementById("cn-easy") as HTMLInputElement | null;
+    const KEY = "chordsuno-easy-chords";
+    const apply = () => {
+      const on = !!easy?.checked;
+      document.querySelectorAll<HTMLElement>(".cc-voicing").forEach((v) => (v.hidden = on && v.dataset.easy === "0"));
+      document.querySelectorAll<HTMLElement>(".cc-chord, .cc-card").forEach((box) => {
+        box.hidden = on && box.querySelectorAll(".cc-voicing:not([hidden])").length === 0;
+      });
+    };
+    if (easy) {
+      try {
+        easy.checked = localStorage.getItem(KEY) === "1";
+      } catch {
+        // no storage: off
+      }
+      easy.addEventListener("change", () => {
+        try {
+          localStorage.setItem(KEY, easy.checked ? "1" : "0");
+        } catch {
+          // fine
+        }
+        apply();
+      });
+      apply();
+    }
+  }
+</script>

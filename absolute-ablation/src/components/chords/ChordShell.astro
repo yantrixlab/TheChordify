@@ -1,0 +1,22 @@
+---
+// The frame of a chart, hub or lesson page: the site's header and footer around a main area, and the shared styles.
+import Layout from "../../layouts/Layout.astro";
+import Nav from "../Nav.astro";
+import Footer from "../Footer.astro";
+import "./chords.css";
+
+interface Props {
+  title: string;
+  description: string;
+  jsonLd?: unknown[];
+}
+const { title, description, jsonLd = [] } = Astro.props;
+---
+
+<Layout title={title} description={description} jsonLd={jsonLd}>
+  <Nav />
+  <main id="main-content" class="ch">
+    <slot />
+  </main>
+  <Footer />
+</Layout>

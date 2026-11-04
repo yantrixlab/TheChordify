@@ -1,0 +1,104 @@
+---
+// /chords/: every chord chart, the reference of all the kinds of chord, and the lessons.
+import ChordShell from "../../components/chords/ChordShell.astro";
+import { GROUPS, INSTRUMENTS, KINDS, ROOTS, kindsOf, notePath } from "../../lib/chordCatalog";
+import { chordNotes } from "../../lib/chordShapes";
+import { LESSONS } from "../../lib/lessons";
+
+const title = "Chord Charts for Guitar, Piano, Ukulele and Mandolin — Chord Suno";
+const description = "Every chord on guitar, piano, ukulele and mandolin: a chord chart with diagrams for all twelve notes, a page for each note, and short lessons to learn them.";
+const jsonLd = [
+  { "@context": "https://schema.org", "@type": "CollectionPage", name: title, description, url: "https://chordsuno.com/chords/" },
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Chord Suno", item: "https://chordsuno.com/" },
+      { "@type": "ListItem", position: 2, name: "Chord charts", item: "https://chordsuno.com/chords/" },
+    ],
+  },
+];
+const sharpen = (s: string) => s.replace(/#/g, "♯");
+const describe: Record<string, string> = {
+  guitar: "Six strings, E A D G B E. Open chords, barre chords and every other shape, up to three ways to play each.",
+  piano: "Keyboard diagrams with the keys named, in root position and every inversion.",
+  ukulele: "Four strings, G C E A. Easy open shapes and others further up the neck.",
+  mandolin: "Four pairs of strings, G D A E, tuned in fifths like a violin.",
+};
+---
+
+<ChordShell title={title} description={description} jsonLd={jsonLd}>
+  <header class="ch-hero">
+    <div class="ch-in">
+      <p class="ch-eyebrow">Chord charts</p>
+      <h1>Every chord, on every instrument</h1>
+      <p class="ch-lead">
+        {KINDS.length} kinds of chord on twelve notes make {KINDS.length * 12} chords, and every one has a diagram on guitar, piano, ukulele and mandolin. Pick an instrument for its chart, then a note for all of its chords.
+      </p>
+      <a class="ch-btn" href="/#find">Find chords for a song</a>
+      <a class="ch-btn is-ghost" href="/learn/">Learn chords</a>
+    </div>
+  </header>
+
+  <section class="ch-in ch-sec">
+    <h2>Choose an instrument</h2>
+    <div class="ch-links">
+      {INSTRUMENTS.map((i) => <a class="ch-link" href={i.chartPath}><strong>{i.name} chord chart</strong><span>{describe[i.key]}</span></a>)}
+    </div>
+  </section>
+
+  <section class="ch-in ch-sec">
+    <h2>Find a note</h2>
+    <p>A page for each note shows every chord that starts on it.</p>
+    {
+      INSTRUMENTS.map((i) => (
+        <div style="margin-bottom: 14px">
+          <p style="margin: 0 0 6px; font-weight: 700; color: var(--color-ink)">{i.name}</p>
+          <ul class="ch-pillrow">{ROOTS.map((r) => <li><a href={notePath(i.key, r)}>{r.short}</a></li>)}</ul>
+        </div>
+      ))
+    }
+  </section>
+
+  <section class="ch-in ch-sec" id="kinds">
+    <h2>Every kind of chord</h2>
+    <p>The formula says which notes of the major scale make the chord. The example is built on C; the same kind works on every note.</p>
+    {
+      GROUPS.map((g) => (
+        <div style="margin-top: 22px">
+          <h3>{g.title}</h3>
+          <p class="ch-muted" style="margin: 4px 0 10px; font-size: 14px">{g.text}</p>
+          <div class="cg-wrap">
+            <table class="cg">
+              <thead><tr><th scope="col" style="text-align:left">Chord</th><th scope="col">Symbol</th><th scope="col">Formula</th><th scope="col">Notes on C</th><th scope="col" style="text-align:left">Sound</th></tr></thead>
+              <tbody>
+                {kindsOf(g.id).map((k) => (
+                  <tr>
+                    <th scope="row">{k.name.replace(/^./, (x) => x.toUpperCase())}</th>
+                    <td>C{k.suffix.replace("b", "♭").replace("#", "♯")}</td>
+                    <td>{k.formula}</td>
+                    <td>{chordNotes(`C${k.suffix}`).map(sharpen).join(" ")}</td>
+                    <td style="text-align:left; white-space: normal; min-width: 260px">{k.text}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ))
+    }
+  </section>
+
+  <section class="ch-in ch-sec">
+    <h2>Lessons</h2>
+    <div class="ch-links">
+      {LESSONS.map((l) => <a class="ch-link" href={`/learn/${l.slug}/`}><strong>{l.title}</strong><span>{l.summary}</span></a>)}
+    </div>
+  </section>
+
+  <section class="ch-in ch-cta">
+    <h2>Play along with a song</h2>
+    <p>Search for a song on Chord Suno and see every chord on the beat, drawn for the instrument you choose.</p>
+    <a class="ch-btn" href="/#find">Find chords for a song</a>
+  </section>
+</ChordShell>

@@ -1,0 +1,11 @@
+---
+import LessonPage from "../../components/chords/LessonPage.astro";
+import { LESSONS, lessonBySlug } from "../../lib/lessons";
+
+export function getStaticPaths() {
+  return LESSONS.map((l) => ({ params: { lesson: l.slug } }));
+}
+const lesson = lessonBySlug(Astro.params.lesson as string)!;
+---
+
+<LessonPage lesson={lesson} />

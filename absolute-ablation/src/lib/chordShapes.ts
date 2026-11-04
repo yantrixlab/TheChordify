@@ -685,6 +685,11 @@ export const STRING_NAMES: Record<Exclude<InstrumentId, "piano">, string[]> = {
   mandolin: ["G", "D", "A", "E"],
 };
 
+/** The suffix this chord quality is known by here ("" major, "m", "maj7"...), whichever way it was written ("min", "-7", "M7", "+"); null when it is not one of them. */
+export function canonicalSuffix(written: string): string | null {
+  return (QUALITY_BY_SUFFIX.get(written) ?? QUALITY_BY_SUFFIX.get(SUFFIX_ALIASES[written] ?? " "))?.suffix ?? null;
+}
+
 /** Every chord quality the site can draw, for checks and for pickers. */
 export const CHORD_QUALITIES: { suffix: string; intervals: number[]; name: string }[] = QUALITIES.map((q) => ({ suffix: q.suffix, intervals: [...q.intervals], name: q.name }));
 export const CHORD_ROOTS: string[] = [...NOTE_NAMES];

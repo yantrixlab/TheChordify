@@ -375,6 +375,7 @@ export const LANDING: Landing[] = [
         { chord: "Dm", frets: ["D", "F", "A"], notes: "D F A" },
       ],
       note: "In the player, choose Piano above the song details and every chord is drawn on a keyboard, with its inversions. Piano diagrams are part of the Premium plan; the notes above are free for everyone.",
+      more: { label: "See the full piano chord chart: every chord on the keyboard", href: "/piano-chord-chart/" },
     },
     guides: [
       {
@@ -443,6 +444,7 @@ export const LANDING: Landing[] = [
         { chord: "Am", frets: ["2", "2", "3", "5"], notes: "A C E" },
       ],
       note: "In the player, choose Mandolin above the song details and every chord is drawn as a mandolin diagram (G D A E), with other ways to play it. Mandolin diagrams are part of the Premium plan; the shapes above are free for everyone.",
+      more: { label: "See the full mandolin chord chart: every chord with a diagram", href: "/mandolin-chord-chart/" },
     },
     guides: [
       {
