@@ -1,6 +1,9 @@
 ---
 import Logo from "./Logo.astro";
 
+const TELEGRAM = "https://t.me/chordsuno";
+const YOUTUBE = "https://www.youtube.com/@chordsuno";
+
 const columns = [
   {
     heading: "Product",
@@ -63,41 +66,33 @@ const columns = [
   "
 >
   <div class="max-w-6xl mx-auto">
-    <div class="grid sm:grid-cols-2 lg:grid-cols-5 gap-10 mb-12">
-      <!-- Brand column -->
-      <div class="lg:col-span-1">
+    <div class="ft-grid grid sm:grid-cols-2 gap-10 mb-12">
+      <!-- Brand column: the name, a line about it, the Telegram community (scan the code) and the YouTube channel -->
+      <div class="ft-brand lg:col-span-1">
         <a href="/" class="mb-4 inline-block" style="text-decoration:none;" aria-label="Chord Suno — home">
           <Logo size={32} />
         </a>
-        <p style="font-size:13px;color:var(--color-body);line-height:1.6;max-width:210px;margin-bottom:20px;">
-          Suno means listen. Hear every chord, play every song.
-        </p>
-        <!-- Social links -->
-        <div class="flex gap-2">
-          {
-            [
-              { label: "Twitter", icon: `<path d="M2 2l12 12M14 2L2 14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>` },
-              { label: "Instagram", icon: `<rect x="2" y="2" width="12" height="12" rx="3" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="1.4"/><circle cx="12" cy="4" r="1" fill="currentColor"/>` },
-              { label: "YouTube", icon: `<rect x="1" y="3" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M6 6l4 2-4 2V6z" fill="currentColor"/>` },
-            ].map((s) => (
-              <a
-                href="#"
-                aria-label={s.label}
-                class="flex items-center justify-center rounded-md transition-colors"
-                style="
-                  width:32px;height:32px;
-                  background:var(--color-canvas-soft);
-                  border:1px solid var(--color-hairline);
-                  color:var(--color-body);
-                "
-                onmouseover="this.style.borderColor='var(--color-hairline-strong)';this.style.color='var(--color-ink)'"
-                onmouseout="this.style.borderColor='var(--color-hairline)';this.style.color='var(--color-body)'"
-              >
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" set:html={s.icon}/>
-              </a>
-            ))
-          }
-        </div>
+        <p class="ft-tag">Suno means listen. Hear every chord, play every song.</p>
+
+        <section class="ft-join" aria-labelledby="ft-join-title">
+          <a class="ft-qr" href={TELEGRAM} target="_blank" rel="noopener" aria-label="Open Chord Suno on Telegram (@chordsuno)">
+            <img src="/telegram-qr.png" width="311" height="352" alt="QR code for the Chord Suno Telegram channel, @chordsuno" loading="lazy" decoding="async" />
+          </a>
+          <div class="ft-join-text">
+            <p class="ft-eyebrow">Community</p>
+            <h2 id="ft-join-title" class="ft-join-title">Join us on Telegram</h2>
+            <p class="ft-join-sub">Scan the code with your phone, or open it here.</p>
+            <a class="ft-btn ft-btn-tg" href={TELEGRAM} target="_blank" rel="noopener">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21.5 4.3 2.9 11.5c-1.3.5-1.3 1.2-.2 1.5l4.7 1.5 1.8 5.6c.2.6.1.8.7.8.5 0 .7-.2 1-.5l2.3-2.2 4.8 3.5c.9.5 1.5.2 1.7-.8l3.1-14.8c.3-1.2-.5-1.8-1.3-1.4ZM8.6 13.7l9.7-6.1c.5-.3.9-.1.5.2l-8.3 7.5-.3 3.3Z"/></svg>
+              @chordsuno
+            </a>
+          </div>
+        </section>
+
+        <a class="ft-btn ft-btn-yt" href={YOUTUBE} target="_blank" rel="noopener">
+          <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><rect x="1.5" y="4.5" width="21" height="15" rx="4.5" fill="#ff1f3d"/><path d="m10 9 5.2 3-5.2 3z" fill="#fff"/></svg>
+          Subscribe on YouTube
+        </a>
       </div>
 
       <!-- Nav columns -->
@@ -166,3 +161,29 @@ const columns = [
     </div>
   </div>
 </footer>
+
+<style>
+  .ft-tag { max-width: 230px; margin: 0 0 20px; font-size: 13px; line-height: 1.6; color: var(--color-body); }
+  .ft-join { display: flex; align-items: center; gap: 16px; max-width: 350px; padding: 14px; border-radius: 22px; background: linear-gradient(160deg, var(--color-canvas-soft), var(--color-canvas-soft-2)); border: 1px solid var(--color-hairline); box-shadow: 0 1px 2px #1a05330a, 0 18px 30px -24px #5b21b6; }
+  .ft-qr { flex: none; display: block; width: 120px; overflow: hidden; border-radius: 16px; background: #fff; box-shadow: 0 0 0 1px #ffffff, 0 10px 22px -10px #1a0533aa; transition: transform 0.25s cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 0.25s; }
+  .ft-qr:hover, .ft-qr:focus-visible { transform: translateY(-3px) rotate(-1deg); box-shadow: 0 0 0 1px #ffffff, 0 18px 30px -12px #229ed9cc; }
+  .ft-qr img { display: block; width: 100%; height: auto; }
+  .ft-join-text { min-width: 0; }
+  .ft-eyebrow { margin: 0 0 3px; font: 700 10px var(--font-mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-violet-text, var(--color-violet)); }
+  .ft-join-title { margin: 0; font-size: 15px; font-weight: 750; letter-spacing: -0.015em; line-height: 1.25; color: var(--color-ink); }
+  .ft-join-sub { margin: 4px 0 10px; font-size: 12.5px; line-height: 1.5; color: var(--color-mute); }
+  .ft-btn { display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 13px; border-radius: 999px; font: 650 13px var(--font-sans); text-decoration: none; white-space: nowrap; transition: transform 0.2s, box-shadow 0.2s, background-color 0.2s, border-color 0.2s; }
+  .ft-btn:hover { transform: translateY(-2px); }
+  .ft-btn:focus-visible { outline: 2px solid var(--color-violet); outline-offset: 2px; }
+  .ft-btn-tg { color: #fff; background: linear-gradient(135deg, #2aabee, #1d8fd1); box-shadow: 0 8px 16px -8px #229ed9; }
+  .ft-btn-tg:hover { box-shadow: 0 12px 20px -8px #229ed9; }
+  .ft-btn-yt { margin-top: 12px; height: 40px; padding: 0 16px 0 12px; color: var(--color-ink); background: var(--color-canvas-soft); border: 1px solid var(--color-hairline); }
+  .ft-btn-yt:hover { border-color: #ff1f3d88; box-shadow: 0 10px 20px -12px #ff1f3d; }
+  @media (max-width: 640px) { .ft-join { max-width: 100%; } .ft-qr { width: 124px; } }
+  @media (prefers-reduced-motion: reduce) { .ft-qr, .ft-btn { transition: none; } .ft-qr:hover, .ft-qr:focus-visible, .ft-btn:hover { transform: none; } }
+</style>
+
+<style>
+  /* the brand column is wider than the link columns: it holds the Telegram code */
+  @media (min-width: 1024px) { .ft-grid { grid-template-columns: minmax(0, 1.85fr) repeat(4, minmax(0, 1fr)); } }
+</style>
