@@ -27,7 +27,7 @@ export const COPY: Record<InstrumentKey, Copy> = {
       { q: "How many guitar chords are there?", a: "On the twelve notes, with the kinds of chord on this chart (major, minor, 6th, 7th, suspended, diminished, augmented and the extended chords), there are 336. Each can be played in several places on the neck; the page of each note shows up to three ways to play every chord." },
       { q: "What is the easiest way to learn guitar chords?", a: "Start with the open chords above, then learn the barre shapes, which move up the neck to give every other chord. The lessons in the Learn section walk through both, step by step." },
       { q: "Why does the chart show sharps and flats together?", a: "C♯ and D♭ are the same pitch. The chart names the chord with sharps (as the player does) and shows the other name beside it, because both are used in songs." },
-      { q: "How can I find the guitar chords of a song?", a: "Search for the song or paste a YouTube link on Chord Suno. Every chord of the song is shown on the beat, with a guitar diagram for each, other ways to play it, and the strumming pattern. Look any chord up here if you want to see all its shapes." },
+      { q: "How can I find the guitar chords of a song?", a: "Search for the song on Chord Suno. Every chord of the song is shown on the beat, with a guitar diagram for each, other ways to play it, and the strumming pattern. Look any chord up here if you want to see all its shapes." },
     ],
   },
   piano: {
@@ -43,7 +43,7 @@ export const COPY: Record<InstrumentKey, Copy> = {
       { q: "What is a chord inversion on piano?", a: "The same notes of a chord with a different one at the bottom. C is C E G in root position, E G C in first inversion and G C E in second inversion. Each page shows a chord in root position and its inversions." },
       { q: "How do I play a chord like C/E on piano?", a: "A chord written over a note, such as C/E, is the chord C with E in the bass. Play E with your left hand and the chord C with your right hand. In the player, a chord over a bass note shows exactly that." },
       { q: "Why does the chart show sharps and flats together?", a: "C♯ and D♭ are the same black key. The chart names the chord with sharps (as the player does) and shows the other name beside it, because both are used in songs." },
-      { q: "How can I find the piano chords of a song?", a: "Search for the song or paste a YouTube link on Chord Suno, then choose Piano in the player: every chord of the song is drawn on a keyboard, with its inversions." },
+      { q: "How can I find the piano chords of a song?", a: "Search for the song on Chord Suno, then choose Piano in the player: every chord of the song is drawn on a keyboard, with its inversions." },
     ],
   },
   ukulele: {
@@ -59,7 +59,7 @@ export const COPY: Record<InstrumentKey, Copy> = {
       { q: "How do I read a ukulele chord diagram?", a: "The four vertical lines are the strings, left to right G, C, E, A. A dot is where a finger presses, the number on it is the finger (1 is the index finger), and a circle above a string means it is played open." },
       { q: "What tuning are these ukulele chords in?", a: "Standard ukulele tuning: G C E A, with the G string tuned above the C. Soprano, concert and tenor ukuleles all use it. Baritone ukuleles are tuned D G B E and use the guitar shapes for the top four strings." },
       { q: "Are there other ways to play each chord?", a: "Yes. Every chord can be played in several places on the neck. The page of each note shows up to three ways to play every chord." },
-      { q: "How can I find the ukulele chords of a song?", a: "Paste a YouTube link or search for the song on Chord Suno. Every chord is shown on the beat with its key and tempo, and choosing Ukulele in the player draws every chord as a ukulele diagram." },
+      { q: "How can I find the ukulele chords of a song?", a: "Search for the song on Chord Suno. Every chord is shown on the beat with its key and tempo, and choosing Ukulele in the player draws every chord as a ukulele diagram." },
     ],
   },
   mandolin: {
@@ -75,7 +75,7 @@ export const COPY: Record<InstrumentKey, Copy> = {
       { q: "What is the standard mandolin tuning?", a: "G D A E from the lowest pair of strings to the highest, the same as a violin. Every chord on this chart is for that tuning." },
       { q: "Why does a mandolin diagram have only four lines?", a: "Each line stands for a pair of strings, because the same shape is pressed on both strings of a pair. So a mandolin chord is drawn like a four-string instrument." },
       { q: "Why are some chords missing a note?", a: "On four strings, long chords such as 11ths and 13ths cannot hold every note, so players leave out the root and the fifth. Those shapes do the same." },
-      { q: "How can I find the mandolin chords of a song?", a: "Paste a YouTube link or search for the song on Chord Suno. Every chord is shown on the beat, and choosing Mandolin in the player draws each one as a mandolin diagram." },
+      { q: "How can I find the mandolin chords of a song?", a: "Search for the song on Chord Suno. Every chord is shown on the beat, and choosing Mandolin in the player draws each one as a mandolin diagram." },
     ],
   },
 };

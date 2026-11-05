@@ -73,18 +73,18 @@ export const LANDING: Landing[] = [
   {
     slug: "youtube-to-chords",
     title: "YouTube to Chords: Find the Chords of Any Song — Chord Suno",
-    description: "How to find out what chords are in a song: paste a YouTube link and get every chord, synced to the beat, with its key and tempo. Free to start, no card needed.",
+    description: "How to find out what chords are in a song: search for it by name and get every chord, synced to the beat, with its key and tempo. Free to start, no card needed.",
     nav: "YouTube to chords",
     eyebrow: "YouTube to chords",
     h1: "Turn any YouTube song into chords",
-    lead: "Paste a YouTube link and Chord Suno listens to the song, works out every chord and puts it on the beat, so you can play along instead of pausing and rewinding.",
+    lead: "Search for a song and Chord Suno listens to it, works out every chord and puts it on the beat, so you can play along instead of pausing and rewinding.",
     primary: { label: "Get the chords of a song", href: "/#find" },
     secondary: { label: "See how it works", href: "#how" },
     chips: ["Free to start", "No card needed", "Synced to the beat", "Key and tempo included"],
     demo: { song: "Any song from YouTube", chords: ["Am", "F", "C", "G"], meta: "Key of C · 92 BPM" },
-    stepsHeading: "From a link to chords in three steps",
+    stepsHeading: "From a song name to chords in three steps",
     steps: [
-      { title: "Find the song", text: "Search for it on Chord Suno or paste its YouTube link. A song that somebody has already chordified opens straight away." },
+      { title: "Find the song", text: "Search for it by name on Chord Suno. A song that somebody has already chordified opens straight away." },
       { title: "We listen", text: "Our chord model analyses the audio, finds the beats and the bars, and writes each chord where it starts. A new song usually takes a minute or two." },
       { title: "Play along", text: "Follow the chords as they scroll with the music. Slow the song down, loop a hard part, change the key or add a capo." },
     ],
@@ -129,7 +129,7 @@ export const LANDING: Landing[] = [
       { q: "Which instruments is it for?", a: "The chord names and timing work for any instrument. The player draws every chord for guitar, piano, ukulele and mandolin: choose yours above the song details and it is remembered on your account, on every device." },
       { q: "Do I need an account?", a: "You can try a song without one. Sign in with Google to keep a library of the songs you play and your favourites." },
     ],
-    cta: { heading: "Try it with your next song", text: "Paste a YouTube link and see its chords in about a minute.", label: "Get the chords of a song", href: "/#find" },
+    cta: { heading: "Try it with your next song", text: "Search for a song and see its chords in about a minute.", label: "Get the chords of a song", href: "/#find" },
   },
 
   // ------------------------------------------------------------------------------------------------------------------------------
@@ -147,7 +147,7 @@ export const LANDING: Landing[] = [
     demo: { song: "Your song, on guitar", chords: ["G", "D", "Em", "C"], meta: "Key of G · 98 BPM" },
     stepsHeading: "How to find the chords of a song on guitar",
     steps: [
-      { title: "Choose a song", text: "Search for the song by name or paste a YouTube link." },
+      { title: "Choose a song", text: "Search for the song by name." },
       { title: "Read the chords", text: "See the chords of the whole song in order: as chord diagrams that follow the music, or as a grid of bars you can read at a glance." },
       { title: "Play it", text: "Press play. The chord you are on is lit, the next one is shown ahead of time, and the strumming pattern is shown below." },
     ],
@@ -186,25 +186,25 @@ export const LANDING: Landing[] = [
       },
     ],
     faq: [
-      { q: "How do I find the chords of a song on guitar?", a: "Search for the song on Chord Suno or paste its YouTube link. The chords are worked out from the audio and shown in order with chord diagrams, synced to the music." },
+      { q: "How do I find the chords of a song on guitar?", a: "Search for the song by name on Chord Suno. The chords are worked out from the audio and shown in order with chord diagrams, synced to the music." },
       { q: "Does it show the strumming pattern?", a: "Yes. The song's strumming pattern is read from the recording and shown under the chords, with an easy version for beginners. When the playing is not steady enough to be sure, you are told it is a best guess or a typical pattern." },
       { q: "Can I change the key or use a capo?", a: "Yes. The player has transpose and capo controls that redraw every chord. They are part of some plans, so check the plans if the controls are locked." },
       { q: "Why are the chords different from the tab I know?", a: "A recording and a printed tab can differ: tabs are often simplified or in another key. Chord Suno follows the recording. You can also move the song to the key of your tab." },
       { q: "Can I practise the chord changes?", a: "Yes. The Toolkit has chord-change drills with a beat, a one-minute changes challenge, a chord library with every way to play each chord, a tuner and a metronome." },
       { q: "Is it free?", a: "It is free to start. The free plan includes a daily allowance of new songs, and songs that someone has already chordified open instantly." },
     ],
-    cta: { heading: "Find the chords of your next song", text: "Search a song or paste a YouTube link and start playing along.", label: "Find chords for a song", href: "/#find" },
+    cta: { heading: "Find the chords of your next song", text: "Search for a song and start playing along.", label: "Find chords for a song", href: "/#find" },
   },
 
   // ------------------------------------------------------------------------------------------------------------------------------
   {
     slug: "chord-detector",
     title: "What Chord Is This? Free Chord Identifier — Chord Suno",
-    description: "Not sure what chord it is? Play into your microphone and the chord identifier names it live, or paste a YouTube link to find every chord in a song. Free to try.",
+    description: "Not sure what chord it is? Play into your microphone and the chord identifier names it live, or search for a song to find every chord in it. Free to try.",
     nav: "Chord detector",
     eyebrow: "Chord identifier",
     h1: "What chord is this? A chord identifier for songs and for your instrument",
-    lead: "Identify the chords of a recorded song from a link, or play a chord on your own instrument and see its name appear as you play.",
+    lead: "Identify the chords of a recorded song by searching for it, or play a chord on your own instrument and see its name appear as you play.",
     primary: { label: "Try the live chord detector", href: "/toolkit/chord-detector/" },
     secondary: { label: "Detect a song's chords", href: "/#find" },
     chips: ["Live from your microphone", "Chords of any song", "Sound stays on your device", "Free to try"],
@@ -212,7 +212,7 @@ export const LANDING: Landing[] = [
     stepsHeading: "Two ways to detect chords",
     steps: [
       { title: "From your instrument", text: "Open the live chord detector, allow the microphone and play. The chord name, its notes and a guitar chord diagram appear while you play." },
-      { title: "From a recorded song", text: "Paste a YouTube link. Chord Suno analyses the whole song and gives you every chord with its timing." },
+      { title: "From a recorded song", text: "Search for the song. Chord Suno analyses the whole song and gives you every chord with its timing." },
       { title: "Check your work", text: "Play along with a song and watch the live detector to see whether the chords you play match." },
     ],
     featuresHeading: "What the chord detector does",
@@ -245,7 +245,7 @@ export const LANDING: Landing[] = [
       {
         heading: "Detecting the chords of a song",
         paragraphs: [
-          "For a recorded song you do not need a microphone. Paste a YouTube link and Chord Suno works out the chords of the whole recording, with the key, the tempo and the sections. You can then play along with the chart and use the live detector to check your own chords.",
+          "For a recorded song you do not need a microphone. Search for the song and Chord Suno works out the chords of the whole recording, with the key, the tempo and the sections. You can then play along with the chart and use the live detector to check your own chords.",
         ],
       },
     ],
@@ -255,7 +255,7 @@ export const LANDING: Landing[] = [
       { q: "Does it record my playing?", a: "No. The sound is analysed in your browser as you play. It is never recorded, uploaded or stored." },
       { q: "Which chords can it name?", a: "It names 11 kinds of chord, including major, minor, sevenths and suspended chords, in every key." },
       { q: "Why does it show the wrong chord sometimes?", a: "Out-of-tune strings, background noise, a single note or a chord that is cut short all make a chord harder to name. Tune up, play in a quiet place and let the chord ring." },
-      { q: "Can it find the chords of a song from a file or a link?", a: "Yes. Paste a YouTube link and the chords of the whole song are worked out and placed on the beat." },
+      { q: "Can it find the chords of a song from a file or by searching for it?", a: "Yes. Search for the song, or upload a file, and the chords of the whole song are worked out and placed on the beat." },
     ],
     cta: { heading: "See your chords as you play", text: "Open the live chord detector and play a chord.", label: "Try the live chord detector", href: "/toolkit/chord-detector/" },
   },
@@ -264,7 +264,7 @@ export const LANDING: Landing[] = [
   {
     slug: "ukulele-chords",
     title: "Ukulele (Uke) Chords for Any Song: Chord Finder — Chord Suno",
-    description: "Get the uke chords of any song: paste a YouTube link and follow the chord names on the beat. Plus the easy ukulele chords, a full chord chart and a free tuner.",
+    description: "Get the uke chords of any song: search for a song and follow the chord names on the beat. Plus the easy ukulele chords, a full chord chart and a free tuner.",
     nav: "Ukulele chords",
     eyebrow: "Ukulele chords",
     h1: "Ukulele chords for any song",
@@ -275,7 +275,7 @@ export const LANDING: Landing[] = [
     demo: { song: "Your song, on ukulele", chords: ["C", "Am", "F", "G"], meta: "Key of C · 100 BPM" },
     stepsHeading: "How to play a song on ukulele with Chord Suno",
     steps: [
-      { title: "Get the chords", text: "Search for the song or paste a YouTube link. You get every chord in order, with its key and tempo." },
+      { title: "Get the chords", text: "Search for the song by name. You get every chord in order, with its key and tempo." },
       { title: "Make it ukulele-friendly", text: "Transpose the song to a key whose chords are easy on ukulele, such as C, F or G, so most chords are open shapes." },
       { title: "Play along", text: "Follow the chords as they scroll with the music, slow it down and loop the tricky change. Tune up first with the free tuner." },
     ],
@@ -321,7 +321,7 @@ export const LANDING: Landing[] = [
     ],
     faq: [
       { q: "Does Chord Suno show ukulele chord diagrams?", a: "Yes. Open a song in the player and choose Ukulele: every chord is drawn as a four-string diagram in standard G C E A tuning, with other ways to play it. Ukulele diagrams are part of the Premium plan. The eight most used ukulele shapes are free on this page." },
-      { q: "Can I find the chords of a song for ukulele?", a: "Yes. Search for the song or paste a YouTube link and you get every chord on the beat. The names are the same on a ukulele." },
+      { q: "Can I find the chords of a song for ukulele?", a: "Yes. Search for the song and you get every chord on the beat. The names are the same on a ukulele." },
       { q: "What is the tuning for the ukulele chords here?", a: "Standard ukulele tuning: G C E A (the G string is the high one, tuned above the C). Baritone ukuleles are tuned differently (D G B E) and use guitar shapes." },
       { q: "Can I make a song easier to play on ukulele?", a: "Yes. Use transpose to move the song to a key with open chords, such as C, F or G. The chord chart redraws to match." },
       { q: "Is there a ukulele tuner?", a: "Yes. The free tuner has a ukulele setting with a display for each string. It uses your microphone, and the sound stays on your device." },
@@ -335,7 +335,7 @@ export const LANDING: Landing[] = [
   {
     slug: "piano-chords",
     title: "Piano Chords for Any Song: Chord Finder — Chord Suno",
-    description: "Get the chords of any song for piano: paste a YouTube link and see every chord on the beat, drawn on a keyboard with its inversions. Free to start.",
+    description: "Get the chords of any song for piano: search for a song and see every chord on the beat, drawn on a keyboard with its inversions. Free to start.",
     nav: "Piano chords",
     eyebrow: "Piano chords",
     h1: "Piano chords for any song",
@@ -346,7 +346,7 @@ export const LANDING: Landing[] = [
     demo: { song: "Your song, on piano", chords: ["C", "Am", "F", "G"], meta: "Key of C · 100 BPM" },
     stepsHeading: "How to play a song on piano with Chord Suno",
     steps: [
-      { title: "Get the chords", text: "Search for the song or paste a YouTube link. You get every chord in order, with its key and tempo." },
+      { title: "Get the chords", text: "Search for the song by name. You get every chord in order, with its key and tempo." },
       { title: "Choose Piano", text: "In the player, choose Piano above the song details. Every chord becomes a keyboard with the keys to press lit and named, and your choice is remembered on your account." },
       { title: "Play along", text: "Follow the chords as they scroll with the music, slow the song down and loop the part you are learning. Step through the inversions to find the one that sits under your hand." },
     ],
@@ -393,7 +393,7 @@ export const LANDING: Landing[] = [
     ],
     faq: [
       { q: "Does Chord Suno show piano chords?", a: "Yes. Open a song in the player and choose Piano: every chord is drawn on a keyboard with the keys to press named, and you can step through its inversions. Piano diagrams are part of the Premium plan. The chord names and the notes of the common chords are free on this page." },
-      { q: "Can I find the chords of a song for piano?", a: "Yes. Search for the song or paste a YouTube link and you get every chord on the beat. The names are the same on a piano." },
+      { q: "Can I find the chords of a song for piano?", a: "Yes. Search for the song and you get every chord on the beat. The names are the same on a piano." },
       { q: "What are inversions?", a: "The same notes of a chord with a different one at the bottom. C is C E G in root position, E G C in first inversion and G C E in second. They sound like the same chord, and they let your hand stay in one place." },
       { q: "How does it show a chord like C/E?", a: "A chord over a bass note has that note for the left hand, and the chord for the right hand. A second way shows the inversion that has the bass note lowest." },
       { q: "Can I change the key of a song for piano?", a: "Yes. Use transpose to move the song to a key you like. The chord chart and every keyboard redraw to match." },
@@ -406,7 +406,7 @@ export const LANDING: Landing[] = [
   {
     slug: "mandolin-chords",
     title: "Mandolin Chords for Any Song: Chord Finder — Chord Suno",
-    description: "Get the chords of any song for mandolin: paste a YouTube link and follow the chords on the beat. Plus common mandolin chords and a free tuner.",
+    description: "Get the chords of any song for mandolin: search for a song and follow the chords on the beat. Plus common mandolin chords and a free tuner.",
     nav: "Mandolin chords",
     eyebrow: "Mandolin chords",
     h1: "Mandolin chords for any song",
@@ -417,7 +417,7 @@ export const LANDING: Landing[] = [
     demo: { song: "Your song, on mandolin", chords: ["G", "C", "D", "Em"], meta: "Key of G · 110 BPM" },
     stepsHeading: "How to play a song on mandolin with Chord Suno",
     steps: [
-      { title: "Get the chords", text: "Search for the song or paste a YouTube link and see every chord in order, with the key and tempo." },
+      { title: "Get the chords", text: "Search for the song and see every chord in order, with the key and tempo." },
       { title: "Pick a friendly key", text: "Transpose the song to a key that sits well on a mandolin, such as G, D or A, where the chord shapes are close together." },
       { title: "Play along", text: "Follow the chords as they scroll with the music. Slow it down and loop the part you are learning. Tune up first with the free tuner." },
     ],
@@ -461,7 +461,7 @@ export const LANDING: Landing[] = [
     ],
     faq: [
       { q: "Does Chord Suno show mandolin chord diagrams?", a: "Yes. Open a song in the player and choose Mandolin: every chord is drawn as a four-string diagram in standard G D A E tuning, with other ways to play it. Mandolin diagrams are part of the Premium plan. The common mandolin shapes are free on this page." },
-      { q: "Can I find the chords of a song for mandolin?", a: "Yes. Search for the song or paste a YouTube link and you get every chord on the beat. The names are the same on a mandolin." },
+      { q: "Can I find the chords of a song for mandolin?", a: "Yes. Search for the song and you get every chord on the beat. The names are the same on a mandolin." },
       { q: "What is the standard mandolin tuning?", a: "G D A E, from the lowest pair of strings to the highest, the same as a violin. The chord shapes on this page are for that tuning." },
       { q: "Can I change the key of a song for mandolin?", a: "Yes. Use transpose to move the song to a key such as G, D or A, where the chords are close and use open strings." },
       { q: "Is there a mandolin tuner?", a: "Yes. The free tuner has a mandolin setting with a display for each string. It uses your microphone, and the sound stays on your device." },
