@@ -21,7 +21,7 @@ interface Props {
 const { title, description, heading, sub, eyebrow = "Toolkit", feature, tool = "", crumb } = Astro.props;
 ---
 
-<Layout title={title} description={description}>
+<Layout title={title} description={description} themeable>
   <Nav />
   <main id="main-content" class="tk" data-feature={feature ?? ""} data-tool={tool}>
     <div class="tk-wrap">

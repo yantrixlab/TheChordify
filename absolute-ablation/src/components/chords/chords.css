@@ -369,10 +369,6 @@
 /* ---- dark theme (html[data-theme="dark"], set on a page that has <Layout themeable>) ---------------------------------------------
    The hero, the call to action and the dark keys stay as they are (already dark); light surfaces become dark cards, the greys lighten for 4.5:1,
    the family colours are lighter so the chord names read on a dark card, and the diagrams take their colours from --dg-* / --pn-*. */
-html[data-theme="dark"] {
-  --dg-dot: #7c3aed; --dg-ink: #f4effc; --dg-line: #7a6aa3; --dg-label: #ffffff; --dg-x: #f87171;
-  --pn-white: #e9e2f7; --pn-black: #0b0416; --pn-line: #7a6aa3; --pn-root: #7c3aed; --pn-press: #f59e0b; --pn-ink: #ffffff;
-}
 html[data-theme="dark"] .ch {
   --ch-card: #1c1131; --ch-soft: #2a1a4a; --ch-soft-2: #231540; --ch-line: #33224f; --ch-mute: #a99cc9; --ch-deep: #c4b5fd; --ch-violet: #a78bfa;
   background: #140a24; color: var(--color-body);

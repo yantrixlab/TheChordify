@@ -282,6 +282,11 @@ html[data-theme="dark"] {
   --color-violet-deep: #c4b5fd;
   --color-accent-soft: #3a2a0b;
 }
+/* chord diagrams (lib/tools/diagram.ts, lib/pianoDiagram.ts) take their colours from these, with the light colours as the fallback */
+html[data-theme="dark"] {
+  --dg-dot: #7c3aed; --dg-ink: #f4effc; --dg-line: #7a6aa3; --dg-label: #ffffff; --dg-x: #f87171;
+  --pn-white: #e9e2f7; --pn-black: #0b0416; --pn-line: #7a6aa3; --pn-root: #7c3aed; --pn-press: #f59e0b; --pn-ink: #ffffff;
+}
 html[data-theme="dark"] body { background: var(--color-canvas); color: var(--color-body); }
 html[data-theme="dark"] .nav-blur { background: rgba(20, 10, 36, 0.82); }
 /* the shared bits (favourite heart, level ring, plan cards and switch, home sections) in the dark theme */

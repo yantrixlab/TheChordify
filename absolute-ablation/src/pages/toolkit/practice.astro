@@ -1288,3 +1288,14 @@ const progressions = [
   window.addEventListener("load", () => moveThumb());
   window.setTimeout(() => moveThumb(), 150);
 </script>
+
+<style is:global>
+  /* dark theme: the white cards behind the chord diagrams become dark ones (the diagrams' colours follow the theme) */
+  html[data-theme="dark"] .pz-modes, html[data-theme="dark"] .pz-quals button:not([aria-pressed="true"]), html[data-theme="dark"] .pz-shapes button, html[data-theme="dark"] .pz-chip { background: #1c1131; }
+  html[data-theme="dark"] .pz-modes { box-shadow: 0 1px 2px #0006, 0 14px 30px -20px #000; }
+  html[data-theme="dark"] .pz-shape, html[data-theme="dark"] .pz-now, html[data-theme="dark"] .pz-quiz-card { background: #241440; }
+  html[data-theme="dark"] .pz-now.good, html[data-theme="dark"] .pz-quiz-card.good { background: #0d3b2c; }
+  html[data-theme="dark"] .pz-now.miss, html[data-theme="dark"] .pz-quiz-card.miss { background: #3a1f10; }
+  html[data-theme="dark"] .pz-modes button:hover { color: #fff; }
+  html[data-theme="dark"] .pz-now .pz-label, html[data-theme="dark"] .pz-quiz-card .pz-label { color: #a78bfa; }
+</style>

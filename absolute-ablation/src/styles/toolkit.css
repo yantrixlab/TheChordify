@@ -111,3 +111,26 @@
 .mic-warn { max-width: 400px; margin: 0 auto 12px; padding: 10px 14px; text-align: left; font-size: 13px; line-height: 1.5; color: #fde68a; background: #f59e0b22; border: 1px solid #f59e0b66; border-radius: 14px; }
 .mic-warn[hidden] { display: none; }
 .tn-meter i:not(.open), .cd-meter i:not(.open), .pr-meter i:not(.open) { opacity: 0.45; }
+
+/* ---- dark theme ---------------------------------------------------------------------------------------------------------------------- */
+html[data-theme="dark"] .tk { background: radial-gradient(ellipse 70% 34% at 50% -4%, #7c3aed38, transparent 70%), radial-gradient(ellipse 46% 26% at 92% 14%, #f59e0b14, transparent 70%), linear-gradient(180deg, #170b29, #140a24 55%); }
+html[data-theme="dark"] .tk-eyebrow, html[data-theme="dark"] .tk-card h2 { color: #a78bfa; }
+html[data-theme="dark"] .tk-gate-card, html[data-theme="dark"] .tk-card, html[data-theme="dark"] .tk-more a, html[data-theme="dark"] .tk-seg button:not([aria-pressed="true"]), html[data-theme="dark"] .tk-chip:not([aria-pressed="true"]), html[data-theme="dark"] .tk-number, html[data-theme="dark"] .tk-select, html[data-theme="dark"] .tk-kbd { background: #1c1131; }
+html[data-theme="dark"] .tk-card { box-shadow: 0 1px 2px #0006, 0 12px 30px -18px #000; }
+html[data-theme="dark"] .tk-gate-card { box-shadow: 0 30px 70px -24px #000, 0 0 0 1px #ffffff14; }
+html[data-theme="dark"] .tk-gate-lock { background: linear-gradient(135deg, #3a2663, #4a3510); }
+html[data-theme="dark"] .tk-more a:hover { box-shadow: 0 14px 30px -18px #000; }
+html[data-theme="dark"] .tk-btn { background: #7c3aed; color: #fff; }
+html[data-theme="dark"] .tk-btn:hover { background: #8b4df0; }
+html[data-theme="dark"] .tk-btn.amber { color: #1a0533; background: linear-gradient(180deg, #fbbf24, #f59e0b); }
+html[data-theme="dark"] .tk-btn.amber:hover { background: linear-gradient(180deg, #fcd34d, #f59e0b); }
+html[data-theme="dark"] .tk-btn.soft { background: #2a1a4a; color: #d8ccf5; }
+html[data-theme="dark"] .tk-btn.soft:hover { background: #3a2663; }
+html[data-theme="dark"] .tk-btn.ghost { background: transparent; }
+html[data-theme="dark"] .tk-btn.ghost:hover { background: #2a1a4a; }
+html[data-theme="dark"] .tk-btn.on-dark { background: #ffffff1c; }
+html[data-theme="dark"] .tk-range:not(.on-dark) { --track-color: #3d2b63; }
+html[data-theme="dark"] .tk-switch i { background: #4a3578; }
+html[data-theme="dark"] .tk-error { color: #fca5a5; background: #3a1218; border-color: #6b2330; }
+html[data-theme="dark"] .mic-select option, html[data-theme="dark"] .tk-select option { color: #f4effc; background: #1c1131; }
+html[data-theme="dark"] .tk-seg.on-dark button:not([aria-pressed="true"]) { background: #ffffff14; }
