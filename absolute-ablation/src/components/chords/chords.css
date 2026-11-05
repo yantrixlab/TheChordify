@@ -184,16 +184,18 @@
 .cn-note[aria-current] { background: linear-gradient(135deg, #fcd34d, #f59e0b); color: #1a0533; box-shadow: 0 8px 16px -8px #f59e0bcc; }
 
 /* "Jump to": tabs with an underline that slides to the section being read */
-.cn-tabrow { display: flex; align-items: center; gap: 10px; margin-top: 4px; border-top: 1px solid #efe7ff; }
-.cn-tabs { position: relative; display: flex; flex: 1; min-width: 0; gap: 2px; overflow-x: auto; scrollbar-width: none; }
+.cn-tabrow { display: flex; align-items: center; gap: 12px; margin-top: 8px; padding-bottom: 10px; }
+.cn-tabs { position: relative; display: flex; flex: 0 1 auto; min-width: 0; gap: 2px; padding: 4px; border-radius: 999px; background: #f1eaff; box-shadow: inset 0 0 0 1px #e4d9fb; overflow-x: auto; scrollbar-width: none; }
 .cn-tabs::-webkit-scrollbar { display: none; }
-.cn-tabs.fade-r { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 36px), transparent); }
-.cn-tabs.fade-l { -webkit-mask-image: linear-gradient(90deg, transparent, #000 36px); mask-image: linear-gradient(90deg, transparent, #000 36px); }
-.cn-tabs.fade-l.fade-r { -webkit-mask-image: linear-gradient(90deg, transparent, #000 36px, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(90deg, transparent, #000 36px, #000 calc(100% - 36px), transparent); }
-.cn-tab { flex: none; padding: 12px 13px 13px; font-weight: 650; font-size: 13.5px; text-decoration: none; white-space: nowrap; color: var(--ch-mute); transition: color 0.2s; }
+.cn-tabs.fade-r { -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); }
+.cn-tabs.fade-l { -webkit-mask-image: linear-gradient(90deg, transparent, #000 28px); mask-image: linear-gradient(90deg, transparent, #000 28px); }
+.cn-tabs.fade-l.fade-r { -webkit-mask-image: linear-gradient(90deg, transparent, #000 28px, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(90deg, transparent, #000 28px, #000 calc(100% - 28px), transparent); }
+.cn-tab { position: relative; z-index: 1; flex: none; padding: 7px 15px; border-radius: 999px; font-weight: 650; font-size: 13.5px; line-height: 1.2; text-decoration: none; white-space: nowrap; color: var(--ch-mute); transition: color 0.25s; }
 .cn-tab:hover { color: var(--ch-deep); }
-.cn-tab.is-on { color: var(--ch-deep); font-weight: 750; }
-.cn-ind { position: absolute; left: 0; bottom: 0; width: 100px; height: 3px; border-radius: 3px 3px 0 0; background: linear-gradient(90deg, #7c3aed, #f59e0b); transform-origin: left center; transform: translateX(0) scaleX(0); opacity: 0; transition: transform 0.4s var(--ch-ease), opacity 0.2s; pointer-events: none; }
+.cn-tab:focus-visible { outline: 3px solid var(--ch-amber); outline-offset: -2px; }
+.cn-tab.is-on, .cn-tab.is-on:hover { color: #fff; font-weight: 700; }
+/* the lit tab is a pill that slides from tab to tab behind the labels (the script sets its width and place) */
+.cn-ind { position: absolute; z-index: 0; left: 0; top: 4px; bottom: 4px; width: 0; border-radius: 999px; background: linear-gradient(135deg, #7c3aed, #5b21b6); box-shadow: 0 8px 16px -8px #5b21b6, inset 0 1px 0 #ffffff40; opacity: 0; transition: transform 0.42s var(--ch-ease), width 0.42s var(--ch-ease), opacity 0.2s; pointer-events: none; }
 .cn-expand { flex: none; display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 14px; border: 1px solid var(--ch-line); border-radius: 999px; background: #fff; font: 650 13px var(--font-sans); color: var(--ch-deep); cursor: pointer; transition: border-color 0.2s, transform 0.2s var(--ch-ease); }
 .cn-expand:hover { border-color: var(--ch-violet); transform: translateY(-1px); }
 

@@ -1,7 +1,7 @@
 ---
 // The bar that stays under the site's header on a chart. Top: the four instruments, a search box ("F#m7" goes straight to that chord; press
 // "/" anywhere to start typing) and a switch for "easy chords only". Then the twelve notes as one strip, and "Jump to" as tabs whose
-// underline slides to the section being read. While the page is scrolled down the top two rows tuck away (scroll up, or press the search
+// pill slides to the section being read. While the page is scrolled down the top two rows tuck away (scroll up, or press the search
 // button, to bring them back); the page below never moves, because the bar keeps its place in the flow.
 import { INSTRUMENTS, ROOTS, notePath, type InstrumentKey } from "../../lib/chordCatalog";
 
@@ -184,7 +184,7 @@ const { instrument, rootSlug, chips = [], easy = true, here = "chart" } = Astro.
       input.focus();
     });
 
-    // ---- "Jump to": the tab of the section being read is lit, with an underline that slides to it -------------------------------------
+    // ---- "Jump to": the tab of the section being read is lit, with a pill that slides to it -------------------------------------
     const tabsEl = document.getElementById("cn-tabs");
     const ind = document.getElementById("cn-ind") as HTMLElement | null;
     const tabs = tabsEl ? [...tabsEl.querySelectorAll<HTMLAnchorElement>(".cn-tab")] : [];
@@ -206,7 +206,8 @@ const { instrument, rootSlug, chips = [], easy = true, here = "chart" } = Astro.
       }
       const tab = tabs[index];
       ind.style.opacity = "1";
-      ind.style.transform = `translateX(${tab.offsetLeft}px) scaleX(${tab.offsetWidth / 100})`;
+      ind.style.width = `${tab.offsetWidth}px`;
+      ind.style.transform = `translateX(${tab.offsetLeft}px)`;
       // keep the lit tab in view when the row is wider than the screen
       const left = tab.offsetLeft - 24;
       const right = tab.offsetLeft + tab.offsetWidth + 24;
