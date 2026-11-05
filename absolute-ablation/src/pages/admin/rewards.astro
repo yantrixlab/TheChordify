@@ -41,19 +41,30 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 19h16" /></svg>
             Import from Excel
           </button>
-          <input id="import-file" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden />
+          <input id="import-file-badges" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden />
         </div>
       </div>
       <p class="adm-hint">Won once, when a number reaches its target. A badge can also pay bonus XP. The code is its permanent name: changing it makes the badge new to everybody.</p>
       <p class="adm-hint" style="margin-top:6px">Import reads an .xlsx file with the columns <strong>Target, Icon, Name, Reach, Bonus XP, Code, Description</strong> (the sheet called Badges, or the first sheet). A badge whose code is already here is updated; the others are added; none are removed. Nothing is saved until you press Save changes.</p>
-      <div id="import-report" class="rw-report" role="status" hidden></div>
+      <div id="import-report-badges" class="rw-report" role="status" hidden></div>
       <div id="badges" class="rw-rows"></div>
       <button id="add-badge" type="button" class="adm-btn ghost small">+ Add a badge</button>
     </section>
 
     <section class="adm-card" aria-labelledby="h-rewards">
-      <h2 id="h-rewards">Rewards</h2>
+      <div class="rw-head">
+        <h2 id="h-rewards">Rewards</h2>
+        <div class="rw-tools">
+          <button id="import-rewards" type="button" class="adm-btn ghost small">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 19h16" /></svg>
+            Import from Excel
+          </button>
+          <input id="import-file-rewards" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden />
+        </div>
+      </div>
       <p class="adm-hint">Things that unlock at a level. Set “Repeats every” to make one keep coming (a star every 10 levels, for example), so there is always something ahead. A ring colours the picture around a person's avatar; a perk is something you hand out yourself, such as a month of Premium.</p>
+      <p class="adm-hint" style="margin-top:6px">Import reads an .xlsx file with the columns <strong>Name, At level, Repeats every, Kind, Value, Description, ID</strong> (the sheet called Rewards, or the first sheet; other columns such as Section, Swatch and Status are ignored). Kind is Avatar (a ring colour like #f59e0b in Value), Star or Perk. A reward whose ID is already here is updated; the others are added; none are removed. Nothing is saved until you press Save changes.</p>
+      <div id="import-report-rewards" class="rw-report" role="status" hidden></div>
       <div id="rewards" class="rw-rows"></div>
       <button id="add-reward" type="button" class="adm-btn ghost small">+ Add a reward</button>
     </section>
@@ -207,6 +218,7 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
   ];
 
   const badgeBlank = () => ({ icon: "🏅", name: "", rule: "plays", threshold: 10, bonusXp: 0, description: "", code: "" });
+  const rewardBlank = () => ({ name: "", level: 5, repeatEvery: 0, kind: "ring", value: "#f59e0b", description: "", id: "" });
   const badgeNote = (b: Item) => (b.code in badgeCounts ? `Won by ${number(badgeCounts[b.code])}` : "Not won yet");
   let titles: ReturnType<typeof listEditor>;
   let badges: ReturnType<typeof listEditor>;
@@ -260,12 +272,13 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
       { key: "description", label: "Description", cls: "wide", max: 120 },
       { key: "code", label: "Code", cls: "narrow", max: 40 },
     ];
-    $("import-report").hidden = true;
+    $("import-report-badges").hidden = true;
+    $("import-report-rewards").hidden = true;
     badges = listEditor($("badges"), config.badges, BADGE_FIELDS, badgeBlank, badgeNote);
-    rewards = listEditor($("rewards"), config.rewards, REWARD_FIELDS(), () => ({ name: "", level: 5, repeatEvery: 0, kind: "ring", value: "#f59e0b", description: "", id: "" }));
+    rewards = listEditor($("rewards"), config.rewards, REWARD_FIELDS(), rewardBlank);
   }
 
-  // ---- import badges from an Excel file -------------------------------------------------------------------------------
+  // ---- import from an Excel file (badges and rewards) -----------------------------------------------------------------
 
   const CODE = /^[a-z0-9][a-z0-9_-]{0,39}$/;
   const slug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
@@ -275,68 +288,61 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
     return Number.isInteger(n) ? n : NaN;
   };
 
-  /** Which badge rule a "Target" cell means: the rule's own name, its key ("plays"), or its label with or without the part in brackets. */
-  function ruleOf(cell: string): string | null {
+  /** Which entry of a list ({ key: label }) a cell means: the key, the label, or the label cut short at a bracket or comma; plus any extra words. */
+  function choiceOf(cell: string, choices: Record<string, string>, extra: Record<string, string[]> = {}): string | null {
     const want = plain(cell);
     if (!want) return null;
-    for (const [key, label] of Object.entries(rules)) {
-      if ([key, label, label.replace(/\s*\(.*\)\s*$/, "")].some((alias) => plain(alias) === want)) return key;
+    for (const [key, label] of Object.entries(choices)) {
+      if ([key, label, label.replace(/\s*\(.*\)\s*$/, ""), label.split(",")[0], ...(extra[key] ?? [])].some((alias) => plain(alias) === want)) return key;
     }
     return null;
   }
 
-  const COLUMNS: Record<string, string[]> = {
-    rule: ["target", "rule"],
-    icon: ["icon", "emoji"],
-    name: ["name", "badge", "badge name"],
-    threshold: ["reach", "threshold"],
-    bonusXp: ["bonus xp", "bonusxp", "bonus"],
-    code: ["code", "id"],
-    description: ["description", "details"],
-  };
+  interface ImportSpec {
+    noun: string; // "badge"
+    ids: string; // what the unique name of one is called: "code" or "ID"
+    sheet: string; // the sheet to prefer by name
+    max: number; // the most the server keeps
+    columns: Record<string, string[]>; // field → the headers that mean it
+    required: string[]; // fields whose column must be there (the header row is the first row that has the first two)
+    keyField: string; // the field that identifies an entry ("code", "id")
+    /** A row with a name but none of the numbers or choices is a note under the table, not an entry */
+    isNote: (cell: (field: string) => string) => boolean;
+    /** One row of the sheet → an entry, or the reason it cannot be used */
+    parse: (cell: (field: string) => string, found: Item[]) => Item | string;
+    current: () => Item[];
+    show: (items: Item[]) => void;
+    report: string; // the id of the box that tells what happened
+  }
 
-  /** Turns the rows of a sheet into badges, and says what was wrong with the rows that cannot be used. */
-  function badgesFromRows(rows: string[][]): { found: Item[]; problems: string[]; header: boolean } {
+  function readTable(rows: string[][], spec: ImportSpec): { found: Item[]; problems: string[]; header: boolean } {
     const headerAt = rows.findIndex((r) => {
       const names = r.map(plain);
-      return COLUMNS.name.some((n) => names.includes(n)) && COLUMNS.threshold.some((n) => names.includes(n));
+      return spec.required.slice(0, 2).every((field) => spec.columns[field].some((n) => names.includes(n)));
     });
     if (headerAt < 0) return { found: [], problems: [], header: false };
     const names = rows[headerAt].map(plain);
     const at: Record<string, number> = {};
-    for (const [key, aliases] of Object.entries(COLUMNS)) at[key] = names.findIndex((n) => aliases.includes(n));
-    if (at.rule < 0) return { found: [], problems: ["The sheet has no Target column."], header: true };
+    for (const [field, aliases] of Object.entries(spec.columns)) at[field] = names.findIndex((n) => aliases.includes(n));
+    const missing = spec.required.filter((field) => at[field] < 0);
+    if (missing.length) return { found: [], problems: [`The sheet has no ${missing.map((m) => spec.columns[m][0]).join(" or ")} column.`], header: true };
 
     const found: Item[] = [];
     const problems: string[] = [];
-    const cell = (row: string[], key: string) => (at[key] >= 0 ? String(row[at[key]] ?? "").trim() : "");
     rows.slice(headerAt + 1).forEach((row, i) => {
-      const name = cell(row, "name");
+      const cell = (field: string) => (at[field] >= 0 ? String(row[at[field]] ?? "").trim() : "");
+      const name = cell("name");
       if (!name) return; // a blank line, or the totals and notes under the table
-      const line = headerAt + 2 + i;
-      const rule = ruleOf(cell(row, "rule"));
-      const threshold = whole(cell(row, "threshold"));
-      const bonus = cell(row, "bonusXp") === "" ? 0 : whole(cell(row, "bonusXp"));
-      const code = (cell(row, "code") || slug(name)).toLowerCase();
-      const why = !rule
-        ? `its target “${cell(row, "rule")}” is not one of: ${Object.values(rules).join(", ")}`
-        : !(threshold >= 1 && threshold <= 10_000_000)
-          ? "Reach must be a whole number from 1 to 10,000,000"
-          : !(bonus >= 0 && bonus <= 100_000)
-            ? "Bonus XP must be a whole number from 0 to 100,000"
-            : !CODE.test(code)
-              ? `the code “${code}” can only use lowercase letters, numbers, - and _`
-              : found.some((f) => f.code === code)
-                ? `the code “${code}” is used twice in the file`
-                : "";
-      if (why) problems.push(`Row ${line} (${name}): ${why}.`);
-      else found.push({ icon: cell(row, "icon").slice(0, 8) || "🏅", name: name.slice(0, 40), rule, threshold, bonusXp: bonus, description: cell(row, "description").slice(0, 120), code });
+      if (spec.isNote(cell)) return;
+      const result = spec.parse(cell, found);
+      if (typeof result === "string") problems.push(`Row ${headerAt + 2 + i} (${name}): ${result}.`);
+      else found.push(result);
     });
     return { found, problems, header: true };
   }
 
-  function report(kind: "" | "is-warn" | "is-bad", text: string, problems: string[] = []) {
-    const box = $("import-report");
+  function report(id: string, kind: "" | "is-warn" | "is-bad", text: string, problems: string[] = []) {
+    const box = $(id);
     box.className = `rw-report ${kind}`.trim();
     box.replaceChildren(text);
     if (problems.length) {
@@ -348,46 +354,123 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
     box.hidden = false;
   }
 
-  async function importBadges(file: File) {
+  async function importFile(file: File, spec: ImportSpec) {
+    const plural = `${spec.noun}s`;
     try {
       const sheets = await readXlsx(file);
-      const sheet = sheets.find((s) => plain(s.name) === "badges") ?? sheets[0];
-      const { found, problems, header } = sheet ? badgesFromRows(sheet.rows) : { found: [], problems: [], header: false };
+      const sheet = sheets.find((x) => plain(x.name) === spec.sheet) ?? sheets[0];
+      const { found, problems, header } = sheet ? readTable(sheet.rows, spec) : { found: [], problems: [], header: false };
       if (!found.length) {
-        report("is-bad", header ? "No badges could be read from this file." : "This sheet has no header row with Name and Reach columns, so nothing was imported.", problems);
+        report(spec.report, "is-bad", header ? `No ${plural} could be read from this file.` : `This sheet has no header row with ${spec.required.slice(0, 2).map((f) => spec.columns[f][0].replace(/^./, (c) => c.toUpperCase())).join(" and ")} columns, so nothing was imported.`, problems);
         return;
       }
-      // merge by code: a badge already here is updated, the rest are added at the end, and none are removed
-      const current: Item[] = badges.collect().map((b) => ({ ...b, code: b.code || slug(String(b.name)) }));
-      const byCode = new Map(current.map((b, i) => [b.code, i]));
+      // merge by id: one already here is updated, the rest are added at the end, and none are removed
+      const current = spec.current();
+      const byId = new Map(current.map((item, i) => [item[spec.keyField], i]));
       let updated = 0;
-      for (const badge of found) {
-        const i = byCode.get(badge.code);
+      for (const item of found) {
+        const i = byId.get(item[spec.keyField]);
         if (i === undefined) {
-          byCode.set(badge.code, current.length);
-          current.push({ ...badge, _imported: true });
+          byId.set(item[spec.keyField], current.length);
+          current.push({ ...item, _imported: true });
         } else {
-          current[i] = { ...badge, _imported: true };
+          current[i] = { ...item, _imported: true };
           updated++;
         }
       }
-      if (current.length > 80) {
-        report("is-bad", `That would make ${current.length} badges, and 80 is the most. Nothing was imported; remove some badges first.`);
+      if (current.length > spec.max) {
+        report(spec.report, "is-bad", `That would make ${current.length} ${plural}, and ${spec.max} is the most. Nothing was imported; remove some first.`);
         return;
       }
-      badges = listEditor($("badges"), current, BADGE_FIELDS, badgeBlank, badgeNote);
+      spec.show(current);
       const skipped = problems.length ? ` ${problems.length} row${problems.length === 1 ? " was" : "s were"} skipped.` : "";
       report(
+        spec.report,
         problems.length ? "is-warn" : "",
-        `Read ${found.length} badge${found.length === 1 ? "" : "s"} from “${file.name}”: ${found.length - updated} new, ${updated} updated (highlighted below).${skipped} Nothing is saved yet: check them, then press Save changes.`,
+        `Read ${found.length} ${found.length === 1 ? spec.noun : plural} from “${file.name}”: ${found.length - updated} new, ${updated} updated (highlighted below).${skipped} Nothing is saved yet: check them, then press Save changes.`,
         problems,
       );
       say("msg", "Imported, not saved yet.", "");
-      $("import-report").scrollIntoView({ block: "center" });
+      $(spec.report).scrollIntoView({ block: "center" });
     } catch (err) {
-      report("is-bad", err instanceof Error ? err.message : "Could not read that file.");
+      report(spec.report, "is-bad", err instanceof Error ? err.message : "Could not read that file.");
     }
   }
+
+  const badgeSpec: ImportSpec = {
+    noun: "badge",
+    ids: "code",
+    sheet: "badges",
+    max: 80,
+    columns: {
+      rule: ["target", "rule"],
+      icon: ["icon", "emoji"],
+      name: ["name", "badge", "badge name"],
+      threshold: ["reach", "threshold"],
+      bonusXp: ["bonus xp", "bonusxp", "bonus"],
+      code: ["code", "id"],
+      description: ["description", "details"],
+    },
+    required: ["name", "threshold", "rule"],
+    keyField: "code",
+    isNote: (cell) => !cell("rule") && !cell("threshold"),
+    parse: (cell, found) => {
+      const name = cell("name");
+      const rule = choiceOf(cell("rule"), rules);
+      const threshold = whole(cell("threshold"));
+      const bonus = cell("bonusXp") === "" ? 0 : whole(cell("bonusXp"));
+      const code = (cell("code") || slug(name)).toLowerCase();
+      if (!rule) return `its target “${cell("rule")}” is not one of: ${Object.values(rules).join(", ")}`;
+      if (!(threshold >= 1 && threshold <= 10_000_000)) return "Reach must be a whole number from 1 to 10,000,000";
+      if (!(bonus >= 0 && bonus <= 100_000)) return "Bonus XP must be a whole number from 0 to 100,000";
+      if (!CODE.test(code)) return `the code “${code}” can only use lowercase letters, numbers, - and _`;
+      if (found.some((f) => f.code === code)) return `the code “${code}” is used twice in the file`;
+      return { icon: cell("icon").slice(0, 8) || "🏅", name: name.slice(0, 40), rule, threshold, bonusXp: bonus, description: cell("description").slice(0, 120), code };
+    },
+    current: () => badges.collect().map((b) => ({ ...b, code: b.code || slug(String(b.name)) })),
+    show: (items) => (badges = listEditor($("badges"), items, BADGE_FIELDS, badgeBlank, badgeNote)),
+    report: "import-report-badges",
+  };
+
+  const rewardSpec: ImportSpec = {
+    noun: "reward",
+    ids: "ID",
+    sheet: "rewards",
+    max: 60,
+    columns: {
+      name: ["name", "reward", "reward name"],
+      level: ["at level", "level"],
+      repeatEvery: ["repeats every (0 = once)", "repeats every", "repeat every", "repeat"],
+      kind: ["kind", "type"],
+      value: ["value"],
+      description: ["description", "details"],
+      id: ["id", "code"],
+    },
+    required: ["name", "level", "kind"],
+    keyField: "id",
+    isNote: (cell) => !cell("kind") && !cell("level"),
+    parse: (cell, found) => {
+      const name = cell("name");
+      const kind = choiceOf(cell("kind"), kinds, { ring: ["avatar", "ring", "avatar frame"], star: ["star", "prestige"], perk: ["perk"] });
+      const level = whole(cell("level"));
+      const repeat = cell("repeatEvery") === "" ? 0 : whole(cell("repeatEvery"));
+      const id = (cell("id") || slug(name)).toLowerCase();
+      let value = cell("value").slice(0, 80);
+      if (!kind) return `its kind “${cell("kind")}” is not one of: ${Object.values(kinds).map((l) => l.split(" (")[0].split(",")[0]).join(", ")}`;
+      if (!(level >= 1 && level <= 100_000)) return "At level must be a whole number from 1 to 100,000";
+      if (!(repeat >= 0 && repeat <= 100_000)) return "Repeats every must be a whole number from 0 to 100,000";
+      if (kind === "ring") {
+        if (/^[0-9a-f]{6}$/i.test(value)) value = `#${value}`;
+        if (!/^#[0-9a-f]{6}$/i.test(value)) return "an avatar ring needs a colour like #f59e0b in Value";
+      }
+      if (!CODE.test(id)) return `the ID “${id}” can only use lowercase letters, numbers, - and _`;
+      if (found.some((f) => f.id === id)) return `the ID “${id}” is used twice in the file`;
+      return { name: name.slice(0, 40), level, repeatEvery: repeat, kind, value, description: cell("description").slice(0, 140), id };
+    },
+    current: () => rewards.collect().map((r) => ({ ...r, id: r.id || slug(String(r.name)) })),
+    show: (items) => (rewards = listEditor($("rewards"), items, REWARD_FIELDS(), rewardBlank)),
+    report: "import-report-rewards",
+  };
 
   function collect(): Item {
     const xp = read($("xp-fields"), XP_FIELDS);
@@ -417,13 +500,15 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
 
   $("add-title").addEventListener("click", () => titles.add());
   $("add-badge").addEventListener("click", () => badges.add());
-  $("import-badges").addEventListener("click", () => $<HTMLInputElement>("import-file").click());
-  $("import-file").addEventListener("change", (event) => {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    input.value = ""; // so the same file can be chosen again
-    if (file) void importBadges(file);
-  });
+  for (const [which, spec] of [["badges", badgeSpec], ["rewards", rewardSpec]] as const) {
+    const input = $<HTMLInputElement>(`import-file-${which}`);
+    $(`import-${which}`).addEventListener("click", () => input.click());
+    input.addEventListener("change", () => {
+      const file = input.files?.[0];
+      input.value = ""; // so the same file can be chosen again
+      if (file) void importFile(file, spec);
+    });
+  }
   $("add-reward").addEventListener("click", () => rewards.add());
   $("discard").addEventListener("click", () => {
     load();
