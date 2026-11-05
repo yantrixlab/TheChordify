@@ -6,7 +6,7 @@ import SimilarSongs from "../components/SimilarSongs.astro";
 import SongRating from "../components/SongRating.astro";
 ---
 
-<Layout title="Play along — Chord Suno" noindex>
+<Layout title="Play along — Chord Suno" noindex themeable>
   <Nav />
   <main id="main-content" class="gradient-mesh" style="min-height:100vh;padding:var(--main-top, 28px) var(--main-x, var(--space-lg)) var(--space-3xl);">
     <div class="mx-auto" style="max-width:1180px;color:white;">
@@ -156,7 +156,7 @@ import SongRating from "../components/SongRating.astro";
                     <button id="countin-toggle" type="button" aria-pressed="false" style="font-size:11px;color:var(--color-body);background:none;border:none;cursor:pointer;font-weight:600;">Off</button>
                   )}
                   {tool.id === "sections" && (
-                    <button id="sections-toggle" type="button" aria-pressed="true" style="font-size:11px;color:var(--color-violet);background:none;border:none;cursor:pointer;font-weight:600;">On</button>
+                    <button id="sections-toggle" type="button" aria-pressed="true" style="font-size:11px;color:var(--color-violet-text, var(--color-violet));background:none;border:none;cursor:pointer;font-weight:600;">On</button>
                   )}
                   {tool.id === "detail" && (
                     <button id="detail-toggle" type="button" aria-pressed="false" style="font-size:11px;color:var(--color-body);background:none;border:none;cursor:pointer;font-weight:600;">Simple</button>
@@ -302,9 +302,9 @@ import SongRating from "../components/SongRating.astro";
   .sm-tile::before { content: ""; position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
   .sm-tile .sm-ar { display: grid; place-items: center; line-height: 0; }
   .sm-tile svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
-  .sm-tile small { font: 600 10.5px/1 var(--font-mono); color: #ffffffb3; }
-  .sm-tile.is-rest { background: #1a1037; border: 1px dashed #ffffff1f; box-shadow: none; color: #6f5fa8; }
-  .sm-tile.is-rest small { color: #6f5fa8; }
+  .sm-tile small { font: 600 10.5px/1 var(--font-mono); color: #fff; }
+  .sm-tile.is-rest { background: #1a1037; border: 1px dashed #ffffff1f; box-shadow: none; color: #9283c4; }
+  .sm-tile.is-rest small { color: #9283c4; }
   .sm-tile.is-now { z-index: 1; transform: translateY(-3px) scale(1.08); box-shadow: 0 0 0 2px #fcd34d, 0 0 14px #f59e0b88; }
   .sm-tile.is-now::before { animation: sm-flash 0.3s ease-out; }
   .sm-tile.is-rest.is-now { box-shadow: 0 0 0 2px #fcd34d66; }
@@ -320,7 +320,7 @@ import SongRating from "../components/SongRating.astro";
   .sm-how[open] summary::after { content: "–"; }
   .sm-how > div { margin-top: 8px; font-size: 14px; line-height: 1.7; color: #cbbfe8; }
   .sm-how > div p { margin: 0 0 8px !important; font-size: 14px !important; line-height: 1.7 !important; color: #cbbfe8 !important; }
-  .sm-note { margin: 12px 0 0 !important; font-size: 12px !important; line-height: 1.5; color: #8f81b8 !important; }
+  .sm-note { margin: 12px 0 0 !important; font-size: 12px !important; line-height: 1.5; color: #a396cb !important; }
   @keyframes sm-flash { from { opacity: 0.38; } to { opacity: 0; } }
   @keyframes sm-down { 0% { transform: translateY(-6px); } 45% { transform: translateY(4px); } 100% { transform: translateY(0); } }
   @keyframes sm-up { 0% { transform: translateY(6px); } 45% { transform: translateY(-4px); } 100% { transform: translateY(0); } }
@@ -477,7 +477,7 @@ import SongRating from "../components/SongRating.astro";
   .ph-tool-icon { font-size: 16px; line-height: 1; margin-bottom: 4px; }
   .ph-tool-label { margin-top: 2px; font-size: 9px; color: var(--color-mute); text-transform: uppercase; letter-spacing: 0.05em; }
   .ph-note::before { content: " · "; }
-  .ph-note { color: var(--color-violet); }
+  .ph-note { color: var(--color-violet-text, var(--color-violet)); }
   .tl-tab .short { display: none; }
   .ph-tools::-webkit-scrollbar { display: none; }
   .ph-btn, .ph-play { display: grid; place-items: center; border: 0; border-radius: 50%; cursor: pointer;
@@ -525,6 +525,25 @@ import SongRating from "../components/SongRating.astro";
   .gc.is-active { background: #2d2a3a; color: #fff; border-radius: 3px; }
   .gc.is-silence { font-family: "Segoe UI Symbol", "Noto Music", "Apple Symbols", sans-serif; font-size: 22px; font-weight: 400; color: var(--color-mute); }
 
+  /* dark theme: the player's own light surfaces (the header, the cards and the panels already follow the colour tokens) */
+  html[data-theme="dark"] .bs-cell { background: #231540; border-color: #4d3875; }
+  html[data-theme="dark"] .bs-cell.has-chord { background: #2a1a4a; border-color: #6a5a92; }
+  html[data-theme="dark"] .grid-panel { background: #170b29; }
+  html[data-theme="dark"] .gr { border-bottom-color: #2a1a4a; }
+  html[data-theme="dark"] .gb { background: #1c1131; }
+  html[data-theme="dark"] .gb.is-current { background: #2a1a4a; }
+  html[data-theme="dark"] .gb + .gb, html[data-theme="dark"] #chord-grid.wide-bars .gb + .gb { border-left-color: #6a5a92; border-top-color: #6a5a92; }
+  html[data-theme="dark"] .gc { border-left-color: #2a1a4a; }
+  html[data-theme="dark"] .gc:hover { background: #33224f; }
+  html[data-theme="dark"] .gc.is-active { background: #7c3aed; color: #fff; }
+  html[data-theme="dark"] .gs-tag { color: #1a0533; }
+  html[data-theme="dark"] .tl-tab.is-active { background: #4a3578; color: #fff; }
+  html[data-theme="dark"] .tl-tab:hover { color: #fff; }
+  html[data-theme="dark"] .tl-tabs .tl-seg { background: rgba(42, 26, 74, 0.92); }
+  html[data-theme="dark"] .ph-btn:hover, html[data-theme="dark"] .ph-share:hover { background: #3a2663; }
+  html[data-theme="dark"] .hb.hb-head:hover { background: #43142f; }
+  html[data-theme="dark"] .ph, html[data-theme="dark"] .tl-card { box-shadow: 0 14px 34px -16px #000; }
+  html[data-theme="dark"] .sm-card { border-color: #ffffff1f; }
   /* Chord diagrams: summary of every chord used in the song */
   .sum-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 14px; padding: 20px; justify-items: center; }
 
@@ -1211,11 +1230,11 @@ import SongRating from "../components/SongRating.astro";
     tempo = baseTempo * meter.pulse;
     applyMeter(meter.perBar);
     meterValueEl.textContent = String(meter.perBar);
-    meterValueEl.style.color = meter.perBar === baseBeatsPerBar ? "var(--color-ink)" : "var(--color-violet)";
+    meterValueEl.style.color = meter.perBar === baseBeatsPerBar ? "var(--color-ink)" : "var(--color-violet-text, var(--color-violet))";
     pulseValueEl.textContent = `×${meter.pulse}`;
-    pulseValueEl.style.color = meter.pulse === 1 ? "var(--color-ink)" : "var(--color-violet)";
+    pulseValueEl.style.color = meter.pulse === 1 ? "var(--color-ink)" : "var(--color-violet-text, var(--color-violet))";
     barStartValueEl.textContent = meter.shift === null ? "auto" : meter.shift === 0 ? "0" : `+${meter.shift}`;
-    barStartValueEl.style.color = meter.shift === null ? "var(--color-ink)" : "var(--color-violet)";
+    barStartValueEl.style.color = meter.shift === null ? "var(--color-ink)" : "var(--color-violet-text, var(--color-violet))";
   }
 
   function saveMeter() {
@@ -1679,7 +1698,7 @@ import SongRating from "../components/SongRating.astro";
       marker.style.top = "0";
       marker.style.transform = "translateX(-50%)";
       marker.style.fontSize = `${11 * scale}px`;
-      marker.style.color = fret === "x" ? "var(--color-error)" : "var(--color-ink)";
+      marker.style.color = fret === "x" ? "var(--dg-x, var(--color-error))" : "var(--color-ink)";
       markerRow.appendChild(marker);
     });
     wrap.appendChild(markerRow);
@@ -1784,7 +1803,7 @@ import SongRating from "../components/SongRating.astro";
         bar.style.top = `${rowCenter - dotSize / 2}px`;
         bar.style.width = `${colX(maxString) - colX(minString)}px`;
         bar.style.height = `${dotSize}px`;
-        bar.style.background = "var(--color-ink)";
+        bar.style.background = "var(--dg-dot, var(--color-ink))";
         bar.style.borderRadius = `${dotSize / 2}px`;
         grid.appendChild(bar);
 
@@ -1811,7 +1830,7 @@ import SongRating from "../components/SongRating.astro";
           dot.style.width = `${dotSize}px`;
           dot.style.height = `${dotSize}px`;
           dot.style.borderRadius = "50%";
-          dot.style.background = "var(--color-ink)";
+          dot.style.background = "var(--dg-dot, var(--color-ink))";
           dot.style.color = "white";
           dot.style.fontSize = `${10 * scale}px`;
           dot.style.fontWeight = "700";
@@ -2258,7 +2277,7 @@ import SongRating from "../components/SongRating.astro";
   }
   async function runCountIn() {
     const beatMs = 60000 / (tempo * (tempoPct / 100));
-    timeNowEl.style.color = "var(--color-violet)";
+    timeNowEl.style.color = "var(--color-violet-text, var(--color-violet))";
     for (let n = 3; n >= 1; n--) {
       timeNowEl.textContent = String(n); // 3, 2, 1 in the clock beside the play button
       clickSound(n === 3);
@@ -2472,7 +2491,7 @@ import SongRating from "../components/SongRating.astro";
     loopSection = loopMode === "section" ? Math.max(0, currentSectionIdx) : -1;
     audioEl.loop = loopMode === "song";
     loopToggle.textContent = loopMode === "off" ? "Off" : loopMode === "song" ? "Song" : "Section";
-    loopToggle.style.color = loopMode === "off" ? "var(--color-body)" : "var(--color-violet)";
+    loopToggle.style.color = loopMode === "off" ? "var(--color-body)" : "var(--color-violet-text, var(--color-violet))";
     loopToggle.setAttribute("aria-pressed", String(loopMode !== "off"));
   });
 
@@ -2685,20 +2704,20 @@ import SongRating from "../components/SongRating.astro";
   countInToggle.addEventListener("click", () => {
     countInEnabled = !countInEnabled;
     countInToggle.textContent = countInEnabled ? "On" : "Off";
-    countInToggle.style.color = countInEnabled ? "var(--color-violet)" : "var(--color-body)";
+    countInToggle.style.color = countInEnabled ? "var(--color-violet-text, var(--color-violet))" : "var(--color-body)";
     countInToggle.setAttribute("aria-pressed", String(countInEnabled));
   });
   sectionsToggle.addEventListener("click", () => {
     const showing = chordGridEl.classList.toggle("grid-hide-tags") === false;
     sectionsToggle.textContent = showing ? "On" : "Off";
-    sectionsToggle.style.color = showing ? "var(--color-violet)" : "var(--color-body)";
+    sectionsToggle.style.color = showing ? "var(--color-violet-text, var(--color-violet))" : "var(--color-body)";
     sectionsToggle.setAttribute("aria-pressed", String(showing));
   });
   detailToggle.addEventListener("click", () => {
     const detailed = chords === chordsSimple;
     chords = detailed ? chordsDetailed : chordsSimple;
     detailToggle.textContent = detailed ? "Detailed" : "Simple";
-    detailToggle.style.color = detailed ? "var(--color-violet)" : "var(--color-body)";
+    detailToggle.style.color = detailed ? "var(--color-violet-text, var(--color-violet))" : "var(--color-body)";
     detailToggle.setAttribute("aria-pressed", String(detailed));
     refreshViews();
     onTimeUpdate(playerTime());

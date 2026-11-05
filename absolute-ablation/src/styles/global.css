@@ -281,6 +281,7 @@ html[data-theme="dark"] {
   --color-violet-soft: #2c1b4d;
   --color-violet-deep: #c4b5fd;
   --color-accent-soft: #3a2a0b;
+  --color-violet-text: #a78bfa; /* violet as the colour of text on a dark page (the violet itself is too dark there) */
 }
 /* chord diagrams (lib/tools/diagram.ts, lib/pianoDiagram.ts) take their colours from these, with the light colours as the fallback */
 html[data-theme="dark"] {

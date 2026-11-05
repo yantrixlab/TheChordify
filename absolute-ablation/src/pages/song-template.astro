@@ -6,7 +6,7 @@ import Nav from "../components/Nav.astro";
 import Footer from "../components/Footer.astro";
 ---
 
-<Layout title="__SP_TITLE__" description="__SP_DESC__" image="https://img.invalid/__SP_IMAGE__" noindex>
+<Layout title="__SP_TITLE__" description="__SP_DESC__" image="https://img.invalid/__SP_IMAGE__" noindex themeable>
   <Nav />
   <main id="main-content" class="sp-main">__SP_BODY__</main>
   <Footer />
@@ -95,9 +95,9 @@ import Footer from "../components/Footer.astro";
   .sm-tile { position: relative; overflow: hidden; aspect-ratio: 1 / 1; display: grid; place-items: center; align-content: center; gap: 4px; border-radius: 14px; background: linear-gradient(160deg, #7e3ff1 0%, #5421b8 100%); border: 1px solid #ffffff2b; box-shadow: inset 0 1px 0 #ffffff3d, 0 8px 16px -10px #5b21b6; color: #fff; transition: transform 0.28s cubic-bezier(0.3, 1.6, 0.5, 1), box-shadow 0.28s ease, filter 0.28s ease; }
   .sm-tile .sm-ar { display: grid; place-items: center; line-height: 0; }
   .sm-tile svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
-  .sm-tile small { font: 600 10.5px/1 var(--font-mono); color: #ffffffb3; }
-  .sm-tile.is-rest { background: #1a1037; border: 1px dashed #ffffff1f; box-shadow: none; color: #6f5fa8; }
-  .sm-tile.is-rest small { color: #6f5fa8; }
+  .sm-tile small { font: 600 10.5px/1 var(--font-mono); color: #fff; }
+  .sm-tile.is-rest { background: #1a1037; border: 1px dashed #ffffff1f; box-shadow: none; color: #9283c4; }
+  .sm-tile.is-rest small { color: #9283c4; }
   .sm-tile.is-now { z-index: 1; transform: translateY(-3px) scale(1.08); filter: brightness(1.2); box-shadow: 0 0 0 2px #fcd34d, 0 0 26px #f59e0b99, 0 16px 22px -10px #000; animation: sm-hit 0.45s ease-out; }
   .sm-tile.is-now::after { content: ""; position: absolute; inset: 0; background: linear-gradient(115deg, transparent 30%, #ffffff66 50%, transparent 70%); transform: translateX(-130%); animation: sm-shine 0.55s ease-out forwards; }
   .sm-tile.is-rest.is-now { filter: none; box-shadow: 0 0 0 2px #fcd34d66, 0 0 18px #f59e0b33; }
@@ -114,7 +114,7 @@ import Footer from "../components/Footer.astro";
   .sm-how[open] summary::after { content: "–"; }
   .sm-how > div { margin-top: 8px; font-size: 14px; line-height: 1.7; color: #cbbfe8; }
   .sm-how > div p { margin: 0 0 8px !important; font-size: 14px !important; line-height: 1.7 !important; color: #cbbfe8 !important; }
-  .sm-note { margin: 12px 0 0 !important; font-size: 12px !important; line-height: 1.5; color: #8f81b8 !important; }
+  .sm-note { margin: 12px 0 0 !important; font-size: 12px !important; line-height: 1.5; color: #a396cb !important; }
   @keyframes sm-hit { 0% { box-shadow: 0 0 0 0 #fcd34dcc, 0 0 0 2px #fcd34d, 0 0 26px #f59e0b99, 0 16px 22px -10px #000; } 100% { box-shadow: 0 0 0 14px #fcd34d00, 0 0 0 2px #fcd34d, 0 0 26px #f59e0b99, 0 16px 22px -10px #000; } }
   @keyframes sm-shine { to { transform: translateX(130%); } }
   @keyframes sm-down { 0% { transform: translateY(-6px); } 45% { transform: translateY(4px); } 100% { transform: translateY(0); } }
@@ -122,6 +122,31 @@ import Footer from "../components/Footer.astro";
   @keyframes sm-drift { to { transform: translate(-36px, 26px) scale(1.12); } }
   @media (max-width: 640px) { .sm-card { padding: 16px 14px 14px; border-radius: 18px; } .sm-tiles { gap: 6px; } .sm-tile { border-radius: 11px; } .sm-tile svg { width: 17px; height: 17px; } .sm-tile small { font-size: 9.5px; } }
   @media (prefers-reduced-motion: reduce) { .sm-card::before, .sm-tile.is-now, .sm-tile.is-now::after, .sm-tile.is-now .sm-ar { animation: none !important; } .sm-tile { transition: none; } .sm-tile.is-now { transform: none; } }
+  /* dark theme */
+  html[data-theme="dark"] .sp-main { background: #140a24; }
+  html[data-theme="dark"] .sp-hero img { box-shadow: 0 24px 50px -28px #000; }
+  html[data-theme="dark"] .sp-ghost { background: #1c1131; border-color: #4d3875; color: #c4b5fd; }
+  html[data-theme="dark"] .sp-ghost:hover { background: #2a1a4a; border-color: #6d4fb5; }
+  html[data-theme="dark"] .sp-play { background: #7c3aed; color: #fff; box-shadow: 0 14px 30px -14px #7c3aedaa; }
+  html[data-theme="dark"] .sp-facts, html[data-theme="dark"] .sp-chips span, html[data-theme="dark"] .sp-prog li, html[data-theme="dark"] .sg-sec, html[data-theme="dark"] .sp-dg, html[data-theme="dark"] .sp-dg-nav button, html[data-theme="dark"] .sp-rich details, html[data-theme="dark"] .sp-card, html[data-theme="dark"] .sp-note { background: #1c1131; border-color: #33224f; }
+  html[data-theme="dark"] .sp-facts div + div, html[data-theme="dark"] .sp-rich th, html[data-theme="dark"] .sp-rich td, html[data-theme="dark"] .sp-rich hr { border-color: #33224f; }
+  html[data-theme="dark"] .sp-facts, html[data-theme="dark"] .sp-chips span, html[data-theme="dark"] .sg-sec, html[data-theme="dark"] .sp-dg, html[data-theme="dark"] .sp-card { box-shadow: 0 1px 2px #0006; }
+  html[data-theme="dark"] .sp-note { border-color: #4d3875; }
+  html[data-theme="dark"] .sg-tag { background: #2c1b4d; color: #c4b5fd; }
+  html[data-theme="dark"] .sg-sec.is-intro .sg-tag, html[data-theme="dark"] .sg-sec.is-outro .sg-tag, html[data-theme="dark"] .sg-sec.is-break .sg-tag { background: #2a2540; color: #cbd5e1; }
+  html[data-theme="dark"] .sg-sec.is-chorus .sg-tag { background: #4a2f8a; color: #ede9fe; }
+  html[data-theme="dark"] .sg-sec.is-bridge .sg-tag, html[data-theme="dark"] .sg-sec.is-instrumental .sg-tag { background: #3a2663; color: #ddd6fe; }
+  html[data-theme="dark"] .sg-row { border-bottom-color: #2a1a4a; }
+  html[data-theme="dark"] .sg-bar { border-left-color: #6a5a92; background: #1c1131; }
+  html[data-theme="dark"] .sg-c { border-left-color: #2a1a4a; }
+  html[data-theme="dark"] .sg-c.is-empty { background: #231540; }
+  html[data-theme="dark"] .sp-prog i, html[data-theme="dark"] .sp-mini i { background: #2a1a4a; }
+  html[data-theme="dark"] .sp-dg:hover, html[data-theme="dark"] .sp-card:hover { border-color: #6d4fb5; box-shadow: 0 18px 30px -22px #000; }
+  html[data-theme="dark"] .sp-dg-nav button:hover { background: #2a1a4a; }
+  html[data-theme="dark"] .sp-rich th { background: #231540; }
+  html[data-theme="dark"] .sp-rich code { background: #2a1a4a; color: #e9defc; }
+  html[data-theme="dark"] .sp-rich blockquote { border-left-color: #4d3875; }
+  html[data-theme="dark"] .sp-rich pre { background: #0d0620; }
   .sp-custom-wrap { margin-top: 40px; }
   .sp-custom { min-width: 0; overflow-wrap: anywhere; }
   :where(.sp-custom) img { max-width: 100%; height: auto; }
