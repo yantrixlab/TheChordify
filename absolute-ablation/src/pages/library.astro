@@ -134,6 +134,12 @@ import Footer from "../components/Footer.astro";
   .lb-reward { display: flex; align-items: center; gap: 16px; padding: 14px 18px; border-radius: 18px; background: #fff; border: 1px solid var(--color-hairline); }
   .lb-reward.is-locked { opacity: 0.62; }
   .lb-reward .swatch { display: grid; place-items: center; flex: none; width: 48px; height: 48px; border-radius: 50%; background: #f3eeff; font-size: 22px; color: #f59e0b; }
+  .lb-reward .swatch.pick { width: 62px; height: 62px; padding-top: 2px; background: radial-gradient(circle at 50% 30%, color-mix(in srgb, var(--pick) 26%, #fff), color-mix(in srgb, var(--pick) 10%, #fff)); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--pick) 50%, transparent), 0 8px 16px -10px var(--pick); }
+  .lb-reward .swatch.pick svg { display: block; }
+  /* a locked pick stays easy to see, as a preview of what is ahead: only the words are dimmed */
+  .lb-reward.is-locked:has(.swatch.pick) { opacity: 1; }
+  .lb-reward.is-locked:has(.swatch.pick) > div:not(.swatch), .lb-reward.is-locked:has(.swatch.pick) .lvl { opacity: 0.7; }
+  .lb-reward.is-locked .swatch.pick svg { filter: saturate(0.8) brightness(0.92); }
   .lb-reward .swatch.ring { background: linear-gradient(135deg, #7c3aed, #ec4899); box-shadow: 0 0 0 3px #fff, 0 0 0 6px var(--ring); }
   .lb-reward h3 { margin: 0; font-size: 15px; font-weight: 800; color: var(--color-ink); }
   .lb-reward p { margin: 2px 0 0; font-size: 13px; color: var(--color-body); }
@@ -163,6 +169,7 @@ import Footer from "../components/Footer.astro";
   html[data-theme="dark"] .lb-badge .meter { background: #2a1a4a; }
   html[data-theme="dark"] .lb-badge .meter i { background: linear-gradient(90deg, #a78bfa, #7c3aed); }
   html[data-theme="dark"] .lb-reward.is-unlocked .lvl { background: #064e3b; color: #a7f3d0; }
+  html[data-theme="dark"] .lb-reward .swatch.pick { background: radial-gradient(circle at 50% 30%, color-mix(in srgb, var(--pick) 30%, #1c1131), color-mix(in srgb, var(--pick) 8%, #1c1131)); }
   html[data-theme="dark"] .lb-reward .swatch.ring { box-shadow: 0 0 0 3px #1c1131, 0 0 0 6px var(--ring); }
   html[data-theme="dark"] .lb-bar::after { background: repeating-linear-gradient(90deg, transparent 0 calc(10% - 3px), #12032a calc(10% - 3px) 10%); }
 
@@ -191,6 +198,7 @@ import Footer from "../components/Footer.astro";
   import { cachedUser, getMe } from "../lib/auth";
   import { openSignIn } from "../lib/authUi";
   import { levelRing } from "../lib/levelRing";
+  import { isPick, pickSvg } from "../lib/pickArt";
   import { clock } from "../lib/format";
   import { goToProcessing } from "../lib/backNav";
   import { getLibrary, getProfile, heartButton, LibraryError } from "../lib/library";
@@ -390,8 +398,13 @@ import Footer from "../components/Footer.astro";
     const list = el("ul", "lb-rewards");
     p.rewards.forEach((reward) => {
       const li = el("li", `lb-reward ${reward.unlocked ? "is-unlocked" : "is-locked"}`);
-      const swatch = el("div", reward.kind === "ring" ? "swatch ring" : "swatch", reward.kind === "star" ? "★" : reward.kind === "perk" ? "🎁" : "");
-      if (reward.kind === "ring") swatch.style.setProperty("--ring", reward.value);
+      // a ring named "… pick" is drawn as that pick (a glossy guitar pick in its colour and material); any other ring keeps the coloured ring
+      const asPick = reward.kind === "ring" && isPick(reward.name);
+      const swatch = el("div", asPick ? "swatch pick" : reward.kind === "ring" ? "swatch ring" : "swatch", reward.kind === "star" ? "★" : reward.kind === "perk" ? "🎁" : "");
+      if (asPick) {
+        swatch.style.setProperty("--pick", /^#[0-9a-f]{6}$/i.test(reward.value) ? reward.value : "#f59e0b");
+        swatch.innerHTML = pickSvg(reward.name, reward.value, 42);
+      } else if (reward.kind === "ring") swatch.style.setProperty("--ring", reward.value);
       const text = el("div");
       const extra = reward.repeatEvery > 0 ? ` Comes again every ${reward.repeatEvery} levels.` : reward.kind === "perk" && reward.value ? ` ${reward.value}.` : "";
       text.append(el("h3", "", reward.count > 1 ? `${reward.name} ×${reward.count}` : reward.name), el("p", "", `${reward.description}${extra}`));
