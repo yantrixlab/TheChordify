@@ -1,8 +1,9 @@
 ---
-// One chord on a chart. "compact" is a card with its usual shape (the charts, a grid of cards); the full form is a section with the
-// chord's name, its notes and formula, how it sounds, and every way to play it (the page of a note).
+// One chord on a chart. "compact" is a card with its usual shape, linked to the chord's place on its note's page (the charts, a grid of
+// cards); the full form is a card with the chord's name, notes and formula, how it sounds, and every way to play it (the page of a note).
+// A colour marks the family of chord (basic, 6ths, 7ths, suspended, extended) and is the same everywhere.
 import type { ChartChord } from "../../lib/chordCharts";
-import type { InstrumentKey, Kind, Root } from "../../lib/chordCatalog";
+import { chordPath, type InstrumentKey, type Kind, type Root } from "../../lib/chordCatalog";
 
 interface Props {
   instrument: InstrumentKey;
@@ -10,32 +11,37 @@ interface Props {
   kind: Kind;
   root: Root;
   compact?: boolean;
+  index?: number; // its place in a row, so a row of cards appears one after another
 }
-const { instrument, chord, kind, root, compact = false } = Astro.props;
+const { instrument, chord, kind, root, compact = false, index = 0 } = Astro.props;
 const keys = instrument === "piano";
 const first = chord.voicings[0];
+const heading = `${root.short} ${kind.name} `;
 ---
 
 {
   compact ? (
     first && (
-      <figure class={`cc-card${keys ? " is-keys" : ""}`}>
+      <a class={`cc-card${keys ? " is-keys" : ""}`} href={chordPath(instrument, root, kind)} data-g={kind.group} data-reveal style={`--i: ${index % 12}`} aria-label={`${chord.label}: ${chord.notes}. All ways to play it`}>
         <div class="cc-voicing" data-easy={first.easy ? "1" : "0"}>
           <div class="cc-art" set:html={first.svg} />
         </div>
-        <figcaption>
+        <div class="cc-cap">
           <strong>{chord.label}</strong>
           <small>{chord.notes}</small>
           {first.frets && <span class="cc-frets" title="The fret on each string, low to high (x is not played)">{first.frets}</span>}
-        </figcaption>
-      </figure>
+        </div>
+      </a>
     )
   ) : (
-    <article class={`cc-chord${keys ? " cc-keys" : ""}`} id={kind.id}>
+    <article class={`cc-chord${keys ? " cc-keys" : ""}`} id={kind.id} data-g={kind.group} data-reveal>
       <header>
-        <h3>{`${root.short} ${kind.name} `}<span class="cc-sym">{`(${chord.label})`}</span></h3>
-        <p class="cc-facts">{chord.notes} · {chord.formula}</p>
+        <h3>{heading}<span class="cc-sym">{chord.label}</span></h3>
       </header>
+      <p class="cc-facts">
+        {chord.notes.split(" ").map((n) => <span class="cc-note">{n}</span>)}
+        <span class="cc-deg" title="The notes of the major scale it is built from">{chord.formula}</span>
+      </p>
       <p class="cc-text">{kind.text}</p>
       <div class="cc-voicings">
         {chord.voicings.map((v) => (

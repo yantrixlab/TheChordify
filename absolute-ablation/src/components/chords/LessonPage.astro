@@ -1,6 +1,8 @@
 ---
 // One lesson of the Learn section, made from its blocks (lib/lessons.ts): the chord diagrams in it are drawn here, when the site is built.
+// A bar across the top fills as the lesson is read, and a contents list beside it follows the section on screen.
 import ChordShell from "./ChordShell.astro";
+import ChHero from "./ChHero.astro";
 import { LESSONS, type Lesson } from "../../lib/lessons";
 import { voicingsFor } from "../../lib/chordCharts";
 import { INSTRUMENTS } from "../../lib/chordCatalog";
@@ -11,13 +13,16 @@ interface Props {
 const { lesson } = Astro.props;
 const url = `https://chordsuno.com/learn/${lesson.slug}/`;
 const related = lesson.related.map((slug) => LESSONS.find((l) => l.slug === slug)).filter(Boolean) as Lesson[];
-const names = new Map([
+const arrows = new Map([
   ["-", ""],
   ["D", "↓"],
   ["U", "↑"],
 ]);
 const COUNT = ["1", "&", "2", "&", "3", "&", "4", "&"];
 const label = (chord: string) => chord.replace("#", "♯");
+// the headings become the contents list: each gets an address of its own
+let headings = 0;
+const contents = lesson.blocks.filter((b) => b.type === "h").map((b, i) => ({ id: `part-${i + 1}`, text: (b as { text: string }).text }));
 const jsonLd = [
   { "@context": "https://schema.org", "@type": "Article", headline: lesson.title, description: lesson.description, url, author: { "@type": "Organization", name: "Chord Suno" }, publisher: { "@type": "Organization", name: "Chord Suno" } },
   {
@@ -30,120 +35,105 @@ const jsonLd = [
     ],
   },
 ];
+const number = LESSONS.findIndex((l) => l.slug === lesson.slug) + 1;
 ---
 
 <ChordShell title={`${lesson.title} — Chord Suno`} description={lesson.description} jsonLd={jsonLd}>
-  <header class="ch-hero">
-    <div class="ch-in">
-      <p class="ch-crumbs"><a href="/learn/">Learn</a> › {lesson.title}</p>
-      <p class="ch-eyebrow">{lesson.level} · {lesson.minutes} min read</p>
-      <h1>{lesson.title}</h1>
-      <p class="ch-lead">{lesson.summary}</p>
-    </div>
-  </header>
+  <div class="ls-bar" id="ls-bar" aria-hidden="true"></div>
+  <ChHero
+    eyebrow={`Lesson ${number} · ${lesson.level} · ${lesson.minutes} min read`}
+    title={lesson.title}
+    lead={lesson.summary}
+    crumbs={[{ label: "Learn", href: "/learn/" }, { label: lesson.title }]}
+  >
+    <a class="ch-btn is-ghost" href="/learn/">All lessons</a>
+  </ChHero>
 
-  <article class="ch-in ls">
-    {
-      lesson.blocks.map((b) => {
-        if (b.type === "p") return <p>{b.text}</p>;
-        if (b.type === "h") return <h2>{b.text}</h2>;
-        if (b.type === "list") return <ul>{b.items.map((i) => <li>{i}</li>)}</ul>;
-        if (b.type === "chords") {
-          return (
-            <figure class="ls-chords">
-              <div class="ls-row">
-                {b.chords.map((c) => {
-                  const v = voicingsFor(b.instrument, c, 1)[0];
-                  return v ? (
-                    <div class={`ls-chord${b.instrument === "piano" ? " is-keys" : ""}`}>
-                      <div class="cc-art" set:html={v.svg} />
-                      <strong>{label(c)}</strong>
-                    </div>
-                  ) : null;
-                })}
+  <div class="ls-wrap">
+    <article class="ls">
+      {
+        lesson.blocks.map((b) => {
+          if (b.type === "p") return <p>{b.text}</p>;
+          if (b.type === "h") {
+            headings += 1;
+            return <h2 id={`part-${headings}`}>{b.text}</h2>;
+          }
+          if (b.type === "list") return <ul>{b.items.map((i) => <li>{i}</li>)}</ul>;
+          if (b.type === "chords") {
+            return (
+              <figure class="ls-chords" data-reveal>
+                <div class="ls-row">
+                  {b.chords.map((c) => {
+                    const v = voicingsFor(b.instrument, c, 1)[0];
+                    return v ? (
+                      <div class={`ls-chord${b.instrument === "piano" ? " is-keys" : ""}`}>
+                        <div class="cc-art" set:html={v.svg} />
+                        <strong>{label(c)}</strong>
+                      </div>
+                    ) : null;
+                  })}
+                </div>
+                {b.caption && <figcaption>{b.caption}</figcaption>}
+              </figure>
+            );
+          }
+          if (b.type === "table") {
+            return (
+              <div class="ls-table" data-reveal>
+                <div class="cg-wrap">
+                  <table class="cg">
+                    <thead><tr>{b.head.map((h) => <th scope="col">{h}</th>)}</tr></thead>
+                    <tbody>{b.rows.map((r) => <tr>{r.map((cell, i) => (i === 0 ? <th scope="row">{cell}</th> : <td>{cell}</td>))}</tr>)}</tbody>
+                  </table>
+                </div>
+                {b.caption && <p class="ls-cap">{b.caption}</p>}
               </div>
-              {b.caption && <figcaption>{b.caption}</figcaption>}
-            </figure>
-          );
-        }
-        if (b.type === "table") {
+            );
+          }
           return (
-            <div class="ls-table">
-              <div class="cg-wrap">
-                <table class="cg">
-                  <thead><tr>{b.head.map((h, i) => <th scope="col" style={i === 0 ? "text-align:left" : undefined}>{h}</th>)}</tr></thead>
-                  <tbody>{b.rows.map((r) => <tr>{r.map((cell, i) => (i === 0 ? <th scope="row">{cell}</th> : <td>{cell}</td>))}</tr>)}</tbody>
-                </table>
-              </div>
-              {b.caption && <p class="ls-cap">{b.caption}</p>}
+            <div class="ls-strum">
+              {b.rows.map((r, n) => (
+                <div class="ls-pat" data-reveal style={`--i: ${n}`}>
+                  <strong>{r.name}</strong>
+                  <div class="ls-tiles" role="img" aria-label={`${r.name}: ${r.slots.map((s, i) => `${COUNT[i]} ${s === "D" ? "down" : s === "U" ? "up" : "rest"}`).join(", ")}`}>
+                    {r.slots.map((s, i) => (
+                      <span class={`ls-tile${s === "D" ? " is-down" : s === "U" ? " is-up" : ""}`}>
+                        <b>{arrows.get(s)}</b>
+                        <i>{COUNT[i]}</i>
+                      </span>
+                    ))}
+                  </div>
+                  <p>{r.note}</p>
+                </div>
+              ))}
             </div>
           );
-        }
-        return (
-          <div class="ls-strum">
-            {b.rows.map((r) => (
-              <div class="ls-pat">
-                <strong>{r.name}</strong>
-                <div class="ls-tiles" role="img" aria-label={`${r.name}: ${r.slots.map((s, i) => `${COUNT[i]} ${s === "D" ? "down" : s === "U" ? "up" : "rest"}`).join(", ")}`}>
-                  {r.slots.map((s, i) => (
-                    <span class={`ls-tile${s === "D" ? " is-down" : s === "U" ? " is-up" : ""}`}>
-                      <b>{names.get(s)}</b>
-                      <i>{COUNT[i]}</i>
-                    </span>
-                  ))}
-                </div>
-                <p>{r.note}</p>
-              </div>
-            ))}
-          </div>
-        );
-      })
-    }
-  </article>
+        })
+      }
+    </article>
+    <aside class="ls-toc" aria-label="In this lesson">
+      <strong>In this lesson</strong>
+      <ol>{contents.map((c) => <li><a href={`#${c.id}`}>{c.text}</a></li>)}</ol>
+    </aside>
+  </div>
 
   <section class="ch-in ch-sec">
-    <h2>Keep going</h2>
+    <span class="ch-kicker" data-reveal>Next</span>
+    <h2 data-reveal style="--i: 1">Keep going</h2>
     <div class="ch-links">
-      {related.map((l) => <a class="ch-link" href={`/learn/${l.slug}/`}><strong>{l.title}</strong><span>{l.summary}</span></a>)}
-      {INSTRUMENTS.filter((i) => lesson.instruments.length === 0 || lesson.instruments.includes(i.key)).slice(0, 2).map((i) => (
-        <a class="ch-link" href={i.chartPath}><strong>{i.name} chord chart</strong><span>Every {i.name.toLowerCase()} chord with a diagram.</span></a>
+      {related.map((l, i) => <a class="ch-link" href={`/learn/${l.slug}/`} data-reveal style={`--i: ${i}`}><strong>{l.title}</strong><span>{l.summary}</span><em class="ch-go" style="font-style: normal">Read the lesson</em></a>)}
+      {INSTRUMENTS.filter((i) => lesson.instruments.length === 0 || lesson.instruments.includes(i.key)).slice(0, 2).map((i, n) => (
+        <a class="ch-link" href={i.chartPath} data-reveal style={`--i: ${related.length + n}`}><strong>{i.name} chord chart</strong><span>Every {i.name.toLowerCase()} chord with a diagram.</span><em class="ch-go" style="font-style: normal">Open the chart</em></a>
       ))}
     </div>
   </section>
 
-  <section class="ch-in ch-cta">
-    <h2>Practise with a real song</h2>
-    <p>Search for a song on Chord Suno and play along: every chord is shown on the beat, and you can slow the song down and loop the part you are learning.</p>
-    <a class="ch-btn" href="/#find">Find chords for a song</a>
-    <a class="ch-btn is-ghost" href="/learn/">All lessons</a>
-  </section>
+  <div class="ch-in ch-cta-wrap">
+    <div class="ch-cta-in" data-reveal>
+      <h2>Practise with a real song</h2>
+      <p>Search for a song on Chord Suno and play along: every chord is shown on the beat, and you can slow the song down and loop the part you are learning.</p>
+      <a class="ch-btn" href="/#find">Find chords for a song</a>
+      <a class="ch-btn is-ghost" href="/learn/">All lessons</a>
+    </div>
+  </div>
 </ChordShell>
-
-<style is:global>
-  .ls { max-width: 780px; padding-top: 28px; }
-  .ls p, .ls li { font-size: 17px; line-height: 1.75; }
-  .ls h2 { margin: 38px 0 10px; font-size: 24px; }
-  .ls ul { margin: 0 0 18px; padding-left: 22px; }
-  .ls li { margin-bottom: 8px; }
-  .ls-chords { margin: 22px 0; padding: 18px 16px 14px; border-radius: 18px; background: #fff; border: 1px solid var(--color-hairline); }
-  .ls-row { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; }
-  .ls-chord { display: grid; justify-items: center; gap: 4px; min-width: 108px; }
-  .ls-chord .cc-art svg { display: block; width: 100%; max-width: 104px; height: auto; font-family: var(--font-sans); }
-  .ls-chord.is-keys .cc-art svg { max-width: 150px; }
-  .ls-chord strong { font-size: 17px; color: var(--color-ink); }
-  .ls-chords figcaption { margin: 14px auto 0; max-width: 640px; font-size: 14px; line-height: 1.6; color: var(--color-mute); text-align: center; }
-  .ls-table { margin: 20px 0 26px; }
-  .ls-table .cg th, .ls-table .cg td { padding: 7px 10px; font-size: 14px; }
-  .ls-cap { margin: 8px 2px 0; font-size: 13.5px; color: var(--color-mute); }
-  .ls-strum { display: grid; gap: 14px; margin: 18px 0 24px; }
-  .ls-pat { padding: 16px 18px; border-radius: 16px; background: #fff; border: 1px solid var(--color-hairline); }
-  .ls-pat strong { color: var(--color-ink); }
-  .ls-pat p { margin: 10px 0 0; font-size: 15px; line-height: 1.6; }
-  .ls-tiles { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 6px; max-width: 520px; margin-top: 10px; }
-  .ls-tile { display: grid; justify-items: center; gap: 2px; padding: 8px 0 5px; border-radius: 10px; background: #f6f3fc; color: #b9aedb; }
-  .ls-tile b { font-size: 20px; line-height: 1; font-weight: 800; }
-  .ls-tile i { font: 700 11px var(--font-mono); font-style: normal; color: var(--color-mute); }
-  .ls-tile.is-down { background: #5b21b6; color: #fff; }
-  .ls-tile.is-up { background: #c4b5fd; color: #2e1065; }
-  .ls-tile.is-down i, .ls-tile.is-up i { color: inherit; opacity: 0.8; }
-</style>

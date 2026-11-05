@@ -1,0 +1,26 @@
+---
+// A one-octave keyboard whose twelve keys are links to the pages of the twelve notes: a way to pick a note that looks like what it picks.
+import { ROOTS, notePath, type InstrumentKey } from "../../lib/chordCatalog";
+
+interface Props {
+  instrument: InstrumentKey;
+  current?: string; // the slug of the note whose page this is
+}
+const { instrument, current } = Astro.props;
+const whites = ROOTS.filter((r) => !r.name.includes("#"));
+const blacks = ROOTS.map((r, i) => ({ r, i })).filter(({ r }) => r.name.includes("#"));
+// a black key sits on the line between the white key before it and the one after: the white keys are 1/7 of the width each
+const whiteIndexBefore = (rootIndex: number) => ROOTS.slice(0, rootIndex).filter((r) => !r.name.includes("#")).length - 1;
+---
+
+<div class="nk-wrap">
+  <nav class="nk" aria-label="Choose a note">
+    {whites.map((r) => <a class="nk-w" href={notePath(instrument, r)} aria-current={r.slug === current ? "page" : undefined} title={`All ${r.label} chords`}>{r.short}</a>)}
+    {
+      blacks.map(({ r, i }) => (
+        <a class="nk-b" style={`left: calc(${(whiteIndexBefore(i) + 1) * (100 / 7)}% - 4.2%)`} href={notePath(instrument, r)} aria-current={r.slug === current ? "page" : undefined} title={`All ${r.label} chords`}>{r.short}</a>
+      ))
+    }
+  </nav>
+  <p class="nk-hint">Press a key for every chord that starts on that note.</p>
+</div>

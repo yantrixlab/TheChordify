@@ -2,10 +2,12 @@
 // The chart of one instrument: a diagram for the eight chords most songs use on all twelve notes, a grid that links every one of the 336
 // chords to its place on the page of its note, and the questions people ask. The page of each note (NotePage.astro) has everything else.
 import ChordShell from "./ChordShell.astro";
+import ChHero from "./ChHero.astro";
 import ChordNav from "./ChordNav.astro";
 import ChordCard from "./ChordCard.astro";
+import NoteKeys from "./NoteKeys.astro";
 import { CHART_KINDS, GROUPS, INSTRUMENTS, KINDS, ROOTS, chordLabel, chordPath, instrumentInfo, kindById, kindsOf, notePath, type InstrumentKey } from "../../lib/chordCatalog";
-import { chartChord } from "../../lib/chordCharts";
+import { chartChord, voicingsFor } from "../../lib/chordCharts";
 import { COPY } from "../../lib/chordCopy";
 import { LESSONS } from "../../lib/lessons";
 
@@ -16,13 +18,15 @@ const { instrument } = Astro.props;
 const info = instrumentInfo(instrument);
 const copy = COPY[instrument];
 const url = `https://chordsuno.com${info.chartPath}`;
+const lower = info.name.toLowerCase();
 
 const sections = CHART_KINDS.map((id) => kindById(id)!).map((kind) => ({
   kind,
   chords: ROOTS.map((root) => ({ root, chord: chartChord(instrument, root, kind, 1) })),
 }));
-const lower = info.name.toLowerCase();
 const others = INSTRUMENTS.filter((i) => i.key !== instrument);
+const art = ["C", "G", "Am", "F"].map((c) => ({ svg: voicingsFor(instrument, c, 1)[0]?.svg ?? "", label: c, keys: instrument === "piano" })).filter((a) => a.svg);
+const [title, accent] = copy.h1.split(": ");
 
 const jsonLd = [
   { "@context": "https://schema.org", "@type": "WebPage", name: copy.chartTitle, description: copy.chartDescription, url, isPartOf: { "@type": "WebSite", name: "Chord Suno", url: "https://chordsuno.com/" } },
@@ -46,48 +50,59 @@ const chips = [
 ---
 
 <ChordShell title={copy.chartTitle} description={copy.chartDescription} jsonLd={jsonLd}>
-  <header class="ch-hero">
-    <div class="ch-in">
-      <p class="ch-crumbs"><a href="/chords/">Chord charts</a> › {info.name}</p>
-      <p class="ch-eyebrow">{info.name} chord chart</p>
-      <h1>{copy.h1}</h1>
-      <p class="ch-lead">{copy.lead}</p>
-      <a class="ch-btn" href="/#find">Find chords for a song</a>
-      <a class="ch-btn is-ghost" href={`/learn/`}>Learn {lower} chords</a>
-    </div>
-  </header>
+  <ChHero
+    eyebrow={`${info.name} chord chart`}
+    title={`${title}:`}
+    accent={accent}
+    lead={copy.lead}
+    crumbs={[{ label: "Chord charts", href: "/chords/" }, { label: info.name }]}
+    art={art}
+    stats={[{ n: 336, label: "chords" }, { n: 28, label: "kinds of chord" }, { n: 12, label: "notes" }]}
+  >
+    <a class="ch-btn" href="/#find">Find chords for a song <svg width="16" height="16" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M3 7h8M7 3l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg></a>
+    <a class="ch-btn is-ghost" href="/learn/">Learn {lower} chords</a>
+  </ChHero>
 
   <ChordNav instrument={instrument} chips={chips} easy={true} here="chart" />
 
+  <section class="ch-in ch-sec" id="notes">
+    <span class="ch-kicker" data-reveal>Start here</span>
+    <h2 data-reveal style="--i: 1">Pick a note</h2>
+    <p data-reveal style="--i: 2">Every chord that starts on a note is on one page, with up to three ways to play each. Press a key.</p>
+    <div data-reveal style="--i: 3"><NoteKeys instrument={instrument} /></div>
+  </section>
+
   <section class="ch-in ch-sec" id="how">
-    <h2>{copy.howHeading}</h2>
-    <p>{copy.how}</p>
-    {copy.tuningNote && <p class="ch-muted">{copy.tuningNote}</p>}
+    <span class="ch-kicker" data-reveal>Before you start</span>
+    <h2 data-reveal style="--i: 1">{copy.howHeading}</h2>
+    <p data-reveal style="--i: 2">{copy.how}</p>
+    {copy.tuningNote && <p class="ch-muted" data-reveal style="--i: 3">{copy.tuningNote}</p>}
   </section>
 
   <section class="ch-in ch-sec" id="all">
-    <h2>Every {lower} chord, from A to G♯</h2>
-    <p>
+    <span class="ch-kicker" data-reveal>The whole chart</span>
+    <h2 data-reveal style="--i: 1">Every {lower} chord, from C to B</h2>
+    <p data-reveal style="--i: 2">
       {KINDS.length} kinds of chord on twelve notes make {KINDS.length * 12} chords. Each name below goes to its diagram on the page of its note, where you will find other ways to play it. Black-key notes
       are named with sharps, as the player does; C♯ and D♭ are the same pitch.
     </p>
     {
       GROUPS.map((group) => (
-        <div class="ch-grid-block">
-          <h3 style="margin: 22px 0 6px">{group.title}</h3>
-          <p class="ch-muted" style="margin: 0 0 10px; font-size: 14px">{group.text}</p>
+        <div class="ch-grid-block" data-g={group.id} data-reveal>
+          <div class="ch-gh"><h3>{group.title}</h3></div>
+          <p class="ch-muted" style="margin: 0 0 12px; font-size: 14.5px">{group.text}</p>
           <div class="cg-wrap">
             <table class="cg">
               <thead>
                 <tr>
-                  <th scope="col" style="text-align:left">Note</th>
+                  <th scope="col">Note</th>
                   {kindsOf(group.id).map((k) => <th scope="col">{k.nameShort}</th>)}
                 </tr>
               </thead>
               <tbody>
                 {ROOTS.map((root) => (
                   <tr>
-                    <th scope="row"><a href={notePath(instrument, root)}>{root.label}</a></th>
+                    <th scope="row"><a href={notePath(instrument, root)} style="color: inherit; text-decoration: none">{root.label}</a></th>
                     {kindsOf(group.id).map((k) => <td><a href={chordPath(instrument, root, k)}>{chordLabel(root, k)}</a></td>)}
                   </tr>
                 ))}
@@ -101,42 +116,48 @@ const chips = [
 
   {
     sections.map((s) => (
-      <section class="ch-in ch-sec" id={s.kind.id}>
-        <h2>{s.kind.name.replace(/^./, (c) => c.toUpperCase())} chords</h2>
-        <p>{s.kind.text} <span class="ch-muted">({s.kind.formula})</span></p>
+      <section class="ch-in ch-sec" id={s.kind.id} data-g={s.kind.group}>
+        <span class="ch-kicker" data-reveal>{s.kind.formula}</span>
+        <h2 data-reveal style="--i: 1">{s.kind.name.replace(/^./, (c) => c.toUpperCase())} chords</h2>
+        <p data-reveal style="--i: 2">{s.kind.text}</p>
         <div class={`cc-grid${instrument === "piano" ? " cc-grid-wide" : ""}`}>
-          {s.chords.map((c) => <ChordCard instrument={instrument} chord={c.chord} kind={s.kind} root={c.root} compact={true} />)}
+          {s.chords.map((c, i) => <ChordCard instrument={instrument} chord={c.chord} kind={s.kind} root={c.root} compact={true} index={i} />)}
         </div>
       </section>
     ))
   }
 
   <section class="ch-in ch-sec">
-    <h2>Learn {lower} chords</h2>
-    <p>Short lessons that go with this chart.</p>
+    <span class="ch-kicker" data-reveal>Keep learning</span>
+    <h2 data-reveal style="--i: 1">Learn {lower} chords</h2>
+    <p data-reveal style="--i: 2">Short lessons that go with this chart.</p>
     <div class="ch-links">
-      {LESSONS.filter((l) => l.instruments.includes(instrument) || l.instruments.length === 0).slice(0, 4).map((l) => (
-        <a class="ch-link" href={`/learn/${l.slug}/`}><strong>{l.title}</strong><span>{l.summary}</span></a>
+      {LESSONS.filter((l) => l.instruments.includes(instrument) || l.instruments.length === 0).slice(0, 4).map((l, i) => (
+        <a class="ch-link" href={`/learn/${l.slug}/`} data-reveal style={`--i: ${i}`}><strong>{l.title}</strong><span>{l.summary}</span><em class="ch-go" style="font-style: normal">Read the lesson</em></a>
       ))}
     </div>
   </section>
 
   <section class="ch-in ch-sec ch-faq" id="faq">
-    <h2>{info.name} chord questions</h2>
-    {copy.faq.map((f) => <details><summary>{f.q}</summary><p>{f.a}</p></details>)}
+    <span class="ch-kicker" data-reveal>Good to know</span>
+    <h2 data-reveal style="--i: 1">{info.name} chord questions</h2>
+    {copy.faq.map((f, i) => <details data-reveal style={`--i: ${i}`}><summary>{f.q}</summary><p>{f.a}</p></details>)}
   </section>
 
   <section class="ch-in ch-sec">
-    <h2>Chord charts for other instruments</h2>
+    <span class="ch-kicker" data-reveal>More charts</span>
+    <h2 data-reveal style="--i: 1">Chord charts for other instruments</h2>
     <div class="ch-links">
-      {others.map((i) => <a class="ch-link" href={i.chartPath}><strong>{i.name} chord chart</strong><span>Every {i.name.toLowerCase()} chord with a diagram.</span></a>)}
+      {others.map((i, n) => <a class="ch-link" href={i.chartPath} data-reveal style={`--i: ${n}`}><strong>{i.name} chord chart</strong><span>Every {i.name.toLowerCase()} chord with a diagram.</span><em class="ch-go" style="font-style: normal">Open the chart</em></a>)}
     </div>
   </section>
 
-  <section class="ch-in ch-cta">
-    <h2>Play your favourite song on {lower}</h2>
-    <p>Get its chords in about a minute, then choose {info.name} in the player to see every chord drawn, with other ways to play it.</p>
-    <a class="ch-btn" href="/#find">Find chords for a song</a>
-    <a class="ch-btn is-ghost" href={info.notesPath + "c/"}>All C chords</a>
-  </section>
+  <div class="ch-in ch-cta-wrap">
+    <div class="ch-cta-in" data-reveal>
+      <h2>Play your favourite song on {lower}</h2>
+      <p>Get its chords in about a minute, then choose {info.name} in the player to see every chord drawn, with other ways to play it.</p>
+      <a class="ch-btn" href="/#find">Find chords for a song</a>
+      <a class="ch-btn is-ghost" href={info.notesPath + "c/"}>All C chords</a>
+    </div>
+  </div>
 </ChordShell>

@@ -1,8 +1,11 @@
 ---
 // /learn/: the lessons.
 import ChordShell from "../../components/chords/ChordShell.astro";
+import ChHero from "../../components/chords/ChHero.astro";
 import { LESSONS } from "../../lib/lessons";
 import { INSTRUMENTS } from "../../lib/chordCatalog";
+import { voicingsFor } from "../../lib/chordCharts";
+import { INSTRUMENT_ICONS } from "../../lib/instrumentIcons";
 
 const title = "Learn Chords: Free Lessons for Guitar, Piano, Ukulele and Mandolin — Chord Suno";
 const description = "Free, short lessons on chords: how to read a chord diagram, the first guitar chords, barre chords, piano inversions, chords in a key, capo and strumming patterns.";
@@ -17,45 +20,70 @@ const jsonLd = [
     ],
   },
 ];
-const beginner = LESSONS.filter((l) => l.level === "Beginner");
-const next = LESSONS.filter((l) => l.level === "Next step");
+const [first, ...rest] = LESSONS;
+const beginner = LESSONS.filter((l) => l.level === "Beginner").length;
+const art = ["Em", "Am", "D", "G"].map((c) => ({ svg: voicingsFor("guitar", c, 1)[0]?.svg ?? "", label: c })).filter((a) => a.svg);
+const who = (l: (typeof LESSONS)[number]) => (l.instruments.length ? l.instruments.map((k) => INSTRUMENTS.find((i) => i.key === k)!.name) : ["Every instrument"]);
 ---
 
 <ChordShell title={title} description={description} jsonLd={jsonLd}>
-  <header class="ch-hero">
-    <div class="ch-in">
-      <p class="ch-eyebrow">Learn</p>
-      <h1>Learn chords, step by step</h1>
-      <p class="ch-lead">Short, plain lessons that take you from reading your first diagram to playing songs in any key. Each one links to the chord charts, and the player lets you practise with a real song.</p>
-      <a class="ch-btn" href="/learn/read-chord-diagrams/">Start here: reading a diagram</a>
-      <a class="ch-btn is-ghost" href="/chords/">Chord charts</a>
-    </div>
-  </header>
+  <ChHero
+    eyebrow="Learn"
+    title="Learn chords,"
+    accent="step by step"
+    lead="Short, plain lessons that take you from reading your first diagram to playing songs in any key. Each one links to the chord charts, and the player lets you practise with a real song."
+    art={art}
+    stats={[{ n: LESSONS.length, label: "lessons" }, { n: beginner, label: "for beginners" }, { n: LESSONS.reduce((n, l) => n + l.minutes, 0), label: "minutes in all" }]}
+  >
+    <a class="ch-btn" href={`/learn/${first.slug}/`}>Start here: {first.title.toLowerCase()} <svg width="16" height="16" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M3 7h8M7 3l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg></a>
+    <a class="ch-btn is-ghost" href="/chords/">Chord charts</a>
+  </ChHero>
 
   <section class="ch-in ch-sec">
-    <h2>Beginner</h2>
+    <span class="ch-kicker" data-reveal>All lessons</span>
+    <h2 data-reveal style="--i: 1">Pick up where you are</h2>
+    <p data-reveal style="--i: 2">Read them in order, or jump to what you need. Each takes a few minutes.</p>
     <div class="ch-links">
-      {beginner.map((l) => <a class="ch-link" href={`/learn/${l.slug}/`}><strong>{l.title}</strong><span>{l.summary} <small class="ch-muted">· {l.minutes} min</small></span></a>)}
+      {
+        LESSONS.map((l, i) => (
+          <a class="ch-link" href={`/learn/${l.slug}/`} data-reveal style={`--i: ${i}`}>
+            <span class="ch-num">{String(i + 1).padStart(2, "0")}</span>
+            <strong>{l.title}</strong>
+            <span>{l.summary}</span>
+            <span class="ch-tags">
+              <span class={`ch-tag${l.level === "Beginner" ? " is-amber" : ""}`}>{l.level}</span>
+              <span class="ch-tag">{l.minutes} min</span>
+              {who(l).map((w) => <span class="ch-tag">{w}</span>)}
+            </span>
+            <em class="ch-go" style="font-style: normal">Read the lesson</em>
+          </a>
+        ))
+      }
     </div>
   </section>
 
   <section class="ch-in ch-sec">
-    <h2>The next step</h2>
+    <span class="ch-kicker" data-reveal>Look a chord up</span>
+    <h2 data-reveal style="--i: 1">The chord charts</h2>
     <div class="ch-links">
-      {next.map((l) => <a class="ch-link" href={`/learn/${l.slug}/`}><strong>{l.title}</strong><span>{l.summary} <small class="ch-muted">· {l.minutes} min</small></span></a>)}
+      {
+        INSTRUMENTS.map((i, n) => (
+          <a class="ch-link" href={i.chartPath} data-reveal style={`--i: ${n}`}>
+            <span class="ch-ico"><svg viewBox="0 0 24 24" set:html={INSTRUMENT_ICONS[i.key]} /></span>
+            <strong>{i.name} chord chart</strong>
+            <span>Every {i.name.toLowerCase()} chord with a diagram.</span>
+            <em class="ch-go" style="font-style: normal">Open the chart</em>
+          </a>
+        ))
+      }
     </div>
   </section>
 
-  <section class="ch-in ch-sec">
-    <h2>Look a chord up</h2>
-    <div class="ch-links">
-      {INSTRUMENTS.map((i) => <a class="ch-link" href={i.chartPath}><strong>{i.name} chord chart</strong><span>Every {i.name.toLowerCase()} chord with a diagram.</span></a>)}
+  <div class="ch-in ch-cta-wrap">
+    <div class="ch-cta-in" data-reveal>
+      <h2>Practise with a real song</h2>
+      <p>Search for a song and play along: slow it down, loop the hard part and watch every chord on the beat.</p>
+      <a class="ch-btn" href="/#find">Find chords for a song</a>
     </div>
-  </section>
-
-  <section class="ch-in ch-cta">
-    <h2>Practise with a real song</h2>
-    <p>Search for a song and play along: slow it down, loop the hard part and watch every chord on the beat.</p>
-    <a class="ch-btn" href="/#find">Find chords for a song</a>
-  </section>
+  </div>
 </ChordShell>

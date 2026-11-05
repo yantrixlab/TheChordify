@@ -80,6 +80,18 @@ export const KINDS: Kind[] = [
   { suffix: "13", id: "thirteenth", group: "extended", name: "dominant 13th", nameShort: "13th", formula: "1 3 5 ♭7 9 13", text: "A dominant 9th with the thirteenth added: the full, big-band dominant chord. Some notes are left out when played." },
 ];
 
+/** The notes of a chord built on C, spelled as a musician writes them from its formula: "1 ♭3 5" is C E♭ G (not C D♯ G). */
+export function spellOnC(formula: string): string {
+  const scale: Record<string, string> = { "1": "C", "2": "D", "3": "E", "4": "F", "5": "G", "6": "A", "7": "B", "9": "D", "11": "F", "13": "A" };
+  return formula
+    .split(" ")
+    .map((degree) => {
+      const m = /^([♭♯]*)(\d+)$/.exec(degree);
+      return m ? `${scale[m[2]] ?? "?"}${m[1]}` : degree;
+    })
+    .join(" ");
+}
+
 export const kindById = (id: string) => KINDS.find((k) => k.id === id);
 export const kindBySuffix = (suffix: string) => KINDS.find((k) => k.suffix === suffix);
 export const kindsOf = (group: string) => KINDS.filter((k) => k.group === group);

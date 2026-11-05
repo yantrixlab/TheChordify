@@ -1,0 +1,69 @@
+---
+// The hero of every chord page: dark violet, full width and running up under the fixed header, with a staff of faint lines, two slow
+// glows, a headline whose last words are in colour, optional numbers that count up, and cards with real chord diagrams floating beside it.
+// It rises in piece by piece when the page opens (CSS), and holds still for a visitor who asks for less motion.
+interface Props {
+  eyebrow: string;
+  title: string;
+  accent?: string; // the last words of the headline, in colour
+  lead: string;
+  crumbs?: { label: string; href?: string }[];
+  art?: { svg: string; label: string; sub?: string; keys?: boolean }[]; // chord diagrams to float beside the headline
+  big?: string; // a huge letter behind the headline (the note of a note's page)
+  stats?: { n: number; label: string }[];
+}
+const { eyebrow, title, accent, lead, crumbs = [], art = [], big, stats = [] } = Astro.props;
+const solo = art.length === 0 && !big;
+---
+
+<header class="ch-hero">
+  <div class="ch-staff" aria-hidden="true"></div>
+  <div class="ch-orb ch-orb-a" aria-hidden="true"></div>
+  <div class="ch-orb ch-orb-b" aria-hidden="true"></div>
+  <div class={`ch-in ch-hero-in${solo ? " is-solo" : ""}`}>
+    <div class="ch-hero-copy">
+      {
+        crumbs.length > 0 && (
+          <nav class="ch-crumbs" aria-label="Breadcrumb" data-rise style="--d: 0ms">
+            {crumbs.map((c, i) => (
+              <>
+                {i > 0 && " › "}
+                {c.href ? <a href={c.href}>{c.label}</a> : <span aria-current="page">{c.label}</span>}
+              </>
+            ))}
+          </nav>
+        )
+      }
+      <p class="ch-eyebrow" data-rise style="--d: 40ms"><i aria-hidden="true"></i>{eyebrow}</p>
+      <h1 data-rise style="--d: 110ms">{title}{accent && <> <span class="ch-grad">{accent}</span></>}</h1>
+      <p class="ch-lead" data-rise style="--d: 190ms">{lead}</p>
+      <div class="ch-actions" data-rise style="--d: 270ms"><slot /></div>
+      {
+        stats.length > 0 && (
+          <dl class="ch-stats" data-rise style="--d: 350ms">
+            {stats.map((s) => (
+              <div>
+                <dt>{s.label}</dt>
+                <dd data-count={s.n}>{s.n}</dd>
+              </div>
+            ))}
+          </dl>
+        )
+      }
+    </div>
+    {
+      !solo && (
+        <div class="ch-art" aria-hidden="true" data-rise style="--d: 240ms">
+          {big && <span class="ch-big">{big}</span>}
+          {art.slice(0, 4).map((a, i) => (
+            <div class={`ch-fc${a.keys ? " is-keys" : ""}`} style={`--i: ${i}`}>
+              <div set:html={a.svg} />
+              <strong>{a.label}</strong>
+              {a.sub && <small>{a.sub}</small>}
+            </div>
+          ))}
+        </div>
+      )
+    }
+  </div>
+</header>

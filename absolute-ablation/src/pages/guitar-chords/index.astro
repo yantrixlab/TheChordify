@@ -1,8 +1,11 @@
 ---
 // /guitar-chords/: the notes, each with a page of every chord that starts on it. (The other instruments' addresses of this kind are their landing pages.)
 import ChordShell from "../../components/chords/ChordShell.astro";
+import ChHero from "../../components/chords/ChHero.astro";
 import ChordNav from "../../components/chords/ChordNav.astro";
+import NoteKeys from "../../components/chords/NoteKeys.astro";
 import { ROOTS, notePath, chordLabel, kindBySuffix } from "../../lib/chordCatalog";
+import { voicingsFor } from "../../lib/chordCharts";
 
 const title = "Guitar Chords A to G♯: Every Guitar Chord by Note — Chord Suno";
 const description = "Every guitar chord, note by note: a page for each of the twelve notes with all its chords (major, minor, 7th, sus and more), diagrams and other ways to play each.";
@@ -19,34 +22,48 @@ const jsonLd = [
   },
 ];
 const sample = ["", "m", "7", "maj7", "m7", "sus4"].map((s) => kindBySuffix(s)!);
+const art = ["E", "A", "D", "G"].map((c) => ({ svg: voicingsFor("guitar", c, 1)[0]?.svg ?? "", label: c })).filter((a) => a.svg);
 ---
 
 <ChordShell title={title} description={description} jsonLd={jsonLd}>
-  <header class="ch-hero">
-    <div class="ch-in">
-      <p class="ch-crumbs"><a href="/chords/">Chord charts</a> › <a href="/guitar-chord-chart/">Guitar</a> › By note</p>
-      <p class="ch-eyebrow">Guitar chords</p>
-      <h1>Guitar chords, note by note</h1>
-      <p class="ch-lead">Choose a note to see every chord that starts on it, with a diagram, its notes and other ways to play it. Or open the <a href="/guitar-chord-chart/">guitar chord chart</a> to see the chords most songs use on all twelve notes at once.</p>
-    </div>
-  </header>
+  <ChHero
+    eyebrow="Guitar chords"
+    title="Guitar chords,"
+    accent="note by note"
+    lead="Choose a note to see every chord that starts on it, with a diagram, its notes and other ways to play it. Or open the guitar chord chart to see the chords most songs use on all twelve notes at once."
+    crumbs={[{ label: "Chord charts", href: "/chords/" }, { label: "Guitar", href: "/guitar-chord-chart/" }, { label: "By note" }]}
+    art={art}
+  >
+    <a class="ch-btn" href="/guitar-chord-chart/">Guitar chord chart <svg width="16" height="16" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M3 7h8M7 3l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg></a>
+    <a class="ch-btn is-ghost" href="/learn/beginner-guitar-chords/">The first guitar chords to learn</a>
+  </ChHero>
   <ChordNav instrument="guitar" easy={false} here="note" />
   <section class="ch-in ch-sec">
+    <span class="ch-kicker" data-reveal>Twelve notes</span>
+    <h2 data-reveal style="--i: 1">Press a key</h2>
+    <div data-reveal style="--i: 2"><NoteKeys instrument="guitar" /></div>
+  </section>
+  <section class="ch-in ch-sec">
+    <span class="ch-kicker" data-reveal>Or choose from the list</span>
+    <h2 data-reveal style="--i: 1">Every note</h2>
     <div class="ch-links">
       {
-        ROOTS.map((r) => (
-          <a class="ch-link" href={notePath("guitar", r)}>
+        ROOTS.map((r, i) => (
+          <a class="ch-link" href={notePath("guitar", r)} data-reveal style={`--i: ${i % 8}`}>
+            <span class="ch-num">{r.short}</span>
             <strong>{r.label} chords</strong>
             <span>{sample.map((k) => chordLabel(r, k)).join(" · ")} and 22 more</span>
+            <em class="ch-go" style="font-style: normal">See every {r.short} chord</em>
           </a>
         ))
       }
     </div>
   </section>
-  <section class="ch-in ch-cta">
-    <h2>Find the chords of a song</h2>
-    <p>Paste a YouTube link or search for a song: every chord is drawn for guitar, on the beat.</p>
-    <a class="ch-btn" href="/#find">Find chords for a song</a>
-    <a class="ch-btn is-ghost" href="/learn/beginner-guitar-chords/">The first guitar chords to learn</a>
-  </section>
+  <div class="ch-in ch-cta-wrap">
+    <div class="ch-cta-in" data-reveal>
+      <h2>Find the chords of a song</h2>
+      <p>Paste a YouTube link or search for a song: every chord is drawn for guitar, on the beat.</p>
+      <a class="ch-btn" href="/#find">Find chords for a song</a>
+    </div>
+  </div>
 </ChordShell>

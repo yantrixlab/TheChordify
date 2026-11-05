@@ -6,6 +6,8 @@ import { isBlackKey, midiName, type PianoVoicing } from "./chordShapes";
 interface Options {
   /** Size multiplier (1 is about 160 px wide for two octaves). */
   scale?: number;
+  /** What the drawing is, for people who cannot see it. */
+  title?: string;
   /** Colours, so a page on a dark background can restyle it. */
   white?: string;
   black?: string;
@@ -81,5 +83,5 @@ export function pianoSvg(voicing: PianoVoicing, options: Options = {}): string {
     return k.on ? `${rect}<text x="${k.x + k.w / 2}" y="${k.h - 5}" font-size="6.4" font-weight="800" fill="${ink}" text-anchor="middle" font-family="inherit">${k.label}</text>` : rect;
   });
   const names = voicing.notes.map(midiName).join(", ");
-  return `<svg viewBox="0 0 ${width} ${height}" width="${Math.round(width * scale)}" height="${Math.round(height * scale)}" role="img" aria-label="Piano keys: ${names}" xmlns="http://www.w3.org/2000/svg">${parts.join("")}</svg>`;
+  return `<svg viewBox="0 0 ${width} ${height}" width="${Math.round(width * scale)}" height="${Math.round(height * scale)}" role="img" aria-label="${(options.title ? options.title + ": " : "Piano keys: ") + names}" xmlns="http://www.w3.org/2000/svg">${parts.join("")}</svg>`;
 }

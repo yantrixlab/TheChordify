@@ -13,6 +13,8 @@ interface Options {
   line?: string;
   /** Colour of the finger numbers on the dots. */
   label?: string;
+  /** What the drawing is, for people who cannot see it ("C major on guitar"). */
+  title?: string;
 }
 
 const ROWS = 5;
@@ -62,5 +64,5 @@ export function diagramSvg(shape: GuitarShape, options: Options = {}): string {
     parts.push(`<circle cx="${x(p.string)}" cy="${cy}" r="6" fill="${dot}"/>`);
     if (p.finger) parts.push(`<text x="${x(p.string)}" y="${cy + 3.5}" font-size="9.5" font-weight="700" fill="${label}" text-anchor="middle" font-family="inherit">${p.finger}</text>`);
   }
-  return `<svg viewBox="0 0 120 138" role="img" aria-label="Chord diagram" xmlns="http://www.w3.org/2000/svg">${parts.join("")}</svg>`;
+  return `<svg viewBox="0 0 120 138" role="img" aria-label="${(options.title ?? "Chord diagram").replace(/"/g, "")}" xmlns="http://www.w3.org/2000/svg">${parts.join("")}</svg>`;
 }

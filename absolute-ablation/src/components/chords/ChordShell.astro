@@ -1,5 +1,6 @@
 ---
-// The frame of a chart, hub or lesson page: the site's header and footer around a main area, and the shared styles.
+// The frame of a chart, hub or lesson page: the site's header and footer around a main area, the shared styles, and the small script that
+// makes things appear as they are scrolled to, counts the numbers up, and (on a lesson) draws the reading progress.
 import Layout from "../../layouts/Layout.astro";
 import Nav from "../Nav.astro";
 import Footer from "../Footer.astro";
@@ -14,9 +15,90 @@ const { title, description, jsonLd = [] } = Astro.props;
 ---
 
 <Layout title={title} description={description} jsonLd={jsonLd}>
+  <script is:inline>document.documentElement.classList.add("ch-js");</script>
   <Nav />
   <main id="main-content" class="ch">
     <slot />
   </main>
   <Footer />
 </Layout>
+
+<script>
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // things appear as they are scrolled to, one after another (--i sets the order); without the observer, or for reduced motion, all show at once
+  const revealed = document.querySelectorAll<HTMLElement>("[data-reveal]");
+  if (reduce || !("IntersectionObserver" in window)) {
+    revealed.forEach((el) => el.classList.add("is-in"));
+  } else {
+    const watch = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          entry.target.classList.add("is-in");
+          watch.unobserve(entry.target);
+        }
+      },
+      { rootMargin: "0px 0px -6% 0px", threshold: 0.06 },
+    );
+    revealed.forEach((el) => watch.observe(el));
+  }
+
+  // numbers count up the first time they are seen
+  const counters = document.querySelectorAll<HTMLElement>("[data-count]");
+  const count = (el: HTMLElement) => {
+    const target = Number(el.dataset.count);
+    if (reduce || !Number.isFinite(target)) return;
+    const start = performance.now();
+    const length = 1100;
+    const step = (now: number) => {
+      const t = Math.min(1, (now - start) / length);
+      el.textContent = String(Math.round(target * (1 - Math.pow(1 - t, 3))));
+      if (t < 1) requestAnimationFrame(step);
+    };
+    el.textContent = "0";
+    requestAnimationFrame(step);
+  };
+  if ("IntersectionObserver" in window) {
+    const seen = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        count(entry.target as HTMLElement);
+        seen.unobserve(entry.target);
+      }
+    });
+    counters.forEach((el) => seen.observe(el));
+  }
+
+  // a lesson: the bar across the top fills as it is read, and the contents list follows the section on screen
+  const bar = document.getElementById("ls-bar");
+  if (bar && !reduce) {
+    let queued = false;
+    const draw = () => {
+      queued = false;
+      const room = document.documentElement.scrollHeight - innerHeight;
+      bar.style.transform = `scaleX(${room > 0 ? Math.min(1, scrollY / room) : 0})`;
+    };
+    addEventListener("scroll", () => {
+      if (!queued) {
+        queued = true;
+        requestAnimationFrame(draw);
+      }
+    }, { passive: true });
+    draw();
+  }
+  const links = [...document.querySelectorAll<HTMLAnchorElement>(".ls-toc a")];
+  if (links.length && "IntersectionObserver" in window) {
+    const heads = links.map((a) => document.getElementById(a.hash.slice(1))).filter(Boolean) as HTMLElement[];
+    const follow = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          links.forEach((a) => a.classList.toggle("is-on", a.hash === `#${entry.target.id}`));
+        }
+      },
+      { rootMargin: "-20% 0px -70% 0px" },
+    );
+    heads.forEach((h) => follow.observe(h));
+  }
+</script>

@@ -42,10 +42,10 @@ function fretLabel(shape: GuitarShape, index: number): string {
 export function voicingsFor(instrument: InstrumentKey, chord: string, max: number): Voicing[] {
   const drawing = chordDrawing(instrument, chord);
   if (drawing.kind === "keys") {
-    return drawing.voicings.slice(0, max).map((v) => ({ svg: pianoSvg(v, { scale: 1 }), label: v.name, easy: v.notes.length <= 3 }));
+    return drawing.voicings.slice(0, max).map((v) => ({ svg: pianoSvg(v, { scale: 1, title: `${chord.replace("#", "♯")} on piano, ${v.name.toLowerCase()}` }), label: v.name, easy: v.notes.length <= 3 }));
   }
   return drawing.shapes.slice(0, max).map((shape, i) => ({
-    svg: diagramSvg(shape),
+    svg: diagramSvg(shape, { title: `${chord.replace("#", "♯")} on ${instrument}${i === 0 ? "" : ", way " + (i + 1)}` }),
     label: fretLabel(shape, i),
     easy: isEasy(shape),
     frets: shape.frets.join(" "),
