@@ -34,8 +34,19 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
     </section>
 
     <section class="adm-card" aria-labelledby="h-badges">
-      <h2 id="h-badges">Badges</h2>
+      <div class="rw-head">
+        <h2 id="h-badges">Badges</h2>
+        <div class="rw-tools">
+          <button id="import-badges" type="button" class="adm-btn ghost small">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 19h16" /></svg>
+            Import from Excel
+          </button>
+          <input id="import-file" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden />
+        </div>
+      </div>
       <p class="adm-hint">Won once, when a number reaches its target. A badge can also pay bonus XP. The code is its permanent name: changing it makes the badge new to everybody.</p>
+      <p class="adm-hint" style="margin-top:6px">Import reads an .xlsx file with the columns <strong>Target, Icon, Name, Reach, Bonus XP, Code, Description</strong> (the sheet called Badges, or the first sheet). A badge whose code is already here is updated; the others are added; none are removed. Nothing is saved until you press Save changes.</p>
+      <div id="import-report" class="rw-report" role="status" hidden></div>
       <div id="badges" class="rw-rows"></div>
       <button id="add-badge" type="button" class="adm-btn ghost small">+ Add a badge</button>
     </section>
@@ -66,6 +77,15 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
   .rw-f.narrow { flex: 0 1 96px; }
   .rw-f.wide { flex: 2 1 240px; }
   .rw-f input[type="color"] { height: 42px; padding: 3px; }
+  .rw-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; }
+  .rw-head h2 { margin: 0 0 4px; }
+  .rw-tools .adm-btn { display: inline-flex; align-items: center; gap: 7px; }
+  .rw-report { margin: 12px 0 0; padding: 12px 14px; border-radius: 12px; background: #ecfdf5; color: #065f46; font-size: 13.5px; line-height: 1.55; }
+  .rw-report.is-warn { background: #fef3c7; color: #92400e; }
+  .rw-report.is-bad { background: #fef2f2; color: #991b1b; }
+  .rw-report[hidden] { display: none; }
+  .rw-report ul { margin: 6px 0 0; padding-left: 20px; list-style: disc; }
+  .rw-row.is-imported { margin: 0 -10px; padding-left: 10px; padding-right: 10px; border-radius: 10px; background: #f6f1ff; }
   .rw-note { align-self: center; font-size: 12.5px; color: var(--color-mute); white-space: nowrap; }
   .rw-save { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px; margin: 8px -12px 0; padding: 14px 12px; background: linear-gradient(180deg, #f7f3fd00, #f7f3fd 30%); }
   .rw-save .adm-msg { flex: 1 1 200px; margin: 0; }
@@ -74,6 +94,7 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
 
 <script>
   import { adminReady, adminFetch, el, say, number } from "../../lib/admin";
+  import { readXlsx } from "../../lib/xlsx";
 
   const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 
@@ -136,7 +157,7 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
   function listEditor(host: HTMLElement, items: Item[], fields: Field[], blank: () => Item, notes?: (item: Item) => string) {
     const rows = host;
     const add = (item: Item) => {
-      const row = el("div", "rw-row");
+      const row = el("div", item._imported ? "rw-row is-imported" : "rw-row");
       fields.forEach((f) => row.append(field(f, item[f.key])));
       if (notes) row.append(el("span", "rw-note", notes(item)));
       const remove = el("button", "adm-btn danger small", "Remove");
@@ -185,6 +206,8 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
     { key: "id", label: "Id", cls: "narrow", max: 40 },
   ];
 
+  const badgeBlank = () => ({ icon: "🏅", name: "", rule: "plays", threshold: 10, bonusXp: 0, description: "", code: "" });
+  const badgeNote = (b: Item) => (b.code in badgeCounts ? `Won by ${number(badgeCounts[b.code])}` : "Not won yet");
   let titles: ReturnType<typeof listEditor>;
   let badges: ReturnType<typeof listEditor>;
   let rewards: ReturnType<typeof listEditor>;
@@ -237,8 +260,133 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
       { key: "description", label: "Description", cls: "wide", max: 120 },
       { key: "code", label: "Code", cls: "narrow", max: 40 },
     ];
-    badges = listEditor($("badges"), config.badges, BADGE_FIELDS, () => ({ icon: "🏅", name: "", rule: "plays", threshold: 10, bonusXp: 0, description: "", code: "" }), (b) => (b.code in badgeCounts ? `Won by ${number(badgeCounts[b.code])}` : "Not won yet"));
+    $("import-report").hidden = true;
+    badges = listEditor($("badges"), config.badges, BADGE_FIELDS, badgeBlank, badgeNote);
     rewards = listEditor($("rewards"), config.rewards, REWARD_FIELDS(), () => ({ name: "", level: 5, repeatEvery: 0, kind: "ring", value: "#f59e0b", description: "", id: "" }));
+  }
+
+  // ---- import badges from an Excel file -------------------------------------------------------------------------------
+
+  const CODE = /^[a-z0-9][a-z0-9_-]{0,39}$/;
+  const slug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40);
+  const plain = (text: string) => text.toLowerCase().replace(/\s+/g, " ").trim();
+  const whole = (text: string) => {
+    const n = Number(text.replace(/[,\s_]/g, ""));
+    return Number.isInteger(n) ? n : NaN;
+  };
+
+  /** Which badge rule a "Target" cell means: the rule's own name, its key ("plays"), or its label with or without the part in brackets. */
+  function ruleOf(cell: string): string | null {
+    const want = plain(cell);
+    if (!want) return null;
+    for (const [key, label] of Object.entries(rules)) {
+      if ([key, label, label.replace(/\s*\(.*\)\s*$/, "")].some((alias) => plain(alias) === want)) return key;
+    }
+    return null;
+  }
+
+  const COLUMNS: Record<string, string[]> = {
+    rule: ["target", "rule"],
+    icon: ["icon", "emoji"],
+    name: ["name", "badge", "badge name"],
+    threshold: ["reach", "threshold"],
+    bonusXp: ["bonus xp", "bonusxp", "bonus"],
+    code: ["code", "id"],
+    description: ["description", "details"],
+  };
+
+  /** Turns the rows of a sheet into badges, and says what was wrong with the rows that cannot be used. */
+  function badgesFromRows(rows: string[][]): { found: Item[]; problems: string[]; header: boolean } {
+    const headerAt = rows.findIndex((r) => {
+      const names = r.map(plain);
+      return COLUMNS.name.some((n) => names.includes(n)) && COLUMNS.threshold.some((n) => names.includes(n));
+    });
+    if (headerAt < 0) return { found: [], problems: [], header: false };
+    const names = rows[headerAt].map(plain);
+    const at: Record<string, number> = {};
+    for (const [key, aliases] of Object.entries(COLUMNS)) at[key] = names.findIndex((n) => aliases.includes(n));
+    if (at.rule < 0) return { found: [], problems: ["The sheet has no Target column."], header: true };
+
+    const found: Item[] = [];
+    const problems: string[] = [];
+    const cell = (row: string[], key: string) => (at[key] >= 0 ? String(row[at[key]] ?? "").trim() : "");
+    rows.slice(headerAt + 1).forEach((row, i) => {
+      const name = cell(row, "name");
+      if (!name) return; // a blank line, or the totals and notes under the table
+      const line = headerAt + 2 + i;
+      const rule = ruleOf(cell(row, "rule"));
+      const threshold = whole(cell(row, "threshold"));
+      const bonus = cell(row, "bonusXp") === "" ? 0 : whole(cell(row, "bonusXp"));
+      const code = (cell(row, "code") || slug(name)).toLowerCase();
+      const why = !rule
+        ? `its target “${cell(row, "rule")}” is not one of: ${Object.values(rules).join(", ")}`
+        : !(threshold >= 1 && threshold <= 10_000_000)
+          ? "Reach must be a whole number from 1 to 10,000,000"
+          : !(bonus >= 0 && bonus <= 100_000)
+            ? "Bonus XP must be a whole number from 0 to 100,000"
+            : !CODE.test(code)
+              ? `the code “${code}” can only use lowercase letters, numbers, - and _`
+              : found.some((f) => f.code === code)
+                ? `the code “${code}” is used twice in the file`
+                : "";
+      if (why) problems.push(`Row ${line} (${name}): ${why}.`);
+      else found.push({ icon: cell(row, "icon").slice(0, 8) || "🏅", name: name.slice(0, 40), rule, threshold, bonusXp: bonus, description: cell(row, "description").slice(0, 120), code });
+    });
+    return { found, problems, header: true };
+  }
+
+  function report(kind: "" | "is-warn" | "is-bad", text: string, problems: string[] = []) {
+    const box = $("import-report");
+    box.className = `rw-report ${kind}`.trim();
+    box.replaceChildren(text);
+    if (problems.length) {
+      const list = el("ul");
+      list.append(...problems.slice(0, 12).map((p) => el("li", "", p)));
+      if (problems.length > 12) list.append(el("li", "", `… and ${problems.length - 12} more.`));
+      box.append(list);
+    }
+    box.hidden = false;
+  }
+
+  async function importBadges(file: File) {
+    try {
+      const sheets = await readXlsx(file);
+      const sheet = sheets.find((s) => plain(s.name) === "badges") ?? sheets[0];
+      const { found, problems, header } = sheet ? badgesFromRows(sheet.rows) : { found: [], problems: [], header: false };
+      if (!found.length) {
+        report("is-bad", header ? "No badges could be read from this file." : "This sheet has no header row with Name and Reach columns, so nothing was imported.", problems);
+        return;
+      }
+      // merge by code: a badge already here is updated, the rest are added at the end, and none are removed
+      const current: Item[] = badges.collect().map((b) => ({ ...b, code: b.code || slug(String(b.name)) }));
+      const byCode = new Map(current.map((b, i) => [b.code, i]));
+      let updated = 0;
+      for (const badge of found) {
+        const i = byCode.get(badge.code);
+        if (i === undefined) {
+          byCode.set(badge.code, current.length);
+          current.push({ ...badge, _imported: true });
+        } else {
+          current[i] = { ...badge, _imported: true };
+          updated++;
+        }
+      }
+      if (current.length > 80) {
+        report("is-bad", `That would make ${current.length} badges, and 80 is the most. Nothing was imported; remove some badges first.`);
+        return;
+      }
+      badges = listEditor($("badges"), current, BADGE_FIELDS, badgeBlank, badgeNote);
+      const skipped = problems.length ? ` ${problems.length} row${problems.length === 1 ? " was" : "s were"} skipped.` : "";
+      report(
+        problems.length ? "is-warn" : "",
+        `Read ${found.length} badge${found.length === 1 ? "" : "s"} from “${file.name}”: ${found.length - updated} new, ${updated} updated (highlighted below).${skipped} Nothing is saved yet: check them, then press Save changes.`,
+        problems,
+      );
+      say("msg", "Imported, not saved yet.", "");
+      $("import-report").scrollIntoView({ block: "center" });
+    } catch (err) {
+      report("is-bad", err instanceof Error ? err.message : "Could not read that file.");
+    }
   }
 
   function collect(): Item {
@@ -269,6 +417,13 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
 
   $("add-title").addEventListener("click", () => titles.add());
   $("add-badge").addEventListener("click", () => badges.add());
+  $("import-badges").addEventListener("click", () => $<HTMLInputElement>("import-file").click());
+  $("import-file").addEventListener("change", (event) => {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = ""; // so the same file can be chosen again
+    if (file) void importBadges(file);
+  });
   $("add-reward").addEventListener("click", () => rewards.add());
   $("discard").addEventListener("click", () => {
     load();
