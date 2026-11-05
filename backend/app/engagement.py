@@ -458,6 +458,29 @@ class Engagement:
             "previousLevel": before["level"], **after,
         }
 
+    def clear_history(self, user_id: str) -> int:
+        """Forgets what the person has played: songs they only played are removed from the library, favourites stay but lose their play
+        counts. XP, level, streak and badges are kept. Returns how many songs were removed."""
+        removed, _ = self._db.run("SELECT COUNT(*) AS n FROM library_items WHERE user_id = ? AND favorite = 0", (user_id,))
+        self._db.run("DELETE FROM library_items WHERE user_id = ? AND favorite = 0", (user_id,))
+        self._db.run("UPDATE library_items SET plays = 0, first_played_at = 0, last_played_at = 0 WHERE user_id = ?", (user_id,))
+        return int(removed[0]["n"])
+
+    def export_user(self, user_id: str) -> dict:
+        """Everything the library holds about a person, for them to download."""
+        rows, _ = self._db.run("SELECT * FROM library_items WHERE user_id = ? ORDER BY last_played_at DESC", (user_id,))
+        badges, _ = self._db.run("SELECT code, earned_at FROM user_badges WHERE user_id = ?", (user_id,))
+        snap = self.snapshot(user_id)
+        return {
+            "progress": {k: snap[k] for k in ("xp", "level", "title", "streak", "bestStreak")},
+            "badges": [{"code": b["code"], "earnedAt": b["earned_at"]} for b in badges],
+            "library": [
+                {"songId": r["session_id"], "youtubeId": r["video_id"] or None, "title": r["title"], "artist": r["artist"], "plays": r["plays"],
+                 "favorite": bool(r["favorite"]), "firstPlayedAt": r["first_played_at"] or None, "lastPlayedAt": r["last_played_at"] or None}
+                for r in rows
+            ],
+        }
+
     def delete_user(self, user_id: str) -> list[str]:
         """Removes a person's library, favourites, XP, streak and badges. Returns the songs they uploaded that nobody else has in a
         library, whose audio and results can go with them."""

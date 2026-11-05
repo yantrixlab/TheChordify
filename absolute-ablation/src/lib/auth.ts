@@ -11,6 +11,9 @@ export interface AuthUser {
   plan: string; // the plan code ("free", "premium"...)
   planName?: string;
   instrument?: string; // the instrument they show chords for ("" until chosen)
+  settings?: { easyChords: boolean; lite: boolean; theme: "system" | "light" | "dark" }; // what they chose in Settings, kept on the account
+  settingsSaved?: string[]; // which of those they have set (the rest are the defaults, so a choice made before signing in is kept)
+  memberSince?: number; // when the account was made (seconds since 1970)
   isAdmin: boolean;
   level?: number; // from the library: where they stand, for the menu
   title?: string;

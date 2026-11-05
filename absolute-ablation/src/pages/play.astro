@@ -1068,6 +1068,12 @@ import SongRating from "../components/SongRating.astro";
   } catch {
     // no storage: only the first check applies
   }
+  // Performance mode is a setting (on the device and the account): signing in, or changing it in Settings, changes it here too
+  window.addEventListener("settings-change", (event) => {
+    const chosen = !!(event as CustomEvent<{ lite: boolean }>).detail?.lite;
+    const modest = (navigator.hardwareConcurrency || 8) <= 4 || ((navigator as any).deviceMemory ?? 8) <= 3;
+    setLite(chosen || modest);
+  });
   const LEAD_CELLS = 8; // empty cells before the silent bar, so the playing beat can sit a quarter in from the very start
   let SILENT_CELLS = 4; // the silent bar before the song: blank cells and a rest sign, one bar long
   const TAIL_CELLS = 30; // empty cells after the last beat, so the strip can scroll the last beat into place

@@ -266,6 +266,25 @@ section[id], [id] {
   scroll-margin-top: 80px;
 }
 
+/* ── Dark theme ──
+   Only on a page that has opted in (Layout themeable: <html data-themeable>), where the early script sets data-theme="dark" from the
+   person's choice in Settings. The site's colour tokens are redefined, so what uses them (the header, the footer, text, borders) follows. */
+html[data-theme="dark"] {
+  --color-canvas: #140a24;
+  --color-canvas-soft: #1a0f2e;
+  --color-canvas-soft-2: #261741;
+  --color-ink: #f4effc;
+  --color-body: #cbbfe5;
+  --color-mute: #a99cc9;
+  --color-hairline: #33224f;
+  --color-hairline-strong: #4d3875;
+  --color-violet-soft: #2c1b4d;
+  --color-violet-deep: #c4b5fd;
+  --color-accent-soft: #3a2a0b;
+}
+html[data-theme="dark"] body { background: var(--color-canvas); color: var(--color-body); }
+html[data-theme="dark"] .nav-blur { background: rgba(20, 10, 36, 0.82); }
+
 /* ── Nav ── */
 .nav-blur {
   backdrop-filter: blur(12px) saturate(150%);

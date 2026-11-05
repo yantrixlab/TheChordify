@@ -1,0 +1,724 @@
+---
+// Settings: the account, the chords and the player, how the site looks, the plan, privacy and data, and (last, set apart) deleting the account.
+// Everything is made in the browser from the signed-in person; a choice is applied and kept on the device at once, and sent to the account.
+import Layout from "../layouts/Layout.astro";
+import Nav from "../components/Nav.astro";
+import Footer from "../components/Footer.astro";
+import { business } from "../lib/business";
+
+const sections = [
+  { id: "profile", label: "Profile", icon: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/>' },
+  { id: "chords", label: "Chords & player", icon: '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>' },
+  { id: "appearance", label: "Appearance", icon: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>' },
+  { id: "plan", label: "Plan & billing", icon: '<rect x="2" y="5" width="20" height="14" rx="3"/><path d="M2 10h20"/>' },
+  { id: "privacy", label: "Privacy & data", icon: '<path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6z"/><path d="m9 12 2 2 4-4"/>' },
+  { id: "danger", label: "Delete account", icon: '<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v5M14 11v5"/>' },
+];
+---
+
+<Layout title="Settings — Chord Suno" description="Your account, chords, appearance, plan and privacy settings on Chord Suno." noindex themeable>
+  <Nav />
+  <main id="main-content" class="st">
+    <header class="st-hero">
+      <div class="st-orb st-orb-a" aria-hidden="true"></div>
+      <div class="st-orb st-orb-b" aria-hidden="true"></div>
+      <div class="st-in">
+        <p class="st-eyebrow"><i aria-hidden="true"></i>Settings</p>
+        <div id="st-who" class="st-who" hidden>
+          <span id="st-avatar" class="st-avatar"></span>
+          <div class="st-who-text">
+            <h1 id="st-name">Your settings</h1>
+            <p id="st-meta" class="st-meta"></p>
+          </div>
+        </div>
+        <h1 id="st-title" class="st-title">Make Chord Suno <span class="st-grad">yours</span></h1>
+        <p id="st-lead" class="st-lead">Your instrument, how the site looks, your plan and your data, in one place.</p>
+      </div>
+    </header>
+
+    <div class="st-in st-bodywrap">
+      <section id="st-gate" class="st-gate" hidden>
+        <div class="st-gate-mark" aria-hidden="true">⚙️</div>
+        <h2>Sign in to change your settings</h2>
+        <p>Your choices are saved on your account, so they follow you to every browser and to the app.</p>
+        <button id="st-signin" type="button" class="st-btn">Continue with Google</button>
+      </section>
+
+      <div id="st-app" class="st-layout" hidden>
+        <nav class="st-nav" id="st-nav" aria-label="Settings sections">
+          <div class="st-nav-in">
+            {
+              sections.map((s) => (
+                <a href={`#${s.id}`} class={`st-nav-link${s.id === "danger" ? " is-danger" : ""}`} data-for={s.id}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" set:html={s.icon} />
+                  <span>{s.label}</span>
+                </a>
+              ))
+            }
+          </div>
+        </nav>
+
+        <div class="st-main">
+          <!-- Profile -->
+          <section class="st-card" id="profile" aria-labelledby="h-profile">
+            <div class="st-card-head">
+              <h2 id="h-profile">Profile</h2>
+              <p>Your name, email and picture come from your Google account.</p>
+            </div>
+            <dl class="st-list">
+              <div class="st-row"><dt>Name</dt><dd id="p-name">—</dd></div>
+              <div class="st-row"><dt>Email</dt><dd id="p-email">—</dd></div>
+              <div class="st-row"><dt>Member since</dt><dd id="p-since">—</dd></div>
+              <div class="st-row"><dt>Level</dt><dd id="p-level">—</dd></div>
+            </dl>
+            <div class="st-actions">
+              <a class="st-btn ghost" href="/library/">Open my library</a>
+              <button id="st-signout" class="st-btn ghost" type="button">Sign out</button>
+            </div>
+          </section>
+
+          <!-- Chords and the player -->
+          <section class="st-card" id="chords" aria-labelledby="h-chords">
+            <div class="st-card-head">
+              <h2 id="h-chords">Chords &amp; player</h2>
+              <p>How chords are shown on the charts, in the player and in the app.</p>
+            </div>
+            <div class="st-list">
+              <div class="st-row is-stack">
+                <div class="st-label"><strong id="l-instrument">Instrument</strong><span>The diagrams you see everywhere. Piano, ukulele and mandolin come with some plans.</span></div>
+                <div class="st-seg" id="st-instrument" role="radiogroup" aria-labelledby="l-instrument"></div>
+              </div>
+              <div class="st-row">
+                <div class="st-label"><strong id="l-easy">Easy chords only</strong><span>On the chord charts, hide the shapes that need a barre or sit high on the neck.</span></div>
+                <label class="st-switch"><input type="checkbox" role="switch" id="st-easy" aria-labelledby="l-easy" /><i aria-hidden="true"></i></label>
+              </div>
+              <div class="st-row">
+                <div class="st-label"><strong id="l-lite">Performance mode</strong><span>Turns off animations and effects in the player. It helps on older phones and slower computers.</span></div>
+                <label class="st-switch"><input type="checkbox" role="switch" id="st-lite" aria-labelledby="l-lite" /><i aria-hidden="true"></i></label>
+              </div>
+              <div class="st-row">
+                <div class="st-label"><strong>Chord shapes</strong><span>You can pick another way to play a chord in the player. This goes back to the usual shape for every chord.</span></div>
+                <button id="st-voicings" class="st-btn ghost small" type="button">Reset my shapes</button>
+              </div>
+            </div>
+          </section>
+
+          <!-- Appearance -->
+          <section class="st-card" id="appearance" aria-labelledby="h-appearance">
+            <div class="st-card-head">
+              <h2 id="h-appearance">Appearance</h2>
+              <p>Choose how Chord Suno looks. “System” follows your device.</p>
+            </div>
+            <div class="st-themes" id="st-theme" role="radiogroup" aria-label="Theme">
+              {
+                (["system", "light", "dark"] as const).map((t) => (
+                  <button type="button" class="st-theme" role="radio" aria-checked="false" data-theme-pick={t}>
+                    <span class={`st-prev is-${t}`} aria-hidden="true">
+                      <b></b><b></b><b></b>
+                    </span>
+                    <strong>{t === "system" ? "System" : t === "light" ? "Light" : "Dark"}</strong>
+                  </button>
+                ))
+              }
+            </div>
+            <p class="st-fine">Dark is on this page now and is coming to the rest of the site; the other pages stay light until then.</p>
+          </section>
+
+          <!-- Plan -->
+          <section class="st-card" id="plan" aria-labelledby="h-plan">
+            <div class="st-card-head">
+              <h2 id="h-plan">Plan &amp; billing</h2>
+              <p>What you are on, and when it renews.</p>
+            </div>
+            <div class="st-plan" id="st-plan-box">
+              <div class="st-plan-main">
+                <span class="st-plan-name" id="pl-name">…</span>
+                <span class="st-plan-note" id="pl-note"></span>
+              </div>
+              <div class="st-actions" id="pl-actions"></div>
+            </div>
+            <p class="st-fine" id="pl-fine" hidden></p>
+          </section>
+
+          <!-- Privacy and data -->
+          <section class="st-card" id="privacy" aria-labelledby="h-privacy">
+            <div class="st-card-head">
+              <h2 id="h-privacy">Privacy &amp; data</h2>
+              <p>Take a copy of your data, tidy it up, and control where you are signed in.</p>
+            </div>
+            <div class="st-list">
+              <div class="st-row">
+                <div class="st-label"><strong>Download my data</strong><span>Your account, plan, settings, library and progress, as one file.</span></div>
+                <button id="st-export" class="st-btn ghost small" type="button">Download</button>
+              </div>
+              <div class="st-row">
+                <div class="st-label"><strong>Clear my play history</strong><span>Removes the songs you have played from your library. Favourites stay; your XP, level and badges are kept.</span></div>
+                <div class="st-confirm">
+                  <button id="st-clear" class="st-btn ghost small" type="button">Clear history</button>
+                  <span id="st-clear-ask" hidden><button id="st-clear-yes" class="st-btn danger small" type="button">Yes, clear it</button> <button id="st-clear-no" class="st-btn ghost small" type="button">Cancel</button></span>
+                </div>
+              </div>
+              <div class="st-row">
+                <div class="st-label"><strong>Where you are signed in</strong><span id="st-sessions">Checking…</span></div>
+                <button id="st-others" class="st-btn ghost small" type="button" hidden>Sign out everywhere else</button>
+              </div>
+            </div>
+            <p class="st-fine">How we handle your data is in the <a href="/privacy/">Privacy Policy</a> and the <a href="/terms/">Terms of Service</a>.</p>
+          </section>
+
+          <!-- Danger -->
+          <section class="st-card is-danger" id="danger" aria-labelledby="h-danger">
+            <div class="st-card-head">
+              <h2 id="h-danger">Delete account</h2>
+              <p>Permanent. Your account, library, progress, ratings and uploads are deleted, and a paid plan is cancelled at once, without a refund. Records of payments are kept without your name or email, as the law requires.</p>
+            </div>
+            <div class="st-del" id="st-del">
+              <button id="st-del-open" class="st-btn danger" type="button">Delete my account…</button>
+              <div id="st-del-form" hidden>
+                <label class="st-check"><input id="st-del-sure" type="checkbox" /> <span>I understand that this cannot be undone.</span></label>
+                <label class="st-type"><span>Type <b>DELETE</b> to confirm</span><input id="st-del-type" type="text" autocomplete="off" spellcheck="false" placeholder="DELETE" /></label>
+                <div class="st-actions">
+                  <button id="st-del-go" class="st-btn danger" type="button" disabled>Delete my account for good</button>
+                  <button id="st-del-cancel" class="st-btn ghost" type="button">Keep my account</button>
+                </div>
+              </div>
+              <p id="st-del-error" class="st-error" role="alert" hidden></p>
+            </div>
+            <p class="st-fine">Cannot sign in? Write to <a href={`mailto:${business.email}`}>{business.email}</a> from your account's email. More is on the <a href="/delete-account/">delete account page</a>.</p>
+          </section>
+        </div>
+      </div>
+    </div>
+    <p id="st-saved" class="st-saved" role="status" aria-live="polite"></p>
+  </main>
+  <Footer />
+</Layout>
+
+<style is:global>
+  .st {
+    --st-bg: #f7f4fd; --st-card: #ffffff; --st-soft: #f3eeff; --st-line: #e8dff5; --st-ink: #0d001f; --st-body: #4a3d6a; --st-mute: #6b5f8a;
+    --st-violet: #7c3aed; --st-deep: #5b21b6; --st-amber: #f59e0b; --st-red: #dc2626; --st-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+    background: var(--st-bg); color: var(--st-body); min-height: 100vh;
+  }
+  html[data-theme="dark"] .st {
+    --st-bg: #0f0720; --st-card: #1a0f2e; --st-soft: #2a1a4a; --st-line: #33224f; --st-ink: #f4effc; --st-body: #c9bde3; --st-mute: #a99cc9; --st-deep: #c4b5fd;
+  }
+  html[data-theme="dark"] .st-card.is-danger { border-color: #6b2330; background: linear-gradient(180deg, #2a1018, var(--st-card) 60%); }
+  html[data-theme="dark"] .st-card.is-danger .st-card-head h2, html[data-theme="dark"] .st-nav-link.is-danger { color: #fca5a5 !important; }
+  html[data-theme="dark"] .st-switch i { background: #3d2b63; }
+  html[data-theme="dark"] .st-btn.ghost:hover:not(:disabled) { background: #3a2663; }
+  html[data-theme="dark"] .st-opt .lock { background: #3a2a0b; color: #fcd34d; }
+  html[data-theme="dark"] .st-error { background: #3a1218; }
+  html[data-theme="dark"] .st-nav-link:hover { background: #2a1a4a; }
+  html[data-theme="dark"] .st-nav-link.is-on, html[data-theme="dark"] .st-nav-link.is-on svg { color: #fff !important; }
+  html[data-theme="dark"] .st-nav-in { box-shadow: 0 24px 40px -32px #000; }
+  .st [hidden] { display: none !important; }
+  .st :focus-visible { outline: 3px solid var(--st-amber); outline-offset: 3px; border-radius: 8px; }
+  .st a { color: var(--st-deep); }
+  .st-in { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+
+  /* hero: dark, up under the fixed header */
+  .st-hero { position: relative; isolation: isolate; overflow: hidden; color: #fff; padding: 112px 0 72px;
+    background: radial-gradient(900px 480px at 85% -10%, #5b21b6, transparent 62%), radial-gradient(620px 420px at -4% 120%, #7a2e0b88, transparent 58%), linear-gradient(180deg, #1a0533, #0d0019); }
+  .st-orb { position: absolute; z-index: -1; border-radius: 50%; filter: blur(70px); pointer-events: none; }
+  .st-orb-a { width: 340px; height: 340px; right: 8%; top: 0; background: #7c3aed; opacity: 0.4; animation: st-drift 16s ease-in-out infinite alternate; }
+  .st-orb-b { width: 260px; height: 260px; left: 6%; bottom: -10%; background: #f59e0b; opacity: 0.18; animation: st-drift 20s ease-in-out infinite alternate-reverse; }
+  @keyframes st-drift { to { transform: translate3d(-40px, 30px, 0) scale(1.1); } }
+  .st-eyebrow { display: inline-flex; align-items: center; gap: 9px; margin: 0 0 18px; padding: 6px 14px 6px 10px; border-radius: 999px; background: #ffffff14; border: 1px solid #ffffff22; font: 700 11.5px var(--font-mono); letter-spacing: 0.12em; text-transform: uppercase; color: #ffffffd9; }
+  .st-eyebrow i { width: 8px; height: 8px; border-radius: 50%; background: var(--st-amber); }
+  .st-title { margin: 0 0 12px; font-size: clamp(32px, 5vw, 52px); font-weight: 800; line-height: 1.05; letter-spacing: -0.04em; color: #fff; }
+  .st-grad { background: linear-gradient(100deg, #fcd34d, #fb923c 45%, #f472b6 80%, #c4b5fd); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .st-lead { margin: 0; max-width: 560px; font-size: 17px; line-height: 1.6; color: #ffffffc7; }
+  .st.is-in .st-title, .st.is-in .st-lead { display: none; }
+  .st-who { display: flex; align-items: center; gap: 20px; }
+  .st-avatar { flex: none; --lr-track: #ffffff26; filter: drop-shadow(0 10px 22px #0007); }
+  .st-who h1 { margin: 0; font-size: clamp(26px, 4vw, 40px); font-weight: 800; letter-spacing: -0.035em; color: #fff; overflow-wrap: anywhere; }
+  .st-meta { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0 0; padding: 0; }
+  .st-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px; background: #ffffff1a; border: 1px solid #ffffff22; font-size: 13px; font-weight: 650; color: #fff; }
+  .st-chip.gold { background: linear-gradient(135deg, #fcd34d, #f59e0b); border-color: transparent; color: #1a0533; }
+
+  /* the body */
+  .st-bodywrap { margin-top: -28px; padding-bottom: 96px; position: relative; }
+  .st-layout { display: grid; grid-template-columns: 232px minmax(0, 1fr); gap: 32px; align-items: start; }
+  .st-nav { position: sticky; top: 88px; }
+  .st-nav-in { display: grid; gap: 2px; padding: 10px; border-radius: 20px; background: var(--st-card); border: 1px solid var(--st-line); box-shadow: 0 24px 40px -32px #1a0533; }
+  .st-nav-link { position: relative; display: flex; align-items: center; gap: 12px; padding: 11px 14px; border-radius: 12px; font-size: 14.5px; font-weight: 650; text-decoration: none; color: var(--st-body) !important; transition: background 0.2s, color 0.2s; }
+  .st-nav-link svg { flex: none; color: var(--st-mute); transition: color 0.2s; }
+  .st-nav-link:hover { background: var(--st-soft); }
+  .st-nav-link.is-on { background: linear-gradient(135deg, #7c3aed, #5b21b6); color: #fff !important; box-shadow: 0 10px 20px -12px #5b21b6; }
+  .st-nav-link.is-on svg { color: #fff; }
+  .st-nav-link.is-danger { margin-top: 6px; color: #b91c1c !important; }
+  .st-nav-link.is-danger svg { color: #dc2626; }
+  .st-nav-link.is-danger.is-on { background: linear-gradient(135deg, #ef4444, #b91c1c); color: #fff !important; }
+  .st-nav-link.is-danger.is-on svg { color: #fff; }
+  .st-main { display: grid; gap: 20px; min-width: 0; }
+  .st-main > .st-card { scroll-margin-top: 92px; }
+
+  .st-card { padding: 28px 28px 26px; border-radius: 24px; background: var(--st-card); border: 1px solid var(--st-line); box-shadow: 0 24px 40px -34px #1a0533; }
+  .st-card-head h2 { margin: 0 0 6px; font-size: 21px; font-weight: 800; letter-spacing: -0.02em; color: var(--st-ink); }
+  .st-card-head p { margin: 0 0 6px; max-width: 640px; font-size: 14.5px; line-height: 1.6; color: var(--st-mute); }
+  .st-card.is-danger { border-color: #f5c2c2; background: linear-gradient(180deg, #fff7f7, var(--st-card) 60%); }
+  .st-card.is-danger .st-card-head h2 { color: #b91c1c; }
+
+  .st-list { margin: 14px 0 0; padding: 0; }
+  .st-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 16px 0; border-top: 1px solid var(--st-line); }
+  .st-row:first-child { border-top: 0; }
+  .st-row.is-stack { flex-direction: column; align-items: stretch; gap: 14px; }
+  .st-row dt { font-size: 14px; font-weight: 650; color: var(--st-mute); }
+  .st-row dd { margin: 0; min-width: 0; text-align: right; font-size: 15px; font-weight: 650; color: var(--st-ink); overflow-wrap: anywhere; }
+  .st-label { min-width: 0; display: grid; gap: 3px; }
+  .st-label strong { font-size: 15.5px; font-weight: 700; color: var(--st-ink); }
+  .st-label span { font-size: 13.5px; line-height: 1.55; color: var(--st-mute); max-width: 520px; }
+
+  /* buttons */
+  .st-btn { display: inline-flex; align-items: center; justify-content: center; height: 44px; padding: 0 22px; border: 0; border-radius: 14px; cursor: pointer; font: 700 15px var(--font-sans); color: #fff; background: linear-gradient(135deg, #7c3aed, #5b21b6); box-shadow: 0 12px 22px -12px #5b21b6; text-decoration: none; transition: transform 0.2s var(--st-ease), box-shadow 0.2s, background 0.2s; }
+  .st-btn:hover:not(:disabled) { transform: translateY(-1px); }
+  .st-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .st-btn.ghost { background: var(--st-soft); color: var(--st-deep) !important; box-shadow: none; }
+  .st-btn.ghost:hover:not(:disabled) { background: #e9defc; }
+  .st-btn.danger { background: linear-gradient(135deg, #ef4444, #b91c1c); box-shadow: 0 12px 22px -12px #b91c1c; }
+  .st-btn.small { height: 38px; padding: 0 16px; font-size: 14px; border-radius: 12px; }
+  .st-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+  .st-confirm { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+
+  /* switch */
+  .st-switch { position: relative; flex: none; display: inline-block; width: 52px; height: 30px; cursor: pointer; }
+  .st-switch input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; z-index: 1; }
+  .st-switch i { position: absolute; inset: 0; border-radius: 999px; background: #d9ccf0; transition: background 0.25s; }
+  .st-switch i::after { content: ""; position: absolute; left: 3px; top: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 2px 6px #1a053344; transition: transform 0.28s var(--st-ease); }
+  .st-switch input:checked + i { background: linear-gradient(135deg, #7c3aed, #5b21b6); }
+  .st-switch input:checked + i::after { transform: translateX(22px); }
+  .st-switch input:focus-visible + i { outline: 3px solid var(--st-amber); outline-offset: 3px; }
+
+  /* instrument choices */
+  .st-seg { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  .st-opt { position: relative; display: grid; justify-items: center; gap: 6px; padding: 16px 8px 14px; border: 1.5px solid var(--st-line); border-radius: 18px; background: var(--st-card); cursor: pointer; font: 700 14px var(--font-sans); color: var(--st-body); transition: border-color 0.2s, background 0.2s, transform 0.2s var(--st-ease), box-shadow 0.2s; }
+  .st-opt:hover { transform: translateY(-2px); border-color: #c4b0e0; }
+  .st-opt .ico { font-size: 28px; line-height: 1; }
+  .st-opt[aria-checked="true"] { border-color: var(--st-violet); background: var(--st-soft); color: var(--st-deep); box-shadow: 0 0 0 3px #7c3aed26; }
+  .st-opt .lock { position: absolute; top: 8px; right: 8px; font-size: 11px; padding: 2px 7px; border-radius: 999px; background: #fef3c7; color: #92400e; font-weight: 700; }
+
+  /* theme previews */
+  .st-themes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 16px; }
+  .st-theme { display: grid; gap: 10px; padding: 10px 10px 12px; border: 1.5px solid var(--st-line); border-radius: 20px; background: var(--st-card); cursor: pointer; text-align: center; font: 700 14px var(--font-sans); color: var(--st-body); transition: border-color 0.2s, transform 0.2s var(--st-ease), box-shadow 0.2s; }
+  .st-theme:hover { transform: translateY(-2px); }
+  .st-theme[aria-checked="true"] { border-color: var(--st-violet); box-shadow: 0 0 0 3px #7c3aed26; color: var(--st-deep); }
+  .st-prev { display: grid; gap: 6px; align-content: start; height: 92px; padding: 10px; border-radius: 12px; border: 1px solid #00000014; background: #fbfaff; }
+  .st-prev b { display: block; height: 10px; border-radius: 5px; background: #e4d9fb; }
+  .st-prev b:first-child { width: 46%; height: 12px; background: #7c3aed; }
+  .st-prev b:last-child { width: 70%; }
+  .st-prev.is-dark { background: #140626; border-color: #ffffff1f; }
+  .st-prev.is-dark b { background: #3b2766; }
+  .st-prev.is-dark b:first-child { background: #a78bfa; }
+  .st-prev.is-system { background: linear-gradient(105deg, #fbfaff 0 50%, #140626 50% 100%); }
+  .st-prev.is-system b { background: #c9b8ee; }
+  .st-prev.is-system b:first-child { background: #8b5cf6; }
+
+  /* plan */
+  .st-plan { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; margin-top: 16px; padding: 20px 22px; border-radius: 20px; color: #fff; background: radial-gradient(circle at 90% 0, #7c3aed99, transparent 55%), linear-gradient(135deg, #2a0a52, #12032a); }
+  .st-plan-main { display: grid; gap: 4px; }
+  .st-plan-name { font-size: 24px; font-weight: 800; letter-spacing: -0.03em; }
+  .st-plan-note { font-size: 14px; color: #d8c8f5; }
+  .st-plan .st-actions { margin: 0; }
+  .st-plan .st-btn.ghost { background: #ffffff1f; color: #fff !important; }
+  .st-plan .st-btn.ghost:hover:not(:disabled) { background: #ffffff33; }
+  .st-plan .st-btn:not(.ghost):not(.danger) { background: linear-gradient(135deg, #fcd34d, #f59e0b); color: #1a0533 !important; box-shadow: none; }
+
+  .st-fine { margin: 16px 0 0; font-size: 13.5px; line-height: 1.6; color: var(--st-mute); }
+  .st-error { margin: 14px 0 0; padding: 10px 14px; border-radius: 12px; background: #fef2f2; color: var(--st-red); font-size: 14.5px; }
+  .st-check { display: flex; align-items: flex-start; gap: 10px; margin: 18px 0 14px; font-size: 14.5px; line-height: 1.5; cursor: pointer; color: var(--st-ink); }
+  .st-check input { flex: none; width: 18px; height: 18px; margin-top: 2px; accent-color: #dc2626; }
+  .st-type { display: grid; gap: 8px; font-size: 14px; color: var(--st-body); max-width: 360px; }
+  .st-type input { height: 44px; padding: 0 14px; border: 1.5px solid var(--st-line); border-radius: 12px; background: var(--st-card); font: 600 15px var(--font-mono); letter-spacing: 0.06em; color: var(--st-ink); }
+  .st-type input:focus { outline: none; border-color: #dc2626; box-shadow: 0 0 0 4px #dc262622; }
+  .st-del { margin-top: 12px; }
+
+  /* signed out */
+  .st-gate { max-width: 460px; margin: 40px auto 0; padding: 40px 28px; border-radius: 26px; background: var(--st-card); border: 1px solid var(--st-line); box-shadow: 0 30px 60px -34px #5b21b690; text-align: center; }
+  .st-gate-mark { display: grid; place-items: center; width: 64px; height: 64px; margin: 0 auto 16px; border-radius: 20px; background: var(--st-soft); font-size: 30px; }
+  .st-gate h2 { margin: 0 0 8px; font-size: 24px; font-weight: 800; letter-spacing: -0.03em; color: var(--st-ink); }
+  .st-gate p { margin: 0 auto 22px; max-width: 340px; font-size: 15px; line-height: 1.6; }
+
+  /* "Saved" note, for people who cannot see the corner pop-up */
+  .st-saved { position: fixed; left: 50%; bottom: 22px; z-index: 90; margin: 0; padding: 10px 18px; border-radius: 999px; background: #1a0533; color: #fff; font: 650 14px var(--font-sans); box-shadow: 0 18px 36px -14px #000a; opacity: 0; transform: translate(-50%, 14px); pointer-events: none; transition: opacity 0.25s, transform 0.3s var(--st-ease); }
+  .st-saved.is-on { opacity: 1; transform: translate(-50%, 0); }
+
+  @media (max-width: 880px) {
+    .st-layout { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+    .st-nav { position: sticky; top: 64px; z-index: 30; margin: 0 -24px; }
+    .st-nav-in { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 8px 24px; border-radius: 0; border-width: 1px 0; box-shadow: 0 14px 24px -24px #1a0533; background: color-mix(in srgb, var(--st-card) 90%, transparent); backdrop-filter: blur(14px); }
+    .st-nav-in::-webkit-scrollbar { display: none; }
+    .st-nav-link { flex: none; padding: 9px 14px; white-space: nowrap; min-height: 44px; }
+    .st-nav-link.is-danger { margin: 0; }
+    .st-main > .st-card { scroll-margin-top: 140px; }
+  }
+  @media (max-width: 640px) {
+    .st-in { padding: 0 16px; }
+    .st-nav { margin: 0 -16px; }
+    .st-nav-in { padding-left: 16px; padding-right: 16px; }
+    .st-hero { padding: 96px 0 60px; }
+    .st-card { padding: 22px 18px 20px; border-radius: 22px; }
+    .st-row { flex-wrap: wrap; }
+    .st-row:has(.st-switch) { flex-wrap: nowrap; }
+    .st-row dd { text-align: left; }
+    .st-seg { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .st-themes { gap: 8px; }
+    .st-prev { height: 70px; }
+    .st-who { align-items: flex-start; }
+    .st-btn { min-height: 44px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .st-orb { animation: none; }
+    .st *, .st-saved { transition: none !important; }
+  }
+</style>
+
+<script>
+  import { cachedUser, getMe, signOut, deleteAccount } from "../lib/auth";
+  import type { AuthUser } from "../lib/auth";
+  import { openSignIn } from "../lib/authUi";
+  import { API_BASE } from "../lib/api";
+  import { getSettings, setSettings } from "../lib/settings";
+  import type { Theme } from "../lib/settings";
+  import { INSTRUMENTS, getInstrument, setInstrument } from "../lib/instrument";
+  import type { InstrumentId } from "../lib/instrument";
+  import { levelRing } from "../lib/levelRing";
+  import { can, loadPlan, myPlan, nudge } from "../lib/plan";
+  import type { MyPlan } from "../lib/plan";
+  import { cancelSubscription } from "../lib/billing";
+
+  const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
+  const root = document.querySelector<HTMLElement>(".st")!;
+  const saved = $("st-saved");
+  let savedTimer = 0;
+  const tell = (text: string) => {
+    saved.textContent = text;
+    saved.classList.add("is-on");
+    clearTimeout(savedTimer);
+    savedTimer = window.setTimeout(() => saved.classList.remove("is-on"), 1800);
+  };
+  const api = async (path: string, init: RequestInit = {}) => {
+    const res = await fetch(`${API_BASE}${path}`, { credentials: "include", ...init });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(typeof body.detail === "string" ? body.detail : "Something went wrong. Please try again.");
+    }
+    return res;
+  };
+  const chip = (text: string, gold = false) => {
+    const span = document.createElement("span");
+    span.className = `st-chip${gold ? " gold" : ""}`;
+    span.textContent = text;
+    return span;
+  };
+
+  // ---- who is here -----------------------------------------------------------------------------------------------------------
+  let ring: ReturnType<typeof levelRing> | null = null;
+  let ringFor = "";
+  function showUser(user: AuthUser | null) {
+    $("st-gate").hidden = !!user;
+    $("st-app").hidden = !user;
+    $("st-who").hidden = !user;
+    $("st-title").hidden = !!user;
+    $("st-lead").hidden = !!user;
+    root.classList.toggle("is-in", !!user);
+    if (!user) return;
+    if (!ring || ringFor !== user.id) {
+      ring = levelRing(user, 92);
+      ringFor = user.id;
+      $("st-avatar").replaceChildren(ring.el);
+    } else ring.update(user);
+    $("st-name").textContent = user.name || user.email;
+    const meta = $("st-meta");
+    meta.replaceChildren(chip(user.email));
+    if (user.level) meta.append(chip(`Level ${user.level} · ${user.title ?? ""}`, true));
+    if (user.planName) meta.append(chip(`${user.planName} plan`));
+    if (user.streak) meta.append(chip(`🔥 ${user.streak}-day streak`));
+    $("p-name").textContent = user.name || "—";
+    $("p-email").textContent = user.email;
+    $("p-since").textContent = user.memberSince ? new Date(user.memberSince * 1000).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" }) : "—";
+    $("p-level").textContent = user.level ? `Level ${user.level}, ${user.title ?? ""} · ${(user.xp ?? 0).toLocaleString()} XP` : "—";
+  }
+  $("st-signin").addEventListener("click", () => void openSignIn());
+  $("st-signout").addEventListener("click", async () => {
+    await signOut();
+    location.href = "/";
+  });
+  showUser(cachedUser());
+  void getMe().then(showUser);
+  window.addEventListener("auth-change", (event) => showUser((event as CustomEvent<AuthUser | null>).detail));
+
+  // ---- chords and the player -------------------------------------------------------------------------------------------------
+  const seg = $("st-instrument");
+  function drawInstruments() {
+    const current = getInstrument();
+    seg.replaceChildren(
+      ...INSTRUMENTS.map((info) => {
+        const locked = info.feature !== null && !can(info.feature);
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "st-opt";
+        b.setAttribute("role", "radio");
+        b.setAttribute("aria-checked", String(info.id === current));
+        b.dataset.id = info.id;
+        b.innerHTML = `<span class="ico" aria-hidden="true">${info.icon}</span><span>${info.label}</span>${locked ? '<span class="lock">Plan</span>' : ""}`;
+        b.addEventListener("click", () => {
+          if (locked) return nudge("More instruments");
+          setInstrument(info.id as InstrumentId);
+          tell(`${info.label} chords on`);
+        });
+        return b;
+      }),
+    );
+  }
+  drawInstruments();
+  window.addEventListener("instrument-change", drawInstruments);
+  window.addEventListener("plan-change", drawInstruments);
+
+  const easy = $<HTMLInputElement>("st-easy");
+  const lite = $<HTMLInputElement>("st-lite");
+  const syncSwitches = () => {
+    const s = getSettings();
+    easy.checked = s.easyChords;
+    lite.checked = s.lite;
+  };
+  const saveSetting = async (patch: Parameters<typeof setSettings>[0], message: string) => {
+    tell((await setSettings(patch)) ? message : "Saved on this device; will sync when you are online");
+  };
+  easy.addEventListener("change", () => void saveSetting({ easyChords: easy.checked }, easy.checked ? "Easy chords only: on" : "Easy chords only: off"));
+  lite.addEventListener("change", () => void saveSetting({ lite: lite.checked }, lite.checked ? "Performance mode: on" : "Performance mode: off"));
+  $("st-voicings").addEventListener("click", () => {
+    try {
+      localStorage.removeItem("chordsuno-voicings");
+    } catch {
+      // nothing was kept
+    }
+    tell("Chord shapes reset");
+  });
+
+  // ---- appearance -------------------------------------------------------------------------------------------------------------
+  const themeButtons = [...document.querySelectorAll<HTMLButtonElement>("[data-theme-pick]")];
+  const syncTheme = () => {
+    const current = getSettings().theme;
+    themeButtons.forEach((b) => b.setAttribute("aria-checked", String(b.dataset.themePick === current)));
+  };
+  themeButtons.forEach((b) =>
+    b.addEventListener("click", () => {
+      const theme = b.dataset.themePick as Theme;
+      void saveSetting({ theme }, `Theme: ${theme}`);
+    }),
+  );
+  const syncAll = () => {
+    syncSwitches();
+    syncTheme();
+  };
+  syncAll();
+  window.addEventListener("settings-change", syncAll);
+
+  // ---- plan ---------------------------------------------------------------------------------------------------------------------
+  const money = (minor: number, currency: string) => {
+    try {
+      return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: minor % 100 ? 2 : 0 }).format(minor / 100);
+    } catch {
+      return `${(minor / 100).toFixed(2)} ${currency}`;
+    }
+  };
+  const every = (period: string, n: number) => {
+    const unit = ({ daily: "day", weekly: "week", monthly: "month", quarterly: "quarter", yearly: "year" } as Record<string, string>)[period] ?? "period";
+    return n > 1 ? `every ${n} ${unit}s` : `per ${unit}`;
+  };
+  const day = (seconds: number) => new Date(seconds * 1000).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+  function drawPlan(plan: MyPlan | null) {
+    if (!plan || !plan.signedIn) return;
+    $("pl-name").textContent = `${plan.plan.name} plan`;
+    const note = $("pl-note");
+    const actions = $("pl-actions");
+    const fine = $("pl-fine");
+    actions.replaceChildren();
+    fine.hidden = true;
+    const link = (text: string, href: string, ghost = false) => {
+      const a = document.createElement("a");
+      a.className = `st-btn small${ghost ? " ghost" : ""}`;
+      a.href = href;
+      a.textContent = text;
+      return a;
+    };
+    const sub = plan.subscription;
+    if (plan.plan.isFree || !sub) {
+      note.textContent = "Free. Upgrade for more songs, more instruments and more tools.";
+      actions.append(link("See the plans", "/pricing/"));
+      return;
+    }
+    if (sub.gift) {
+      note.textContent = sub.currentEnd ? `Given to you by the Chord Suno team, until ${day(sub.currentEnd)}. Nothing is charged.` : "Given to you by the Chord Suno team. Nothing is charged.";
+      actions.append(link("See the plans", "/pricing/", true));
+      return;
+    }
+    const price = `${money(sub.amountMinor, sub.currency)} ${every(sub.period, sub.intervalCount)}`;
+    if (sub.cancelAtPeriodEnd) {
+      note.textContent = `${price}. It will not renew: your plan ends on ${sub.currentEnd ? day(sub.currentEnd) : "the last day you paid for"}.`;
+      actions.append(link("Choose a plan", "/pricing/"));
+    } else {
+      note.textContent = `${price}${sub.currentEnd ? `. Renews on ${day(sub.currentEnd)}` : ""}.`;
+      const cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.className = "st-btn small ghost";
+      cancel.textContent = "Cancel renewal";
+      cancel.addEventListener("click", async () => {
+        cancel.disabled = true;
+        await cancelSubscription(); // reloads the plan, which draws this again
+        cancel.disabled = false;
+      });
+      actions.append(link("Change plan", "/pricing/"), cancel);
+      fine.hidden = false;
+      fine.textContent = "Cancelling stops the next payment. Your plan stays until the end of the period you paid for. See our refund policy for more.";
+    }
+  }
+  drawPlan(myPlan());
+  window.addEventListener("plan-change", (event) => drawPlan((event as CustomEvent<MyPlan>).detail));
+  void loadPlan();
+
+  // ---- privacy and data -------------------------------------------------------------------------------------------------------
+  $("st-export").addEventListener("click", async () => {
+    const button = $<HTMLButtonElement>("st-export");
+    button.disabled = true;
+    try {
+      const blob = await (await api("/api/me/export")).blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "chord-suno-my-data.json";
+      document.body.append(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      tell("Your data is downloading");
+    } catch (err) {
+      tell(err instanceof Error ? err.message : "Could not download");
+    }
+    button.disabled = false;
+  });
+  const clearAsk = $("st-clear-ask");
+  const clearButton = $("st-clear");
+  const askClear = (on: boolean) => {
+    clearAsk.hidden = !on;
+    clearButton.hidden = on;
+  };
+  clearButton.addEventListener("click", () => askClear(true));
+  $("st-clear-no").addEventListener("click", () => askClear(false));
+  $("st-clear-yes").addEventListener("click", async () => {
+    try {
+      const { removed } = await (await api("/api/me/history", { method: "DELETE" })).json();
+      tell(removed ? `Cleared ${removed} song${removed === 1 ? "" : "s"} from your history` : "Your history was already empty");
+    } catch (err) {
+      tell(err instanceof Error ? err.message : "Could not clear");
+    }
+    askClear(false);
+  });
+  const sessionsText = $("st-sessions");
+  const others = $("st-others");
+  async function loadSessions() {
+    try {
+      const { sessions } = await (await api("/api/me/security")).json();
+      sessionsText.textContent = sessions > 1 ? `You are signed in on ${sessions} browsers or devices, including this one.` : "You are signed in only here.";
+      others.hidden = sessions <= 1;
+    } catch {
+      sessionsText.textContent = "Sign in to see this.";
+    }
+  }
+  void loadSessions();
+  window.addEventListener("auth-change", () => void loadSessions());
+  others.addEventListener("click", async () => {
+    others.disabled = true;
+    try {
+      const { ended } = await (await api("/api/me/sessions/end-others", { method: "POST" })).json();
+      tell(`Signed out of ${ended} other ${ended === 1 ? "place" : "places"}`);
+    } catch (err) {
+      tell(err instanceof Error ? err.message : "Could not sign out the others");
+    }
+    others.disabled = false;
+    void loadSessions();
+  });
+
+  // ---- delete the account -----------------------------------------------------------------------------------------------------
+  const open = $("st-del-open");
+  const form = $("st-del-form");
+  const sure = $<HTMLInputElement>("st-del-sure");
+  const typed = $<HTMLInputElement>("st-del-type");
+  const go = $<HTMLButtonElement>("st-del-go");
+  const error = $("st-del-error");
+  const ready = () => (go.disabled = !(sure.checked && typed.value.trim() === "DELETE"));
+  open.addEventListener("click", () => {
+    open.hidden = true;
+    form.hidden = false;
+    typed.focus();
+  });
+  $("st-del-cancel").addEventListener("click", () => {
+    form.hidden = true;
+    open.hidden = false;
+    sure.checked = false;
+    typed.value = "";
+    error.hidden = true;
+    ready();
+  });
+  sure.addEventListener("change", ready);
+  typed.addEventListener("input", ready);
+  go.addEventListener("click", async () => {
+    if (go.disabled) return;
+    error.hidden = true;
+    go.disabled = true;
+    go.textContent = "Deleting…";
+    try {
+      await deleteAccount();
+      $("st-app").hidden = true;
+      $("st-who").hidden = true;
+      $("st-title").hidden = false;
+      $("st-lead").hidden = false;
+      $("st-title").textContent = "Your account has been deleted";
+      $("st-lead").textContent = "Thank you for using Chord Suno. Taking you to the home page…";
+      setTimeout(() => (location.href = "/"), 3500);
+    } catch (err) {
+      error.textContent = err instanceof Error ? err.message : "We could not delete the account. Please try again, or write to us.";
+      error.hidden = false;
+      go.textContent = "Delete my account for good";
+      ready();
+    }
+  });
+
+  // ---- the section being read is lit in the list on the side ----------------------------------------------------------------
+  const links = [...document.querySelectorAll<HTMLAnchorElement>(".st-nav-link")];
+  const targets = links.map((a) => document.getElementById(a.dataset.for!)!);
+  const light = (id: string) => {
+    links.forEach((a) => {
+      const on = a.dataset.for === id;
+      a.classList.toggle("is-on", on);
+      if (on) {
+        a.setAttribute("aria-current", "location");
+        const strip = a.parentElement!;
+        if (strip.scrollWidth > strip.clientWidth) strip.scrollTo({ left: a.offsetLeft - 24, behavior: "smooth" });
+      } else a.removeAttribute("aria-current");
+    });
+  };
+  let queued = false;
+  const spy = () => {
+    queued = false;
+    let best = targets[0]?.id;
+    const line = innerWidth <= 880 ? 190 : 140;
+    for (const t of targets) if (t && !t.closest("[hidden]") && t.getBoundingClientRect().top <= line) best = t.id;
+    if (innerHeight + scrollY >= document.documentElement.scrollHeight - 4) best = targets[targets.length - 1].id;
+    if (best) light(best);
+  };
+  addEventListener(
+    "scroll",
+    () => {
+      if (!queued) {
+        queued = true;
+        requestAnimationFrame(spy);
+      }
+    },
+    { passive: true },
+  );
+  links.forEach((a) => a.addEventListener("click", () => light(a.dataset.for!)));
+  spy();
+  new MutationObserver(spy).observe($("st-app"), { attributes: true, attributeFilter: ["hidden"] });
+</script>

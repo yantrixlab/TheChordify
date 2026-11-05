@@ -64,6 +64,7 @@ const { instrument, rootSlug, chips = [], easy = true, here = "chart" } = Astro.
 
 <script>
   import { chordPath, resolveChord, type InstrumentKey } from "../../lib/chordCatalog";
+  import { getSettings, setSettings } from "../../lib/settings";
 
   const nav = document.getElementById("chord-nav");
   if (nav) {
@@ -122,7 +123,6 @@ const { instrument, rootSlug, chips = [], easy = true, here = "chart" } = Astro.
 
     // ---- easy chords only: hide the ways to play that need a barre or sit high on the neck; a chord with none left is hidden too ----
     const easy = document.getElementById("cn-easy") as HTMLInputElement | null;
-    const KEY = "chordsuno-easy-chords";
     const apply = () => {
       const on = !!easy?.checked;
       document.querySelectorAll<HTMLElement>(".cc-voicing").forEach((v) => (v.hidden = on && v.dataset.easy === "0"));
@@ -131,17 +131,14 @@ const { instrument, rootSlug, chips = [], easy = true, here = "chart" } = Astro.
       });
     };
     if (easy) {
-      try {
-        easy.checked = localStorage.getItem(KEY) === "1";
-      } catch {
-        // no storage: off
-      }
+      // the choice is a setting (kept on the device and on the account), so changing it in Settings, or on another device, changes it here
+      easy.checked = getSettings().easyChords;
       easy.addEventListener("change", () => {
-        try {
-          localStorage.setItem(KEY, easy.checked ? "1" : "0");
-        } catch {
-          // fine
-        }
+        void setSettings({ easyChords: easy.checked });
+        apply();
+      });
+      window.addEventListener("settings-change", () => {
+        easy.checked = getSettings().easyChords;
         apply();
       });
       apply();

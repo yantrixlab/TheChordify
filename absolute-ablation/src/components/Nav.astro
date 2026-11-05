@@ -377,4 +377,13 @@ const navLinks = [
   @keyframes au-fade { from { opacity: 0; } }
   @keyframes au-rise { from { opacity: 0; transform: translateY(12px) scale(0.98); } }
   @media (prefers-reduced-motion: reduce) { .au-backdrop, .au-dialog { animation: none; } }
+
+  /* dark theme (a page that has one: html[data-theme="dark"]): the parts that are white by colour, not by token */
+  html[data-theme="dark"] .au-panel, html[data-theme="dark"] .ns-panel, html[data-theme="dark"] .au-dialog, html[data-theme="dark"] .ns.is-sheet { background: #1c1030; }
+  html[data-theme="dark"] .ns.is-focus .ns-form, html[data-theme="dark"] .ns-submit:hover, html[data-theme="dark"] .ns-x:hover, html[data-theme="dark"] .ns-ready b { background: #2c1b4d; }
+  html[data-theme="dark"] .ns-form:hover { background: #321f55; }
+  html[data-theme="dark"] .ns-form input { color: var(--color-ink); }
+  html[data-theme="dark"] .ns-form input::placeholder { color: #8f82b0; }
+  html[data-theme="dark"] .ns-ghost { background: linear-gradient(100deg, #241638 30%, #2e1c4a 50%, #241638 70%); background-size: 200% 100%; }
+  html[data-theme="dark"] .au-rv-form input { background: #241638; color: var(--color-ink); }
 </style>

@@ -3,6 +3,7 @@
 import { cachedUser, getAuthConfig, getMe, renderGoogleButton, signInAsReviewer, signOut } from "./auth";
 import type { AuthUser } from "./auth";
 import { levelFraction, levelRing } from "./levelRing";
+import "./settings"; // applies the theme and the choices made on another device on every page that has the menu
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] => {
   const node = document.createElement(tag);
@@ -216,10 +217,10 @@ function userMenu(user: AuthUser) {
   const billing = el("a", "au-item", "Plans & billing");
   billing.href = "/pricing/";
   billing.setAttribute("role", "menuitem");
-  const remove = el("a", "au-item", "Delete account");
-  remove.href = "/delete-account/";
-  remove.setAttribute("role", "menuitem");
-  panel.append(library, billing);
+  const settings = el("a", "au-item", "Settings");
+  settings.href = "/settings/";
+  settings.setAttribute("role", "menuitem");
+  panel.append(library, billing, settings);
   if (user.isAdmin) {
     const admin = el("a", "au-item", "Admin");
     admin.href = "/admin/";
@@ -234,7 +235,7 @@ function userMenu(user: AuthUser) {
     await signOut();
     if (location.pathname.startsWith("/admin")) location.reload();
   });
-  panel.append(out, remove);
+  panel.append(out);
 
   const setOpen = (open: boolean) => {
     panel.hidden = !open;
@@ -291,7 +292,9 @@ function render(user: AuthUser | null) {
     card.el.classList.add("au-hud-mobile");
     const library = el("a", "au-mobile-link", "My library");
     library.href = "/library/";
-    node.replaceChildren(card.el, library);
+    const settings = el("a", "au-mobile-link", "Settings");
+    settings.href = "/settings/";
+    node.replaceChildren(card.el, library, settings);
     if (user.isAdmin) {
       const admin = el("a", "au-mobile-link", "Admin");
       admin.href = "/admin/";
@@ -301,9 +304,6 @@ function render(user: AuthUser | null) {
     out.type = "button";
     out.addEventListener("click", () => signOut());
     node.append(out);
-    const remove = el("a", "au-mobile-link", "Delete account");
-    remove.href = "/delete-account/";
-    node.append(remove);
     drawn.set(node, { id: user.id, update: card.update });
   });
 }

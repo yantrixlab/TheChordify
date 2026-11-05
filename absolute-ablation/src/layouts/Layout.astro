@@ -9,6 +9,7 @@ interface Props {
   analytics?: boolean; // count visits to this page in Google Analytics (the admin pages turn it off)
   image?: string; // the picture shown when the page is shared (a path on this site); the Chord Suno card by default
   jsonLd?: object | object[]; // structured data for search engines
+  themeable?: boolean; // the page has a dark theme: it follows the person's choice in Settings (the others are always light)
 }
 
 const {
@@ -18,15 +19,24 @@ const {
   description = "Paste a YouTube link or upload a song and get every chord synced to the beat, with guitar chord diagrams, the key and the tempo. Free to start, no card needed.",
   image = "/og-image.png",
   jsonLd,
+  themeable = false,
 } = Astro.props;
 const pageUrl = new URL(Astro.url.pathname, "https://chordsuno.com").href;
 const imageUrl = new URL(image, "https://chordsuno.com").href;
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang="en" data-themeable={themeable ? "" : undefined}>
   <head>
     <meta charset="UTF-8" />
+    {
+      themeable && (
+        <script
+          is:inline
+          set:html={`try{var t=localStorage.getItem("chordsuno-theme");var d=t==="dark"||(t!=="light"&&matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.dataset.theme=d?"dark":"light";document.documentElement.style.colorScheme=d?"dark":"light"}catch(e){}`}
+        ></script>
+      )
+    }
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content={description} />
     <link rel="icon" href="/favicon.ico" sizes="48x48" />

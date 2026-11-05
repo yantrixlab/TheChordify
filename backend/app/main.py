@@ -595,7 +595,7 @@ def _full_user(user: dict) -> dict:
     Signing in and asking "who am I" give the same answer, so the page looks the same straight after signing in as after a refresh."""
     snap = engagement.snapshot(user["id"])
     plan, _sub = plans.effective(user["id"])
-    return {**_public_user(user), "plan": plan["code"], "planName": plan["name"], "instrument": user.get("instrument") or "", **{k: snap[k] for k in ("level", "title", "ring", "stars", "xp", "intoLevel", "levelSpan", "nextLevelXp", "streak")}}
+    return {**_public_user(user), "plan": plan["code"], "planName": plan["name"], "instrument": user.get("instrument") or "", "settings": _settings_of(user), "settingsSaved": sorted((user.get("prefs") or {}).keys() & set(SETTINGS_DEFAULT)), "memberSince": user.get("createdAt"), **{k: snap[k] for k in ("level", "title", "ring", "stars", "xp", "intoLevel", "levelSpan", "nextLevelXp", "streak")}}
 
 
 def _signed_in(user: dict, request: Request, response: Response, mobile: bool) -> dict:
@@ -1609,6 +1609,91 @@ def set_my_instrument(body: InstrumentBody, request: Request) -> dict:
         raise HTTPException(status_code=400, detail="Choose guitar, piano, ukulele or mandolin.")
     accounts.set_instrument(user["id"], body.instrument)
     return {"instrument": body.instrument}
+
+
+# ---- settings: what a person chooses, kept on their account so the website and the app on every device agree ------------------------
+SETTINGS_DEFAULT = {"easyChords": False, "lite": False, "theme": "system"}
+THEMES = ("system", "light", "dark")
+
+
+def _settings_of(user: dict) -> dict:
+    """The person's settings with every one filled in (what they never set is the default); anything unknown or odd is ignored."""
+    saved = user.get("prefs") or {}
+    out = dict(SETTINGS_DEFAULT)
+    for key in ("easyChords", "lite"):
+        if isinstance(saved.get(key), bool):
+            out[key] = saved[key]
+    if saved.get("theme") in THEMES:
+        out["theme"] = saved["theme"]
+    return out
+
+
+class SettingsBody(BaseModel):
+    easyChords: Optional[bool] = None
+    lite: Optional[bool] = None
+    theme: Optional[str] = None
+    instrument: Optional[str] = None
+
+
+@app.get("/api/me/settings")
+def my_settings(request: Request, response: Response) -> dict:
+    response.headers["Cache-Control"] = "no-store"
+    user = _require_user(request)
+    return {"settings": _settings_of(user), "instrument": user.get("instrument") or ""}
+
+
+@app.put("/api/me/settings")
+def set_my_settings(body: SettingsBody, request: Request) -> dict:
+    """Changes the settings that are sent (the others stay as they were) and answers with all of them."""
+    user = _require_user(request, changes=True)
+    now = _settings_of(user)
+    if body.theme is not None and body.theme not in THEMES:
+        raise HTTPException(status_code=400, detail="Choose system, light or dark.")
+    if body.instrument is not None and body.instrument not in INSTRUMENTS:
+        raise HTTPException(status_code=400, detail="Choose guitar, piano, ukulele or mandolin.")
+    for key in ("easyChords", "lite", "theme"):
+        value = getattr(body, key)
+        if value is not None:
+            now[key] = value
+    accounts.set_prefs(user["id"], now)
+    if body.instrument is not None:
+        accounts.set_instrument(user["id"], body.instrument)
+    return {"settings": now, "instrument": body.instrument if body.instrument is not None else user.get("instrument") or ""}
+
+
+@app.get("/api/me/security")
+def my_security(request: Request, response: Response) -> dict:
+    response.headers["Cache-Control"] = "no-store"
+    user = _require_user(request)
+    return {"sessions": accounts.session_count(user["id"])}
+
+
+@app.post("/api/me/sessions/end-others")
+def end_my_other_sessions(request: Request) -> dict:
+    """Signs the person out of every other browser and phone, keeping this one."""
+    user = _require_user(request, changes=True)
+    return {"ended": accounts.end_other_sessions(user["id"], _session_token(request))}
+
+
+@app.delete("/api/me/history")
+def clear_my_history(request: Request) -> dict:
+    user = _require_user(request, changes=True)
+    return {"removed": engagement.clear_history(user["id"])}
+
+
+@app.get("/api/me/export")
+def export_my_data(request: Request) -> Response:
+    """Everything we hold about the signed-in person, as a JSON file to download."""
+    user = _require_user(request)
+    plan, sub = plans.effective(user["id"])
+    data = {
+        "exportedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "account": {"email": user["email"], "name": user["name"], "picture": user["picture"], "createdAt": user["createdAt"], "lastLoginAt": user["lastLoginAt"]},
+        "plan": {"code": plan["code"], "name": plan["name"], "subscription": _subscription_view(sub)},
+        "settings": {**_settings_of(user), "instrument": user.get("instrument") or ""},
+        **engagement.export_user(user["id"]),
+    }
+    return Response(content=json.dumps(data, indent=2, ensure_ascii=False), media_type="application/json", headers={"Content-Disposition": "attachment; filename=chord-suno-my-data.json", "Cache-Control": "no-store"})
 
 
 @app.get("/api/me/library")

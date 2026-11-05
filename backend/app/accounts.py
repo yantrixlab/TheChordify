@@ -17,6 +17,7 @@ interface, so the SQL below is written to work on both.
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import secrets
 import time
@@ -83,6 +84,14 @@ def _hash(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
+def _read_prefs(text: Any) -> dict:
+    try:
+        value = json.loads(text or "{}")
+    except (TypeError, ValueError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
 def _user(row: dict) -> dict:
     return {
         "id": row["id"],
@@ -93,6 +102,7 @@ def _user(row: dict) -> dict:
         "hasPassword": bool(row.get("password_hash")),
         "plan": row["plan_code"],
         "instrument": row.get("instrument") or "",  # the instrument the person shows chords for ("" until they choose)
+        "prefs": _read_prefs(row.get("prefs")),  # their other settings (see SETTINGS in main.py): stored as JSON text
         "logins": row["logins"],
         "disabled": bool(row["disabled"]),
         "createdAt": row["created_at"],
@@ -110,7 +120,7 @@ class AccountStore:
     def _ensure_columns(self) -> None:
         """Adds the role and password columns to a users table made before they existed (nothing changes for people already there: they
         are general users with no password)."""
-        wanted = {"role": "TEXT NOT NULL DEFAULT 'user'", "password_hash": "TEXT NOT NULL DEFAULT ''", "instrument": "TEXT NOT NULL DEFAULT ''"}
+        wanted = {"role": "TEXT NOT NULL DEFAULT 'user'", "password_hash": "TEXT NOT NULL DEFAULT ''", "instrument": "TEXT NOT NULL DEFAULT ''", "prefs": "TEXT NOT NULL DEFAULT '{}'"}
         if getattr(self._db, "kind", "sqlite") == "postgres":
             for column, ddl in wanted.items():
                 self._db.run(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {column} {ddl}")
@@ -178,6 +188,10 @@ class AccountStore:
 
     def set_instrument(self, user_id: str, instrument: str) -> bool:
         _, changed = self._db.run("UPDATE users SET instrument = ? WHERE id = ?", (instrument, user_id))
+        return changed > 0
+
+    def set_prefs(self, user_id: str, prefs: dict) -> bool:
+        _, changed = self._db.run("UPDATE users SET prefs = ? WHERE id = ?", (json.dumps(prefs, separators=(",", ":")), user_id))
         return changed > 0
 
     def set_disabled(self, user_id: str, disabled: bool) -> bool:
@@ -275,6 +289,15 @@ class AccountStore:
         self._db.run("DELETE FROM sessions WHERE user_id = ?", (user_id,))
         _, removed = self._db.run("DELETE FROM users WHERE id = ?", (user_id,))
         return removed > 0
+
+    def session_count(self, user_id: str) -> int:
+        rows, _ = self._db.run("SELECT COUNT(*) AS n FROM sessions WHERE user_id = ? AND expires_at > ?", (user_id, time.time()))
+        return int(rows[0]["n"])
+
+    def end_other_sessions(self, user_id: str, keep_token: str) -> int:
+        """Signs the person out everywhere but where they are now. Returns how many sign-ins ended."""
+        _, removed = self._db.run("DELETE FROM sessions WHERE user_id = ? AND token_hash <> ?", (user_id, _hash(keep_token)))
+        return int(removed)
 
     def end_session(self, token: str) -> None:
         if token:

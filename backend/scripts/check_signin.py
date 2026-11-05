@@ -21,6 +21,7 @@ from app import main  # noqa: E402
 import _pg_guard  # noqa: E402
 
 _pg_guard.install(main)
+main._reviewer_limiter._limit = 1000  # these checks sign in more often than the real limit allows
 
 passed = failed = 0
 
@@ -80,6 +81,41 @@ check("a request from another site is refused", client3.put("/api/me/instrument"
 check("the choice is unchanged by those", sign_in()[1]["instrument"] == "piano")
 for name in ("guitar", "ukulele", "mandolin"):
     check(f"{name} is accepted", client3.put("/api/me/instrument", json={"instrument": name}).status_code == 200)
+
+print("== settings")
+c4, me4 = sign_in()
+DEFAULTS = {"easyChords": False, "lite": False, "theme": "system"}
+check("a new person has every setting at its default", me4["settings"] == DEFAULTS, str(me4.get("settings")))
+r = c4.put("/api/me/settings", json={"easyChords": True, "theme": "dark"})
+check("changing some settings answers with all of them", r.status_code == 200 and r.json()["settings"] == {"easyChords": True, "lite": False, "theme": "dark"}, r.text)
+check("the others are left as they were", c4.put("/api/me/settings", json={"lite": True}).json()["settings"] == {"easyChords": True, "lite": True, "theme": "dark"})
+check("signing in again brings them back (any device)", sign_in()[1]["settings"] == {"easyChords": True, "lite": True, "theme": "dark"})
+check("asking for them gives the same", c4.get("/api/me/settings").json()["settings"]["theme"] == "dark")
+check("an unknown theme is refused", c4.put("/api/me/settings", json={"theme": "neon"}).status_code == 400)
+check("an unknown instrument is refused", c4.put("/api/me/settings", json={"instrument": "kazoo"}).status_code == 400)
+check("the instrument can be set with them", c4.put("/api/me/settings", json={"instrument": "ukulele"}).json()["instrument"] == "ukulele" and c4.get("/api/auth/me").json()["user"]["instrument"] == "ukulele")
+check("signed out, nothing is read or saved", TestClient(main.app, base_url="http://testserver").get("/api/me/settings").status_code == 401)
+check("a request from another site is refused", c4.put("/api/me/settings", json={"lite": False}, headers={"Origin": "https://evil.example"}).status_code == 403)
+check("and changed nothing", c4.get("/api/me/settings").json()["settings"]["lite"] is True)
+
+print("== signed-in devices, history and the download of my data")
+c5, _ = sign_in()
+check("two sign-ins are counted", c4.get("/api/me/security").json()["sessions"] >= 2)
+r = c4.post("/api/me/sessions/end-others")
+check("signing out the others ends them", r.status_code == 200 and r.json()["ended"] >= 1, r.text)
+check("this sign-in stays", c4.get("/api/auth/me").json()["user"] is not None and c4.get("/api/me/security").json()["sessions"] == 1)
+check("the other is signed out", c5.get("/api/auth/me").json()["user"] is None)
+check("a request from another site cannot end sign-ins", c4.post("/api/me/sessions/end-others", headers={"Origin": "https://evil.example"}).status_code == 403)
+uid4 = me4["id"]
+main.engagement.record_play(uid4, "yt_abcdefghijk", {"title": "A song", "artist": "Somebody", "duration": 120, "chords": []})
+data = c4.get("/api/me/export")
+check("the download is a file with the account, plan, settings and library", data.status_code == 200 and "attachment" in data.headers["content-disposition"] and {"account", "plan", "settings", "library", "progress"} <= set(data.json()), data.text[:200])
+check("it lists the song that was played", [i["title"] for i in data.json()["library"]] == ["A song"])
+check("it holds no session or password data", "token" not in data.text and "password" not in data.text.lower())
+r = c4.delete("/api/me/history")
+check("clearing the history removes songs that were only played", r.status_code == 200 and r.json()["removed"] == 1, r.text)
+check("the library is empty after it", c4.get("/api/me/export").json()["library"] == [])
+check("signed out, none of these work", TestClient(main.app, base_url="http://testserver").get("/api/me/export").status_code == 401)
 
 print(f"\npassed {passed}, failed {failed}")
 sys.exit(1 if failed else 0)
