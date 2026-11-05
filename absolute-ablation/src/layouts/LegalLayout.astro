@@ -22,7 +22,7 @@ const pages = [
 const here = Astro.url.pathname.replace(/\/?$/, "/");
 ---
 
-<Layout title={`${title} — Chord Suno`} description={description}>
+<Layout title={`${title} — Chord Suno`} description={description} themeable>
   <Nav />
   <main id="main-content" class="lg">
     <article class="lg-wrap">
@@ -66,5 +66,10 @@ const here = Astro.url.pathname.replace(/\/?$/, "/");
   .lg-others { display: flex; flex-wrap: wrap; gap: 8px 10px; margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--color-hairline); }
   .lg-others a { padding: 8px 14px; border-radius: 999px; background: var(--color-violet-soft); font-size: 14px; font-weight: 700; color: var(--color-violet-deep); text-decoration: none; }
   .lg-others a:hover { background: #ddd2fb; }
+  html[data-theme="dark"] .lg { background: radial-gradient(ellipse 70% 30% at 50% -4%, #7c3aed33, transparent 70%), linear-gradient(180deg, #170b29, #140a24 40%); }
+  html[data-theme="dark"] .lg-eyebrow, html[data-theme="dark"] .lg-body li::marker { color: #a78bfa; }
+  html[data-theme="dark"] .lg-body code { background: #2a1a4a; color: #e9defc; }
+  html[data-theme="dark"] .lg-card { background: #1c1131; box-shadow: 0 1px 2px #0006; }
+  html[data-theme="dark"] .lg-others a:hover { background: #3a2663; }
   @media (max-width: 640px) { .lg { padding: 36px 16px 72px; } .lg-body { font-size: 15.5px; } }
 </style>

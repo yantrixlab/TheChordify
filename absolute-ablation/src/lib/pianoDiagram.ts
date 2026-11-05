@@ -66,12 +66,12 @@ export function pianoLayout(voicing: PianoVoicing): { width: number; height: num
 
 export function pianoSvg(voicing: PianoVoicing, options: Options = {}): string {
   const scale = options.scale ?? 1;
-  const white = options.white ?? "#ffffff";
-  const black = options.black ?? "#1a0533";
-  const line = options.line ?? "#bda9e0";
-  const rootColor = options.root ?? "#7c3aed";
-  const press = options.press ?? "#f59e0b";
-  const ink = options.ink ?? "#ffffff";
+  const white = options.white ?? "var(--pn-white, #ffffff)";
+  const black = options.black ?? "var(--pn-black, #1a0533)";
+  const line = options.line ?? "var(--pn-line, #bda9e0)";
+  const rootColor = options.root ?? "var(--pn-root, #7c3aed)";
+  const press = options.press ?? "var(--pn-press, #f59e0b)";
+  const ink = options.ink ?? "var(--pn-ink, #ffffff)";
   const { width, height, keys } = pianoLayout(voicing);
   const parts = keys.map((k) => {
     const fill = k.on ? (k.root ? rootColor : press) : k.black ? black : white;

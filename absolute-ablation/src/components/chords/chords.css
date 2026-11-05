@@ -365,3 +365,94 @@
   [data-rise] { animation: none; }
   .ls-bar { display: none; }
 }
+
+/* ---- dark theme (html[data-theme="dark"], set on a page that has <Layout themeable>) ---------------------------------------------
+   The hero, the call to action and the dark keys stay as they are (already dark); light surfaces become dark cards, the greys lighten for 4.5:1,
+   the family colours are lighter so the chord names read on a dark card, and the diagrams take their colours from --dg-* / --pn-*. */
+html[data-theme="dark"] {
+  --dg-dot: #7c3aed; --dg-ink: #f4effc; --dg-line: #7a6aa3; --dg-label: #ffffff; --dg-x: #f87171;
+  --pn-white: #e9e2f7; --pn-black: #0b0416; --pn-line: #7a6aa3; --pn-root: #7c3aed; --pn-press: #f59e0b; --pn-ink: #ffffff;
+}
+html[data-theme="dark"] .ch {
+  --ch-card: #1c1131; --ch-soft: #2a1a4a; --ch-soft-2: #231540; --ch-line: #33224f; --ch-mute: #a99cc9; --ch-deep: #c4b5fd; --ch-violet: #a78bfa;
+  background: #140a24; color: var(--color-body);
+}
+html[data-theme="dark"] [data-g="basic"] { --g: #a78bfa; --gs: #2c1b4d; }
+html[data-theme="dark"] [data-g="sixths"] { --g: #2dd4bf; --gs: #0f3a37; }
+html[data-theme="dark"] [data-g="sevenths"] { --g: #fbbf24; --gs: #3d2a08; }
+html[data-theme="dark"] [data-g="suspended"] { --g: #f472b6; --gs: #43142f; }
+html[data-theme="dark"] [data-g="extended"] { --g: #60a5fa; --gs: #112c52; }
+
+/* cards and panels: white → dark card */
+html[data-theme="dark"] .ch-pillrow a, html[data-theme="dark"] .ch-link, html[data-theme="dark"] .cc-card, html[data-theme="dark"] .cc-chord,
+html[data-theme="dark"] .cg-wrap, html[data-theme="dark"] .cg tbody th, html[data-theme="dark"] .ch-faq details, html[data-theme="dark"] .ls li,
+html[data-theme="dark"] .ls-toc, html[data-theme="dark"] .ls-chord, html[data-theme="dark"] .ls-pat, html[data-theme="dark"] .cn-expand,
+html[data-theme="dark"] .cn-search input { background: var(--ch-card); }
+html[data-theme="dark"] .ch-link:hover, html[data-theme="dark"] .cc-card:hover, html[data-theme="dark"] .cc-card:focus-visible, html[data-theme="dark"] .ch-faq details[open] { border-color: #6d4fb5; }
+html[data-theme="dark"] .ch-link:hover { box-shadow: 0 30px 50px -28px #000; }
+html[data-theme="dark"] .cc-card:hover, html[data-theme="dark"] .cc-card:focus-visible { box-shadow: 0 28px 44px -26px #000; }
+html[data-theme="dark"] .cc-chord, html[data-theme="dark"] .cg-wrap { box-shadow: 0 1px 2px #0006; }
+html[data-theme="dark"] .cc-chord:hover, html[data-theme="dark"] .ch-faq details[open] { box-shadow: 0 30px 50px -34px #000; }
+html[data-theme="dark"] .cc-chord::after { opacity: 0.8; }
+html[data-theme="dark"] .ls-toc { box-shadow: 0 20px 36px -30px #000; }
+html[data-theme="dark"] .ls-chords { background: linear-gradient(180deg, var(--ch-card), var(--ch-soft-2)); box-shadow: 0 24px 40px -34px #000; }
+html[data-theme="dark"] .ls-chord { border-color: var(--ch-line); }
+html[data-theme="dark"] .ls-chord:hover, html[data-theme="dark"] .cc-voicing:hover { box-shadow: 0 20px 34px -22px #000; }
+html[data-theme="dark"] .cc-voicing { background: var(--ch-soft-2); border-color: var(--ch-line); }
+html[data-theme="dark"] .cc-voicing:hover { background: var(--ch-soft); }
+html[data-theme="dark"] .ch-pillrow a:hover { box-shadow: 0 10px 20px -12px #000; }
+
+/* text */
+html[data-theme="dark"] .ls p, html[data-theme="dark"] .ls li { color: #d3c8ea; }
+html[data-theme="dark"] .ls > p:first-child { color: var(--color-ink); }
+html[data-theme="dark"] .ch-link .ch-tag.is-amber, html[data-theme="dark"] .ch-tag.is-amber { background: #3d2a08; color: #fcd34d; }
+html[data-theme="dark"] .ch-tag, html[data-theme="dark"] .cc-deg { background: var(--ch-soft); color: var(--ch-deep); }
+html[data-theme="dark"] .cc-note { background: #3b2766; }
+html[data-theme="dark"] .cc-note:first-child { background: linear-gradient(135deg, #7c3aed, #5b21b6); }
+html[data-theme="dark"] .ch-btn.is-soft { background: var(--ch-soft); color: var(--ch-deep) !important; }
+
+/* the grid table */
+html[data-theme="dark"] .cg th, html[data-theme="dark"] .cg td { border-bottom-color: var(--ch-line); }
+html[data-theme="dark"] .cg thead th, html[data-theme="dark"] .cg thead th:first-child { background: var(--ch-soft-2); }
+html[data-theme="dark"] .cg tbody tr:hover td, html[data-theme="dark"] .cg tbody tr:hover th { background: var(--ch-soft); }
+
+/* the bar under the header */
+html[data-theme="dark"] .cn-panel { background: rgba(20, 10, 36, 0.86); border-bottom-color: #33224fcc; box-shadow: 0 18px 32px -28px #000; }
+html[data-theme="dark"] .cn-seg, html[data-theme="dark"] .cn-notes, html[data-theme="dark"] .cn-tabs { background: var(--ch-soft); box-shadow: none; }
+html[data-theme="dark"] .cn-tabs { box-shadow: inset 0 0 0 1px #3d2b63; }
+html[data-theme="dark"] .cn-seg a:hover { background: #ffffff14; color: #fff; }
+html[data-theme="dark"] .cn-seg a[aria-current] { background: #3b2766; color: #fff; box-shadow: 0 4px 12px -6px #000; }
+html[data-theme="dark"] .cn-note { background: #3b2766; color: var(--color-ink); }
+html[data-theme="dark"] .cn-note.is-sharp { background: #0d0019; color: #efe6ff; }
+html[data-theme="dark"] .cn-note[aria-current] { background: linear-gradient(135deg, #fcd34d, #f59e0b); color: #1a0533; }
+html[data-theme="dark"] .cn-search input::placeholder { color: var(--ch-mute); }
+html[data-theme="dark"] .cn-kbd { background: var(--ch-soft); }
+html[data-theme="dark"] .cn-clear { background: var(--ch-soft); }
+html[data-theme="dark"] .cn-clear:hover { background: #3b2766; }
+html[data-theme="dark"] .cn-switch input { background: #4a3578; }
+html[data-theme="dark"] .cn-tab:hover { color: #fff; }
+html[data-theme="dark"] .cn-msg { color: #fca5a5; }
+
+/* faq, strumming, lesson tiles */
+html[data-theme="dark"] .ch-faq summary::after { background: var(--ch-soft); }
+html[data-theme="dark"] .ch-faq details[open] summary::after { background: #3d2a08; color: #fcd34d; }
+html[data-theme="dark"] .ls-toc a:hover, html[data-theme="dark"] .ls-toc a.is-on { background: var(--ch-soft); color: #fff; }
+html[data-theme="dark"] .ls-tile { background: var(--ch-soft-2); color: #6d5a9c; }
+html[data-theme="dark"] .ls-tile i { color: var(--ch-mute); }
+html[data-theme="dark"] .ls-tile.is-down { background: linear-gradient(180deg, #7c3aed, #5b21b6); color: #fff; }
+html[data-theme="dark"] .ls-tile.is-up { background: #c4b5fd; color: #2e1065; }
+html[data-theme="dark"] .ls-tile.is-down i, html[data-theme="dark"] .ls-tile.is-up i { color: inherit; }
+
+/* the piano note picker: white keys become soft lavender keys */
+html[data-theme="dark"] .nk { filter: drop-shadow(0 24px 24px #00000066); }
+html[data-theme="dark"] .nk-w { background: linear-gradient(180deg, #e9e2f7 0%, #d8cdf0 100%); border-color: #7a6aa3; }
+html[data-theme="dark"] .nk-b { box-shadow: inset 0 -5px 0 #ffffff14, 0 8px 12px -6px #000; }
+
+/* the floating cards in the hero */
+html[data-theme="dark"] .ch-fc { background: linear-gradient(180deg, #2a1a4a 0%, #1f1238 100%); box-shadow: 0 30px 60px -24px #000, 0 0 0 1px #ffffff26; }
+
+@keyframes ch-flash-dark { 0% { background: color-mix(in srgb, var(--g, #a78bfa) 18%, #1c1131); } 100% { background: #1c1131; } }
+html[data-theme="dark"] .cc-chord:target { animation-name: ch-flash-dark; }
+html[data-theme="dark"] .nk-w { color: #1a0533 !important; }
+html[data-theme="dark"] .nk-w:hover, html[data-theme="dark"] .nk-w:focus-visible { color: #fff !important; }
+html[data-theme="dark"] .nk [aria-current] { color: #1a0533 !important; }

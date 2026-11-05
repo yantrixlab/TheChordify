@@ -284,6 +284,11 @@ html[data-theme="dark"] {
 }
 html[data-theme="dark"] body { background: var(--color-canvas); color: var(--color-body); }
 html[data-theme="dark"] .nav-blur { background: rgba(20, 10, 36, 0.82); }
+/* the shared bits (favourite heart, level ring, plan cards and switch, home sections) in the dark theme */
+html[data-theme="dark"] .hb { background: #1c1131ee; color: #a99cc9; box-shadow: 0 2px 10px -2px #000; }
+html[data-theme="dark"] .hb.hb-row { background: #1c1131; }
+html[data-theme="dark"] .lr-track { stroke: var(--lr-track, #3d2b63); }
+html[data-theme="dark"] .lr-lv { box-shadow: 0 0 0 2px #1c1131, 0 3px 8px -2px #0006; }
 
 /* ── Nav ── */
 .nav-blur {
@@ -424,6 +429,31 @@ html[data-theme="dark"] .nav-blur { background: rgba(20, 10, 36, 0.82); }
 .pr-card.is-featured .pr-was { color: #b9a6e0; text-decoration-color: #fb7185; }
 .pr-was-total { color: var(--color-mute); text-decoration-thickness: 1.5px; text-decoration-color: #e11d48; }
 .pr-card.is-featured .pr-was-total { color: #9d89c9; text-decoration-color: #fb7185; }
+
+/* pricing in the dark theme */
+html[data-theme="dark"] .pr-switch, html[data-theme="dark"] .pr-card, html[data-theme="dark"] .pr-table-wrap, html[data-theme="dark"] .pr-faq details, html[data-theme="dark"] .pr-cancel { background: #1c1131; }
+html[data-theme="dark"] .pr-switch { box-shadow: 0 8px 24px -16px #000; }
+html[data-theme="dark"] .pr-switch button:not(.is-on):hover { color: #fff; }
+html[data-theme="dark"] .pr-save, html[data-theme="dark"] .pr-soon { background: #3d2a08; color: #fcd34d; }
+html[data-theme="dark"] .pr-card { box-shadow: 0 1px 2px #0006; }
+html[data-theme="dark"] .pr-card:hover { box-shadow: 0 30px 50px -30px #000; }
+html[data-theme="dark"] .pr-card.is-featured { box-shadow: 0 40px 70px -34px #5b21b6; border: 1px solid #5b3a9e; }
+html[data-theme="dark"] .pr-bill em { color: #fbbf24; }
+html[data-theme="dark"] .pr-cta:hover:not(:disabled) { background: #3a2663; }
+html[data-theme="dark"] .pr-card.is-featured .pr-cta:hover:not(:disabled) { background: linear-gradient(135deg, #fde68a, #fbbf24); }
+html[data-theme="dark"] .pr-banner { background: linear-gradient(135deg, #2a1a4a, #2c1640); border-color: #4d3875; }
+html[data-theme="dark"] .pr-cancel { border-color: #6b2330; color: #fca5a5; }
+html[data-theme="dark"] .pr-cancel:hover:not(:disabled) { background: #3a1218; }
+html[data-theme="dark"] .pr-table thead th { background: #231540; }
+html[data-theme="dark"] .pr-table thead th.is-featured, html[data-theme="dark"] .pr-table td.is-featured { background: #271748; }
+html[data-theme="dark"] .pr-table .pr-group th { background: #1c1131; }
+html[data-theme="dark"] .pr-table .pr-label, html[data-theme="dark"] .pr-table td { border-top-color: #2a1a4a; }
+html[data-theme="dark"] .pr-table td.is-yes { color: #34d399; }
+html[data-theme="dark"] .pr-table td.is-no { color: #6d5a9c; }
+html[data-theme="dark"] .pr-tick { color: #34d399; }
+html[data-theme="dark"] .pr-card.is-featured .pr-tick { color: #fcd34d; }
+html[data-theme="dark"] .pr-was-total, html[data-theme="dark"] .pr-was { color: var(--color-mute); }
+html[data-theme="dark"] .pr-faq details[open] { border-color: #4d3875; }
 
 /* ── Home page sections: one quiet style (ink, white, soft grey, a single violet accent) ── */
 .hs { padding: 104px 24px; background: #fff; }

@@ -3,7 +3,7 @@ import Layout from "../layouts/Layout.astro";
 import Nav from "../components/Nav.astro";
 ---
 
-<Layout title="Listening… — Chord Suno" noindex>
+<Layout title="Listening… — Chord Suno" noindex themeable>
   <Nav />
   <main id="main-content" class="gradient-hero" style="min-height:100vh;padding:140px var(--space-lg);">
     <div class="max-w-2xl mx-auto" style="text-align:center;">
@@ -123,3 +123,9 @@ import Nav from "../components/Nav.astro";
 
   poll();
 </script>
+
+<style is:global>
+  /* the error text and link have inline light-theme colours */
+  html[data-theme="dark"] #error-text { color: #fca5a5 !important; }
+  html[data-theme="dark"] #error-box a { color: #c4b5fd !important; }
+</style>

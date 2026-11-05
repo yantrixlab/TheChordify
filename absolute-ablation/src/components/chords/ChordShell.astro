@@ -14,7 +14,7 @@ interface Props {
 const { title, description, jsonLd = [] } = Astro.props;
 ---
 
-<Layout title={title} description={description} jsonLd={jsonLd}>
+<Layout title={title} description={description} jsonLd={jsonLd} themeable>
   <script is:inline>document.documentElement.classList.add("ch-js");</script>
   <Nav />
   <main id="main-content" class="ch">

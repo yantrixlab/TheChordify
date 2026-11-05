@@ -20,10 +20,10 @@ interface Options {
 const ROWS = 5;
 
 export function diagramSvg(shape: GuitarShape, options: Options = {}): string {
-  const dot = options.dot ?? "#7c3aed";
-  const ink = options.ink ?? "#0d001f";
-  const line = options.line ?? "#c4b0e0";
-  const label = options.label ?? "#ffffff";
+  const dot = options.dot ?? "var(--dg-dot, #7c3aed)";
+  const ink = options.ink ?? "var(--dg-ink, #0d001f)";
+  const line = options.line ?? "var(--dg-line, #c4b0e0)";
+  const label = options.label ?? "var(--dg-label, #ffffff)";
   const base = shape.baseFret ?? 1;
   const n = shape.frets.length; // 6 on the guitar, 4 on the ukulele and the mandolin
   const last = n - 1;
@@ -38,7 +38,7 @@ export function diagramSvg(shape: GuitarShape, options: Options = {}): string {
 
   // open and muted strings above the nut
   shape.frets.forEach((fret, i) => {
-    if (fret === "x") parts.push(`<path d="M${x(i) - 3.2} 20.8l6.4 6.4m0 -6.4l-6.4 6.4" stroke="#dc2626" stroke-width="1.6" stroke-linecap="round"/>`);
+    if (fret === "x") parts.push(`<path d="M${x(i) - 3.2} 20.8l6.4 6.4m0 -6.4l-6.4 6.4" stroke="var(--dg-x, #dc2626)" stroke-width="1.6" stroke-linecap="round"/>`);
     else if (fret === "0") parts.push(`<circle cx="${x(i)}" cy="24" r="3.6" fill="none" stroke="${ink}" stroke-width="1.5"/>`);
   });
 
