@@ -6,27 +6,27 @@ let counter = 0;
 
 const channel = (hex: string, at: number) => parseInt(hex.slice(at, at + 2), 16);
 /** Mixes two #rrggbb colours: 0 is all `a`, 1 is all `b`. */
-function mix(a: string, b: string, t: number): string {
+export function mix(a: string, b: string, t: number): string {
   const part = (i: number) => Math.round(channel(a, i) * (1 - t) + channel(b, i) * t).toString(16).padStart(2, "0");
   return `#${part(1)}${part(3)}${part(5)}`;
 }
-const lighten = (hex: string, t: number) => mix(hex, "#ffffff", t);
-const darken = (hex: string, t: number) => mix(hex, "#000000", t);
+export const lighten = (hex: string, t: number) => mix(hex, "#ffffff", t);
+export const darken = (hex: string, t: number) => mix(hex, "#000000", t);
 
 // the outline of a pick: wide shoulders, a rounded point
 const OUTLINE = "M32 60.5C26 58.5 7 41 7 22.5C7 12 17 5.5 32 5.5C47 5.5 57 12 57 22.5C57 41 38 58.5 32 60.5Z";
 
-type Material = "tortoise" | "nylon" | "jade" | "metal" | "bone" | "abalone" | "carbon" | "crystal" | "holo" | "plain";
+export type Material = "tortoise" | "nylon" | "jade" | "metal" | "bone" | "abalone" | "carbon" | "crystal" | "holo" | "plain";
 
-const MATERIALS: [RegExp, Material][] = [
+export const MATERIALS: [RegExp, Material][] = [
   [/tortoise/, "tortoise"],
   [/nylon/, "nylon"],
   [/jade/, "jade"],
-  [/copper|brass|gold|silver|platinum/, "metal"],
+  [/bronze|copper|brass|gold|silver|platinum/, "metal"],
   [/bone/, "bone"],
   [/abalone/, "abalone"],
   [/carbon/, "carbon"],
-  [/amethyst|sapphire|ruby|diamond/, "crystal"],
+  [/amethyst|sapphire|ruby|diamond|emerald/, "crystal"],
   [/eternal/, "holo"],
 ];
 
