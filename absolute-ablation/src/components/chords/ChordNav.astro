@@ -1,6 +1,8 @@
 ---
-// The bar that stays under the site's header on a chart: the four instruments, the twelve notes, a search box ("F#m7" goes straight to
-// that chord), an "easy chords only" switch and, where there are many sections, links that jump to each.
+// The bar that stays under the site's header on a chart. Top: the four instruments, a search box ("F#m7" goes straight to that chord; press
+// "/" anywhere to start typing) and a switch for "easy chords only". Then the twelve notes as one strip, and "Jump to" as tabs whose
+// underline slides to the section being read. While the page is scrolled down the top two rows tuck away (scroll up, or press the search
+// button, to bring them back); the page below never moves, because the bar keeps its place in the flow.
 import { INSTRUMENTS, ROOTS, notePath, type InstrumentKey } from "../../lib/chordCatalog";
 
 interface Props {
@@ -14,29 +16,49 @@ const { instrument, rootSlug, chips = [], easy = true, here = "chart" } = Astro.
 ---
 
 <div class="cn" id="chord-nav" data-instrument={instrument}>
-  <div class="cn-in">
-    <div class="cn-row cn-top">
-      <span class="cn-label">Chords for</span>
-      <span class="cn-group" aria-label="Instrument">
-        {INSTRUMENTS.map((i) => <a class="cn-pill" href={i.chartPath} aria-current={i.key === instrument && here === "chart" ? "page" : undefined}>{i.name}</a>)}
-      </span>
-      <form class="cn-search" role="search" id="cn-form">
-        <input type="search" id="cn-q" placeholder="Find a chord: F#m7, Bbmaj7…" aria-label="Find a chord" autocomplete="off" />
-        <button type="submit">Find</button>
-      </form>
-      {easy && <label class="cn-easy"><input type="checkbox" id="cn-easy" /> Easy chords only</label>}
-      <span class="cn-msg" id="cn-msg" role="status"></span>
-    </div>
-    <div class="cn-row" aria-label="Note">
-      <span class="cn-label">Note</span>
-      {ROOTS.map((r) => <a class="cn-pill cn-root" href={notePath(instrument, r)} aria-current={r.slug === rootSlug ? "page" : undefined} title={`All ${r.label} chords`}>{r.short}</a>)}
-    </div>
-    {chips.length > 0 && (
-      <div class="cn-row" aria-label="Jump to">
-        <span class="cn-label">Jump to</span>
-        {chips.map((c) => <a class="cn-chip" href={c.href}>{c.label}</a>)}
+  <div class="cn-panel">
+    <div class="cn-in">
+      <div class="cn-fold">
+        <div class="cn-fold-in" id="cn-fold">
+          <div class="cn-row cn-top">
+            <span class="cn-label">Chords for</span>
+            <span class="cn-seg" role="group" aria-label="Instrument">
+              {INSTRUMENTS.map((i) => <a href={i.chartPath} aria-current={i.key === instrument && here === "chart" ? "page" : undefined}>{i.name}</a>)}
+            </span>
+            <form class="cn-search" role="search" id="cn-form">
+              <svg class="cn-sicon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+              <input type="search" id="cn-q" placeholder="Find a chord: F#m7, Bbmaj7…" aria-label="Find a chord" autocomplete="off" spellcheck="false" />
+              <kbd class="cn-kbd" aria-hidden="true">/</kbd>
+              <button type="button" class="cn-clear" id="cn-clear" aria-label="Clear the search" hidden>×</button>
+              <button type="submit" class="cn-go" aria-label="Go to this chord"><svg width="16" height="16" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M3 7h8M7 3l4 4-4 4" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" /></svg></button>
+            </form>
+            {easy && <label class="cn-switch"><input type="checkbox" role="switch" id="cn-easy" /><span>Easy chords only</span></label>}
+            <span class="cn-msg" id="cn-msg" role="status"></span>
+          </div>
+          <div class="cn-row cn-notes-row">
+            <span class="cn-label">Note</span>
+            <span class="cn-notes" role="group" aria-label="Note">
+              {ROOTS.map((r) => <a class={`cn-note${r.name.includes("#") ? " is-sharp" : ""}`} href={notePath(instrument, r)} aria-current={r.slug === rootSlug ? "page" : undefined} title={`All ${r.label} chords`}>{r.short}</a>)}
+            </span>
+          </div>
+        </div>
       </div>
-    )}
+      {
+        chips.length > 0 && (
+          <div class="cn-tabrow">
+            <span class="cn-label">Jump to</span>
+            <nav class="cn-tabs" id="cn-tabs" aria-label="Jump to a section">
+              {chips.map((c) => <a class="cn-tab" href={c.href}>{c.label}</a>)}
+              <i class="cn-ind" id="cn-ind" aria-hidden="true"></i>
+            </nav>
+            <button type="button" class="cn-expand" id="cn-expand" aria-label="Search and change the instrument or note">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+              <span>Find a chord</span>
+            </button>
+          </div>
+        )
+      }
+    </div>
   </div>
 </div>
 
@@ -46,11 +68,16 @@ const { instrument, rootSlug, chips = [], easy = true, here = "chart" } = Astro.
   const nav = document.getElementById("chord-nav");
   if (nav) {
     const instrument = nav.dataset.instrument as InstrumentKey;
+    const panel = nav.querySelector<HTMLElement>(".cn-panel")!;
+    const fold = document.getElementById("cn-fold")!;
     const form = document.getElementById("cn-form") as HTMLFormElement;
     const input = document.getElementById("cn-q") as HTMLInputElement;
+    const clear = document.getElementById("cn-clear") as HTMLButtonElement;
     const message = document.getElementById("cn-msg")!;
+    const wide = matchMedia("(min-width: 641px)"); // below this the bar scrolls with the page, whole
+    const reduce = matchMedia("(prefers-reduced-motion: reduce)");
 
-    // search: a chord's name goes to its place on its note's page
+    // ---- search: a chord's name goes to its place on its note's page -----------------------------------------------------------
     form.addEventListener("submit", (event) => {
       event.preventDefault();
       const hit = resolveChord(input.value);
@@ -64,9 +91,36 @@ const { instrument, rootSlug, chips = [], easy = true, here = "chart" } = Astro.
       if (here.pathname === location.pathname) location.hash = here.hash;
       else location.href = target;
     });
-    input.addEventListener("input", () => (message.textContent = ""));
+    input.addEventListener("input", () => {
+      message.textContent = "";
+      clear.hidden = input.value === "";
+      form.classList.toggle("has-value", input.value !== "");
+    });
+    clear.addEventListener("click", () => {
+      input.value = "";
+      clear.hidden = true;
+      form.classList.remove("has-value");
+      message.textContent = "";
+      input.focus();
+    });
+    // "/" starts a search from anywhere on the page, as on most documentation sites. On a chart it means "find a chord", so this runs in the
+    // capture phase and stops the header's own "/" (which opens the song search) from also taking it.
+    addEventListener(
+      "keydown",
+      (event) => {
+        if (event.key !== "/" || event.ctrlKey || event.metaKey || event.altKey) return;
+        const typing = (event.target as HTMLElement | null)?.closest("input, textarea, select, [contenteditable='true']");
+        if (typing) return;
+        event.preventDefault();
+        event.stopPropagation();
+        setCompact(false);
+        input.focus();
+        input.select();
+      },
+      true,
+    );
 
-    // easy chords only: hide the ways to play that need a barre or sit high on the neck; a chord with none left is hidden too
+    // ---- easy chords only: hide the ways to play that need a barre or sit high on the neck; a chord with none left is hidden too ----
     const easy = document.getElementById("cn-easy") as HTMLInputElement | null;
     const KEY = "chordsuno-easy-chords";
     const apply = () => {
@@ -92,5 +146,122 @@ const { instrument, rootSlug, chips = [], easy = true, here = "chart" } = Astro.
       });
       apply();
     }
+
+    // ---- the bar keeps its full height in the page's flow (so nothing below it moves) while its look can shrink ---------------------
+    let compact = false;
+    let holdUntil = 0; // after the person asks for the top rows, they stay for a moment
+    const measure = () => {
+      if (!wide.matches) {
+        nav.style.removeProperty("--cn-h");
+        return;
+      }
+      const was = compact;
+      nav.classList.remove("is-compact");
+      nav.style.setProperty("--cn-h", `${panel.offsetHeight}px`);
+      if (was) nav.classList.add("is-compact");
+    };
+    function setCompact(next: boolean) {
+      if (next && !wide.matches) next = false;
+      if (next === compact) return;
+      compact = next;
+      nav!.classList.toggle("is-compact", compact);
+      if (compact) fold.setAttribute("inert", "");
+      else fold.removeAttribute("inert");
+    }
+    const ready = () => measure();
+    if (document.fonts?.ready) document.fonts.ready.then(ready);
+    addEventListener("load", ready);
+    addEventListener("resize", () => {
+      measure();
+      if (!wide.matches) setCompact(false);
+    });
+    nav.addEventListener("focusin", () => {
+      if (fold.contains(document.activeElement)) setCompact(false);
+    });
+    document.getElementById("cn-expand")?.addEventListener("click", () => {
+      holdUntil = performance.now() + 4000;
+      setCompact(false);
+      input.focus();
+    });
+
+    // ---- "Jump to": the tab of the section being read is lit, with an underline that slides to it -------------------------------------
+    const tabsEl = document.getElementById("cn-tabs");
+    const ind = document.getElementById("cn-ind") as HTMLElement | null;
+    const tabs = tabsEl ? [...tabsEl.querySelectorAll<HTMLAnchorElement>(".cn-tab")] : [];
+    const targets = tabs.map((t) => document.getElementById(decodeURIComponent(t.hash.slice(1))));
+    const LINE = 256; // a section is the current one once its top is above this line: just under the bar, past the 236px an anchor jump leaves
+    let current = -2;
+    function show(index: number) {
+      if (index === current) return;
+      current = index;
+      tabs.forEach((t, i) => {
+        t.classList.toggle("is-on", i === index);
+        if (i === index) t.setAttribute("aria-current", "location");
+        else t.removeAttribute("aria-current");
+      });
+      if (!ind || !tabsEl) return;
+      if (index < 0) {
+        ind.style.opacity = "0";
+        return;
+      }
+      const tab = tabs[index];
+      ind.style.opacity = "1";
+      ind.style.transform = `translateX(${tab.offsetLeft}px) scaleX(${tab.offsetWidth / 100})`;
+      // keep the lit tab in view when the row is wider than the screen
+      const left = tab.offsetLeft - 24;
+      const right = tab.offsetLeft + tab.offsetWidth + 24;
+      if (left < tabsEl.scrollLeft || right > tabsEl.scrollLeft + tabsEl.clientWidth) {
+        tabsEl.scrollTo({ left: Math.max(0, tab.offsetLeft - (tabsEl.clientWidth - tab.offsetWidth) / 2), behavior: reduce.matches ? "auto" : "smooth" });
+      }
+    }
+    function spy() {
+      let best = -1;
+      let bestTop = -Infinity;
+      targets.forEach((el, i) => {
+        if (!el || el.hidden) return;
+        const top = el.getBoundingClientRect().top;
+        if (top <= LINE && top > bestTop) {
+          best = i;
+          bestTop = top;
+        }
+      });
+      if (innerHeight + scrollY >= document.documentElement.scrollHeight - 4 && tabs.length) best = Math.max(best, tabs.length - 1);
+      show(best);
+    }
+    tabs.forEach((t, i) => t.addEventListener("click", () => show(i)));
+    const fades = () => {
+      if (!tabsEl) return;
+      tabsEl.classList.toggle("fade-l", tabsEl.scrollLeft > 4);
+      tabsEl.classList.toggle("fade-r", tabsEl.scrollLeft + tabsEl.clientWidth < tabsEl.scrollWidth - 4);
+    };
+    tabsEl?.addEventListener("scroll", fades, { passive: true });
+
+    // ---- one scroll handler for both: which tab is lit, and whether the top rows are tucked away ---------------------------------
+    let lastY = scrollY;
+    let queued = false;
+    const onScroll = () => {
+      queued = false;
+      const y = scrollY;
+      const stuck = wide.matches && nav.getBoundingClientRect().top <= 66;
+      const moved = y - lastY;
+      if (!stuck || fold.contains(document.activeElement) || performance.now() < holdUntil) setCompact(false);
+      else if (moved > 10) setCompact(true);
+      else if (moved < -10) setCompact(false);
+      if (Math.abs(moved) > 10) lastY = y;
+      spy();
+    };
+    addEventListener(
+      "scroll",
+      () => {
+        if (!queued) {
+          queued = true;
+          requestAnimationFrame(onScroll);
+        }
+      },
+      { passive: true },
+    );
+    measure();
+    fades();
+    spy();
   }
 </script>
