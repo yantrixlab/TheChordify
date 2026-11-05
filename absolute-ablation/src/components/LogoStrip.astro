@@ -27,6 +27,8 @@ const stats = [
   .hs-stat + .hs-stat { border-left: 1px solid #eeeaf5; }
   .hs-stat dt { font-size: clamp(22px, 2.6vw, 30px); font-weight: 700; letter-spacing: -0.03em; line-height: 1.15; color: var(--color-ink); }
   .hs-stat dd { margin: 6px 0 0; font-size: 13.5px; color: var(--color-mute); }
+  :global(html[data-theme="dark"]) .hs-stats { background: #140a24; border-color: #2a1a4a; }
+  :global(html[data-theme="dark"]) .hs-stat + .hs-stat { border-color: #2a1a4a; }
   @media (max-width: 760px) {
     .hs-stats { padding: 26px 18px; }
     .hs-stats-in { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 22px; }

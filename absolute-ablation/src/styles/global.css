@@ -471,5 +471,12 @@ html[data-theme="dark"] .pr-faq details[open] { border-color: #4d3875; }
 .hs-ico svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
 .hs-tag { display: inline-block; padding: 3px 9px; border-radius: 999px; background: #f1ecfc; font: 600 11px var(--font-mono); letter-spacing: 0.02em; color: var(--color-violet-deep); }
 .hs-tag.is-dark { background: var(--color-ink); color: #fff; }
+html[data-theme="dark"] .hs { background: #140a24; }
+html[data-theme="dark"] .hs.is-soft { background: #1a0f2e; }
+html[data-theme="dark"] .hs-title em { color: #a78bfa; }
+html[data-theme="dark"] .hs-card { background: #1c1131; border-color: #33224f; box-shadow: 0 1px 2px #0006, 0 14px 30px -20px #000; }
+html[data-theme="dark"] .hs-card:hover { border-color: #6d4fb5; box-shadow: 0 2px 4px #0006, 0 24px 40px -22px #000; }
+html[data-theme="dark"] .hs-ico, html[data-theme="dark"] .hs-tag { background: #2a1a4a; }
+html[data-theme="dark"] .hs-tag.is-dark { background: #7c3aed; color: #fff; }
 @media (max-width: 640px) { .hs { padding: 72px 18px; } .hs-head { margin-bottom: 38px; } }
 @media (prefers-reduced-motion: reduce) { .hs-card { transition: none; } .hs-card:hover { transform: none; } }

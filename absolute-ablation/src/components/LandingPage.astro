@@ -38,7 +38,7 @@ const jsonLd = [
 ];
 ---
 
-<Layout title={page.title} description={page.description} jsonLd={jsonLd}>
+<Layout title={page.title} description={page.description} jsonLd={jsonLd} themeable>
   <Nav />
   <main id="main-content" class="lp">
     <!-- Hero -->
@@ -309,6 +309,26 @@ const jsonLd = [
   .lp-cta-in { max-width: 640px; margin: 0 auto; }
   .lp-cta h2 { margin: 0 0 12px; font-size: clamp(28px, 4vw, 40px); font-weight: 700; letter-spacing: -0.035em; line-height: 1.1; color: #fff; text-wrap: balance; }
   .lp-cta p { margin: 0 0 28px; font-size: 17px; line-height: 1.6; color: #b7acd0; }
+
+  /* dark theme */
+  html[data-theme="dark"] .lp { background: #140a24; }
+  html[data-theme="dark"] .lp-hero { background: radial-gradient(70% 90% at 85% 0%, #3b1d7a66 0%, transparent 60%), radial-gradient(60% 80% at 0% 100%, #2c1b4d88 0%, transparent 60%), #170b29; border-bottom-color: #2a1a4a; }
+  html[data-theme="dark"] .lp-btn.is-primary { background: #7c3aed; color: #fff; box-shadow: 0 16px 30px -16px #7c3aedaa; }
+  html[data-theme="dark"] .lp-btn.is-primary:hover { background: #8b4df0; }
+  html[data-theme="dark"] .lp-btn.is-ghost { background: #1c1131; border-color: #4d3875; color: #c4b5fd; }
+  html[data-theme="dark"] .lp-btn.is-ghost:hover { background: #2a1a4a; }
+  html[data-theme="dark"] .lp-btn.is-light { color: #0d001f; }
+  html[data-theme="dark"] .lp-chips li { background: #1c1131; border-color: #33224f; }
+  html[data-theme="dark"] .lp-chips li::before { color: #a78bfa; }
+  html[data-theme="dark"] .lp-step-n { background: #7c3aed; }
+  html[data-theme="dark"] .lp-table th, html[data-theme="dark"] .lp-table td { border-bottom-color: #2a1a4a; }
+  html[data-theme="dark"] .lp-table td.num span { background: #2a1a4a; }
+  html[data-theme="dark"] .lp-table td.num span.open { border-color: #4d3875; }
+  html[data-theme="dark"] .lp-prose li::before { background-color: #2c1b4d; }
+  html[data-theme="dark"] .lp-q { background: #1c1131; border-color: #33224f; box-shadow: 0 1px 2px #0006; }
+  html[data-theme="dark"] .lp-q[open] { border-color: #4d3875; box-shadow: 0 18px 32px -24px #000; }
+  html[data-theme="dark"] .lp-q summary::after { background: #2a1a4a; }
+  html[data-theme="dark"] .lp-q[open] summary::after { background: #7c3aed; color: #fff; }
 
   @media (max-width: 960px) {
     .lp-hero { padding: 44px 20px 52px; }

@@ -368,6 +368,31 @@ const sparkles = [
     .star, .orb, .eq i, .title-grad, .card { animation: none; }
   }
 
+  /* ── dark theme ── */
+  :global(html[data-theme="dark"]) .hero { background: radial-gradient(ellipse 80% 55% at 50% -8%, #7c3aed40, transparent 70%), linear-gradient(180deg, #170b29 0%, #140a24 60%, #140a24 100%); }
+  :global(html[data-theme="dark"]) .orb { opacity: 0.32; }
+  :global(html[data-theme="dark"]) .o2 { opacity: 0.16; }
+  :global(html[data-theme="dark"]) .o3 { opacity: 0.22; }
+  :global(html[data-theme="dark"]) .dots { background-image: radial-gradient(#a78bfa33 1px, transparent 1.3px); }
+  :global(html[data-theme="dark"]) .chip { color: color-mix(in srgb, var(--c) 70%, #fff); background: color-mix(in srgb, var(--c) 16%, rgba(28, 17, 49, 0.8)); }
+  :global(html[data-theme="dark"]) .eyebrow { background: rgba(255, 255, 255, 0.06); border-color: #4d3875; color: #d8ccf5; box-shadow: 0 8px 24px -12px #000; }
+  :global(html[data-theme="dark"]) .title-grad { background-image: linear-gradient(100deg, #a78bfa 0%, #e879f9 45%, #fbbf24 100%); background-size: 160% 100%; }
+  :global(html[data-theme="dark"]) .card { box-shadow: 0 30px 60px -28px #000, 0 12px 28px -12px #0008; }
+  :global(html[data-theme="dark"]) .card-body { background: rgba(28, 17, 49, 0.94); }
+  :global(html[data-theme="dark"]) .tabs { background: #2a1a4a; }
+  :global(html[data-theme="dark"]) .tab[aria-selected="true"] { background: #4a3578; color: #fff; box-shadow: 0 1px 2px #0006, 0 6px 14px -6px #000; }
+  :global(html[data-theme="dark"]) .field input { background: #231540; }
+  :global(html[data-theme="dark"]) .field input::placeholder { color: var(--color-mute); }
+  :global(html[data-theme="dark"]) .field input:focus { background: #2a1a4a; box-shadow: 0 0 0 4px #7c3aed44; }
+  :global(html[data-theme="dark"]) .drop { background: #231540; border-color: #4d3875; }
+  :global(html[data-theme="dark"]) .drop:hover, :global(html[data-theme="dark"]) .drop.drag { background: #2a1a4a; }
+  :global(html[data-theme="dark"]) .drop-icon { background: #1c1131; color: #a78bfa; box-shadow: 0 6px 16px -8px #000, 0 0 0 1px #33224f; }
+  :global(html[data-theme="dark"]) .drop strong { color: #a78bfa; }
+  :global(html[data-theme="dark"]) .chip-btn { background: #1c1131; }
+  :global(html[data-theme="dark"]) .chip-btn:hover { color: #fff; }
+  :global(html[data-theme="dark"]) .chip-btn[aria-pressed="true"] { background: linear-gradient(135deg, #7c3aed, #5b21b6); }
+  :global(html[data-theme="dark"]) .trust svg { color: #34d399; }
+
   /* ── small screens ── */
   @media (max-width: 720px) {
     .hero { padding: 88px 18px 64px; }
