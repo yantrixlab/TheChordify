@@ -298,8 +298,8 @@ html[data-theme="dark"] .lr-lv { box-shadow: 0 0 0 2px #131116, 0 3px 8px -2px #
 
 /* ── Nav ── */
 .nav-blur {
-  backdrop-filter: blur(12px) saturate(150%);
-  -webkit-backdrop-filter: blur(12px) saturate(150%);
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
   background: rgba(253, 249, 255, 0.85);
 }
 
