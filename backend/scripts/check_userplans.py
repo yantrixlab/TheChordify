@@ -191,5 +191,21 @@ sessions = main.accounts.start_session(e["id"])
 r = TestClient(main.app, base_url="http://testserver").delete("/api/me", headers={"Authorization": f"Bearer {sessions}"})
 check("the paid plan is cancelled even though a gift sits on top", r.status_code == 200 and ("sub_paid2", False) in cancelled, f"{r.status_code} {r.text} {cancelled}")
 
+print("== editing a plan from the admin (its name, button text and so on)")
+admin = TestClient(main.app, base_url="http://testserver")  # nobody signed in on this one: the admin token alone
+listed = main.plans.pricing()
+edit_plan = [p for p in main.plans.list_plans() if not p["isFree"]][0]
+r = admin.put(
+    f"/api/admin/plans/{edit_plan['id']}", headers=TOKEN,
+    json={"code": edit_plan["code"], "name": edit_plan["name"], "description": "d", "badge": "Most popular", "cta": "Go Jammer Pro", "featured": True, "active": True, "sortOrder": 2},
+)
+check("saving a plan with a new button text works", r.status_code == 200 and r.json()["plan"]["cta"] == "Go Jammer Pro", f"{r.status_code} {r.text[:200]}")
+check("and the pricing page shows it", any(p["cta"] == "Go Jammer Pro" for p in admin.get("/api/pricing").json()["plans"]))
+r = admin.post(
+    "/api/admin/plans", headers=TOKEN,
+    json={"code": "extra-check", "name": "Extra", "description": "", "badge": "", "cta": "Go Extra", "featured": False, "active": False, "sortOrder": 9},
+)
+check("creating a plan works", r.status_code == 200, f"{r.status_code} {r.text[:200]}")
+
 print(f"\npassed {passed}, failed {failed}")
 sys.exit(1 if failed else 0)

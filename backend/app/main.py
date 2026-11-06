@@ -990,7 +990,7 @@ def admin_users(request: Request, search: str = "", page: int = 1, pageSize: int
 # Plans are not privileges, so any person may be given one (an administrator too); the permission is what matters.
 
 
-class PlanBody(BaseModel):
+class UserPlanBody(BaseModel):
     action: str  # give | extend | end | stop_renewal
     planId: str = ""
     unit: str = ""  # days | months | years | lifetime | until
@@ -1001,7 +1001,7 @@ class PlanBody(BaseModel):
 _UNIT_LIMITS = {"days": 3650, "months": 120, "years": 10}
 
 
-def _plan_end(body: PlanBody, start: float) -> float:
+def _plan_end(body: UserPlanBody, start: float) -> float:
     """When a plan given for this length ends (0: no end date)."""
     if body.unit == "lifetime":
         return 0.0
@@ -1050,7 +1050,7 @@ def admin_user_plan(user_id: str, request: Request) -> dict:
 
 
 @app.post("/api/admin/users/{user_id}/plan")
-def admin_user_plan_change(user_id: str, body: PlanBody, request: Request) -> dict:
+def admin_user_plan_change(user_id: str, body: UserPlanBody, request: Request) -> dict:
     actor = _require_perm(request, "users.plans")
     target = accounts.get_user(user_id)
     if not target:
