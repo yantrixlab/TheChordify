@@ -14,6 +14,7 @@ export type Block =
 export interface Lesson {
   slug: string;
   title: string;
+  seoTitle?: string; // the <title> (before " — Chord Suno"), written for what people search; the page heading stays `title`
   summary: string; // one line, for the lists
   description: string; // the meta description
   instruments: InstrumentKey[]; // who it is for (empty: everybody)
@@ -56,6 +57,7 @@ export const LESSONS: Lesson[] = [
   {
     slug: "read-chord-diagrams",
     title: "How to read a chord diagram",
+    seoTitle: "How to Read Chord Diagrams: Guitar Chord Charts",
     summary: "Strings, frets, dots, circles and crosses: what every part of a guitar, ukulele, mandolin or piano diagram means.",
     description: "How to read a chord diagram for guitar, ukulele, mandolin and piano: strings, frets, finger numbers, open and muted strings, barres and keyboard diagrams.",
     instruments: [],
@@ -84,6 +86,7 @@ export const LESSONS: Lesson[] = [
   {
     slug: "beginner-guitar-chords",
     title: "The first guitar chords to learn",
+    seoTitle: "Easy Guitar Chords for Beginners: The First 8",
     summary: "Em, Am, E, A, D, C, G and Dm, in the order that makes them easiest, and four progressions that play hundreds of songs.",
     description: "The first guitar chords for beginners: Em, Am, E, A, D, C, G and Dm with diagrams, the best order to learn them, and four easy chord progressions.",
     instruments: ["guitar"],
@@ -107,6 +110,7 @@ export const LESSONS: Lesson[] = [
   {
     slug: "barre-chords",
     title: "Barre chords: the shapes that move up the neck",
+    seoTitle: "Barre Chords on Guitar: Shapes, Names and Tips",
     summary: "Learn two shapes, the E shape and the A shape, and you can play every major and minor chord anywhere on the neck.",
     description: "How to play barre chords on guitar: the E shape and the A shape, how to name any barre chord from its fret, and how to build the strength to play them.",
     instruments: ["guitar"],
@@ -134,8 +138,9 @@ export const LESSONS: Lesson[] = [
   {
     slug: "major-minor-and-seventh-chords",
     title: "Major, minor and 7th chords",
+    seoTitle: "Major, Minor and 7th Chords: Notes & Formulas",
     summary: "What a chord is made of, and the formulas behind major, minor, 7th, major 7th, minor 7th, sus and diminished chords.",
-    description: "What makes a chord major, minor or a 7th chord: the notes and formulas of major, minor, dominant 7th, major 7th, minor 7th, sus2, sus4, diminished and augmented chords.",
+    description: "What makes a chord major, minor or 7th: the notes and formulas of major, minor, dominant 7th, major 7th, minor 7th, sus2, sus4, diminished and augmented chords.",
     instruments: [],
     level: "Next step",
     minutes: 7,
@@ -173,6 +178,7 @@ export const LESSONS: Lesson[] = [
   {
     slug: "piano-chords-and-inversions",
     title: "Piano chords and inversions",
+    seoTitle: "Piano Chords for Beginners: Triads & Inversions",
     summary: "Triads, root position and inversions, and how to move between chords with the smallest steps.",
     description: "Piano chords for beginners: how triads work, root position and inversions of C, Am, F and G, and how to change between chords smoothly.",
     instruments: ["piano"],
@@ -199,8 +205,9 @@ export const LESSONS: Lesson[] = [
   {
     slug: "chords-in-a-key",
     title: "Chords in a key",
+    seoTitle: "Chords in a Key: Chart for All 24 Keys",
     summary: "Why some chords belong together, the Roman numerals players use, and a table of the chords of all twelve keys.",
-    description: "Chords in a key explained: the seven chords of every major and minor key, Roman numerals, and the common progressions such as I–V–vi–IV, with a table for all 12 keys.",
+    description: "Chords in a key explained: the seven chords of every major and minor key, Roman numerals and common progressions like I–V–vi–IV, with a table for all keys.",
     instruments: [],
     level: "Next step",
     minutes: 8,
@@ -225,8 +232,9 @@ export const LESSONS: Lesson[] = [
   {
     slug: "capo-and-transposing",
     title: "Capo and transposing",
+    seoTitle: "Capo Chart for Guitar: How to Use a Capo",
     summary: "How a capo changes the key, how to pick the easiest shapes for a song, and how transposing works.",
-    description: "How a guitar capo works: the key a capo gives for each set of chord shapes, how to choose a capo fret to suit your voice, and how transposing a song changes its chords.",
+    description: "How a guitar capo works: the key it gives for each chord shape, how to pick a capo fret to suit your voice, and how transposing changes a song's chords.",
     instruments: ["guitar", "ukulele", "mandolin"],
     level: "Next step",
     minutes: 6,
@@ -248,6 +256,7 @@ export const LESSONS: Lesson[] = [
   {
     slug: "strumming-patterns-for-beginners",
     title: "Strumming patterns for beginners",
+    seoTitle: "Easy Guitar Strumming Patterns for Beginners",
     summary: "Counting a bar, down and up strokes, and four patterns to start with, from one strum a beat to the pop standard.",
     description: "Strumming patterns for beginners on guitar and ukulele: how to count a bar, down and up strokes, and four easy patterns to learn first.",
     instruments: ["guitar", "ukulele", "mandolin"],

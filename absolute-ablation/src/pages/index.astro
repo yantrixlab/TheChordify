@@ -12,6 +12,10 @@ import Pricing from "../components/Pricing.astro";
 import CTABand from "../components/CTABand.astro";
 import Footer from "../components/Footer.astro";
 
+// What the search result shows (about 60 and 155 characters: longer is cut off). The words people type most are at the front.
+const title = "Chord Finder: Get the Chords of Any Song, Free — Chord Suno";
+const description = "Find the chords of any song, free. Search a song or upload audio for every chord synced to the beat, with guitar, piano and ukulele diagrams, key and tempo.";
+
 const jsonLd = [
   {
     "@context": "https://schema.org",
@@ -43,7 +47,7 @@ const jsonLd = [
 ];
 ---
 
-<Layout jsonLd={jsonLd} themeable>
+<Layout title={title} description={description} jsonLd={jsonLd} themeable>
   <Nav />
   <main>
     <Hero />

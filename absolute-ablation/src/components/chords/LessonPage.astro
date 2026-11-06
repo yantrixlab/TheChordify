@@ -38,7 +38,7 @@ const jsonLd = [
 const number = LESSONS.findIndex((l) => l.slug === lesson.slug) + 1;
 ---
 
-<ChordShell title={`${lesson.title} — Chord Suno`} description={lesson.description} jsonLd={jsonLd}>
+<ChordShell title={`${lesson.seoTitle ?? lesson.title} — Chord Suno`} description={lesson.description} jsonLd={jsonLd}>
   <div class="ls-bar" id="ls-bar" aria-hidden="true"></div>
   <ChHero
     eyebrow={`Lesson ${number} · ${lesson.level} · ${lesson.minutes} min read`}
