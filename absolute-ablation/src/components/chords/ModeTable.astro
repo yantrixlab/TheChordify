@@ -1,0 +1,53 @@
+---
+// A table of scales: one row for each, with the eight notes from the root up to the octave. The notes a mode changes from the major scale
+// are marked, the root and its octave are in colour, and a flat name is kept beside each black key for the sharps and flats switch.
+import { FLAT, SHARP } from "../../lib/modes";
+
+interface Row {
+  th: string; // "C Dorian", or "C♯" for a table of keys
+  href?: string;
+  sub?: string; // a second line: the formula, or "same notes as B♭ major"
+  id?: string; // the anchor of the row
+  notes: number[]; // eight pitch classes
+  alt?: boolean[]; // which of them differ from the major scale
+}
+interface Props {
+  caption: string; // describes the table, for people who cannot see it
+  corner: string; // the heading of the first column
+  rows: Row[];
+  strong?: boolean; // the first column is the mode (a little wider)
+}
+const { caption, corner, rows, strong = false } = Astro.props;
+const heads = ["1st", "2nd", "3rd", "4th", "5th", "6th", "7th", "8th"];
+---
+
+<div class="md-tablewrap" data-reveal>
+  <div class="cg-wrap">
+    <table class={`cg md-table${strong ? " is-modes" : ""}`}>
+      <caption class="sr-only">{caption}</caption>
+      <thead>
+        <tr>
+          <th scope="col">{corner}</th>
+          {heads.map((h) => <th scope="col">{h}</th>)}
+        </tr>
+      </thead>
+      <tbody>
+        {
+          rows.map((r) => (
+            <tr id={r.id}>
+              <th scope="row">
+                {r.href ? <a href={r.href}>{r.th}</a> : r.th}
+                {r.sub && <small>{r.sub}</small>}
+              </th>
+              {r.notes.map((pc, i) => (
+                <td class={`md-n${r.alt?.[i] ? " is-alt" : ""}${i === 0 || i === 7 ? " is-root" : ""}`}>
+                  <span class="n" data-f={FLAT[pc] !== SHARP[pc] ? FLAT[pc] : undefined}>{SHARP[pc]}</span>
+                </td>
+              ))}
+            </tr>
+          ))
+        }
+      </tbody>
+    </table>
+  </div>
+</div>

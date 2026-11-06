@@ -1,0 +1,76 @@
+---
+// The bar under the header on a page of modes: tabs that jump to a section, with a pill that slides to the one being read.
+// (The same look as the chord charts' bar, with only the "Jump to" row.)
+interface Props {
+  tabs: { href: string; label: string }[];
+  label?: string;
+}
+const { tabs, label = "Jump to" } = Astro.props;
+---
+
+<div class="cn md-nav" id="mode-nav">
+  <div class="cn-panel">
+    <div class="cn-in">
+      <div class="cn-tabrow">
+        <span class="cn-label">{label}</span>
+        <nav class="cn-tabs" id="mn-tabs" aria-label={label}>
+          {tabs.map((t) => <a class="cn-tab" href={t.href}>{t.label}</a>)}
+          <i class="cn-ind" id="mn-ind" aria-hidden="true"></i>
+        </nav>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const tabsEl = document.getElementById("mn-tabs");
+  const ind = document.getElementById("mn-ind") as HTMLElement | null;
+  if (tabsEl && ind) {
+    const tabs = [...tabsEl.querySelectorAll<HTMLAnchorElement>(".cn-tab")];
+    const targets = tabs.map((t) => document.getElementById(decodeURIComponent(t.hash.slice(1))));
+    let current = -2;
+    const show = (index: number) => {
+      if (index === current) return;
+      current = index;
+      tabs.forEach((t, i) => {
+        t.classList.toggle("is-on", i === index);
+        if (i === index) t.setAttribute("aria-current", "location");
+        else t.removeAttribute("aria-current");
+      });
+      if (index < 0) {
+        ind.style.opacity = "0";
+        return;
+      }
+      const tab = tabs[index];
+      ind.style.opacity = "1";
+      ind.style.width = `${tab.offsetWidth}px`;
+      ind.style.transform = `translateX(${tab.offsetLeft}px)`;
+      const left = tab.offsetLeft - 24;
+      const right = tab.offsetLeft + tab.offsetWidth + 24;
+      if (left < tabsEl.scrollLeft || right > tabsEl.scrollLeft + tabsEl.clientWidth) {
+        tabsEl.scrollTo({ left: Math.max(0, tab.offsetLeft - (tabsEl.clientWidth - tab.offsetWidth) / 2), behavior: "smooth" });
+      }
+    };
+    const spy = () => {
+      let best = -1;
+      let bestTop = -Infinity;
+      targets.forEach((el, i) => {
+        if (!el) return;
+        const top = el.getBoundingClientRect().top;
+        if (top <= 170 && top > bestTop) {
+          best = i;
+          bestTop = top;
+        }
+      });
+      if (innerHeight + scrollY >= document.documentElement.scrollHeight - 4 && tabs.length) best = Math.max(best, tabs.length - 1);
+      show(best);
+    };
+    addEventListener("scroll", spy, { passive: true });
+    addEventListener("resize", () => {
+      current = -2;
+      spy();
+    });
+    tabs.forEach((t, i) => t.addEventListener("click", () => show(i)));
+    spy();
+  }
+</script>

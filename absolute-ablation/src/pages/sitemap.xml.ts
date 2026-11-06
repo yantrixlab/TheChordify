@@ -1,8 +1,9 @@
 // The sitemap search engines read to find the public pages. Pages are listed here; add new public pages to the list.
 import type { APIRoute } from "astro";
 import { business } from "../lib/business";
-import { chartUrls } from "../lib/chordCatalog";
+import { ROOTS, chartUrls } from "../lib/chordCatalog";
 import { LESSONS } from "../lib/lessons";
+import { MODES } from "../lib/modes";
 
 const pages: { path: string; priority: string; changefreq: string }[] = [
   { path: "/", priority: "1.0", changefreq: "weekly" },
@@ -15,6 +16,7 @@ const pages: { path: string; priority: string; changefreq: string }[] = [
   { path: "/chords/", priority: "0.9", changefreq: "monthly" },
   { path: "/guitar-chords/", priority: "0.8", changefreq: "monthly" },
   { path: "/learn/", priority: "0.8", changefreq: "monthly" },
+  { path: "/modes/", priority: "0.9", changefreq: "monthly" },
   { path: "/toolkit/", priority: "0.9", changefreq: "monthly" },
   { path: "/toolkit/tuner/", priority: "0.8", changefreq: "monthly" },
   { path: "/toolkit/metronome/", priority: "0.8", changefreq: "monthly" },
@@ -29,6 +31,9 @@ const pages: { path: string; priority: string; changefreq: string }[] = [
   // the four chord charts and a page for each note of each instrument, and the lessons: made from the same lists as the pages
   ...chartUrls().map((path) => ({ path, priority: path.endsWith("-chord-chart/") ? "0.8" : "0.6", changefreq: "monthly" })),
   ...LESSONS.map((l) => ({ path: `/learn/${l.slug}/`, priority: "0.7", changefreq: "monthly" })),
+  // the musical modes: a page for each of the seven modes and for each of the twelve keys
+  ...MODES.map((m) => ({ path: `/modes/${m.id}/`, priority: "0.8", changefreq: "monthly" })),
+  ...ROOTS.map((r) => ({ path: `/modes/${r.slug}/`, priority: "0.7", changefreq: "monthly" })),
 ];
 
 export const GET: APIRoute = () => {

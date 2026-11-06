@@ -1,0 +1,16 @@
+---
+// /modes/c/ ... /modes/b/ (the seven modes of a key) and /modes/dorian/ ... /modes/locrian/ (one mode in all twelve keys).
+import ModesRootPage from "../../components/chords/ModesRootPage.astro";
+import ModePage from "../../components/chords/ModePage.astro";
+import { ROOTS, rootBySlug } from "../../lib/chordCatalog";
+import { MODES, modeBySlug } from "../../lib/modes";
+
+export function getStaticPaths() {
+  return [...ROOTS.map((r) => ({ params: { slug: r.slug } })), ...MODES.map((m) => ({ params: { slug: m.id } }))];
+}
+const slug = Astro.params.slug as string;
+const root = rootBySlug(slug);
+const mode = modeBySlug(slug);
+---
+
+{root ? <ModesRootPage root={root} /> : <ModePage mode={mode!} />}

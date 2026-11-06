@@ -1,0 +1,40 @@
+---
+// "Sharps / Flats": the notes on a page are written with sharps (C♯) or flats (D♭), as the player prefers. Every note that has a flat name
+// carries it in data-f, and this swaps the text; the choice is remembered on the device and announced as "acc-change" for the keyboard.
+---
+
+<div class="md-acc" role="group" aria-label="Write the notes with">
+  <span class="md-acc-label">Notes with</span>
+  <button type="button" data-acc="sharp" aria-pressed="true">Sharps ♯</button>
+  <button type="button" data-acc="flat" aria-pressed="false">Flats ♭</button>
+</div>
+
+<script>
+  const KEY = "chordsuno-accidental";
+  const buttons = [...document.querySelectorAll<HTMLButtonElement>(".md-acc button")];
+  function apply(acc: "sharp" | "flat") {
+    document.documentElement.dataset.acc = acc;
+    buttons.forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.acc === acc)));
+    document.querySelectorAll<HTMLElement>("[data-f]").forEach((el) => {
+      if (el.dataset.s === undefined) el.dataset.s = el.textContent ?? "";
+      el.textContent = acc === "flat" ? (el.dataset.f ?? "") : (el.dataset.s ?? "");
+    });
+    window.dispatchEvent(new CustomEvent("acc-change", { detail: { acc } }));
+  }
+  buttons.forEach((b) =>
+    b.addEventListener("click", () => {
+      const acc = b.dataset.acc === "flat" ? "flat" : "sharp";
+      try {
+        localStorage.setItem(KEY, acc);
+      } catch {
+        // not remembered
+      }
+      apply(acc);
+    }),
+  );
+  try {
+    if (localStorage.getItem(KEY) === "flat") apply("flat");
+  } catch {
+    // sharps
+  }
+</script>

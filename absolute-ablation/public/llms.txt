@@ -1,0 +1,34 @@
+# Chord Suno
+
+> Chord Suno (chordsuno.com) finds the chords of any song: search for a song or upload audio and get every chord synced to the beat, with guitar, piano, ukulele and mandolin diagrams, the key and the tempo. The site also has free chord charts, lessons on chords and scales, and a tuner, metronome and live chord detector.
+
+Everything below is public, free to read and generated from music theory, so the notes and chords on every page agree with each other. Notes are named by pitch (sharps by default, flats on request).
+
+## Musical modes
+
+- [Musical modes chart](https://chordsuno.com/modes/): the seven modes (Ionian, Dorian, Phrygian, Lydian, Mixolydian, Aeolian, Locrian) in all twelve keys: 84 scales with notes, formulas and chords.
+- [Dorian mode](https://chordsuno.com/modes/dorian/): minor with a raised 6th; formula 1 2 ♭3 4 5 6 ♭7; notes in all 12 keys; chords.
+- [Phrygian mode](https://chordsuno.com/modes/phrygian/): formula 1 ♭2 ♭3 4 5 ♭6 ♭7.
+- [Lydian mode](https://chordsuno.com/modes/lydian/): formula 1 2 3 ♯4 5 6 7.
+- [Mixolydian mode](https://chordsuno.com/modes/mixolydian/): formula 1 2 3 4 5 6 ♭7.
+- [Aeolian mode (natural minor)](https://chordsuno.com/modes/aeolian/): formula 1 2 ♭3 4 5 ♭6 ♭7.
+- [Locrian mode](https://chordsuno.com/modes/locrian/): formula 1 ♭2 ♭3 4 ♭5 ♭6 ♭7.
+- [Ionian mode (major scale)](https://chordsuno.com/modes/ionian/): formula 1 2 3 4 5 6 7.
+- [Modes of C](https://chordsuno.com/modes/c/): the seven modes that start on C, with a keyboard that plays them. There is a page like it for every key: /modes/c-sharp/, /modes/d/, /modes/d-sharp/, /modes/e/, /modes/f/, /modes/f-sharp/, /modes/g/, /modes/g-sharp/, /modes/a/, /modes/a-sharp/ and /modes/b/.
+
+## Chord charts
+
+- [Chord charts for guitar, piano, ukulele and mandolin](https://chordsuno.com/chords/): every chord on all four instruments.
+- [Guitar chord chart](https://chordsuno.com/guitar-chord-chart/): a diagram for every major, minor, 7th, sus, diminished and extended chord on all twelve notes.
+- [Piano chord chart](https://chordsuno.com/piano-chord-chart/), [ukulele chord chart](https://chordsuno.com/ukulele-chord-chart/) and [mandolin chord chart](https://chordsuno.com/mandolin-chord-chart/).
+- [Guitar chords by note](https://chordsuno.com/guitar-chords/): a page for each of the twelve notes with all 28 kinds of chord.
+
+## Lessons
+
+- [Learn chords](https://chordsuno.com/learn/): short lessons on reading chord diagrams, beginner guitar chords, barre chords, major/minor/7th chords, piano chords, chords in a key, capo and transposing, and strumming patterns.
+
+## Tools
+
+- [Chord finder for any song](https://chordsuno.com/): search for a song or upload audio to get its chords.
+- [Guitar chord finder](https://chordsuno.com/guitar-chord-finder/) and [chord detector (what chord is this?)](https://chordsuno.com/chord-detector/).
+- [Toolkit: tuner, metronome, chord practice](https://chordsuno.com/toolkit/).

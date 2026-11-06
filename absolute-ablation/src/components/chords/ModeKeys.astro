@@ -1,0 +1,165 @@
+---
+// A two-octave keyboard for one key: pick a mode and its eight notes press down on the keys with their names; "Play" sounds them one after
+// the other and lights each as it goes. Made with the page (every mode's notes are in it as data), so it works without a server.
+import { KEY_NAME, MODES, SHARP, type Mode } from "../../lib/modes";
+import type { Root } from "../../lib/chordCatalog";
+
+interface Props {
+  root: Root;
+  rootPc: number;
+}
+const { root, rootPc } = Astro.props;
+
+const W = 40; // a white key
+const H = 150;
+const BW = 25;
+const BH = 92;
+const black = new Set([1, 3, 6, 8, 10]);
+const keys: { i: number; pc: number; black: boolean; x: number }[] = [];
+let whiteCount = 0;
+for (let i = 0; i <= 24; i++) {
+  const pc = i % 12;
+  if (black.has(pc)) {
+    const nudge = pc === 1 || pc === 6 ? -2 : pc === 3 || pc === 10 ? 2 : 0;
+    keys.push({ i, pc, black: true, x: whiteCount * W - BW / 2 + nudge });
+  } else {
+    keys.push({ i, pc, black: false, x: whiteCount * W });
+    whiteCount++;
+  }
+}
+const first = MODES[0];
+const lit = new Map<number, number>(); // key index -> degree, for the first mode drawn
+[...first.steps, 12].forEach((s, d) => lit.set(rootPc + s, d));
+const data = { root: rootPc, modes: MODES.map((m: Mode) => ({ id: m.id, name: m.name, steps: m.steps, formula: m.formula, parent: m.parent })), sharp: SHARP, keys: KEY_NAME };
+const ordered = [...keys.filter((k) => !k.black), ...keys.filter((k) => k.black)]; // the black keys are drawn on top
+---
+
+<div class="mk" id="mk" data-root={rootPc}>
+  <div class="mk-bar">
+    <div class="mk-tabs" role="tablist" aria-label={`Modes of ${root.short}`}>
+      {MODES.map((m, i) => <button type="button" role="tab" class="mk-tab" data-mode={m.id} aria-selected={i === 0 ? "true" : "false"}>{m.name}</button>)}
+    </div>
+    <button type="button" class="mk-play" id="mk-play" aria-label="Play the scale">
+      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M3 1.5v11l9-5.5z" fill="currentColor" /></svg>
+      <span>Play scale</span>
+    </button>
+  </div>
+
+  <div class="mk-stage">
+    <svg class="mk-svg" viewBox={`0 0 ${whiteCount * W} ${H + 4}`} role="img" aria-label={`A keyboard showing the notes of the ${root.short} modes`} xmlns="http://www.w3.org/2000/svg">
+      {
+        ordered.map((k) => {
+          const d = lit.get(k.i);
+          const on = d !== undefined;
+          const isRoot = on && (d === 0 || d === 7);
+          return (
+            <g class={`k ${k.black ? "b" : "w"}${on ? " on" : ""}${isRoot ? " root" : ""}`} data-i={k.i}>
+              <rect x={k.x + 1} y="2" width={k.black ? BW : W - 2} height={k.black ? BH : H} rx="3" />
+              <text x={k.x + 1 + (k.black ? BW : W - 2) / 2} y={k.black ? BH - 10 : H - 14} text-anchor="middle">{on ? SHARP[k.pc] : ""}</text>
+            </g>
+          );
+        })
+      }
+    </svg>
+  </div>
+
+  <dl class="mk-facts" aria-live="polite">
+    <div><dt>Notes</dt><dd id="mk-notes">{[...first.steps, 12].map((s) => SHARP[(rootPc + s) % 12]).join(" ")}</dd></div>
+    <div><dt>Formula</dt><dd id="mk-formula">{first.formula}</dd></div>
+    <div><dt>Same notes as</dt><dd id="mk-parent">{KEY_NAME[(rootPc - first.parent + 12) % 12]} major</dd></div>
+  </dl>
+  <script type="application/json" id="mk-data" set:html={JSON.stringify(data)} />
+</div>
+
+<script>
+  const wrap = document.getElementById("mk");
+  const raw = document.getElementById("mk-data")?.textContent;
+  if (wrap && raw) {
+    const data = JSON.parse(raw) as { root: number; modes: { id: string; name: string; steps: number[]; formula: string; parent: number }[]; sharp: string[]; keys: string[] };
+    const FLATS = ["C", "D♭", "D", "E♭", "E", "F", "G♭", "G", "A♭", "A", "B♭", "B"];
+    const keys = [...wrap.querySelectorAll<SVGGElement>(".k")];
+    const tabs = [...wrap.querySelectorAll<HTMLButtonElement>(".mk-tab")];
+    const play = document.getElementById("mk-play") as HTMLButtonElement;
+    let acc: "sharp" | "flat" = document.documentElement.dataset.acc === "flat" ? "flat" : "sharp";
+    let current = data.modes[0];
+    const name = (pc: number) => (acc === "flat" ? FLATS : data.sharp)[((pc % 12) + 12) % 12];
+
+    function show(id: string) {
+      current = data.modes.find((m) => m.id === id) ?? data.modes[0];
+      tabs.forEach((t) => t.setAttribute("aria-selected", String(t.dataset.mode === current.id)));
+      const at = new Map<number, number>();
+      [...current.steps, 12].forEach((s, d) => at.set(data.root + s, d));
+      keys.forEach((k) => {
+        const i = Number(k.dataset.i);
+        const d = at.get(i);
+        const on = d !== undefined;
+        k.style.transitionDelay = on ? `${(d as number) * 35}ms` : "0ms";
+        k.classList.toggle("on", on);
+        k.classList.toggle("root", on && (d === 0 || d === 7));
+        const label = k.querySelector("text");
+        if (label) label.textContent = on ? name(i) : "";
+      });
+      const names = [...current.steps, 12].map((s) => name(data.root + s)).join(" ");
+      document.getElementById("mk-notes")!.textContent = names;
+      document.getElementById("mk-formula")!.textContent = current.formula;
+      document.getElementById("mk-parent")!.textContent = `${data.keys[(data.root - current.parent + 12) % 12]} major`;
+    }
+    tabs.forEach((t) => t.addEventListener("click", () => show(t.dataset.mode!)));
+    window.addEventListener("acc-change", (e) => {
+      acc = (e as CustomEvent<{ acc: "sharp" | "flat" }>).detail.acc;
+      show(current.id);
+    });
+    // the mode in the address (#c-dorian) opens on that mode
+    const fromHash = () => {
+      const m = data.modes.find((x) => location.hash.endsWith("-" + x.id));
+      if (m) show(m.id);
+    };
+    addEventListener("hashchange", fromHash);
+    fromHash();
+
+    // the scale, played: a soft triangle wave for each note, lighting its key as it sounds
+    let ctx: AudioContext | null = null;
+    let timers: number[] = [];
+    function stop() {
+      timers.forEach(clearTimeout);
+      timers = [];
+      keys.forEach((k) => k.classList.remove("ping"));
+      play.classList.remove("is-playing");
+      play.querySelector("span")!.textContent = "Play scale";
+    }
+    function note(midi: number, when: number) {
+      if (!ctx) return;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "triangle";
+      osc.frequency.value = 440 * Math.pow(2, (midi - 69) / 12);
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime + when);
+      gain.gain.exponentialRampToValueAtTime(0.28, ctx.currentTime + when + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + when + 0.5);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(ctx.currentTime + when);
+      osc.stop(ctx.currentTime + when + 0.55);
+    }
+    play.addEventListener("click", async () => {
+      if (play.classList.contains("is-playing")) return stop();
+      try {
+        ctx ??= new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+        await ctx.resume();
+      } catch {
+        return;
+      }
+      play.classList.add("is-playing");
+      play.querySelector("span")!.textContent = "Stop";
+      const seq = [...current.steps, 12].map((s) => data.root + s);
+      seq.forEach((idx, n) => {
+        note(60 + idx, n * 0.34);
+        timers.push(
+          window.setTimeout(() => {
+            keys.forEach((k) => k.classList.toggle("ping", Number(k.dataset.i) === idx));
+          }, n * 340),
+        );
+      });
+      timers.push(window.setTimeout(stop, seq.length * 340 + 200));
+    });
+  }
+</script>

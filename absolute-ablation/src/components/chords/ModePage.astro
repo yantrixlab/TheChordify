@@ -1,0 +1,172 @@
+---
+// /modes/dorian/, /modes/lydian/ ...: one mode explained and shown in all twelve keys: what it is, its formula and steps, how to find it,
+// how it sounds, the chords that belong to it, how it differs from the other modes, and a table of its notes in every key.
+import ChordShell from "./ChordShell.astro";
+import ChHero from "./ChHero.astro";
+import ModeNav from "./ModeNav.astro";
+import ModeTable from "./ModeTable.astro";
+import AccToggle from "./AccToggle.astro";
+import { ROOTS } from "../../lib/chordCatalog";
+import { FLAT, MODES, SHARP, alteredNotes, modeAnchor, modeChords, modePath, parentRoot, rootModesPath, scaleMidi, scalePcs, type Mode, keyName } from "../../lib/modes";
+import { pianoSvg } from "../../lib/pianoDiagram";
+
+interface Props {
+  mode: Mode;
+}
+const { mode } = Astro.props;
+const N = mode.name;
+const path = modePath(mode);
+const url = `https://chordsuno.com${path}`;
+const today = new Date().toISOString().slice(0, 10);
+const ordinal = ["first", "second", "third", "fourth", "fifth", "sixth", "seventh"][mode.order - 1];
+const prev = MODES[(mode.order + 5) % 7];
+const next = MODES[mode.order % 7];
+const inC = scalePcs(0, mode).map((p) => SHARP[p]).join(" ");
+const inA = scalePcs(9, mode).map((p) => SHARP[p]).join(" ");
+const parentC = keyName(parentRoot(0, mode));
+const romans = modeChords(0, mode).map((c) => c.roman).join(" – ");
+const known = mode.family === "major" ? "a major mode (its third is a major third)" : mode.family === "minor" ? "a minor mode (its third is a minor third)" : "a diminished mode (its third is minor and its fifth is lowered)";
+
+const title = `${N} Mode: Notes, Scale Formula & Chords — Chord Suno`;
+const description = `The ${N} mode explained: formula ${mode.formula}, how it sounds, its chords and the notes of ${N} in all 12 keys, with a keyboard and examples.`;
+
+const rows = ROOTS.map((r, pc) => ({ th: `${r.short} ${N}`, href: `${rootModesPath(r)}#${modeAnchor(r, mode)}`, sub: `same notes as ${keyName(parentRoot(pc, mode))} major`, notes: scalePcs(pc, mode), alt: alteredNotes(mode) }));
+const cRows = MODES.map((m) => ({ th: `C ${m.name}`, href: m.id === mode.id ? undefined : modePath(m), sub: m.formula, notes: scalePcs(0, m), alt: alteredNotes(m) }));
+const chords = modeChords(0, mode);
+const order = [...MODES].sort((a, b) => a.brightness - b.brightness);
+const brightness = order.findIndex((m) => m.id === mode.id) + 1;
+
+const faq = [
+  { q: `What is the ${N} mode?`, a: mode.summary },
+  { q: `What are the notes of the ${N} mode?`, a: `They depend on the key. C ${N} is ${inC}, and A ${N} is ${inA}. In any key the formula is ${mode.formula}, and the steps are ${mode.pattern} (W is a whole step, H a half step).` },
+  { q: `Is ${N} major or minor?`, a: `${N} is ${known}.` },
+  { q: `What is the difference between ${N} and the major scale?`, a: mode.id === "ionian" ? "There is none: Ionian is the major scale." : `Compared with the major scale on the same note, ${N} has the formula ${mode.formula} instead of 1 2 3 4 5 6 7, so ${mode.mood}. C ${N} is ${inC}, while C major is C D E F G A B.` },
+  { q: `Which major scale has the same notes as ${N}?`, a: `${N} is the ${ordinal} mode of the major scale, so it has the notes of the major scale that starts ${mode.parent} semitones below its root. C ${N} has the same notes as ${parentC} major, started on C.` },
+  { q: `What chords go with the ${N} mode?`, a: `The chords built on the notes of ${N} follow the pattern ${romans}. In C ${N} they are ${chords.map((c) => c.triad.label).join(", ")}. The home chords that make it sound like ${N} are ${mode.vamp}.` },
+  { q: `Which songs use the ${N} mode?`, a: `${N} is often heard in ${mode.examples.join(", ")}. ${mode.uses}` },
+  { q: `How do I play the ${N} mode on guitar or piano?`, a: `${mode.tip} The notes are the same on every instrument: for C ${N} play ${inC}. On the keyboard below each scale, the pressed keys show the notes.` },
+];
+const jsonLd = [
+  { "@context": "https://schema.org", "@type": "Article", headline: title.replace(" — Chord Suno", ""), description, url, dateModified: today, inLanguage: "en", about: `${N} mode`, author: { "@type": "Organization", name: "Chord Suno" }, publisher: { "@type": "Organization", name: "Chord Suno", url: "https://chordsuno.com/" }, mainEntityOfPage: url },
+  { "@context": "https://schema.org", "@type": "DefinedTerm", name: `${N} mode`, description: mode.summary, url, inDefinedTermSet: { "@type": "DefinedTermSet", name: "Musical modes", url: "https://chordsuno.com/modes/" } },
+  { "@context": "https://schema.org", "@type": "FAQPage", mainEntity: faq.map((f) => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })) },
+  { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [{ "@type": "ListItem", position: 1, name: "Chord Suno", item: "https://chordsuno.com/" }, { "@type": "ListItem", position: 2, name: "Musical modes", item: "https://chordsuno.com/modes/" }, { "@type": "ListItem", position: 3, name: `${N} mode`, item: url }] },
+];
+const art = [0, 9, 4].map((pc) => ({
+  svg: pianoSvg({ notes: scaleMidi(pc, mode), root: pc, name: N }, { scale: 1, title: `${SHARP[pc]} ${N} on the keyboard` }),
+  label: `${SHARP[pc]} ${N}`,
+  sub: scalePcs(pc, mode).map((p) => SHARP[p]).join(" "),
+  keys: true,
+}));
+const tabs = [{ href: "#answer", label: "Quick answer" }, { href: "#find", label: "How to find it" }, { href: "#keys", label: "All 12 keys" }, { href: "#chords", label: "Chords" }, { href: "#compare", label: "Compare" }, { href: "#faq", label: "FAQ" }];
+---
+
+<ChordShell title={title} description={description} jsonLd={jsonLd}>
+  <ChHero
+    eyebrow={`Musical modes · mode ${mode.order} of 7`}
+    title={`The ${N} mode,`}
+    accent="explained"
+    lead={mode.summary}
+    crumbs={[{ label: "Musical modes", href: "/modes/" }, { label: `${N} mode` }]}
+    art={art}
+    big={N.slice(0, 1)}
+  >
+    <a class="ch-btn" href="#keys">{N} in all 12 keys <svg width="16" height="16" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M3 7h8M7 3l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg></a>
+    <a class="ch-btn is-ghost" href="/modes/">All modes</a>
+  </ChHero>
+
+  <ModeNav tabs={tabs} />
+
+  <div class="md-page">
+    <section class="ch-in ch-sec" id="answer">
+      <span class="ch-kicker" data-reveal>Quick answer</span>
+      <h2 data-reveal style="--i: 1">What is the {N} mode?</h2>
+      <p class="md-answer" data-reveal style="--i: 2"><strong>{N}</strong> is the {ordinal} mode of the major scale. Its formula is <b>{mode.formula}</b>, its steps are <b>{mode.pattern}</b>, and C {N} is <b class="md-notes">{inC}</b>.</p>
+      <dl class="md-facts is-wide" data-reveal style="--i: 3">
+        <div><dt>Formula</dt><dd>{mode.formula}</dd></div>
+        <div><dt>Steps</dt><dd>{mode.pattern} <small>(W whole, H half)</small></dd></div>
+        <div><dt>Mode number</dt><dd>{mode.order} of 7, the {ordinal}</dd></div>
+        <div><dt>Type</dt><dd>{mode.family === "major" ? "Major" : mode.family === "minor" ? "Minor" : "Diminished"}</dd></div>
+        <div><dt>Brightness</dt><dd>{brightness} of 7 <small>(1 is the brightest)</small></dd></div>
+        <div><dt>Sounds</dt><dd>{mode.mood}</dd></div>
+        <div><dt>Home chords</dt><dd>{mode.vamp}</dd></div>
+        <div><dt>Heard in</dt><dd>{mode.examples.join(", ")}</dd></div>
+      </dl>
+      <p data-reveal>{mode.detail}</p>
+      <p data-reveal><strong>Where you hear it:</strong> {mode.uses}</p>
+    </section>
+
+    <section class="ch-in ch-sec" id="find">
+      <span class="ch-kicker" data-reveal>Three ways</span>
+      <h2 data-reveal style="--i: 1">How to find the {N} mode in any key</h2>
+      <ol class="md-steps" data-reveal style="--i: 2">
+        <li><strong>Follow the steps.</strong> Start on any note and go up by {mode.pattern.split(" ").map((s) => (s === "W" ? "a whole step" : "a half step")).join(", ")}. After seven notes you are back at the octave.</li>
+        <li><strong>Start from a major scale.</strong> {N} is the {ordinal} mode: take the major scale whose {ordinal} note is your root and play it from that note. C {N} is the notes of {parentC} major started on C.</li>
+        <li><strong>Change the major scale.</strong> {mode.id === "ionian" ? "Ionian is the major scale, so nothing changes." : `Take the major scale on your root and give it the formula ${mode.formula}: the numbers with a ♭ or ♯ are lowered or raised.`}</li>
+      </ol>
+    </section>
+
+    <section class="ch-in ch-sec" id="keys">
+      <span class="ch-kicker" data-reveal>All twelve keys</span>
+      <h2 data-reveal style="--i: 1">{N} mode in every key</h2>
+      <p data-reveal style="--i: 2">The notes of {N} from the root up to the octave, in all twelve keys. Notes that differ from that key's major scale are marked in amber. Press a key's name for all seven of its modes.</p>
+      <div class="md-tools" data-reveal><AccToggle /></div>
+      <ModeTable caption={`The notes of the ${N} mode in all twelve keys`} corner="Key" rows={rows} strong />
+    </section>
+
+    <section class="ch-in ch-sec" id="chords">
+      <span class="ch-kicker" data-reveal>Chords</span>
+      <h2 data-reveal style="--i: 1">Chords in the {N} mode</h2>
+      <p data-reveal style="--i: 2">Stack thirds on each note of {N} and you get its chords. They follow the same pattern in every key: <b>{romans}</b>. Here they are in C {N}.</p>
+      <div class="md-tablewrap" data-reveal>
+        <div class="cg-wrap">
+          <table class="cg md-chords">
+            <caption class="sr-only">The triads and seventh chords of C {N}</caption>
+            <thead><tr><th scope="col">Note</th><th scope="col">Numeral</th><th scope="col">Chord</th><th scope="col">Seventh chord</th></tr></thead>
+            <tbody>
+              {
+                chords.map((c) => (
+                  <tr>
+                    <th scope="row"><span class="n" data-f={FLAT[c.note] !== SHARP[c.note] ? FLAT[c.note] : undefined}>{SHARP[c.note]}</span></th>
+                    <td>{c.roman}</td>
+                    <td><a href={c.triad.href} data-f={c.triad.flat !== c.triad.label ? c.triad.flat : undefined}>{c.triad.label}</a></td>
+                    <td><a href={c.seventh.href} data-f={c.seventh.flat !== c.seventh.label ? c.seventh.flat : undefined}>{c.seventh.label}</a></td>
+                  </tr>
+                ))
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <p data-reveal>The chords that make a song sound {N} are {mode.vamp}. <a href="/learn/chords-in-a-key/">How chords in a key work →</a></p>
+    </section>
+
+    <section class="ch-in ch-sec" id="compare">
+      <span class="ch-kicker" data-reveal>Compare</span>
+      <h2 data-reveal style="--i: 1">{N} next to the other modes</h2>
+      <p data-reveal style="--i: 2">All seven modes on C. From brightest to darkest they run {order.map((m) => m.name).join(", ").replace(/, ([^,]*)$/, " and $1")}. {N} is number {brightness}.</p>
+      <ModeTable caption="The seven modes on C" corner="Mode" rows={cRows} strong />
+      <div class="ch-links" style="margin-top: 24px">
+        <a class="ch-link" href={modePath(prev)} data-reveal><strong>Previous: {prev.name}</strong><span>{prev.mood}</span><em class="ch-go" style="font-style: normal">Read about {prev.name}</em></a>
+        <a class="ch-link" href={modePath(next)} data-reveal style="--i: 1"><strong>Next: {next.name}</strong><span>{next.mood}</span><em class="ch-go" style="font-style: normal">Read about {next.name}</em></a>
+        <a class="ch-link" href="/modes/" data-reveal style="--i: 2"><strong>All musical modes</strong><span>The seven modes in all twelve keys on one page.</span><em class="ch-go" style="font-style: normal">Open the chart</em></a>
+      </div>
+    </section>
+
+    <section class="ch-in ch-sec ch-faq" id="faq">
+      <span class="ch-kicker" data-reveal>Good to know</span>
+      <h2 data-reveal style="--i: 1">{N} mode: questions and answers</h2>
+      {faq.map((f, i) => <details data-reveal style={`--i: ${i % 6}`}><summary>{f.q}</summary><p>{f.a}</p></details>)}
+      <p class="md-note" data-reveal>Notes are named by pitch, as a keyboard shows them. A theory book may write a few as E♯ or B♯ where this page writes F or C.</p>
+    </section>
+
+    <div class="ch-in ch-cta-wrap">
+      <div class="ch-cta-in" data-reveal>
+        <h2>Hear {N} in a real song</h2>
+        <p>Search for a song on Chord Suno and see every chord on the beat, then try the {N} mode over it.</p>
+        <a class="ch-btn" href="/#find">Find chords for a song</a>
+        <a class="ch-btn is-ghost" href="/modes/">All musical modes</a>
+      </div>
+    </div>
+  </div>
+</ChordShell>

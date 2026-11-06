@@ -1,0 +1,188 @@
+---
+// /modes/: the seven musical modes in all twelve keys on one page, with what modes are, how to find them and a link to a page for each key
+// and for each mode.
+import ChordShell from "../../components/chords/ChordShell.astro";
+import ChHero from "../../components/chords/ChHero.astro";
+import ModeNav from "../../components/chords/ModeNav.astro";
+import ModeTable from "../../components/chords/ModeTable.astro";
+import AccToggle from "../../components/chords/AccToggle.astro";
+import { ROOTS } from "../../lib/chordCatalog";
+import { MODES, SHARP, alteredNotes, modeAnchor, modePath, parentRoot, rootModesPath, scaleMidi, scalePcs, keyName } from "../../lib/modes";
+import { pianoSvg } from "../../lib/pianoDiagram";
+
+const url = "https://chordsuno.com/modes/";
+const today = new Date().toISOString().slice(0, 10);
+const title = "Musical Modes Chart: All 7 Modes in All 12 Keys — Chord Suno";
+const description = "All seven musical modes (Ionian, Dorian, Phrygian, Lydian, Mixolydian, Aeolian, Locrian) in all 12 keys: every note, the formulas, the chords and what each sounds like.";
+const order = [...MODES].sort((a, b) => a.brightness - b.brightness);
+const list = (names: string[]) => names.join(", ").replace(/, ([^,]*)$/, " and $1");
+const inC = (m: (typeof MODES)[number]) => scalePcs(0, m).map((p) => SHARP[p]).join(" ");
+
+const faq = [
+  { q: "What are musical modes?", a: "A mode is a scale made by starting a major scale on a different note while keeping the same seven notes. Starting on the second note gives Dorian, on the third Phrygian, and so on. Each mode has its own pattern of whole and half steps and its own mood." },
+  { q: "How many modes are there and what are they called?", a: `There are seven modes: ${list(MODES.map((m) => m.name))}, numbered from the first note of the major scale to the seventh. They are the seven modes of the major scale, also called the diatonic or church modes.` },
+  { q: "What is the easiest way to remember the order of the modes?", a: "Learn them in the order of the major scale: Ionian, Dorian, Phrygian, Lydian, Mixolydian, Aeolian, Locrian. A common memory aid is the phrase \"I Don't Particularly Like Modes A Lot\"." },
+  { q: "Which modes are major and which are minor?", a: "Ionian, Lydian and Mixolydian are major modes because their third is a major third. Dorian, Phrygian and Aeolian are minor modes. Locrian is a diminished mode, with a minor third and a lowered fifth." },
+  { q: "Which mode is the brightest and which is the darkest?", a: `From brightest to darkest the modes run ${list(order.map((m) => m.name))}. Lydian has a raised fourth and Locrian has a lowered second and fifth.` },
+  { q: "What is the difference between a mode and a key?", a: "A key names a home note and the scale around it, such as C major. A mode says which pattern of whole and half steps is used from that home note. The same seven notes can be C major (home on C) or D Dorian (home on D)." },
+  { q: "How do I find the modes of a key?", a: "Write out the major scale, then start on each of its notes in turn. The notes of C major are C D E F G A B, so D Dorian is D E F G A B C, E Phrygian is E F G A B C D, and so on. The page for each key on Chord Suno lists all seven of its modes." },
+  { q: "Do modes work on guitar and piano?", a: "Yes. A mode is a set of notes, so it is the same on every instrument. On the guitar you play the notes on the neck; on the piano you press the keys. The keyboard on each key's page shows the notes and can play them." },
+  { q: "Are modes the same as chords?", a: "No. A mode is a scale of seven notes. Chords are built from its notes by stacking thirds, so each mode has its own set of chords. Each page on Chord Suno lists the chords of the mode." },
+];
+const jsonLd = [
+  { "@context": "https://schema.org", "@type": "Article", headline: title.replace(" — Chord Suno", ""), description, url, dateModified: today, inLanguage: "en", about: "Musical modes", author: { "@type": "Organization", name: "Chord Suno" }, publisher: { "@type": "Organization", name: "Chord Suno", url: "https://chordsuno.com/" }, mainEntityOfPage: url },
+  { "@context": "https://schema.org", "@type": "ItemList", name: "The seven musical modes", itemListElement: MODES.map((m, i) => ({ "@type": "ListItem", position: i + 1, name: `${m.name} mode`, description: m.summary, url: `https://chordsuno.com${modePath(m)}` })) },
+  { "@context": "https://schema.org", "@type": "FAQPage", mainEntity: faq.map((f) => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })) },
+  { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [{ "@type": "ListItem", position: 1, name: "Chord Suno", item: "https://chordsuno.com/" }, { "@type": "ListItem", position: 2, name: "Musical modes", item: url }] },
+];
+const art = [MODES[0], MODES[3], MODES[1]].map((m) => ({
+  svg: pianoSvg({ notes: scaleMidi(0, m), root: 0, name: m.name }, { scale: 1, title: `C ${m.name} on the keyboard` }),
+  label: `C ${m.name}`,
+  sub: inC(m),
+  keys: true,
+}));
+const tabs = [{ href: "#modes", label: "The 7 modes" }, { href: "#keys", label: "Pick a key" }, { href: "#chart", label: "All 84 scales" }, { href: "#cheat", label: "Cheat sheet" }, { href: "#about", label: "What are modes?" }, { href: "#faq", label: "FAQ" }];
+const panels = MODES.map((m) => ({
+  m,
+  rows: ROOTS.map((r, pc) => ({ th: r.short, href: `${rootModesPath(r)}#${modeAnchor(r, m)}`, sub: `same notes as ${keyName(parentRoot(pc, m))} major`, notes: scalePcs(pc, m), alt: alteredNotes(m) })),
+}));
+---
+
+<ChordShell title={title} description={description} jsonLd={jsonLd}>
+  <ChHero
+    eyebrow="Music theory"
+    title="Musical modes,"
+    accent="in every key"
+    lead="The seven modes (Ionian, Dorian, Phrygian, Lydian, Mixolydian, Aeolian and Locrian) in all twelve keys: every note, the formulas, the chords and how each one sounds. Pick a key or a mode."
+    crumbs={[{ label: "Musical modes" }]}
+    art={art}
+    stats={[{ n: 7, label: "modes" }, { n: 12, label: "keys" }, { n: 84, label: "scales" }]}
+  >
+    <a class="ch-btn" href="#keys">Pick a key <svg width="16" height="16" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M3 7h8M7 3l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg></a>
+    <a class="ch-btn is-ghost" href="#chart">The full chart</a>
+  </ChHero>
+
+  <ModeNav tabs={tabs} />
+
+  <div class="md-page">
+    <section class="ch-in ch-sec" id="modes">
+      <span class="ch-kicker" data-reveal>The seven modes</span>
+      <h2 data-reveal style="--i: 1">The 7 musical modes, from brightest to darkest</h2>
+      <p data-reveal style="--i: 2">
+        Every mode is the same seven notes as a major scale, started on a different note. From brightest to darkest they run {list(order.map((m) => m.name))}. Press a mode to learn how it sounds, its formula and its chords.
+      </p>
+      <div class="ch-links">
+        {
+          order.map((m, i) => (
+            <a class="ch-link" href={modePath(m)} data-reveal style={`--i: ${i % 4}`}>
+              <strong>{m.name}</strong>
+              <span>{m.mood}. Formula {m.formula}. C {m.name} is {inC(m)}.</span>
+              <em class="ch-go" style="font-style: normal">{m.name} in all 12 keys</em>
+            </a>
+          ))
+        }
+      </div>
+    </section>
+
+    <section class="ch-in ch-sec" id="keys">
+      <span class="ch-kicker" data-reveal>Twelve keys</span>
+      <h2 data-reveal style="--i: 1">Pick a key to see all seven of its modes</h2>
+      <p data-reveal style="--i: 2">Each key has a page with its seven modes: the notes, the formula, the chords and a keyboard that plays them.</p>
+      <div class="ch-links md-keycards">
+        {
+          ROOTS.map((r, i) => (
+            <a class="ch-link" href={rootModesPath(r)} data-reveal style={`--i: ${i % 4}`}>
+              <strong>{r.label} modes</strong>
+              <span>{r.short} major: {scalePcs(i, MODES[0]).map((p) => SHARP[p]).join(" ")}</span>
+              <em class="ch-go" style="font-style: normal">All 7 modes of {r.short}</em>
+            </a>
+          ))
+        }
+      </div>
+    </section>
+
+    <section class="ch-in ch-sec" id="chart">
+      <span class="ch-kicker" data-reveal>The whole chart</span>
+      <h2 data-reveal style="--i: 1">All 84 mode scales: notes of every mode in every key</h2>
+      <p data-reveal style="--i: 2">Choose a mode to see its eight notes, from the root up to the octave, in all twelve keys. Notes that differ from the major scale on the same root are marked in amber.</p>
+      <div class="md-tools" data-reveal><AccToggle /></div>
+      <div class="md-tabs" role="tablist" aria-label="Choose a mode" data-reveal>
+        {panels.map((p, i) => <button type="button" role="tab" id={`tab-${p.m.id}`} aria-controls={`panel-${p.m.id}`} aria-selected={i === 0 ? "true" : "false"}>{p.m.name}</button>)}
+      </div>
+      {
+        panels.map((p, i) => (
+          <div class="md-panel" id={`panel-${p.m.id}`} role="tabpanel" aria-labelledby={`tab-${p.m.id}`} hidden={i !== 0}>
+            <h3>{p.m.name} in all 12 keys <small>{p.m.formula}</small></h3>
+            <ModeTable caption={`The notes of the ${p.m.name} mode in all twelve keys`} corner="Key" rows={p.rows} strong />
+          </div>
+        ))
+      }
+    </section>
+
+    <section class="ch-in ch-sec" id="cheat">
+      <span class="ch-kicker" data-reveal>Cheat sheet</span>
+      <h2 data-reveal style="--i: 1">The modes at a glance</h2>
+      <div class="md-tablewrap" data-reveal>
+        <div class="cg-wrap">
+          <table class="cg md-cheat">
+            <caption class="sr-only">The seven modes: number, formula, steps, parent scale and sound</caption>
+            <thead><tr><th scope="col">Mode</th><th scope="col">No.</th><th scope="col">Formula</th><th scope="col">Steps</th><th scope="col">Same notes as</th><th scope="col">Sounds</th></tr></thead>
+            <tbody>
+              {MODES.map((m) => <tr><th scope="row"><a href={modePath(m)}>{m.name}</a></th><td>{m.order}</td><td>{m.formula}</td><td>{m.pattern}</td><td>{keyName(parentRoot(0, m))} major (for C {m.name})</td><td>{m.mood}</td></tr>)}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="ch-in ch-sec" id="about">
+      <span class="ch-kicker" data-reveal>The idea</span>
+      <h2 data-reveal style="--i: 1">What are musical modes?</h2>
+      <p data-reveal style="--i: 2">
+        Play the white keys of a piano from C to the next C and you hear the C major scale. Play them from D to the next D and you hear a different scale with the same seven notes, but a different mood: D Dorian. Start on E and it is E Phrygian, on F Lydian, on G Mixolydian, on A Aeolian (the natural minor scale) and on B Locrian. These are the seven modes.
+      </p>
+      <p data-reveal>
+        What changes between them is where the half steps fall. Ionian (the major scale) has its half steps between the 3rd and 4th and the 7th and 8th notes. Lydian moves the first of them up, which is why it sounds bright; Phrygian puts one right above the root, which is why it sounds dark. Learning the modes is learning seven moods you can use in a song, a solo or a progression.
+      </p>
+      <p data-reveal>
+        To use a mode, pick the home note and stay on the chords that belong to it. A vamp of two chords is enough to set the mode: for instance Am7 to D7 for Dorian, Em to F for Phrygian, or G to F for Mixolydian. Each page on Chord Suno lists the chords for every key.
+      </p>
+    </section>
+
+    <section class="ch-in ch-sec ch-faq" id="faq">
+      <span class="ch-kicker" data-reveal>Good to know</span>
+      <h2 data-reveal style="--i: 1">Musical modes: questions and answers</h2>
+      {faq.map((f, i) => <details data-reveal style={`--i: ${i % 6}`}><summary>{f.q}</summary><p>{f.a}</p></details>)}
+      <p class="md-note" data-reveal>Notes are named by pitch, as a keyboard shows them. A theory book may write a few as E♯ or B♯ where this page writes F or C.</p>
+    </section>
+
+    <div class="ch-in ch-cta-wrap">
+      <div class="ch-cta-in" data-reveal>
+        <h2>Put the modes to work on a real song</h2>
+        <p>Search for a song on Chord Suno and see every chord on the beat. Then try the matching mode over it.</p>
+        <a class="ch-btn" href="/#find">Find chords for a song</a>
+        <a class="ch-btn is-ghost" href="/learn/">Chord lessons</a>
+      </div>
+    </div>
+  </div>
+</ChordShell>
+
+<script>
+  // the tabs of the chart: one mode's table at a time (without scripts all seven are shown, one after the other)
+  const tabs = [...document.querySelectorAll<HTMLButtonElement>(".md-tabs button")];
+  const panels = [...document.querySelectorAll<HTMLElement>(".md-panel")];
+  function pick(id: string) {
+    tabs.forEach((t) => t.setAttribute("aria-selected", String(t.id === `tab-${id}`)));
+    panels.forEach((p) => (p.hidden = p.id !== `panel-${id}`));
+  }
+  tabs.forEach((t) => t.addEventListener("click", () => pick(t.id.replace("tab-", ""))));
+  tabs.forEach((t, i) =>
+    t.addEventListener("keydown", (e) => {
+      if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+      const next = tabs[(i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length];
+      next.focus();
+      pick(next.id.replace("tab-", ""));
+    }),
+  );
+  document.documentElement.classList.add("md-js");
+</script>
