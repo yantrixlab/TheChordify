@@ -12,7 +12,7 @@ import threading
 import time
 import uuid
 from typing import Optional
-from urllib.parse import urlencode, urlparse
+from urllib.parse import urlparse
 
 from fastapi import FastAPI, HTTPException, Request, Response, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
@@ -913,8 +913,7 @@ def partner_link(slug: str, request: Request) -> RedirectResponse:
     if not partner or not partner["active"]:
         return RedirectResponse("/", status_code=302)
     landing = partner["landingPath"]
-    utm = urlencode({"utm_source": "influencer", "utm_medium": "social", "utm_campaign": partner["slug"]})  # so Google Analytics sees it too
-    response = RedirectResponse(f"{landing}{'&' if '?' in landing else '?'}{utm}", status_code=302)
+    response = RedirectResponse(landing, status_code=302)  # a clean address: who sent the visitor is in the cookie, not in the URL
     response.headers["Cache-Control"] = "no-store"
     try:
         _remember_partner(request, response, partner, landing, "link")
