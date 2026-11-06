@@ -427,8 +427,7 @@ import SongRating from "../components/SongRating.astro";
   #player-state:not(.hidden) { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; align-items: start;
     min-height: calc(100vh + 260px); /* always room to scroll past the point where the header shrinks, however short the song's page is */ }
   .pl-main { min-width: 0; }
-  .pl-side { position: sticky; top: 88px; max-height: calc(100vh - 104px); overflow-y: auto; scrollbar-width: thin;
-    display: flex; flex-direction: column; gap: 16px; }
+  .pl-side { position: sticky; top: var(--side-top, 88px); display: flex; flex-direction: column; gap: 16px; } /* --side-top: see the script at the end */
   .side-card { border-radius: 16px; overflow: hidden; flex: 0 0 auto; }
   .video-card { aspect-ratio: 16 / 9; background: #000; }
   .video-card iframe { width: 100% !important; height: 100% !important; display: block; }
@@ -525,6 +524,18 @@ import SongRating from "../components/SongRating.astro";
   .gc.is-active { background: #2d2a3a; color: #fff; border-radius: 3px; }
   .gc.is-silence { font-family: "Segoe UI Symbol", "Noto Music", "Apple Symbols", sans-serif; font-size: 22px; font-weight: 400; color: var(--color-mute); }
 
+  /* the page behind the player: a soft lilac in the light theme, a black gradient with a little violet and amber light in the dark theme */
+  html[data-theme="light"] #main-content.gradient-mesh { background: radial-gradient(900px 480px at 85% -8%, #7c3aed1f, transparent 62%), radial-gradient(700px 420px at 0% 100%, #f59e0b14, transparent 60%), linear-gradient(180deg, #f6f1ff 0%, #fbf9ff 45%, #ffffff 100%); }
+  html[data-theme="light"] #main-content > div { color: var(--color-ink) !important; }
+  html[data-theme="light"] #loading-state { color: var(--color-violet-deep) !important; }
+  html[data-theme="light"] .inst-card { background: var(--color-canvas); border-color: var(--color-hairline); }
+  html[data-theme="light"] .instrument-tab[aria-pressed="false"] { color: var(--color-violet-deep) !important; border-color: var(--color-hairline) !important; }
+  html[data-theme="light"] .instrument-tab[aria-pressed="false"]:hover { background: var(--color-violet-soft) !important; }
+  html[data-theme="light"] .inst-soon { background: var(--color-violet-soft); color: var(--color-violet-deep); }
+  html[data-theme="dark"] #main-content.gradient-mesh { background: radial-gradient(1000px 520px at 85% -8%, #2f116040, transparent 62%), radial-gradient(800px 420px at 0% 100%, #4a200a2e, transparent 60%), linear-gradient(180deg, #0a090e 0%, #050507 55%, #020203 100%); }
+  html[data-theme="dark"] .inst-card { background: #0d0c10; border-color: #ffffff14; }
+  html[data-theme="dark"] .instrument-tab[aria-pressed="false"] { border-color: #ffffff1f !important; color: #cbbfe5 !important; }
+
   /* dark theme: the player's own light surfaces (the header, the cards and the panels already follow the colour tokens) */
   html[data-theme="dark"] .bs-cell { background: #18161d; border-color: #322f38; }
   html[data-theme="dark"] .bs-cell.has-chord { background: #1d1a22; border-color: #6a5a92; }
@@ -549,7 +560,7 @@ import SongRating from "../components/SongRating.astro";
 
   @media (max-width: 1000px) {
     #player-state:not(.hidden) { grid-template-columns: minmax(0, 1fr); }
-    .pl-side { position: static; max-height: none; overflow: visible; }
+    .pl-side { position: static; }
     .video-card { max-width: 560px; width: 100%; }
   }
   @media (max-width: 640px) {
@@ -2724,4 +2735,19 @@ import SongRating from "../components/SongRating.astro";
   });
 
   init();
+
+  // The side column (video, instrument, song details) stays in view while the page scrolls. When it is taller than the window it would be cut
+  // off, so it is given a negative "top": it scrolls with the page until its bottom edge reaches the bottom of the window, and stays there. No
+  // scrollbar of its own, and every part of it can be reached.
+  (() => {
+    const side = document.querySelector<HTMLElement>(".pl-side");
+    if (!side) return;
+    const fit = () => {
+      const room = innerHeight - side.offsetHeight - 16;
+      side.style.setProperty("--side-top", `${Math.round(Math.min(88, room))}px`);
+    };
+    new ResizeObserver(fit).observe(side);
+    addEventListener("resize", fit);
+    fit();
+  })();
 </script>
