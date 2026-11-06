@@ -18,23 +18,6 @@ const chordSvg = shape
   ? diagramSvg(shape, { title: "G chord on guitar", dot: "#a78bfa", ink: "currentColor", line: "currentColor", label: "#12081f" })
   : "";
 
-// Chords that twinkle around the photo, placed in the photo's own box (percentages of it).
-const stars = [
-  { chord: "Am", x: 2, y: 10, c: "#8b5cf6", t: 5.2, d: -1.2 },
-  { chord: "Em", x: 88, y: 52, c: "#ec4899", t: 4.4, d: -3.1 },
-  { chord: "C", x: 0, y: 66, c: "#f59e0b", t: 6.0, d: -0.5 },
-  { chord: "D7", x: 74, y: 90, c: "#22d3ee", t: 4.8, d: -2.4 },
-];
-
-// Music notes drifting up behind the photo.
-const notes = [
-  { x: 14, y: 8, s: 30, t: 9, d: -2, g: "♪", c: "#a78bfa" },
-  { x: 40, y: 2, s: 22, t: 11, d: -6, g: "♫", c: "#f59e0b" },
-  { x: 84, y: 6, s: 34, t: 10, d: -4, g: "♪", c: "#f59e0b" },
-  { x: 96, y: 34, s: 24, t: 12, d: -8, g: "♫", c: "#ec4899" },
-  { x: 8, y: 44, s: 20, t: 10, d: -5, g: "♪", c: "#22d3ee" },
-];
-
 const features = [
   { title: "Instant Chords", text: "Find chords instantly", icon: "M13 2 4 14h7l-1 8 9-12h-7z" },
   { title: "Sync with Beat", text: "Play along perfectly", icon: "M9 18V5l11-2v13M9 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM20 16a3 3 0 1 1-6 0 3 3 0 0 1 6 0z" },
@@ -82,6 +65,8 @@ const features = [
 
       <!-- Input card -->
       <div id="find" class="card rise" style="--i:3">
+        <span class="card-glow" aria-hidden="true"><i class="tw"></i></span>
+        <span class="card-ring" aria-hidden="true"><i class="tw"></i></span>
         <div class="card-body">
           <div class="tabs" role="tablist" aria-label="Input method">
             <button id="tab-search" class="tab" role="tab" aria-selected="true" aria-controls="panel-search" type="button">
@@ -185,12 +170,7 @@ const features = [
           <div class="fc-svg" set:html={chordSvg} />
         </div>
       </div>
-      <div class="notes" aria-hidden="true">
-        {notes.map((n) => <span class="note" style={`--x:${n.x}%;--y:${n.y}%;--s:${n.s}px;--t:${n.t}s;--d:${n.d}s;--c:${n.c}`}>{n.g}</span>)}
-      </div>
-      <div class="stars" aria-hidden="true">
-        {stars.map((s) => <span class="star" style={`--x:${s.x}%;--y:${s.y}%;--c:${s.c};--t:${s.t}s;--d:${s.d}s`}>{s.chord}</span>)}
-      </div>
+      <div class="floaters" id="floaters" aria-hidden="true"></div>
     </div>
   </div>
 
@@ -216,6 +196,7 @@ const features = [
     --h-body: #4a3d6a;
     --h-mute: #6b5f8a;
     --h-glass: rgba(255, 255, 255, 0.82);
+    --h-card: rgba(255, 255, 255, 0.95);
     --h-glass-line: #e1d4f7;
     --h-field: #fbf9ff;
     --h-tabs: #f3eeff;
@@ -235,6 +216,7 @@ const features = [
     --h-body: #cfc7e0;
     --h-mute: #9a90b3;
     --h-glass: rgba(14, 12, 20, 0.86);
+    --h-card: rgba(10, 8, 15, 0.95);
     --h-glass-line: #ffffff1c;
     --h-field: #0f0d16;
     --h-tabs: #17131f;
@@ -293,15 +275,17 @@ const features = [
   .lede { max-width: 540px; margin: 0 0 32px; font-size: clamp(16px, 1.7vw, 18.5px); line-height: 1.65; color: var(--h-body); text-wrap: pretty; }
 
   /* ── input card: glass, with a slowly turning gradient edge ── */
-  @property --edge { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
-  .card {
-    position: relative; max-width: 600px; padding: 1.5px; border-radius: 26px; scroll-margin-top: 120px; /* clear of the fixed menu */
-    background: conic-gradient(from var(--edge), #7c3aed, #ec4899, #f59e0b, #22d3ee, #7c3aed);
-    animation: edge 12s linear infinite;
-    box-shadow: 0 30px 60px -30px #5b21b680;
+  .card { position: relative; max-width: 600px; padding: 2px; border-radius: 26px; scroll-margin-top: 120px; /* clear of the fixed menu */ }
+  /* the edge: a dim ring in four colours, and a bright stroke that runs around it (the stroke is a gradient turning inside the clipped ring) */
+  .card-ring { position: absolute; inset: 0; z-index: 0; border-radius: 26px; overflow: hidden; background: conic-gradient(from 0deg, #7c3aedb0, #ec4899b0, #f59e0bb0, #22d3eeb0, #7c3aedb0); box-shadow: 0 30px 60px -30px #5b21b680; }
+  .card-glow { position: absolute; inset: 14px 24px -22px; z-index: -1; border-radius: 40px; overflow: hidden; filter: blur(32px); opacity: calc(0.38 * var(--h-glow) + 0.14); }
+  .card-ring i, .card-glow i {
+    position: absolute; left: 50%; top: 50%; width: 150%; aspect-ratio: 1; border-radius: 50%; will-change: transform;
+    background: conic-gradient(from 0deg, transparent 0 42%, #22d3ee 60%, #8b5cf6 74%, #ec4899 86%, #fbbf24 96%, #fff 99%, transparent 100%);
+    transform: translate(-50%, -50%); animation: ring 6.5s linear infinite;
   }
-  .card::before { content: ""; position: absolute; inset: 14px 24px -22px; z-index: -1; border-radius: 40px; background: inherit; filter: blur(34px); opacity: calc(0.4 * var(--h-glow) + 0.1); }
-  .card-body { position: relative; padding: 14px; border-radius: 24.5px; background: var(--h-glass); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
+  .card-glow i { animation-duration: 6.5s; }
+  .card-body { position: relative; z-index: 1; padding: 14px; border-radius: 24px; background: var(--h-card); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
 
   .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 12px; padding: 4px; border-radius: 16px; background: var(--h-tabs); }
   .tab {
@@ -390,9 +374,14 @@ const features = [
   :global(html:not([data-theme="dark"])) .fc-in strong { color: #1a0533; }
   :global(html:not([data-theme="dark"])) .fc-svg :global(svg) { --dg-dot: #7c3aed; }
 
-  .notes, .stars { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
-  .note { position: absolute; left: var(--x); top: var(--y); font-size: var(--s); line-height: 1; color: var(--c); text-shadow: 0 0 18px var(--c); opacity: 0; animation: note var(--t) ease-in-out var(--d) infinite; }
-  .star { position: absolute; left: var(--x); top: var(--y); padding: 6px 13px; border-radius: 12px; font: 600 14px/1 var(--font-mono); color: color-mix(in srgb, var(--c) 70%, var(--h-ink)); background: color-mix(in srgb, var(--c) 12%, var(--h-chip)); border: 1px solid color-mix(in srgb, var(--c) 45%, transparent); box-shadow: 0 0 22px -4px var(--c); opacity: 0.25; animation: twinkle var(--t) ease-in-out var(--d) infinite; }
+  /* chords and notes that appear at random places, stay a while and fade away (the script chooses where, what, when and how long) */
+  .floaters { position: absolute; inset: -18% -10% -6% -14%; z-index: 2; pointer-events: none; }
+  /* (made by the script, so they carry no scoping mark: global) */
+  :global(.fl) { position: absolute; left: 0; top: 0; opacity: 0; transform: scale(0.82); transition: opacity var(--in, 1s) ease, transform var(--in, 1s) cubic-bezier(0.2, 0.7, 0.2, 1); }
+  :global(.fl.on) { opacity: var(--peak, 1); transform: scale(1); }
+  :global(.fl-in) { display: inline-block; transform: rotate(var(--r, 0deg)); animation: fl-float var(--f, 6s) ease-in-out infinite alternate; }
+  :global(.fl-chip) { padding: 6px 13px; border-radius: 12px; font: 600 14px/1 var(--font-mono); color: color-mix(in srgb, var(--c) 70%, var(--h-ink)); background: color-mix(in srgb, var(--c) 12%, var(--h-chip)); border: 1px solid color-mix(in srgb, var(--c) 45%, transparent); box-shadow: 0 0 22px -4px var(--c); }
+  :global(.fl-note) { font-size: var(--s, 26px); line-height: 1; color: var(--c); text-shadow: 0 0 18px var(--c); }
 
   /* ── what the site does ── */
   .features {
@@ -423,20 +412,21 @@ const features = [
   @keyframes drift-a { to { transform: translate(60px, 40px) scale(1.12); } }
   @keyframes drift-b { to { transform: translate(-50px, 50px) scale(0.92); } }
   @keyframes bob { from { transform: translateY(-6px) rotate(5deg); } to { transform: translateY(8px) rotate(7.5deg); } }
-  @keyframes note { 0% { opacity: 0; transform: translateY(14px) rotate(-8deg); } 25% { opacity: 0.9; } 80% { opacity: 0.5; } 100% { opacity: 0; transform: translateY(-54px) rotate(10deg); } }
-  @keyframes twinkle { 0%, 100% { opacity: 0.22; transform: scale(0.94); } 50% { opacity: 1; transform: scale(1.06); } }
+  @keyframes fl-float { from { transform: translateY(8px) rotate(var(--r, 0deg)); } to { transform: translateY(-14px) rotate(calc(var(--r, 0deg) + 6deg)); } }
   @keyframes eq { 0%, 100% { transform: scaleY(0.35); } 50% { transform: scaleY(1); } }
   @keyframes shine { to { background-position: 100% 0; } }
-  @keyframes edge { to { --edge: 360deg; } }
+  @keyframes ring { to { transform: translate(-50%, -50%) rotate(1turn); } }
   @keyframes spin { to { transform: rotate(360deg); } }
 
   @media (prefers-reduced-motion: reduce) {
     .rise, .art-in, .fc { animation: none; }
-    .glow, .spot, .floor, .eq i, .title-grad, .card, .fc-in { animation: none; }
+    .glow, .spot, .floor, .eq i, .title-grad, .fc-in { animation: none; }
     .swoosh path { animation: none; stroke-dashoffset: 0; }
-    .note { animation: none; opacity: 0.55; }
-    .star { animation: none; opacity: 0.85; }
     .art-in { transition: none; }
+    /* the edge of the card keeps its slow sweep of light, and the chords and notes still fade in and out where they are: only travelling motion stops */
+    .card-ring i, .card-glow i { animation-duration: 18s; }
+    :global(.fl) { transform: none; transition: opacity var(--in, 1s) ease; }
+    :global(.fl-in) { animation: none; }
   }
 
   /* ── smaller screens ── */
@@ -448,6 +438,7 @@ const features = [
     .hero { padding: 92px 18px 32px; }
     .wrap { grid-template-columns: minmax(0, 1fr); gap: 8px; }
     .card { max-width: none; }
+    .floaters { inset: -12% -4% -4% -6%; }
     .lede { max-width: none; }
     .art { max-width: 560px; margin: 52px auto 0; width: 100%; }
     .art-in { margin: 0 -4%; }
@@ -642,5 +633,92 @@ const features = [
       }
     });
     hero.addEventListener("pointerleave", () => (photo.style.transform = ""));
+  }
+
+  // Chords and music notes appear at random places around the photo, stay for a random while and fade away, each on its own random
+  // timing; the chord, the colour and the size change every time. They keep clear of the people, the chord card and the writing.
+  const layer = document.getElementById("floaters");
+  if (layer && art) {
+    const CHORDS = ["Am", "Em", "C", "G", "D7", "F", "Dm", "Bm", "E7", "Cmaj7", "F#m", "B7", "A", "Gsus4", "Asus2", "D"];
+    const NOTES = ["♪", "♫", "♩", "♬", "♭", "♯"];
+    const COLOURS = ["#8b5cf6", "#ec4899", "#f59e0b", "#22d3ee", "#a78bfa", "#fb7185", "#34d399"];
+    const pick = <T,>(list: T[]): T => list[Math.floor(Math.random() * list.length)];
+    const between = (a: number, b: number) => a + Math.random() * (b - a);
+    const narrow = matchMedia("(max-width: 880px)");
+    const heroEl = document.querySelector<HTMLElement>(".hero")!;
+    const copyEl = document.querySelector<HTMLElement>(".copy");
+    const photoEl = art.querySelector<HTMLElement>(".photo");
+    const cardEl = art.querySelector<HTMLElement>(".fc");
+    let active = true;
+
+    // a place for one: not on the people in the photo, not on the chord card, not on the writing
+    function place(el: HTMLElement, w: number, h: number): boolean {
+      const box = layer!.getBoundingClientRect();
+      if (!box.width || !box.height || !photoEl) return false;
+      const p = photoEl.getBoundingClientRect();
+      const c = cardEl?.getBoundingClientRect();
+      const t = copyEl?.getBoundingClientRect();
+      const cx = p.left + p.width * 0.5;
+      const cy = p.top + p.height * 0.6;
+      const rx = p.width * 0.44;
+      const ry = p.height * 0.44;
+      for (let tries = 0; tries < 40; tries++) {
+        const x = between(0, box.width - w);
+        const y = between(0, box.height - h);
+        const mx = box.left + x + w / 2;
+        const my = box.top + y + h / 2;
+        if (((mx - cx) / (rx + w / 2)) ** 2 + ((my - cy) / (ry + h / 2)) ** 2 < 1) continue; // on the people
+        if (c && mx > c.left - 14 - w / 2 && mx < c.right + 14 + w / 2 && my > c.top - 14 - h / 2 && my < c.bottom + 14 + h / 2) continue; // on the chord card
+        if (t && mx > t.left - w / 2 && mx < t.right + w / 2 && my > t.top - h / 2 && my < t.bottom + h / 2) continue; // on the writing
+        const hb = heroEl.getBoundingClientRect();
+        if (my < hb.top + 78) continue; // under the menu
+        el.style.left = `${((x / box.width) * 100).toFixed(2)}%`;
+        el.style.top = `${((y / box.height) * 100).toFixed(2)}%`;
+        return true;
+      }
+      return false;
+    }
+
+    function run(el: HTMLElement, inner: HTMLElement, kind: "chord" | "note") {
+      const next = (ms: number, fn: () => void) => window.setTimeout(fn, ms);
+      const show = () => {
+        if (!active) return void next(800, show); // not while the page is hidden or the hero is off screen
+        const size = kind === "note" ? Math.round(between(18, 38)) : 0;
+        inner.textContent = kind === "note" ? pick(NOTES) : pick(CHORDS);
+        el.style.setProperty("--c", pick(COLOURS));
+        el.style.setProperty("--s", `${size}px`);
+        el.style.setProperty("--r", `${Math.round(between(-14, 14))}deg`);
+        el.style.setProperty("--f", `${between(4, 8).toFixed(1)}s`);
+        el.style.setProperty("--in", `${between(0.7, 1.5).toFixed(2)}s`);
+        el.style.setProperty("--peak", String(kind === "note" ? between(0.55, 0.95).toFixed(2) : between(0.8, 1).toFixed(2)));
+        const w = kind === "note" ? size : 54;
+        const h = kind === "note" ? size : 30;
+        if (!place(el, w, h)) return void next(500, show);
+        el.classList.add("on");
+        next(between(2200, 5600), hide); // stays a random while
+      };
+      const hide = () => {
+        el.classList.remove("on");
+        next(between(1100, 1700) + between(250, 3400), show); // fades out, then a random wait
+      };
+      next(between(150, 4200), show); // each starts at its own moment
+    }
+
+    const total = narrow.matches ? 7 : 13;
+    for (let i = 0; i < total; i++) {
+      const kind = i % 2 === 0 ? "chord" : "note";
+      const el = document.createElement("span");
+      el.className = "fl tw"; // "tw": the site's reduced-motion rule leaves these gentle fades and sweeps alone
+      const inner = document.createElement("span");
+      inner.className = `fl-in ${kind === "chord" ? "fl-chip" : "fl-note"}`;
+      el.append(inner);
+      layer.append(el);
+      run(el, inner, kind);
+    }
+    // nothing starts while the page is in another tab or the hero has been scrolled away
+    const check = () => (active = !document.hidden && heroVisible);
+    let heroVisible = true;
+    if ("IntersectionObserver" in window) new IntersectionObserver((entries) => { heroVisible = entries[0]?.isIntersecting ?? true; check(); }).observe(heroEl);
+    document.addEventListener("visibilitychange", check);
   }
 </script>
