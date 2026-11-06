@@ -375,6 +375,9 @@ const features = [
   :global(html:not([data-theme="dark"])) .fc-in strong { color: #1a0533; }
   :global(html:not([data-theme="dark"])) .fc-svg :global(svg) { --dg-dot: #7c3aed; }
 
+  /* depth: --depth goes from 0 (full size) to 1 (the camera has pulled back as far as it goes); what is nearer the camera moves more */
+  .fc { transform-origin: 85% 0%; transform: scale(calc(1 + var(--depth, 0) * 0.16)); }
+  .floaters { transform-origin: 50% 58%; transform: scale(calc(1 + var(--depth, 0) * 0.26)); }
   /* chords and notes that appear at random places, stay a while and fade away (the script chooses where, what, when and how long) */
   .floaters { position: absolute; inset: -18% -10% -6% -14%; z-index: 2; pointer-events: none; }
   /* (made by the script, so they carry no scoping mark: global) */
@@ -723,37 +726,76 @@ const features = [
     document.addEventListener("visibilitychange", check);
   }
 
-  // As the page scrolls down the picture shrinks towards the ground they sit on, as if they were moving away, and it grows back to full
-  // size as the page scrolls up. It always fits the screen: if the photo would be cut off by the menu (also after the "Discover" link
-  // scrolls down to the search box) it is made just small enough to fit. It follows the scroll position only, so it is the same
-  // going down and going up, and a link that jumps to the search box lands on the same size.
+  // The picture is a camera that pulls back as the page scrolls down and comes forward again as it scrolls up. The people shrink towards
+  // the ground they sit on (never below 0.86 of their size) and, as in a real shot, they stay in the frame: they travel up the screen
+  // more slowly than the page does, so after a link (Discover) has scrolled down to the search box they are shown whole. The chord card
+  // and the notes are nearer the camera, so they shrink less and drift outwards. The size and place follow the scroll position only, and
+  // glide there with a little inertia instead of jumping, also when a link scrolls to the search box in one go.
   if (art) {
     const NAV = 64; // the fixed menu
-    const MIN = 0.5;
-    let last = 1;
-    const update = () => {
+    const MIN = 0.86;
+    const state = { scale: 1, down: 0 }; // what is drawn: the size, and how far it has been held back (px)
+    const aimed = { scale: 1, down: 0 }; // what it is gliding to
+    let running = false;
+    let stamp = 0;
+    let scheduled = 0; // when a frame was last asked for: if frames stopped coming (a hidden tab), the next scroll asks again
+    const paint = () => {
+      const depth = Math.min(1, Math.max(0, (1 - state.scale) / (1 - MIN)));
+      art.style.setProperty("--depth", depth.toFixed(4));
+      const lift = (1 - state.scale) * art.offsetHeight * 0.06; // the feet rise a little towards the horizon
+      const y = state.down - lift;
+      art.style.transform = state.scale >= 0.9995 && Math.abs(y) < 0.05 ? "" : `translate3d(0, ${y.toFixed(2)}px, 0) scale(${state.scale.toFixed(4)})`;
+    };
+    const aim = () => {
       const h = art.offsetHeight;
       if (!h) return;
-      const bottom = art.getBoundingClientRect().bottom; // the feet stay put, so this is not changed by the scaling
+      const wide = innerWidth > 880;
+      // where the feet would be with nothing applied: the bottom edge as drawn, less what was added to it
+      const lift = (1 - state.scale) * h * 0.06;
+      const bottom = art.getBoundingClientRect().bottom - (state.down - lift);
       const pageBottom = bottom + scrollY;
       const vh = innerHeight;
-      const start = Math.max(0, pageBottom - h - vh * (innerWidth <= 880 ? 0.22 : 0.6)); // the page position where the picture starts to shrink: at once on a desktop, later on a phone
-      const span = vh * 0.75;
-      let p = Math.min(1, Math.max(0, (scrollY - start) / span));
+      const start = Math.max(0, pageBottom - h - vh * (wide ? 0.6 : 0.22)); // where the page is when the pull-back begins: at once on a desktop, later on a phone
+      let p = Math.min(1, Math.max(0, (scrollY - start) / (vh * 0.7)));
       p = p * p * (3 - 2 * p);
-      const away = 1 - (1 - MIN) * p;
-      const fit = (bottom - NAV - 14) / h; // just small enough that the top is below the menu
-      const scale = Math.max(MIN * 0.8, Math.min(1, away, fit));
-      if (Math.abs(scale - last) < 0.0015) return;
-      last = scale;
-      art.style.transform = scale >= 0.999 ? "" : `scale(${scale.toFixed(4)})`;
+      aimed.scale = 1 - (1 - MIN) * p;
+      // held back: it climbs the screen at about half the speed of the page, up to a limit, so it stays in the frame
+      aimed.down = wide ? Math.min(150, Math.max(0, (scrollY - start) * 0.42)) : 0;
+      // and if the top would still be under the menu, a little smaller (but not below the least size)
+      const top = bottom + aimed.down - h * aimed.scale - (1 - aimed.scale) * h * 0.06;
+      if (top < NAV + 14) aimed.scale = Math.max(MIN, aimed.scale - (NAV + 14 - top) / h);
+      if (!running || performance.now() - scheduled > 300) {
+        running = true;
+        stamp = 0;
+        scheduled = performance.now();
+        requestAnimationFrame(glide);
+      }
     };
-    // a scroll event comes once a frame at most, and what is done here is a few sums and one transform: no need to wait for another frame
-    addEventListener("scroll", update, { passive: true });
-    addEventListener("resize", update);
-    addEventListener("load", update);
+    // a critically damped glide: about a tenth of a second to close most of the gap, and no overshoot
+    function glide(now: number) {
+      const dt = stamp ? Math.min(64, now - stamp) : 16;
+      stamp = now;
+      const k = 1 - Math.exp(-dt / 110);
+      state.scale += (aimed.scale - state.scale) * k;
+      state.down += (aimed.down - state.down) * k;
+      if (Math.abs(aimed.scale - state.scale) < 0.0006 && Math.abs(aimed.down - state.down) < 0.1) {
+        state.scale = aimed.scale;
+        state.down = aimed.down;
+      }
+      paint();
+      if (state.scale !== aimed.scale || state.down !== aimed.down) {
+        scheduled = performance.now();
+        requestAnimationFrame(glide);
+      } else running = false;
+    }
+    addEventListener("scroll", aim, { passive: true });
+    addEventListener("resize", aim);
+    addEventListener("load", aim);
     const img = art.querySelector<HTMLImageElement>(".photo");
-    if (img && !img.complete) img.addEventListener("load", update, { once: true });
-    update();
+    if (img && !img.complete) img.addEventListener("load", aim, { once: true });
+    aim();
+    state.scale = aimed.scale; // no glide on the first look at the page
+    state.down = aimed.down;
+    paint();
   }
 </script>
