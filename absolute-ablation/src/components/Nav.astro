@@ -3,9 +3,9 @@ import Logo from "./Logo.astro";
 import NavMenu from "./NavMenu.astro";
 import { MENU } from "../lib/menu";
 
-const navLinks: { label?: string; href?: string; wide?: boolean; signedIn?: boolean; menu?: string }[] = [
+const navLinks: { label?: string; href?: string; wide?: boolean; signedIn?: boolean; guestOnly?: boolean; menu?: string }[] = [
   { label: "Discover", href: "/#find" },
-  { label: "Features", href: "/#features", wide: true }, // wide: only where the bar has room (1024px and up); the phone menu lists every link
+  { label: "Features", href: "/#features", wide: true, guestOnly: true }, // the page about what the site does: for visitors, not for somebody who is already signed in // wide: only where the bar has room (1024px and up); the phone menu lists every link
   { label: "Songs", href: "/songs/" },
   { menu: "chords" }, // the big menus (lib/menu.ts): a panel under the bar on a computer, an accordion in the phone menu
   { menu: "learn" },
@@ -43,6 +43,7 @@ const navLinks: { label?: string; href?: string; wide?: boolean; signedIn?: bool
             role="listitem"
             class={`rounded-full${link.wide ? " nav-wide" : ""}`}
             data-auth-user={link.signedIn ? "" : undefined}
+            data-auth-guest={link.guestOnly ? "" : undefined}
             hidden={link.signedIn}
             style="
               padding: var(--space-xs) var(--space-sm);
@@ -173,6 +174,7 @@ const navLinks: { label?: string; href?: string; wide?: boolean; signedIn?: bool
       <a
         href={link.href}
         class="mobile-nav-link rounded-lg"
+        data-auth-guest={link.guestOnly ? "" : undefined}
         style="
           display:block;
           padding: var(--space-sm) var(--space-md);
