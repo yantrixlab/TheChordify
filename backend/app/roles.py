@@ -50,6 +50,10 @@ PERMISSION_GROUPS: list[dict] = [
         ("plans.manage", "Edit plans and prices", "Create, change and delete plans and prices; connect them to Razorpay."),
         ("subscriptions.view", "See subscriptions and revenue", "Who is subscribed, and what has been paid."),
     ]},
+    {"group": "Marketing", "items": [
+        ("partners.view", "See influencers", "Each influencer's link, clicks, sign-ups, paying customers, revenue and what they are owed."),
+        ("partners.manage", "Manage influencers and payouts", "Add influencers, set their commission, and record payouts to them."),
+    ]},
     {"group": "Product", "items": [
         ("features.view", "See features and limits", "What each plan includes."),
         ("features.manage", "Edit features and limits", "Add features and decide which plan gets what."),

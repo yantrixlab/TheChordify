@@ -18,5 +18,5 @@ export const business = {
   /** Shown as "Last updated" on each page. */
   updated: "24 October 2026",
   /** When the Privacy Policy last changed (and the page about deleting an account). */
-  privacyUpdated: "27 October 2026",
+  privacyUpdated: "7 November 2026",
 };

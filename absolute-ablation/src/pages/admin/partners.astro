@@ -1,0 +1,514 @@
+---
+import AdminLayout from "../../layouts/AdminLayout.astro";
+---
+
+<AdminLayout
+  perm="partners.view"
+  manage="partners.manage"
+  title="Influencers"
+  active="partners"
+  lead="Give each influencer a link of their own. See who they bring, what those people pay, and what you owe them."
+>
+  <div id="tiles" class="ov-tiles"></div>
+
+  <div class="pt-bar">
+    <button id="add" type="button" class="adm-btn" data-perm-manage hidden>+ Add influencer</button>
+    <button id="how-toggle" type="button" class="adm-btn ghost" aria-expanded="false" aria-controls="how">How tracking works</button>
+  </div>
+
+  <section id="how" class="adm-card pt-how" hidden>
+    <h2>How tracking works</h2>
+    <ul>
+      <li><strong>Their link.</strong> Give the influencer <code>chordsuno.com/r/their-name</code> for their Instagram bio or stories. Opening it counts a click, remembers them for <span id="how-days">60</span> days in a cookie, and opens the site (or the page you chose).</li>
+      <li><strong>A link to a page.</strong> Add <code>?ref=their-name</code> to any page, such as <code>chordsuno.com/guitar-chord-chart/?ref=their-name</code>. It counts the same way.</li>
+      <li><strong>Who gets the credit.</strong> A person is credited once, at their first sign-in, to the first influencer link they opened. If they had signed in before, they are credited when they first pay. It never moves to another influencer later.</li>
+      <li><strong>Revenue</strong> is what was actually paid minus refunds, in rupees. It is recorded from Razorpay's <code>subscription.charged</code> and <code>refund.processed</code> messages, so both events must be ticked in your Razorpay webhook settings.</li>
+      <li><strong>Commission</strong> is a percent of that revenue, for every payment or only a customer's first months. The flat fee is counted as a cost. Record each payment you make to an influencer under Payouts; "Owed" is what they have earned minus what you have paid.</li>
+      <li>People who use the Android app are not tracked yet: only the website is.</li>
+    </ul>
+  </section>
+
+  <section id="editor" class="adm-card" hidden aria-labelledby="editor-title">
+    <h2 id="editor-title">New influencer</h2>
+    <form id="form" novalidate>
+      <div class="pt-grid">
+        <label class="adm-field"><span>Name</span><input id="f-name" type="text" maxlength="80" required placeholder="Priya Sharma" /></label>
+        <label class="adm-field">
+          <span>Link name</span>
+          <input id="f-slug" type="text" maxlength="30" required placeholder="priya" autocomplete="off" spellcheck="false" />
+          <small id="f-url" class="pt-url"></small>
+        </label>
+        <label class="adm-field"><span>Instagram handle</span><input id="f-handle" type="text" maxlength="60" placeholder="priya.guitar" /></label>
+        <label class="adm-field"><span>Email (optional)</span><input id="f-email" type="email" maxlength="120" placeholder="priya@example.com" /></label>
+        <label class="adm-field">
+          <span>The link opens</span>
+          <select id="f-landing">
+            <option value="/">The home page</option>
+            <option value="/pricing/">The pricing page</option>
+            <option value="/guitar-chord-chart/">The guitar chord chart</option>
+            <option value="/chords/">The chords hub</option>
+            <option value="/toolkit/">The toolkit</option>
+          </select>
+        </label>
+        <label class="adm-field">
+          <span>Commission (percent of what their customers pay)</span>
+          <input id="f-pct" type="number" min="0" max="100" step="0.5" value="20" />
+        </label>
+        <label class="adm-field">
+          <span>Commission lasts</span>
+          <select id="f-months">
+            <option value="0">Every payment, for as long as they pay</option>
+            <option value="1">The first month of each customer</option>
+            <option value="3">The first 3 months</option>
+            <option value="6">The first 6 months</option>
+            <option value="12">The first 12 months</option>
+          </select>
+        </label>
+        <label class="adm-field"><span>Flat fee you pay them (₹, optional)</span><input id="f-fee" type="number" min="0" step="1" value="0" /><small>Counted as a cost, for the return on what you spend.</small></label>
+        <label class="adm-field pt-wide"><span>Notes</span><input id="f-notes" type="text" maxlength="1000" placeholder="Posted a reel on 12 Nov, 2 stories a week" /></label>
+      </div>
+      <label class="pt-check"><input id="f-active" type="checkbox" checked /> Active (a switched-off link stops crediting new people; the numbers stay)</label>
+      <div class="adm-row">
+        <button id="save" type="submit" class="adm-btn">Save influencer</button>
+        <button id="cancel" type="button" class="adm-btn ghost">Cancel</button>
+      </div>
+      <p id="form-msg" class="adm-msg" role="status"></p>
+    </form>
+  </section>
+
+  <p id="msg" class="adm-msg" role="status"></p>
+  <div class="adm-table-wrap">
+    <table class="adm-table pt-table">
+      <thead>
+        <tr>
+          <th>Influencer</th>
+          <th>Link</th>
+          <th class="num">Clicks</th>
+          <th class="num">Sign-ups</th>
+          <th class="num">Paying</th>
+          <th class="num">Revenue</th>
+          <th class="num">Earned</th>
+          <th class="num">Owed</th>
+          <th class="num">Return</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <p id="empty" class="adm-empty" hidden>No influencers yet. Add the first one and give them their link.</p>
+  </div>
+
+  <section id="detail" class="pt-detail" hidden aria-live="polite"></section>
+</AdminLayout>
+
+<style is:global>
+  .ov-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); gap: 14px; margin-bottom: 18px; }
+  .ov-tile { padding: 18px 20px; border-radius: 18px; background: #fff; border: 1px solid var(--color-hairline); box-shadow: 0 1px 2px #1a05330a; }
+  .ov-tile small { display: block; font: 700 11px var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-mute); }
+  .ov-tile strong { display: block; margin: 8px 0 4px; font-size: 28px; font-weight: 800; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; color: var(--color-ink); }
+  .ov-tile span { font-size: 13px; color: var(--color-body); }
+  .ov-tile.is-good strong { color: #047857; }
+  .ov-tile.is-bad strong { color: #b91c1c; }
+  .ov-tile.is-warn strong { color: #b45309; }
+  .pt-bar { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+  .pt-how ul { margin: 10px 0 0; padding-left: 20px; display: grid; gap: 8px; font-size: 14px; line-height: 1.6; color: var(--color-body); }
+  .pt-how code, .pt-url code { padding: 1px 6px; border-radius: 6px; background: var(--color-violet-soft); font: 600 12.5px var(--font-mono); color: var(--color-violet-deep); }
+  .pt-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px 18px; }
+  .pt-wide { grid-column: 1 / -1; }
+  .pt-url { display: block; margin-top: 4px; font: 600 12.5px var(--font-mono); color: var(--color-violet-deep); overflow-wrap: anywhere; }
+  .pt-check { display: flex; align-items: center; gap: 8px; margin: 14px 0; font-size: 14px; color: var(--color-body); }
+  .pt-table tbody tr { cursor: pointer; transition: background 0.15s; }
+  .pt-table tbody tr:hover, .pt-table tbody tr.is-open { background: #faf6ff; }
+  .pt-table tbody tr.is-off { opacity: 0.55; }
+  .pt-who { display: grid; line-height: 1.35; }
+  .pt-who small { color: var(--color-mute); font-size: 12.5px; }
+  .pt-copy { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border: 1px solid var(--color-hairline); border-radius: 999px; background: #fff; cursor: pointer; font: 600 12.5px var(--font-mono); color: var(--color-violet-deep); }
+  .pt-copy:hover { border-color: var(--color-violet); background: var(--color-violet-soft); }
+  .pt-good { color: #047857; font-weight: 700; }
+  .pt-bad { color: #b91c1c; font-weight: 700; }
+  .pt-detail { margin-top: 18px; display: grid; gap: 16px; }
+  .pt-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+  .pt-head h2 { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.02em; color: var(--color-ink); }
+  .pt-head p { margin: 4px 0 0; font-size: 13.5px; color: var(--color-mute); }
+  .pt-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pt-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+  .pt-chart h3 { margin: 0 0 10px; font-size: 14px; }
+  .pt-chart svg { display: block; width: 100%; height: 120px; }
+  .pt-chart .axis { display: flex; justify-content: space-between; margin-top: 4px; font: 600 11px var(--font-mono); color: var(--color-mute); }
+  .pt-two { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
+  .pt-payout-form { display: grid; grid-template-columns: 1fr 1.4fr auto; gap: 10px; align-items: end; margin-top: 12px; }
+  .pt-payout-form .adm-field { margin: 0; }
+  .pt-list { margin: 10px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+  .pt-list li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border-radius: 12px; background: #faf6ff; font-size: 14px; }
+  .pt-list small { display: block; color: var(--color-mute); }
+  @media (max-width: 900px) { .pt-payout-form { grid-template-columns: 1fr; } }
+</style>
+
+<script>
+  import { adminReady, adminFetch, can, el, say, money, day, number } from "../../lib/admin";
+
+  const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
+  const INR = (minor: number) => money(minor, "INR");
+  const pct = (v: number | null | undefined) => (v === null || v === undefined ? "—" : `${v}%`);
+  let siteUrl = "https://chordsuno.com";
+  let editing = "";
+  let openId = "";
+  let list: Record<string, any>[] = [];
+  const canManage = () => can("partners.manage");
+  const linkOf = (slug: string) => `${siteUrl.replace(/^https?:\/\//, "")}/r/${slug}`;
+
+  async function copy(text: string, button?: HTMLElement) {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const area = document.createElement("textarea");
+      area.value = text;
+      document.body.append(area);
+      area.select();
+      document.execCommand("copy");
+      area.remove();
+    }
+    if (button) {
+      const was = button.textContent;
+      button.textContent = "Copied ✓";
+      setTimeout(() => (button.textContent = was), 1400);
+    }
+  }
+
+  const tile = (label: string, value: string, note: string, tone = "") => {
+    const t = el("div", `ov-tile ${tone}`.trim());
+    t.append(el("small", "", label), el("strong", "", value), el("span", "", note));
+    return t;
+  };
+
+  function bars(values: number[], labels: [string, string], color: string, format: (n: number) => string) {
+    const max = Math.max(1, ...values);
+    const w = 300;
+    const h = 120;
+    const gap = 2;
+    const bw = (w - gap * (values.length - 1)) / values.length;
+    const rects = values
+      .map((v, i) => {
+        const bh = Math.max(v > 0 ? 3 : 1, (v / max) * (h - 8));
+        return `<rect x="${(i * (bw + gap)).toFixed(1)}" y="${(h - bh).toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" rx="2" fill="${v > 0 ? color : "#ece4f7"}"><title>${labels[0]} ${i + 1}: ${format(v)}</title></rect>`;
+      })
+      .join("");
+    return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="${labels[1]}">${rects}</svg>`;
+  }
+
+  // ---- the list -----------------------------------------------------------------------------------------------------------
+  async function load() {
+    try {
+      const data = await adminFetch("/api/admin/partners");
+      siteUrl = data.siteUrl || siteUrl;
+      $("how-days").textContent = String(data.cookieDays);
+      list = data.partners;
+      const t = data.totals;
+      $("tiles").replaceChildren(
+        tile("Clicks", number(t.clicks), `${number(t.visitors)} different visitors`),
+        tile("Sign-ups", number(t.signups), "came through a link"),
+        tile("Paying customers", number(t.customers), `${number(t.subscribers)} subscribed now`),
+        tile("Revenue", INR(t.netMinor), "paid, minus refunds", t.netMinor > 0 ? "is-good" : ""),
+        tile("Owed to influencers", INR(Math.max(0, t.owedMinor)), `${INR(t.paidOutMinor)} paid out so far`, t.owedMinor > 0 ? "is-warn" : ""),
+        tile("Profit after cost", INR(t.profitMinor), "revenue − commission − fees", t.profitMinor < 0 ? "is-bad" : t.profitMinor > 0 ? "is-good" : ""),
+      );
+      const rows = $("rows");
+      rows.replaceChildren(
+        ...list.map((p) => {
+          const tr = el("tr", `${p.id === openId ? "is-open" : ""}${p.active ? "" : " is-off"}`.trim());
+          tr.tabIndex = 0;
+          const cell = (...nodes: (Node | string)[]) => {
+            const td = el("td");
+            td.append(...nodes);
+            return td;
+          };
+          const who = el("div", "pt-who");
+          who.append(el("strong", "", p.name), el("small", "", p.handle ? `@${p.handle}${p.active ? "" : " · switched off"}` : p.active ? "" : "switched off"));
+          const copyBtn = el("button", "pt-copy", `/r/${p.slug}`);
+          copyBtn.type = "button";
+          copyBtn.title = `Copy ${linkOf(p.slug)}`;
+          copyBtn.addEventListener("click", (event) => {
+            event.stopPropagation();
+            void copy(`https://${linkOf(p.slug)}`, copyBtn);
+          });
+          const num = (text: string, cls = "") => {
+            const td = cell(text);
+            td.className = `num ${cls}`.trim();
+            return td;
+          };
+          tr.append(
+            cell(who), cell(copyBtn), num(number(p.clicks)), num(number(p.signups)), num(number(p.customers)), num(INR(p.netMinor)), num(INR(p.earnedMinor)),
+            num(INR(Math.max(0, p.owedMinor)), p.owedMinor > 0 ? "pt-bad" : ""),
+            num(p.roiPct === null ? "—" : pct(p.roiPct), p.roiPct === null ? "" : p.roiPct >= 0 ? "pt-good" : "pt-bad"),
+          );
+          const open = () => void showDetail(p.id);
+          tr.addEventListener("click", open);
+          tr.addEventListener("keydown", (event) => event.key === "Enter" && open());
+          return tr;
+        }),
+      );
+      $("empty").hidden = list.length > 0;
+      if (openId && list.some((p) => p.id === openId)) void showDetail(openId, false);
+      else $("detail").hidden = true;
+    } catch (err) {
+      say("msg", err instanceof Error ? err.message : "Could not load the influencers.", "bad");
+    }
+  }
+
+  // ---- one influencer ---------------------------------------------------------------------------------------------------------
+  async function showDetail(id: string, scroll = true) {
+    openId = id;
+    document.querySelectorAll("#rows tr").forEach((tr, i) => tr.classList.toggle("is-open", list[i]?.id === id));
+    const box = $("detail");
+    let d: Record<string, any>;
+    try {
+      d = await adminFetch(`/api/admin/partners/${encodeURIComponent(id)}`);
+    } catch (err) {
+      say("msg", err instanceof Error ? err.message : "Could not load that influencer.", "bad");
+      return;
+    }
+    const p = d.partner;
+    const n = d.numbers;
+    box.hidden = false;
+    box.replaceChildren();
+
+    const head = el("section", "adm-card");
+    const top = el("div", "pt-head");
+    const title = el("div");
+    title.append(el("h2", "", p.name), el("p", "", `${p.handle ? `@${p.handle} · ` : ""}${p.email ? `${p.email} · ` : ""}${p.active ? "Active" : "Switched off"} · ${p.commissionPct}% ${p.commissionMonths ? `for the first ${p.commissionMonths} month${p.commissionMonths > 1 ? "s" : ""} of each customer` : "on every payment"}${p.feeMinor ? ` · fee ${INR(p.feeMinor)}` : ""}`));
+    const actions = el("div", "pt-actions");
+    const copyBtn = el("button", "adm-btn small", `Copy link: ${linkOf(p.slug)}`);
+    copyBtn.type = "button";
+    copyBtn.addEventListener("click", () => void copy(`https://${linkOf(p.slug)}`, copyBtn));
+    actions.append(copyBtn);
+    if (p.handle) {
+      const ig = el("a", "adm-btn small ghost", "Open Instagram");
+      ig.href = `https://instagram.com/${p.handle}`;
+      ig.target = "_blank";
+      ig.rel = "noopener";
+      actions.append(ig);
+    }
+    if (canManage()) {
+      const edit = el("button", "adm-btn small ghost", "Edit");
+      edit.type = "button";
+      edit.addEventListener("click", () => openEditor(p));
+      actions.append(edit);
+      const del = el("button", "adm-btn small danger", "Delete");
+      del.type = "button";
+      del.addEventListener("click", async () => {
+        if (!confirm(`Delete ${p.name}? This only works when they have no clicks, sign-ups or payments. Otherwise switch them off.`)) return;
+        try {
+          await adminFetch(`/api/admin/partners/${encodeURIComponent(p.id)}`, { method: "DELETE" });
+          openId = "";
+          say("msg", `${p.name} deleted.`, "ok");
+          await load();
+        } catch (err) {
+          say("msg", err instanceof Error ? err.message : "Could not delete.", "bad");
+        }
+      });
+      actions.append(del);
+    }
+    top.append(title, actions);
+    const tiles = el("div", "ov-tiles");
+    tiles.style.margin = "16px 0 0";
+    tiles.append(
+      tile("Clicks", number(n.clicks), `${number(n.visitors)} different visitors`),
+      tile("Sign-ups", number(n.signups), n.signupRatePct === null ? "of visitors: —" : `${pct(n.signupRatePct)} of visitors`),
+      tile("Paying customers", number(n.customers), n.payRatePct === null ? "of sign-ups: —" : `${pct(n.payRatePct)} of sign-ups · ${n.subscribers} subscribed now`),
+      tile("Revenue", INR(n.netMinor), `${INR(n.grossMinor)} paid − ${INR(n.refundedMinor)} refunded`, n.netMinor > 0 ? "is-good" : ""),
+      tile("Commission earned", INR(n.earnedMinor), `${INR(n.paidOutMinor)} paid out`),
+      tile("Owed now", INR(Math.max(0, n.owedMinor)), n.owedMinor < 0 ? `paid ${INR(-n.owedMinor)} ahead` : "earned − paid out", n.owedMinor > 0 ? "is-warn" : ""),
+      tile("Cost", INR(n.costMinor), `${INR(p.feeMinor)} fee + ${INR(n.earnedMinor)} commission`),
+      tile("Profit", INR(n.profitMinor), n.roiPct === null ? "return: —" : `${pct(n.roiPct)} return on cost`, n.profitMinor < 0 ? "is-bad" : n.profitMinor > 0 ? "is-good" : ""),
+    );
+    head.append(top, tiles);
+
+    const charts = el("div", "pt-charts");
+    const series = d.series as { day: string; clicks: number; signups: number; revenueMinor: number }[];
+    const chart = (heading: string, values: number[], color: string, format: (v: number) => string, total: string) => {
+      const c = el("section", "adm-card pt-chart");
+      c.append(el("h3", "", `${heading} · ${total}`));
+      const holder = el("div");
+      holder.innerHTML = bars(values, ["Day", heading], color, format);
+      const axis = el("div", "axis");
+      axis.append(el("span", "", series[0]?.day.slice(5) ?? ""), el("span", "", series[series.length - 1]?.day.slice(5) ?? ""));
+      c.append(holder, axis);
+      return c;
+    };
+    const sum = (key: "clicks" | "signups" | "revenueMinor") => series.reduce((a, s) => a + s[key], 0);
+    charts.append(
+      chart("Clicks per day", series.map((s) => s.clicks), "#7c3aed", number, `${number(sum("clicks"))} in 30 days`),
+      chart("Sign-ups per day", series.map((s) => s.signups), "#f59e0b", number, `${number(sum("signups"))} in 30 days`),
+      chart("Revenue per day", series.map((s) => s.revenueMinor), "#059669", INR, `${INR(sum("revenueMinor"))} in 30 days`),
+    );
+
+    const two = el("div", "pt-two");
+    const people = el("section", "adm-card");
+    people.append(el("h2", "", `People who came through ${p.name}'s link`));
+    if (!d.customers.length) {
+      people.append(el("p", "adm-hint", "Nobody has signed up through this link yet. Clicks are counted from the first visit; a person shows here once they sign in."));
+    } else {
+      const wrap = el("div", "adm-table-wrap");
+      wrap.style.boxShadow = "none";
+      const table = el("table", "adm-table");
+      table.innerHTML = "<thead><tr><th>Person</th><th>Signed up</th><th>Plan</th><th class='num'>Paid</th><th>Last payment</th></tr></thead>";
+      const body = el("tbody");
+      for (const c of d.customers) {
+        const tr = el("tr");
+        const who = el("div", "pt-who");
+        who.append(el("strong", "", c.name || c.email), el("small", "", c.email));
+        const td = (...nodes: (Node | string)[]) => {
+          const x = el("td");
+          x.append(...nodes);
+          return x;
+        };
+        const paid = td(c.paidMinor ? INR(c.paidMinor) : "—");
+        paid.className = "num";
+        tr.append(td(who), td(day(c.signedUpAt)), td(el("span", `adm-pill ${c.subscribed ? "ok" : ""}`, c.subscribed ? "Subscribed" : c.plan || "free")), paid, td(day(c.lastPaidAt)));
+        body.append(tr);
+      }
+      table.append(body);
+      wrap.append(table);
+      people.append(wrap);
+    }
+
+    const payouts = el("section", "adm-card");
+    payouts.append(el("h2", "", "Payouts"), el("p", "adm-hint", `Record each payment you make to ${p.name}. Owed is what they have earned minus these.`));
+    const ul = el("ul", "pt-list");
+    if (!d.payouts.length) ul.append(Object.assign(el("li"), { textContent: "Nothing paid out yet." }));
+    for (const o of d.payouts) {
+      const li = el("li");
+      const text = el("div");
+      text.append(el("strong", "", INR(o.amountMinor)), el("small", "", `${day(o.paidAt)}${o.note ? ` · ${o.note}` : ""}`));
+      li.append(text);
+      if (canManage()) {
+        const undo = el("button", "adm-btn small danger", "Undo");
+        undo.type = "button";
+        undo.addEventListener("click", async () => {
+          if (!confirm("Remove this payout from the record?")) return;
+          try {
+            await adminFetch(`/api/admin/partners/${encodeURIComponent(p.id)}/payouts/${encodeURIComponent(o.id)}`, { method: "DELETE" });
+            await load();
+          } catch (err) {
+            say("msg", err instanceof Error ? err.message : "Could not remove it.", "bad");
+          }
+        });
+        li.append(undo);
+      }
+      ul.append(li);
+    }
+    payouts.append(ul);
+    if (canManage()) {
+      const form = el("form", "pt-payout-form");
+      form.noValidate = true;
+      form.innerHTML = `<label class="adm-field"><span>Amount (₹)</span><input type="number" min="1" step="1" name="amount" value="${Math.max(0, Math.round(n.owedMinor / 100))}" /></label>
+        <label class="adm-field"><span>Note</span><input type="text" name="note" maxlength="200" placeholder="UPI, Nov payout" /></label>
+        <button type="submit" class="adm-btn">Record</button>`;
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const data = new FormData(form);
+        const amount = Math.round(Number(data.get("amount")) * 100);
+        if (!(amount > 0)) return say("msg", "Enter the amount you paid.", "bad");
+        try {
+          await adminFetch(`/api/admin/partners/${encodeURIComponent(p.id)}/payouts`, { method: "POST", body: JSON.stringify({ amountMinor: amount, note: String(data.get("note") || "") }) });
+          say("msg", "Payout recorded.", "ok");
+          await load();
+        } catch (err) {
+          say("msg", err instanceof Error ? err.message : "Could not record it.", "bad");
+        }
+      });
+      payouts.append(form);
+    }
+    two.append(payouts, people);
+    if (p.notes) {
+      const note = el("section", "adm-card");
+      note.append(el("h2", "", "Notes"), el("p", "adm-hint", p.notes));
+      box.append(head, charts, two, note);
+    } else box.append(head, charts, two);
+    if (scroll) box.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  // ---- add and edit ---------------------------------------------------------------------------------------------------------
+  const form = $("form") as HTMLFormElement;
+  const slugInput = $<HTMLInputElement>("f-slug");
+  const preview = () => {
+    const slug = slugInput.value.trim().toLowerCase().replace(/^@/, "");
+    $("f-url").textContent = slug ? `https://${linkOf(slug)}` : "";
+  };
+  slugInput.addEventListener("input", preview);
+  const field = (id: string) => $<HTMLInputElement>(id);
+
+  function openEditor(p?: Record<string, any>) {
+    editing = p?.id ?? "";
+    $("editor-title").textContent = p ? `Edit ${p.name}` : "New influencer";
+    field("f-name").value = p?.name ?? "";
+    slugInput.value = p?.slug ?? "";
+    field("f-handle").value = p?.handle ?? "";
+    field("f-email").value = p?.email ?? "";
+    const landing = field("f-landing") as unknown as HTMLSelectElement;
+    if (p && ![...landing.options].some((o) => o.value === p.landingPath)) landing.append(new Option(p.landingPath, p.landingPath));
+    landing.value = p?.landingPath ?? "/";
+    field("f-pct").value = String(p?.commissionPct ?? 20);
+    const months = field("f-months") as unknown as HTMLSelectElement;
+    if (p && ![...months.options].some((o) => o.value === String(p.commissionMonths))) months.append(new Option(`The first ${p.commissionMonths} months`, String(p.commissionMonths)));
+    months.value = String(p?.commissionMonths ?? 0);
+    field("f-fee").value = String(Math.round((p?.feeMinor ?? 0) / 100));
+    field("f-notes").value = p?.notes ?? "";
+    field("f-active").checked = p ? p.active : true;
+    say("form-msg", "");
+    preview();
+    $("editor").hidden = false;
+    field("f-name").focus();
+    $("editor").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  $("add").addEventListener("click", () => openEditor());
+  $("cancel").addEventListener("click", () => ($("editor").hidden = true));
+  $("how-toggle").addEventListener("click", () => {
+    const open = $("how").hidden;
+    $("how").hidden = !open;
+    $("how-toggle").setAttribute("aria-expanded", String(open));
+  });
+  // a name typed in the first box suggests a link name, until the link name has been touched
+  let slugTouched = false;
+  slugInput.addEventListener("input", () => (slugTouched = true));
+  field("f-name").addEventListener("input", () => {
+    if (slugTouched || editing) return;
+    slugInput.value = field("f-name").value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 30);
+    preview();
+  });
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const body = {
+      name: field("f-name").value.trim(),
+      slug: slugInput.value.trim().toLowerCase().replace(/^@/, ""),
+      handle: field("f-handle").value.trim().replace(/^@/, ""),
+      email: field("f-email").value.trim(),
+      notes: field("f-notes").value.trim(),
+      landingPath: (field("f-landing") as unknown as HTMLSelectElement).value,
+      commissionPct: Number(field("f-pct").value) || 0,
+      commissionMonths: Number((field("f-months") as unknown as HTMLSelectElement).value) || 0,
+      feeMinor: Math.round((Number(field("f-fee").value) || 0) * 100),
+      active: field("f-active").checked,
+    };
+    const button = $("save") as HTMLButtonElement;
+    button.disabled = true;
+    try {
+      const res = await adminFetch(editing ? `/api/admin/partners/${encodeURIComponent(editing)}` : "/api/admin/partners", { method: editing ? "PUT" : "POST", body: JSON.stringify(body) });
+      $("editor").hidden = true;
+      openId = res.partner.id;
+      say("msg", `${body.name} saved. Their link is https://${linkOf(body.slug)}`, "ok");
+      slugTouched = false;
+      await load();
+    } catch (err) {
+      say("form-msg", err instanceof Error ? err.message : "Could not save that.", "bad");
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  adminReady().then(() => {
+    if (canManage()) $("add").hidden = false;
+    return load();
+  });
+</script>

@@ -4,6 +4,7 @@ import { cachedUser, getAuthConfig, getMe, renderGoogleButton, signInAsReviewer,
 import type { AuthUser } from "./auth";
 import { levelFraction, levelRing } from "./levelRing";
 import "./settings"; // applies the theme and the choices made on another device on every page that has the menu
+import { noteReferral } from "./referral";
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] => {
   const node = document.createElement(tag);
@@ -309,6 +310,7 @@ function render(user: AuthUser | null) {
 }
 
 export function initAuthUi() {
+  noteReferral(); // a page opened from an influencer's link (?ref=name)
   document.querySelectorAll<HTMLElement>('[data-auth="open"]').forEach((button) =>
     button.addEventListener("click", (event) => {
       event.preventDefault();

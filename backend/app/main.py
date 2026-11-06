@@ -10,8 +10,9 @@ import re
 import tempfile
 import threading
 import time
+import uuid
 from typing import Optional
-from urllib.parse import urlparse
+from urllib.parse import urlencode, urlparse
 
 from fastapi import FastAPI, HTTPException, Request, Response, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
@@ -26,6 +27,8 @@ from . import roles as roles_module
 from .roles import RoleError, RoleStore
 from .billing import Razorpay, RazorpayError, entity_summary
 from . import plans as plans_module
+from . import partners as partners_module
+from .partners import PartnerError, PartnerStore
 from .plans import FREE_CODE, PERIODS, PlanStore
 from .engagement import BADGE_RULES, DEFAULT_CONFIG, REWARD_KINDS, Engagement
 from .jobs import JobQueue
@@ -65,6 +68,7 @@ accounts = AccountStore(catalog.db)
 role_store = RoleStore(catalog.db)
 engagement = Engagement(catalog.db)
 plans = PlanStore(catalog.db)
+partners = PartnerStore(catalog.db)  # influencers: their links, who came through them, what was paid
 razorpay = Razorpay.from_env()  # payments: RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_SECRET
 try:  # results and songs that older versions kept in files join the database, once
     log.info("Imported from files: %s", catalog.import_files(CACHE_DIR))
@@ -603,6 +607,8 @@ def _signed_in(user: dict, request: Request, response: Response, mobile: bool) -
     if mobile:
         return {"user": _full_user(user), "token": accounts.start_session(user["id"]), "expiresInDays": accounts_module.SESSION_DAYS}
     _start_session(user, request, response)
+    if user.get("logins", 0) <= 1:  # their first sign-in: they came through an influencer's link, if the cookie says so
+        _credit_from_cookie(user, request)
     return {"user": _full_user(user)}
 
 
@@ -752,6 +758,7 @@ def billing_subscribe(body: SubscribeBody, request: Request) -> dict:
     current, _sub = plans.effective(user["id"])
     if not current["isFree"]:
         raise HTTPException(status_code=409, detail=f"You are already on {current['name']}. Cancel it first if you want to change plans.")
+    _credit_from_cookie(user, request)  # somebody who signed in before the link was opened is credited when they first pay
     try:
         made = razorpay.create_subscription(plan_id=price["razorpayPlanId"], period=price["period"], notes={"user_id": user["id"], "price_id": price["id"], "plan": plan["code"]})
     except RazorpayError as exc:
@@ -777,6 +784,12 @@ def billing_verify(body: VerifyBody, request: Request) -> dict:
     except RazorpayError:  # Razorpay answered the signature check, so the payment is real: treat it as started, the webhook will correct us
         entity = {"id": body.subscriptionId, "status": "active", "current_start": 0, "current_end": 0, "paid_count": 1, "notes": {}}
     plans.apply_razorpay({**entity, "status": entity["status"] if entity["status"] in ("active", "authenticated", "pending") else "active"})
+    try:  # the first payment goes in the books now; the webhook says the same later, and a payment is only ever counted once
+        paid = razorpay.fetch_payment(body.paymentId)
+        if paid.get("status") == "captured":
+            partners.record_payment(paid["id"], body.subscriptionId, int(paid.get("amount") or 0), str(paid.get("currency") or "INR"), float(paid.get("created_at") or time.time()))
+    except Exception as exc:
+        log.warning("Could not record a payment after checkout: %s", exc)
     plan, sub = plans.effective(user["id"])
     return {"plan": {"code": plan["code"], "name": plan["name"]}, "subscription": _subscription_view(sub)}
 
@@ -845,7 +858,182 @@ async def billing_webhook(request: Request) -> dict:
     if isinstance(entity, dict) and entity.get("id"):
         plans.apply_razorpay({**entity, "status": entity.get("status", "")})
         log.info("Razorpay %s for subscription %s", name, entity.get("id"))
+    try:
+        payload = event.get("payload") or {}
+        if name == "subscription.charged":  # a payment was taken (the first one or a renewal): into the books
+            paid = ((payload.get("payment") or {}).get("entity")) or {}
+            if paid.get("id") and entity and entity.get("id"):
+                partners.record_payment(paid["id"], entity["id"], int(paid.get("amount") or 0), str(paid.get("currency") or "INR"), float(paid.get("created_at") or time.time()))
+        elif name.startswith("refund."):  # money was given back
+            refund = ((payload.get("refund") or {}).get("entity")) or {}
+            if refund.get("id") and refund.get("payment_id") and (name == "refund.processed" or refund.get("status") == "processed"):
+                partners.record_refund(refund["id"], refund["payment_id"], int(refund.get("amount") or 0), float(refund.get("created_at") or time.time()))
+    except Exception as exc:
+        log.warning("Could not record %s: %s", name, exc)
     return {"ok": True}
+
+
+# ---- influencers: their links, who came through them, what was paid ---------------------------------------------------------
+_PARTNER_COOKIE = "cs_ref"  # the slug of the partner whose link was opened first (60 days)
+_VISITOR_COOKIE = "cs_vid"  # a random id for this browser, to count unique visitors
+_SITE_URL = os.environ.get("SITE_URL", "https://chordsuno.com").rstrip("/")
+_click_limiter = RateLimiter(limit=120, window=60.0)
+_BOT_RE = re.compile(r"bot|crawl|spider|preview|slurp|headless|monitor|externalhit|externalagent|curl|wget|python-requests|go-http", re.I)
+
+
+def _remember_partner(request: Request, response: Response, partner: dict, landing: str, source: str) -> None:
+    """Counts a click on a partner's link (not from a robot, which only reads the page for a preview) and remembers the partner in a cookie.
+    The first link a person opened keeps the cookie: another one counts as a click but does not take the credit."""
+    secure = request.url.scheme == "https"
+    visitor = request.cookies.get(_VISITOR_COOKIE, "") or uuid.uuid4().hex[:20]
+    response.set_cookie(_VISITOR_COOKIE, visitor, max_age=365 * 86400, httponly=True, samesite="lax", secure=secure, path="/")
+    caller = request.client.host if request.client else "unknown"
+    if request.method != "HEAD" and not _BOT_RE.search(request.headers.get("user-agent", "")) and _click_limiter.allow(caller):
+        partners.record_click(partner["id"], visitor, landing, source)
+    held = partners.by_slug(request.cookies.get(_PARTNER_COOKIE, "")) if request.cookies.get(_PARTNER_COOKIE) else None
+    if not held or not held["active"]:
+        response.set_cookie(_PARTNER_COOKIE, partner["slug"], max_age=partners_module.COOKIE_DAYS * 86400, httponly=True, samesite="lax", secure=secure, path="/")
+
+
+def _credit_from_cookie(user: dict, request: Request) -> None:
+    """Credits a person to the partner whose link they opened, if they have no partner yet. Never breaks a sign-in or a payment."""
+    try:
+        slug = request.cookies.get(_PARTNER_COOKIE, "")
+        partner = partners.by_slug(slug) if slug else None
+        if partner and partner["active"]:
+            partners.credit_user(user["id"], partner["id"])
+    except Exception as exc:
+        log.warning("Could not credit a partner: %s", exc)
+
+
+@app.get("/r/{slug}")
+def partner_link(slug: str, request: Request) -> RedirectResponse:
+    """An influencer's link, chordsuno.com/r/<slug>: counts the click, remembers who sent the visitor, and opens the site."""
+    partner = partners.by_slug(slug) if partners_module.SLUG_RE.match(slug.strip().lower()) else None
+    if not partner or not partner["active"]:
+        return RedirectResponse("/", status_code=302)
+    landing = partner["landingPath"]
+    utm = urlencode({"utm_source": "influencer", "utm_medium": "social", "utm_campaign": partner["slug"]})  # so Google Analytics sees it too
+    response = RedirectResponse(f"{landing}{'&' if '?' in landing else '?'}{utm}", status_code=302)
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        _remember_partner(request, response, partner, landing, "link")
+    except Exception as exc:
+        log.warning("Could not count a partner click: %s", exc)
+    return response
+
+
+class RefBody(BaseModel):
+    slug: str
+    landing: str = ""
+
+
+@app.post("/api/ref/click")
+def partner_ref_click(body: RefBody, request: Request, response: Response) -> dict:
+    """The same as opening the link, for a page that was opened with ?ref=<slug> (a link to a particular page, or a link in a video's text)."""
+    if not _origin_ok(request):
+        raise HTTPException(status_code=403, detail="This request came from another site")
+    slug = body.slug.strip().lower()
+    partner = partners.by_slug(slug) if partners_module.SLUG_RE.match(slug) else None
+    if partner and partner["active"]:
+        try:
+            _remember_partner(request, response, partner, body.landing[:200], "param")
+        except Exception as exc:
+            log.warning("Could not count a partner click: %s", exc)
+    return {"ok": True}  # the same answer for any name: this is not a way to find out who the partners are
+
+
+class PartnerBody(BaseModel):
+    slug: str
+    name: str
+    handle: str = ""
+    email: str = ""
+    notes: str = ""
+    landingPath: str = "/"
+    commissionPct: float = 0
+    commissionMonths: int = 0
+    feeMinor: int = 0
+    active: bool = True
+
+    def fields(self) -> dict:
+        return {
+            "slug": self.slug, "name": self.name, "handle": self.handle, "email": self.email, "notes": self.notes, "landing_path": self.landingPath,
+            "commission_pct": self.commissionPct, "commission_months": self.commissionMonths, "fee_minor": self.feeMinor, "active": self.active,
+        }
+
+
+class PayoutBody(BaseModel):
+    amountMinor: int
+    note: str = ""
+    paidAt: float = 0
+
+
+def _tz_minutes() -> int:
+    try:
+        return int(engagement.config()["timezoneOffsetMinutes"])
+    except Exception:
+        return 330
+
+
+@app.get("/api/admin/partners")
+def admin_partners(request: Request) -> dict:
+    _require_perm(request, "partners.view")
+    return {**partners.overview(), "siteUrl": _SITE_URL, "cookieDays": partners_module.COOKIE_DAYS}
+
+
+@app.post("/api/admin/partners")
+def admin_add_partner(body: PartnerBody, request: Request) -> dict:
+    _require_perm(request, "partners.manage")
+    try:
+        return {"partner": partners.save(body.fields())}
+    except PartnerError as exc:
+        raise _fail(exc)
+
+
+@app.put("/api/admin/partners/{partner_id}")
+def admin_update_partner(partner_id: str, body: PartnerBody, request: Request) -> dict:
+    _require_perm(request, "partners.manage")
+    try:
+        return {"partner": partners.save(body.fields(), partner_id)}
+    except PartnerError as exc:
+        raise _fail(exc)
+
+
+@app.delete("/api/admin/partners/{partner_id}")
+def admin_delete_partner(partner_id: str, request: Request) -> dict:
+    _require_perm(request, "partners.manage")
+    try:
+        partners.delete(partner_id)
+    except PartnerError as exc:
+        raise _fail(exc)
+    return {"ok": True}
+
+
+@app.get("/api/admin/partners/{partner_id}")
+def admin_partner_detail(partner_id: str, request: Request, days: int = 30) -> dict:
+    _require_perm(request, "partners.view")
+    detail = partners.detail(partner_id, days=max(7, min(days, 120)), tz_minutes=_tz_minutes())
+    if not detail:
+        raise HTTPException(status_code=404, detail="That influencer does not exist.")
+    return {**detail, "siteUrl": _SITE_URL}
+
+
+@app.post("/api/admin/partners/{partner_id}/payouts")
+def admin_add_payout(partner_id: str, body: PayoutBody, request: Request) -> dict:
+    _require_perm(request, "partners.manage")
+    try:
+        return {"payout": partners.add_payout(partner_id, body.amountMinor, body.note, body.paidAt)}
+    except PartnerError as exc:
+        raise _fail(exc)
+
+
+@app.delete("/api/admin/partners/{partner_id}/payouts/{payout_id}")
+def admin_delete_payout(partner_id: str, payout_id: str, request: Request) -> dict:
+    _require_perm(request, "partners.manage")
+    if not partners.delete_payout(partner_id, payout_id):
+        raise HTTPException(status_code=404, detail="That payout does not exist.")
+    return {"ok": True}
+
 
 
 # ---- admin: who is here, people, plans ------------------------------------------------------------------------------------

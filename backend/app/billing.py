@@ -108,6 +108,9 @@ class Razorpay:
             {"plan_id": plan_id, "total_count": cycles_for(period), "customer_notify": 1, "notes": notes},
         )
 
+    def fetch_payment(self, payment_id: str) -> dict:
+        return self._call("GET", f"/payments/{payment_id}")
+
     def fetch_subscription(self, subscription_id: str) -> dict:
         return self._call("GET", f"/subscriptions/{subscription_id}")
 

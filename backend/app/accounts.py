@@ -120,7 +120,7 @@ class AccountStore:
     def _ensure_columns(self) -> None:
         """Adds the role and password columns to a users table made before they existed (nothing changes for people already there: they
         are general users with no password)."""
-        wanted = {"role": "TEXT NOT NULL DEFAULT 'user'", "password_hash": "TEXT NOT NULL DEFAULT ''", "instrument": "TEXT NOT NULL DEFAULT ''", "prefs": "TEXT NOT NULL DEFAULT '{}'"}
+        wanted = {"role": "TEXT NOT NULL DEFAULT 'user'", "password_hash": "TEXT NOT NULL DEFAULT ''", "instrument": "TEXT NOT NULL DEFAULT ''", "prefs": "TEXT NOT NULL DEFAULT '{}'", "partner_id": "TEXT NOT NULL DEFAULT ''", "partner_at": "DOUBLE PRECISION NOT NULL DEFAULT 0"}
         if getattr(self._db, "kind", "sqlite") == "postgres":
             for column, ddl in wanted.items():
                 self._db.run(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {column} {ddl}")
