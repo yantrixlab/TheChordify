@@ -4,6 +4,7 @@ import { business } from "../lib/business";
 import { ROOTS, chartUrls } from "../lib/chordCatalog";
 import { LESSONS } from "../lib/lessons";
 import { MODES } from "../lib/modes";
+import { chordPageUrls } from "../lib/chordPages";
 
 const pages: { path: string; priority: string; changefreq: string }[] = [
   { path: "/", priority: "1.0", changefreq: "weekly" },
@@ -31,6 +32,8 @@ const pages: { path: string; priority: string; changefreq: string }[] = [
   // the four chord charts and a page for each note of each instrument, and the lessons: made from the same lists as the pages
   ...chartUrls().map((path) => ({ path, priority: path.endsWith("-chord-chart/") ? "0.8" : "0.6", changefreq: "monthly" })),
   ...LESSONS.map((l) => ({ path: `/learn/${l.slug}/`, priority: "0.7", changefreq: "monthly" })),
+  // a page for each chord on each instrument (1344 of them)
+  ...chordPageUrls().map((path) => ({ path, priority: "0.6", changefreq: "monthly" })),
   // the musical modes: a page for each of the seven modes and for each of the twelve keys
   ...MODES.map((m) => ({ path: `/modes/${m.id}/`, priority: "0.8", changefreq: "monthly" })),
   ...ROOTS.map((r) => ({ path: `/modes/${r.slug}/`, priority: "0.7", changefreq: "monthly" })),

@@ -1,0 +1,189 @@
+---
+// The page of one chord on one instrument, e.g. /guitar-chords/a/minor/ or /piano-chords/g/seventh/: its notes and formula, every way to play
+// it with the fingering in words, how it sounds, the chords that go with it, and the same chord on the other notes and instruments.
+import ChordShell from "./ChordShell.astro";
+import ChHero from "./ChHero.astro";
+import { INSTRUMENTS, ROOTS, instrumentInfo, notePath, type InstrumentKey, type Kind, type Root } from "../../lib/chordCatalog";
+import { chordPage, chordPagePath } from "../../lib/chordPages";
+import { INSTRUMENT_ICONS } from "../../lib/instrumentIcons";
+
+interface Props {
+  instrument: InstrumentKey;
+  root: Root;
+  kind: Kind;
+}
+const { instrument, root, kind } = Astro.props;
+const info = instrumentInfo(instrument);
+const lower = info.name.toLowerCase();
+const c = chordPage(instrument, root, kind);
+const first = c.voicings[0];
+const path = chordPagePath(instrument, root, kind);
+const url = `https://chordsuno.com${path}`;
+const today = new Date().toISOString().slice(0, 10);
+const showSymbol = c.label !== root.short;
+
+// the title is about 60 characters: the full form where it fits, then shorter ones
+const named = `${c.titleName}${showSymbol ? ` (${c.label})` : ""}`;
+const candidates = [`${named} Chord on ${info.name}: Notes & Diagrams — Chord Suno`, `${named} Chord on ${info.name} — Chord Suno`, `${c.label} Chord on ${info.name}: Notes & Diagrams — Chord Suno`];
+const title = candidates.find((t) => t.length <= 64) ?? candidates[candidates.length - 1];
+const description = `${c.label} chord on ${lower}: ${c.notesText}. Diagrams, fingering and ${c.voicings.length} way${c.voicings.length === 1 ? "" : "s"} to play ${c.titleName}, with its notes, formula and the chords that go with it.`;
+const how = instrument === "piano" ? `Press ${first?.notes?.split(" ").join(", ")} together.` : `The usual shape on ${lower} is ${first?.frets}: the fret on each string, in the order ${info.strings} (x is a string that is not played and 0 is an open string).`;
+const lead = `${c.label}${c.altLabel ? ` (also ${c.altLabel})` : ""} is the ${c.words} chord: ${c.notes.map((n) => n.note).join(", ")}, with the formula ${c.formula}. ${how}`;
+const intervals = c.notes.map((n) => n.interval).filter(Boolean);
+const joined = (xs: string[]) => (xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`);
+
+const faq = [
+  { q: `What notes are in ${c.label}?`, a: `${c.label} (${c.words}) is made of ${joined(c.notes.map((n) => n.note))}. These are the ${joined(c.notes.map((n) => `${n.interval} (${n.degree})`))}, which gives the formula ${c.formula}.` },
+  { q: `How do you play ${c.label} on ${lower}?`, a: `${how} ${first ? first.steps.join(" ") : ""}` },
+  { q: `Is ${c.label} a major or a minor chord?`, a: `${c.label} is ${c.type}. ${kind.text}` },
+  ...(c.aliases.length || c.altLabel ? [{ q: `What is another name for ${c.label}?`, a: `${c.label} is also written ${joined([...c.aliases, ...(c.altLabel ? [c.altLabel] : [])])}.${c.altLabel ? ` ${root.label.replace(" / ", " and ")} are two names for the same key, so ${c.label} and ${c.altLabel} sound the same.` : ""}` }] : []),
+  { q: `How many ways are there to play ${c.label} on ${lower}?`, a: `Chord Suno shows ${c.voicings.length} way${c.voicings.length === 1 ? "" : "s"} to play ${c.label} on ${lower}: ${joined(c.voicings.map((v) => v.label.toLowerCase()))}. They have the same notes, so any of them is ${c.label}.` },
+  ...(c.progressions.length ? [{ q: `What chords go with ${c.label}?`, a: c.progressions.map((p) => `${p.title}: ${p.chords.map((x) => x.label).join(", ")}`).join(". ") + "." }] : []),
+];
+
+const jsonLd = [
+  { "@context": "https://schema.org", "@type": "Article", headline: title.replace(" — Chord Suno", ""), description, url, dateModified: today, inLanguage: "en", about: `${c.label} chord on ${lower}`, author: { "@type": "Organization", name: "Chord Suno" }, publisher: { "@type": "Organization", name: "Chord Suno", url: "https://chordsuno.com/" }, mainEntityOfPage: url },
+  ...(first ? [{ "@context": "https://schema.org", "@type": "HowTo", name: `How to play ${c.label} (${c.words}) on ${lower}`, step: first.steps.map((s, i) => ({ "@type": "HowToStep", position: i + 1, text: s })) }] : []),
+  { "@context": "https://schema.org", "@type": "FAQPage", mainEntity: faq.map((f) => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })) },
+  { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [{ "@type": "ListItem", position: 1, name: "Chord Suno", item: "https://chordsuno.com/" }, { "@type": "ListItem", position: 2, name: `${info.name} chord chart`, item: `https://chordsuno.com${info.chartPath}` }, { "@type": "ListItem", position: 3, name: `${root.short} chords`, item: `https://chordsuno.com${notePath(instrument, root)}` }, { "@type": "ListItem", position: 4, name: c.label, item: url }] },
+];
+const art = c.voicings.slice(0, 3).map((v) => ({ svg: v.svg, label: v.label, sub: v.frets ?? v.notes, keys: instrument === "piano" }));
+---
+
+<ChordShell title={title} description={description} jsonLd={jsonLd}>
+  <ChHero
+    eyebrow={`${info.name} chord · ${c.label}`}
+    title={`${c.words} chord`}
+    accent={`on ${lower}`}
+    lead={lead}
+    crumbs={[{ label: `${info.name} chord chart`, href: info.chartPath }, { label: `${root.short} chords`, href: notePath(instrument, root) }, { label: c.label }]}
+    art={art}
+    big={root.short}
+  >
+    <a class="ch-btn" href="#how">How to play it <svg width="16" height="16" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M3 7h8M7 3l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg></a>
+    <a class="ch-btn is-ghost" href={notePath(instrument, root)}>All {root.short} chords</a>
+  </ChHero>
+
+  <div class="md-page cp-page">
+    <section class="ch-in ch-sec" id="answer">
+      <span class="ch-kicker" data-reveal>Quick answer</span>
+      <h2 data-reveal style="--i: 1">What is the {c.label} chord on {lower}?</h2>
+      <p class="md-answer" data-reveal style="--i: 2"><strong>{c.label}</strong> is {c.type}. Its notes are <b class="md-notes">{c.notesText}</b>. {how}</p>
+      <dl class="md-facts is-wide" data-reveal style="--i: 3">
+        <div><dt>Notes</dt><dd>{c.notesText}</dd></div>
+        <div><dt>Formula</dt><dd>{c.formula}</dd></div>
+        <div><dt>Intervals</dt><dd>{intervals.join(", ")}</dd></div>
+        <div><dt>Type</dt><dd>{kind.name}</dd></div>
+        {(c.aliases.length > 0 || c.altLabel) && <div><dt>Also written</dt><dd>{[...c.aliases, ...(c.altLabel ? [c.altLabel] : [])].join(", ")}</dd></div>}
+        <div><dt>Ways to play</dt><dd>{c.voicings.length} on {lower}</dd></div>
+        {info.strings && <div><dt>Tuning</dt><dd>{info.strings}</dd></div>}
+      </dl>
+    </section>
+
+    <section class="ch-in ch-sec" id="how">
+      <span class="ch-kicker" data-reveal>Diagrams and fingering</span>
+      <h2 data-reveal style="--i: 1">How to play {c.label} on {lower}</h2>
+      <p data-reveal style="--i: 2">
+        {instrument === "piano" ? `Here are ${c.voicings.length} ways to play ${c.label} on the keyboard. The pressed keys are named, and the root is in violet.` : `Here are ${c.voicings.length} way${c.voicings.length === 1 ? "" : "s"} to play ${c.label} on ${lower}. The numbers on the dots are the fingers (1 index, 2 middle, 3 ring, 4 little), x is a string you do not play and a circle is an open string. Start with the first.`}
+      </p>
+      <div class="cp-voicings">
+        {
+          c.voicings.map((v, i) => (
+            <article class="cp-v" data-reveal style={`--i: ${i}`}>
+              <div class={`cp-art${instrument === "piano" ? " is-keys" : ""}`} set:html={v.svg} />
+              <div class="cp-body">
+                <h3>{v.label}{v.easy && <span class="cp-easy">easy</span>}</h3>
+                {v.frets && <p class="cp-frets" title="The fret on each string, low to high">{v.frets}</p>}
+                {v.notes && <p class="cp-frets">{v.notes}</p>}
+                <ol class="cp-steps">{v.steps.map((s) => <li>{s}</li>)}</ol>
+              </div>
+            </article>
+          ))
+        }
+      </div>
+    </section>
+
+    <section class="ch-in ch-sec" id="notes">
+      <span class="ch-kicker" data-reveal>The notes</span>
+      <h2 data-reveal style="--i: 1">Notes in {c.label}</h2>
+      <p data-reveal style="--i: 2">{c.label} has {c.notes.length} notes. Each is a degree of the major scale starting on {root.short}, and the pattern of degrees is the formula {c.formula}.</p>
+      <div class="md-tablewrap" data-reveal>
+        <div class="cg-wrap">
+          <table class="cg cp-notes">
+            <caption class="sr-only">The notes of {c.label}</caption>
+            <thead><tr><th scope="col">Note</th><th scope="col">Degree</th><th scope="col">Interval from {root.short}</th></tr></thead>
+            <tbody>{c.notes.map((n) => <tr><th scope="row">{n.note}</th><td>{n.degree}</td><td>{n.interval}</td></tr>)}</tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section class="ch-in ch-sec" id="sound">
+      <span class="ch-kicker" data-reveal>How it sounds</span>
+      <h2 data-reveal style="--i: 1">What {c.label} sounds like</h2>
+      <p data-reveal style="--i: 2">{kind.text}</p>
+      {c.relation && <p data-reveal>{c.relation}</p>}
+    </section>
+
+    {
+      (c.progressions.length > 0 || c.keyChords) && (
+        <section class="ch-in ch-sec" id="with">
+          <span class="ch-kicker" data-reveal>Play it with</span>
+          <h2 data-reveal style="--i: 1">Chords that go with {c.label}</h2>
+          {
+            c.progressions.map((p, i) => (
+              <div class="cp-prog" data-reveal style={`--i: ${i}`}>
+                <h3>{p.title}</h3>
+                <ul class="ch-pillrow">{p.chords.map((x) => <li><a href={x.href}>{x.roman} · {x.label}</a></li>)}</ul>
+              </div>
+            ))
+          }
+          {
+            c.keyChords && (
+              <div class="cp-prog" data-reveal>
+                <h3>{c.keyChords.title}</h3>
+                <ul class="ch-pillrow">{c.keyChords.chords.map((x) => <li><a href={x.href}>{x.roman} · {x.label}</a></li>)}</ul>
+              </div>
+            )
+          }
+        </section>
+      )
+    }
+
+    <section class="ch-in ch-sec" id="more">
+      <span class="ch-kicker" data-reveal>Keep going</span>
+      <h2 data-reveal style="--i: 1">{kind.name[0].toUpperCase() + kind.name.slice(1)} chords on other notes</h2>
+      <ul class="ch-pillrow" data-reveal style="--i: 2">{c.sameKind.map((x) => <li><a href={x.href}>{x.label}</a></li>)}</ul>
+      <h2 style="margin-top: 44px" data-reveal>Other {root.short} chords</h2>
+      <ul class="ch-pillrow" data-reveal style="--i: 1">{c.otherKinds.map((x) => <li><a href={x.href}>{x.label}</a></li>)}</ul>
+      <h2 style="margin-top: 44px" data-reveal>{c.label} on other instruments</h2>
+      <div class="ch-links">
+        {
+          c.otherInstruments.map((i, n) => (
+            <a class="ch-link" href={i.href} data-reveal style={`--i: ${n}`}>
+              <span class="ch-ico"><svg viewBox="0 0 24 24" set:html={INSTRUMENT_ICONS[i.key]} /></span>
+              <strong>{c.label} on {i.name.toLowerCase()}</strong>
+              <span>Diagrams and fingering for {c.label} on {i.name.toLowerCase()}.</span>
+              <em class="ch-go" style="font-style: normal">Open the page</em>
+            </a>
+          ))
+        }
+      </div>
+    </section>
+
+    <section class="ch-in ch-sec ch-faq" id="faq">
+      <span class="ch-kicker" data-reveal>Good to know</span>
+      <h2 data-reveal style="--i: 1">{c.label} chord: questions and answers</h2>
+      {faq.map((f, i) => <details data-reveal style={`--i: ${i % 6}`}><summary>{f.q}</summary><p>{f.a}</p></details>)}
+    </section>
+
+    <div class="ch-in ch-cta-wrap">
+      <div class="ch-cta-in" data-reveal>
+        <h2>Play a song with {c.label}</h2>
+        <p>Search for a song on Chord Suno and see every chord on the beat, drawn for {lower} in the player.</p>
+        <a class="ch-btn" href="/#find">Find chords for a song</a>
+        <a class="ch-btn is-ghost" href={info.chartPath}>{info.name} chord chart</a>
+      </div>
+    </div>
+  </div>
+</ChordShell>

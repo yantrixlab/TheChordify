@@ -119,8 +119,10 @@ export const instrumentInfo = (key: InstrumentKey) => INSTRUMENTS.find((i) => i.
 
 /** The page with every chord of one note on an instrument: /guitar-chords/c-sharp/ */
 export const notePath = (instrument: InstrumentKey, root: Root) => `${instrumentInfo(instrument).notesPath}${root.slug}/`;
-/** One chord's place on its note's page: /guitar-chords/c-sharp/#minor-seventh */
-export const chordPath = (instrument: InstrumentKey, root: Root, kind: Kind) => `${notePath(instrument, root)}#${kind.id}`;
+/** The page of one chord on one instrument: /guitar-chords/c-sharp/minor-seventh/ (it has all the ways to play it, its notes and how to finger it) */
+export const chordPath = (instrument: InstrumentKey, root: Root, kind: Kind) => `${notePath(instrument, root)}${kind.id}/`;
+/** The same chord's place on the page of its note: /guitar-chords/c-sharp/#minor-seventh */
+export const chordAnchorPath = (instrument: InstrumentKey, root: Root, kind: Kind) => `${notePath(instrument, root)}#${kind.id}`;
 
 /** The chord as it is written: "C♯m7". */
 export const chordLabel = (root: Root, kind: Kind) => `${root.short}${kind.suffix.replace("b", "♭").replace("#", "♯")}`;

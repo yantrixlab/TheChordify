@@ -37,6 +37,7 @@ const heading = `${root.short} ${kind.name} `;
     <article class={`cc-chord${keys ? " cc-keys" : ""}`} id={kind.id} data-g={kind.group} data-reveal>
       <header>
         <h3>{heading}<span class="cc-sym">{chord.label}</span></h3>
+        <a class="cc-open" href={chordPath(instrument, root, kind)} aria-label={`The full ${chord.label} page: notes, fingering and chords that go with it`}>Full page <span aria-hidden="true">→</span></a>
       </header>
       <p class="cc-facts">
         {chord.notes.split(" ").map((n) => <span class="cc-note">{n}</span>)}

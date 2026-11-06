@@ -1,0 +1,13 @@
+---
+// /guitar-chords/a/minor/ ...: one chord on this instrument, with its notes, every way to play it and how to finger it.
+import ChordPage from "../../../components/chords/ChordPage.astro";
+import { KINDS, ROOTS, kindById, rootBySlug } from "../../../lib/chordCatalog";
+
+export function getStaticPaths() {
+  return ROOTS.flatMap((r) => KINDS.map((k) => ({ params: { note: r.slug, chord: k.id } })));
+}
+const root = rootBySlug(Astro.params.note as string)!;
+const kind = kindById(Astro.params.chord as string)!;
+---
+
+<ChordPage instrument="guitar" root={root} kind={kind} />

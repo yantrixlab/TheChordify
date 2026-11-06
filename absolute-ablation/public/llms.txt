@@ -20,6 +20,7 @@ Everything below is public, free to read and generated from music theory, so the
 
 - [Chord charts for guitar, piano, ukulele and mandolin](https://chordsuno.com/chords/): every chord on all four instruments.
 - [Guitar chord chart](https://chordsuno.com/guitar-chord-chart/): a diagram for every major, minor, 7th, sus, diminished and extended chord on all twelve notes.
+- [A page for every chord on every instrument](https://chordsuno.com/guitar-chords/a/minor/): the pattern is /{instrument}-chords/{note}/{kind}/, for example /guitar-chords/a/minor/, /piano-chords/g/seventh/, /ukulele-chords/c-sharp/major-seventh/ and /mandolin-chords/d/minor/. Each gives the notes and formula, every way to play it with the fingering in words, and the chords that go with it. 336 chords on each of guitar, piano, ukulele and mandolin.
 - [Piano chord chart](https://chordsuno.com/piano-chord-chart/), [ukulele chord chart](https://chordsuno.com/ukulele-chord-chart/) and [mandolin chord chart](https://chordsuno.com/mandolin-chord-chart/).
 - [Guitar chords by note](https://chordsuno.com/guitar-chords/): a page for each of the twelve notes with all 28 kinds of chord.
 
