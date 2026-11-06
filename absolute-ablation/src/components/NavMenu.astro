@@ -1,0 +1,95 @@
+---
+// One of the two big menus in the header (Chords, Learn). On a computer it is a trigger in the bar that opens a wide panel under it with the
+// section's groups and a card; on a phone or tablet it is an accordion row in the menu that slides open. Both are made from lib/menu.ts.
+import type { MenuSection } from "../lib/menu";
+
+interface Props {
+  section: MenuSection;
+  kind: "desktop" | "mobile";
+}
+const { section: s, kind } = Astro.props;
+---
+
+{
+  kind === "desktop" ? (
+    <div class="nm-item" data-nm={s.id} data-prefixes={s.prefixes.join(" ")}>
+      <button type="button" class="nm-trigger" id={`nm-t-${s.id}`} aria-expanded="false" aria-controls={`nm-p-${s.id}`}>
+        <span>{s.label}</span>
+        <svg class="nm-chev" width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="m2.5 4.5 3.5 3.5 3.5-3.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg>
+      </button>
+      <div class="nm-panel" id={`nm-p-${s.id}`} role="region" aria-labelledby={`nm-t-${s.id}`} inert>
+        <div class="nm-card">
+          <div class="nm-cols">
+            {
+              s.groups.map((g, i) => (
+                <div class="nm-col" style={`--i:${i}`}>
+                  <p class="nm-title"><i aria-hidden="true"></i>{g.title}</p>
+                  <ul class="nm-list">
+                    {
+                      g.links.map((l) => (
+                        <li>
+                          <a href={l.href} class={l.num ? "nm-row" : l.icon ? "nm-link has-icon" : "nm-link"}>
+                            {l.num && <b class="nm-num">{l.num}</b>}
+                            {l.icon && <span class="nm-ico" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" set:html={l.icon} /></span>}
+                            <span class="nm-txt">
+                              <strong>{l.label}</strong>
+                              {l.text && <small>{l.text}</small>}
+                            </span>
+                            {l.meta && <em class="nm-meta">{l.meta}</em>}
+                          </a>
+                        </li>
+                      ))
+                    }
+                  </ul>
+                  {
+                    g.pills && (
+                      <div class="nm-pills">
+                        <span class="nm-sub">{g.pillsTitle}</span>
+                        <div>{g.pills.map((p) => <a href={p.href}>{p.label}</a>)}</div>
+                      </div>
+                    )
+                  }
+                  {g.more && <a class="nm-more" href={g.more.href}>{g.more.label}<svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M3 7h8M7 3l4 4-4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg></a>}
+                </div>
+              ))
+            }
+            <aside class="nm-feature" style={`--i:${s.groups.length}`}>
+              <span class="nm-glow" aria-hidden="true"></span>
+              <p class="nm-kicker">{s.feature.kicker}</p>
+              <h3>{s.feature.title}</h3>
+              <p class="nm-text">{s.feature.text}</p>
+              <dl>
+                {s.feature.stats.map((x) => <div><dt>{x.label}</dt><dd>{x.n}</dd></div>)}
+              </dl>
+              <a class="nm-cta" href={s.feature.href}>{s.feature.cta}<svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M3 7h8M7 3l4 4-4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg></a>
+            </aside>
+          </div>
+        </div>
+      </div>
+    </div>
+  ) : (
+    <div class="mm-sec" data-prefixes={s.prefixes.join(" ")}>
+      <button type="button" class="mm-acc" aria-expanded="false" aria-controls={`mm-b-${s.id}`}>
+        <span>{s.label}</span>
+        <svg class="mm-chev" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m3.5 6 4.5 4.5L12.5 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+      </button>
+      <div class="mm-body" id={`mm-b-${s.id}`}>
+        <div class="mm-inner">
+          <a class="mm-all" href={s.href}>All of {s.label.toLowerCase()}<svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true"><path d="M3 7h8M7 3l4 4-4 4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" /></svg></a>
+          {
+            s.groups.map((g) => (
+              <div class="mm-group">
+                <p class="mm-title">{g.title}</p>
+                <ul>
+                  {g.links.map((l) => <li><a href={l.href}><strong>{l.num ? `${l.num}  ` : ""}{l.label}</strong>{(l.text || l.meta) && <small>{l.text ?? l.meta}</small>}</a></li>)}
+                </ul>
+                {g.pills && <div class="mm-pills"><span>{g.pillsTitle}</span><div>{g.pills.map((p) => <a href={p.href}>{p.label}</a>)}</div></div>}
+                {g.more && <a class="mm-more" href={g.more.href}>{g.more.label} →</a>}
+              </div>
+            ))
+          }
+        </div>
+      </div>
+    </div>
+  )
+}

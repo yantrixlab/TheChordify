@@ -1,12 +1,14 @@
 ---
 import Logo from "./Logo.astro";
+import NavMenu from "./NavMenu.astro";
+import { MENU } from "../lib/menu";
 
-const navLinks = [
+const navLinks: { label?: string; href?: string; wide?: boolean; signedIn?: boolean; menu?: string }[] = [
   { label: "Discover", href: "/#find" },
   { label: "Features", href: "/#features", wide: true }, // wide: only where the bar has room (1024px and up); the phone menu lists every link
   { label: "Songs", href: "/songs/" },
-  { label: "Chords", href: "/chords/" },
-  { label: "Learn", href: "/learn/", wide: true },
+  { menu: "chords" }, // the big menus (lib/menu.ts): a panel under the bar on a computer, an accordion in the phone menu
+  { menu: "learn" },
   { label: "Toolkit", href: "/toolkit/" },
   { label: "Pricing", href: "/pricing/" },
   { label: "My library", href: "/library/", signedIn: true }, // only for someone who is signed in (the phone menu has its own link)
@@ -31,9 +33,11 @@ const navLinks = [
     </a>
 
     <!-- Nav links – desktop -->
-    <div class="hidden md:flex items-center gap-1" role="list">
+    <div class="hidden lg:flex items-center gap-1" role="list">
       {
-        navLinks.map((link) => (
+        navLinks.map((link) => link.menu ? (
+          <NavMenu section={MENU.find((m) => m.id === link.menu)!} kind="desktop" />
+        ) : (
           <a
             href={link.href}
             role="listitem"
@@ -128,7 +132,7 @@ const navLinks = [
       <!-- Mobile hamburger -->
       <button
         id="hamburger-btn"
-        class="md:hidden flex items-center justify-center rounded-md"
+        class="lg:hidden flex items-center justify-center rounded-md"
         style="width:36px;height:36px;border:1px solid var(--color-hairline);background:var(--color-canvas);cursor:pointer;"
         aria-label="Open menu"
         aria-expanded="false"
@@ -163,7 +167,9 @@ const navLinks = [
 <!-- Mobile menu overlay -->
 <div id="mobile-menu" role="dialog" aria-label="Mobile navigation" aria-modal="true">
   {
-    navLinks.filter((link) => !link.signedIn).map((link) => (
+    navLinks.filter((link) => !link.signedIn).map((link) => link.menu ? (
+      <NavMenu section={MENU.find((m) => m.id === link.menu)!} kind="mobile" />
+    ) : (
       <a
         href={link.href}
         class="mobile-nav-link rounded-lg"
@@ -195,6 +201,9 @@ const navLinks = [
     >Start free</button>
   </div>
 </div>
+
+<!-- a soft shade over the page while a big menu is open -->
+<div id="nm-scrim" class="nm-scrim" aria-hidden="true"></div>
 
 <!-- spacer -->
 <div style="height:64px;" aria-hidden="true"></div>
@@ -244,6 +253,114 @@ const navLinks = [
       btn.focus();
     }
   });
+
+// ---- the big menus: Chords and Learn ---------------------------------------------------------------------------------------
+  // On a computer they open under the bar on hover (a short pause first, so passing the mouse across the bar does not flicker), on a click
+  // or a tap, and with the Down arrow; Escape, a click outside, or leaving them closes them. A menu that was opened by hovering stays open
+  // when its button is clicked. In the phone menu they are accordion rows.
+  const items = [...document.querySelectorAll<HTMLElement>(".nm-item")];
+  const scrim = document.getElementById("nm-scrim");
+  const canHover = matchMedia("(hover: hover) and (pointer: fine)");
+  let hoverTimer = 0;
+  let hoverOpened = false;
+  const triggerOf = (item: HTMLElement) => item.querySelector<HTMLButtonElement>(".nm-trigger")!;
+  const panelOf = (item: HTMLElement) => item.querySelector<HTMLElement>(".nm-panel")!;
+  function setOpen(item: HTMLElement, on: boolean) {
+    item.classList.toggle("is-open", on);
+    triggerOf(item).setAttribute("aria-expanded", String(on));
+    panelOf(item).toggleAttribute("inert", !on); // closed panels are out of the tab order
+  }
+  function openOnly(item: HTMLElement) {
+    items.forEach((other) => other !== item && setOpen(other, false));
+    setOpen(item, true);
+    document.body.classList.add("nm-open");
+  }
+  function closeAll() {
+    clearTimeout(hoverTimer);
+    hoverOpened = false;
+    items.forEach((item) => setOpen(item, false));
+    document.body.classList.remove("nm-open");
+  }
+  items.forEach((item) => {
+    const trigger = triggerOf(item);
+    trigger.addEventListener("click", () => {
+      clearTimeout(hoverTimer);
+      if (item.classList.contains("is-open")) {
+        if (hoverOpened) hoverOpened = false; // it was opened by hovering: a click keeps it open
+        else closeAll();
+      } else {
+        hoverOpened = false;
+        openOnly(item);
+      }
+    });
+    trigger.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        openOnly(item);
+        window.setTimeout(() => panelOf(item).querySelector<HTMLElement>("a")?.focus(), 40); // once the panel has started to show
+      }
+    });
+    item.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && item.classList.contains("is-open")) {
+        closeAll();
+        trigger.focus();
+      }
+    });
+    item.addEventListener("focusout", (event) => {
+      const next = event.relatedTarget as Node | null;
+      if (next && !item.contains(next)) closeAll();
+    });
+    item.addEventListener("pointerenter", (event) => {
+      if (!canHover.matches || event.pointerType !== "mouse") return;
+      clearTimeout(hoverTimer);
+      const another = items.some((other) => other !== item && other.classList.contains("is-open"));
+      hoverTimer = window.setTimeout(() => {
+        if (!item.classList.contains("is-open")) hoverOpened = true;
+        openOnly(item);
+      }, another ? 0 : 120);
+    });
+    item.addEventListener("pointerleave", (event) => {
+      if (!canHover.matches || event.pointerType !== "mouse") return;
+      clearTimeout(hoverTimer);
+      hoverTimer = window.setTimeout(closeAll, 240);
+    });
+    panelOf(item).querySelectorAll("a").forEach((a) => a.addEventListener("click", closeAll));
+  });
+  scrim?.addEventListener("click", closeAll);
+  document.addEventListener("click", (event) => {
+    if (!(event.target as Element).closest(".nm-item")) closeAll();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeAll();
+  });
+  document.getElementById("ns-input")?.addEventListener("focus", closeAll);
+
+  // the section the visitor is in is marked, on a computer and in the phone menu
+  const here = location.pathname;
+  document.querySelectorAll<HTMLElement>("[data-prefixes]").forEach((el) => {
+    el.classList.toggle("is-current", (el.dataset.prefixes ?? "").split(" ").some((p) => p && here.startsWith(p)));
+  });
+  document.querySelectorAll<HTMLAnchorElement>(".nm-panel a, .mm-body a").forEach((a) => {
+    if (a.pathname === here && !a.hash) a.setAttribute("aria-current", "page");
+  });
+
+  // the accordion rows of the phone menu (the one that holds the current page opens with the menu)
+  document.querySelectorAll<HTMLElement>(".mm-sec").forEach((section) => {
+    const button = section.querySelector<HTMLButtonElement>(".mm-acc")!;
+    button.addEventListener("click", () => {
+      const open = section.classList.toggle("is-open");
+      button.setAttribute("aria-expanded", String(open));
+    });
+  });
+  btn.addEventListener("click", () => {
+    if (!menu.classList.contains("open")) return;
+    document.querySelectorAll<HTMLElement>(".mm-sec.is-current").forEach((section) => {
+      section.classList.add("is-open");
+      section.querySelector(".mm-acc")?.setAttribute("aria-expanded", "true");
+    });
+  });
+  // a computer-sized window has the bar, not the phone menu
+  matchMedia("(min-width: 1024px)").addEventListener("change", (event) => event.matches && closeMenu());
 </script>
 
 <style is:global>
@@ -251,7 +368,7 @@ const navLinks = [
   nav button[data-auth] { white-space: nowrap; }
   @media (max-width: 420px) { nav[aria-label="Main navigation"] > div { padding-left: 14px !important; padding-right: 14px !important; } }
   nav button[data-auth], #mobile-menu button[data-auth] { border: 1px solid transparent; font-family: inherit; cursor: pointer; }
-  @media (max-width: 1023px) { nav .nav-wide { display: none; } } /* a tablet's bar has room for fewer links; the phone menu lists them all */
+  @media (max-width: 1179px) { nav .nav-wide { display: none; } } /* a narrower bar has room for fewer links (the phone menu lists them all) */
 
   /* the account menu */
   .au-menu { position: relative; }
@@ -386,4 +503,103 @@ const navLinks = [
   html[data-theme="dark"] .ns-form input::placeholder { color: #8f82b0; }
   html[data-theme="dark"] .ns-ghost { background: linear-gradient(100deg, #17151a 30%, #1e1b22 50%, #17151a 70%); background-size: 200% 100%; }
   html[data-theme="dark"] .au-rv-form input { background: #17151a; color: var(--color-ink); }
+
+  /* ── the big menus (Chords, Learn): a panel under the bar on a computer, an accordion in the phone menu ── */
+  .nm-item { position: relative; }
+  .nm-trigger { display: inline-flex; align-items: center; gap: 6px; padding: var(--space-xs) var(--space-sm); border: 0; border-radius: 999px; background: transparent; font: 500 14px var(--font-sans); color: var(--color-body); cursor: pointer; transition: background-color 0.15s, color 0.15s; }
+  .nm-trigger:hover, .nm-item.is-open .nm-trigger { background: var(--color-canvas-soft-2); color: var(--color-ink); }
+  .nm-trigger:focus-visible { outline: 2px solid var(--color-violet); outline-offset: 2px; }
+  .nm-item.is-current .nm-trigger { color: var(--color-ink); font-weight: 650; }
+  .nm-item.is-current .nm-trigger::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: linear-gradient(135deg, #7c3aed, #f59e0b); }
+  .nm-chev { opacity: 0.7; transition: transform 0.3s cubic-bezier(0.2, 0.7, 0.2, 1); }
+  .nm-item.is-open .nm-chev { transform: rotate(180deg); }
+
+  .nm-panel { position: fixed; left: 50%; top: 64px; z-index: 60; width: min(1120px, calc(100vw - 32px)); padding-top: 10px; opacity: 0; visibility: hidden; pointer-events: none; transform: translate(-50%, -8px); transition: opacity 0.22s ease, transform 0.3s cubic-bezier(0.2, 0.7, 0.2, 1), visibility 0s linear 0.3s; }
+  .nm-item.is-open .nm-panel { opacity: 1; visibility: visible; pointer-events: auto; transform: translate(-50%, 0); transition-delay: 0s; }
+  .nm-card { padding: 26px; border-radius: 26px; background: var(--color-canvas); border: 1px solid var(--color-hairline); box-shadow: 0 50px 90px -40px rgba(26, 5, 51, 0.55), 0 4px 14px rgba(26, 5, 51, 0.08); }
+  .nm-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) 270px; gap: 26px; }
+  .nm-col, .nm-feature { opacity: 0; transform: translateY(10px); transition: opacity 0.35s ease, transform 0.45s cubic-bezier(0.2, 0.7, 0.2, 1); transition-delay: calc(var(--i, 0) * 45ms + 50ms); }
+  .nm-item.is-open .nm-col, .nm-item.is-open .nm-feature { opacity: 1; transform: none; }
+
+  .nm-title { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font: 700 11px var(--font-mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-mute); }
+  .nm-title i { width: 6px; height: 6px; border-radius: 50%; background: linear-gradient(135deg, #7c3aed, #f59e0b); }
+  .nm-list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+  .nm-link, .nm-row { position: relative; display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: 14px; text-decoration: none; color: var(--color-ink); transition: background-color 0.18s, transform 0.22s cubic-bezier(0.2, 0.7, 0.2, 1); }
+  .nm-link:hover, .nm-link:focus-visible, .nm-row:hover, .nm-row:focus-visible { background: var(--color-violet-soft); transform: translateX(3px); outline: none; }
+  .nm-link:focus-visible, .nm-row:focus-visible { box-shadow: 0 0 0 2px var(--color-violet); }
+  .nm-link:not(.has-icon)::before { content: ""; flex: none; width: 6px; height: 6px; margin: 0 4px; border-radius: 50%; background: var(--color-hairline-strong); transition: background-color 0.2s, transform 0.2s; }
+  .nm-link:not(.has-icon):hover::before { background: #7c3aed; transform: scale(1.5); }
+  .nm-ico { display: grid; place-items: center; flex: none; width: 38px; height: 38px; border-radius: 12px; color: #fff; background: linear-gradient(135deg, #7c3aed, #5b21b6); box-shadow: 0 8px 14px -8px #5b21b6; transition: transform 0.25s cubic-bezier(0.2, 0.7, 0.2, 1); }
+  .nm-ico svg { width: 22px; height: 22px; }
+  .nm-link:hover .nm-ico { transform: rotate(-6deg) scale(1.08); }
+  .nm-txt { display: grid; gap: 1px; min-width: 0; }
+  .nm-txt strong { font: 650 14.5px/1.3 var(--font-sans); }
+  .nm-txt small { font-size: 12.5px; line-height: 1.35; color: var(--color-mute); }
+  .nm-num { flex: none; min-width: 22px; font: 700 11px var(--font-mono); color: var(--color-violet); }
+  .nm-row { padding: 7px 10px; }
+  .nm-row .nm-txt strong { font-weight: 600; font-size: 14px; }
+  .nm-meta { margin-left: auto; flex: none; padding-left: 8px; font: 600 11.5px var(--font-mono); font-style: normal; color: var(--color-mute); }
+  .nm-pills { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--color-hairline); }
+  .nm-sub { display: block; margin-bottom: 8px; font: 700 10.5px var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-mute); }
+  .nm-pills div, .mm-pills div { display: flex; flex-wrap: wrap; gap: 6px; }
+  .nm-pills a, .mm-pills a { padding: 5px 11px; border: 1px solid var(--color-hairline); border-radius: 999px; background: var(--color-canvas-soft-2); font: 650 12.5px var(--font-sans); color: var(--color-body); text-decoration: none; transition: background 0.2s, color 0.2s, transform 0.2s, border-color 0.2s; }
+  .nm-pills a:hover, .nm-pills a:focus-visible, .mm-pills a:hover { background: linear-gradient(135deg, #7c3aed, #5b21b6); border-color: transparent; color: #fff; transform: translateY(-2px); outline: none; }
+  .nm-more { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; padding: 4px 10px; font: 700 13px var(--font-sans); color: var(--color-violet-deep); text-decoration: none; }
+  .nm-more svg { transition: transform 0.2s; }
+  .nm-more:hover svg, .nm-more:focus-visible svg { transform: translateX(4px); }
+
+  .nm-feature { position: relative; display: flex; flex-direction: column; overflow: hidden; padding: 22px; border-radius: 22px; color: #fff; background: radial-gradient(260px 200px at 90% 0, #7c3aed99, transparent 65%), linear-gradient(160deg, #1d0b36, #07040c); }
+  .nm-glow { position: absolute; right: -50px; bottom: -60px; width: 180px; height: 180px; border-radius: 50%; background: #f59e0b; filter: blur(60px); opacity: 0.3; pointer-events: none; }
+  .nm-kicker { position: relative; margin: 0 0 10px; font: 700 10.5px var(--font-mono); letter-spacing: 0.12em; text-transform: uppercase; color: #fcd34d; }
+  .nm-feature h3 { position: relative; margin: 0 0 8px; font-size: 20px; font-weight: 800; line-height: 1.15; letter-spacing: -0.025em; color: #fff; }
+  .nm-text { position: relative; margin: 0 0 16px; font-size: 13.5px; line-height: 1.55; color: #d8c8f5; }
+  .nm-feature dl { position: relative; display: flex; gap: 22px; margin: 0 0 18px; }
+  .nm-feature dl div { display: flex; flex-direction: column-reverse; }
+  .nm-feature dd { margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -0.03em; color: #fff; }
+  .nm-feature dt { font: 600 10.5px var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: #b9a6e0; }
+  .nm-cta { position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 42px; margin-top: auto; border-radius: 14px; background: linear-gradient(135deg, #fcd34d, #f59e0b); color: #1a0533; font: 800 14px var(--font-sans); text-decoration: none; transition: transform 0.2s, box-shadow 0.2s; }
+  .nm-cta:hover, .nm-cta:focus-visible { transform: translateY(-2px); box-shadow: 0 14px 24px -12px #f59e0b; outline: none; }
+  .nm-cta svg { transition: transform 0.2s; }
+  .nm-cta:hover svg { transform: translateX(4px); }
+  .nm-scrim { position: fixed; inset: 64px 0 0 0; z-index: 48; background: rgba(13, 6, 26, 0.34); opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.25s ease, visibility 0s linear 0.25s; }
+  body.nm-open .nm-scrim { opacity: 1; visibility: visible; pointer-events: auto; transition-delay: 0s; }
+  @media (max-width: 1199px) {
+    .nm-cols { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .nm-feature { display: none; }
+  }
+
+  /* a bar of a laptop's width: a shorter search box leaves the links their room */
+  @media (min-width: 1024px) and (max-width: 1179px) {
+    .ns-form { width: 160px; }
+    nav [data-auth-guest] > button:first-child { display: none !important; } /* "Start free" opens the same sign-in window as "Log in" */
+  }
+
+  /* the accordion rows of the phone menu */
+  .mm-acc { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: var(--space-sm) var(--space-md); border: 0; border-radius: 12px; background: none; font: 600 18px var(--font-sans); color: var(--color-ink); text-align: left; cursor: pointer; transition: background-color 0.15s; }
+  .mm-acc:hover, .mm-acc:focus-visible { background: var(--color-canvas-soft-2); outline: none; }
+  .mm-sec.is-current .mm-acc span::before { content: ""; display: inline-block; width: 7px; height: 7px; margin-right: 10px; border-radius: 50%; vertical-align: 2px; background: linear-gradient(135deg, #7c3aed, #f59e0b); }
+  .mm-chev { flex: none; color: var(--color-mute); transition: transform 0.3s cubic-bezier(0.2, 0.7, 0.2, 1); }
+  .mm-sec.is-open .mm-chev { transform: rotate(180deg); }
+  .mm-body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 0.38s cubic-bezier(0.2, 0.7, 0.2, 1); }
+  .mm-sec.is-open .mm-body { grid-template-rows: 1fr; }
+  .mm-inner { min-height: 0; overflow: hidden; visibility: hidden; transition: visibility 0s linear 0.38s; }
+  .mm-sec.is-open .mm-inner { visibility: visible; transition-delay: 0s; }
+  .mm-all { display: inline-flex; align-items: center; gap: 6px; margin: 2px 0 6px 16px; padding: 8px 14px; border-radius: 999px; background: var(--color-violet-soft); color: var(--color-violet-deep); font: 700 14px var(--font-sans); text-decoration: none; }
+  .mm-group { margin: 10px 8px 14px 16px; padding-left: 14px; border-left: 2px solid var(--color-hairline); }
+  .mm-title { margin: 4px 0 6px; font: 700 11px var(--font-mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-mute); }
+  .mm-group ul { margin: 0; padding: 0; list-style: none; }
+  .mm-group li a { display: grid; gap: 1px; padding: 9px 8px; border-radius: 10px; color: var(--color-ink); text-decoration: none; }
+  .mm-group li a:hover, .mm-group li a:focus-visible { background: var(--color-canvas-soft-2); outline: none; }
+  .mm-group li strong { font: 600 15.5px var(--font-sans); white-space: pre-wrap; }
+  .mm-group li small { font-size: 12.5px; color: var(--color-mute); }
+  .mm-pills { margin-top: 8px; padding: 0 8px; }
+  .mm-pills > span { display: block; margin-bottom: 6px; font: 700 10.5px var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-mute); }
+  .mm-more { display: inline-block; margin: 10px 8px 0; font: 700 14px var(--font-sans); color: var(--color-violet-deep); text-decoration: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .nm-panel { transform: translate(-50%, 0); transition: opacity 0.15s ease; }
+    .nm-col, .nm-feature { transform: none; }
+  }
+  /* dark theme (a page that has one): the white parts of the menu by colour, not by token */
+  html[data-theme="dark"] .nm-card { box-shadow: 0 50px 90px -40px rgba(0, 0, 0, 0.9), 0 4px 14px rgba(0, 0, 0, 0.5); }
+  html[data-theme="dark"] .nm-pills a, html[data-theme="dark"] .mm-pills a { background: #17141c; }
 </style>
