@@ -123,30 +123,30 @@ import Footer from "../components/Footer.astro";
   @media (max-width: 640px) { .sm-card { padding: 16px 14px 14px; border-radius: 18px; } .sm-tiles { gap: 6px; } .sm-tile { border-radius: 11px; } .sm-tile svg { width: 17px; height: 17px; } .sm-tile small { font-size: 9.5px; } }
   @media (prefers-reduced-motion: reduce) { .sm-card::before, .sm-tile.is-now, .sm-tile.is-now::after, .sm-tile.is-now .sm-ar { animation: none !important; } .sm-tile { transition: none; } .sm-tile.is-now { transform: none; } }
   /* dark theme */
-  html[data-theme="dark"] .sp-main { background: #140a24; }
+  html[data-theme="dark"] .sp-main { background: #0d0c10; }
   html[data-theme="dark"] .sp-hero img { box-shadow: 0 24px 50px -28px #000; }
-  html[data-theme="dark"] .sp-ghost { background: #1c1131; border-color: #4d3875; color: #c4b5fd; }
-  html[data-theme="dark"] .sp-ghost:hover { background: #2a1a4a; border-color: #6d4fb5; }
+  html[data-theme="dark"] .sp-ghost { background: #131116; border-color: #322f38; color: #c4b5fd; }
+  html[data-theme="dark"] .sp-ghost:hover { background: #1d1a22; border-color: #6d4fb5; }
   html[data-theme="dark"] .sp-play { background: #7c3aed; color: #fff; box-shadow: 0 14px 30px -14px #7c3aedaa; }
-  html[data-theme="dark"] .sp-facts, html[data-theme="dark"] .sp-chips span, html[data-theme="dark"] .sp-prog li, html[data-theme="dark"] .sg-sec, html[data-theme="dark"] .sp-dg, html[data-theme="dark"] .sp-dg-nav button, html[data-theme="dark"] .sp-rich details, html[data-theme="dark"] .sp-card, html[data-theme="dark"] .sp-note { background: #1c1131; border-color: #33224f; }
-  html[data-theme="dark"] .sp-facts div + div, html[data-theme="dark"] .sp-rich th, html[data-theme="dark"] .sp-rich td, html[data-theme="dark"] .sp-rich hr { border-color: #33224f; }
+  html[data-theme="dark"] .sp-facts, html[data-theme="dark"] .sp-chips span, html[data-theme="dark"] .sp-prog li, html[data-theme="dark"] .sg-sec, html[data-theme="dark"] .sp-dg, html[data-theme="dark"] .sp-dg-nav button, html[data-theme="dark"] .sp-rich details, html[data-theme="dark"] .sp-card, html[data-theme="dark"] .sp-note { background: #131116; border-color: #211f25; }
+  html[data-theme="dark"] .sp-facts div + div, html[data-theme="dark"] .sp-rich th, html[data-theme="dark"] .sp-rich td, html[data-theme="dark"] .sp-rich hr { border-color: #211f25; }
   html[data-theme="dark"] .sp-facts, html[data-theme="dark"] .sp-chips span, html[data-theme="dark"] .sg-sec, html[data-theme="dark"] .sp-dg, html[data-theme="dark"] .sp-card { box-shadow: 0 1px 2px #0006; }
-  html[data-theme="dark"] .sp-note { border-color: #4d3875; }
-  html[data-theme="dark"] .sg-tag { background: #2c1b4d; color: #c4b5fd; }
-  html[data-theme="dark"] .sg-sec.is-intro .sg-tag, html[data-theme="dark"] .sg-sec.is-outro .sg-tag, html[data-theme="dark"] .sg-sec.is-break .sg-tag { background: #2a2540; color: #cbd5e1; }
+  html[data-theme="dark"] .sp-note { border-color: #322f38; }
+  html[data-theme="dark"] .sg-tag { background: #1e1b23; color: #c4b5fd; }
+  html[data-theme="dark"] .sg-sec.is-intro .sg-tag, html[data-theme="dark"] .sg-sec.is-outro .sg-tag, html[data-theme="dark"] .sg-sec.is-break .sg-tag { background: #1d1c20; color: #cbd5e1; }
   html[data-theme="dark"] .sg-sec.is-chorus .sg-tag { background: #4a2f8a; color: #ede9fe; }
-  html[data-theme="dark"] .sg-sec.is-bridge .sg-tag, html[data-theme="dark"] .sg-sec.is-instrumental .sg-tag { background: #3a2663; color: #ddd6fe; }
-  html[data-theme="dark"] .sg-row { border-bottom-color: #2a1a4a; }
-  html[data-theme="dark"] .sg-bar { border-left-color: #6a5a92; background: #1c1131; }
-  html[data-theme="dark"] .sg-c { border-left-color: #2a1a4a; }
-  html[data-theme="dark"] .sg-c.is-empty { background: #231540; }
-  html[data-theme="dark"] .sp-prog i, html[data-theme="dark"] .sp-mini i { background: #2a1a4a; }
+  html[data-theme="dark"] .sg-sec.is-bridge .sg-tag, html[data-theme="dark"] .sg-sec.is-instrumental .sg-tag { background: #28252e; color: #ddd6fe; }
+  html[data-theme="dark"] .sg-row { border-bottom-color: #1d1a22; }
+  html[data-theme="dark"] .sg-bar { border-left-color: #6a5a92; background: #131116; }
+  html[data-theme="dark"] .sg-c { border-left-color: #1d1a22; }
+  html[data-theme="dark"] .sg-c.is-empty { background: #18161d; }
+  html[data-theme="dark"] .sp-prog i, html[data-theme="dark"] .sp-mini i { background: #1d1a22; }
   html[data-theme="dark"] .sp-dg:hover, html[data-theme="dark"] .sp-card:hover { border-color: #6d4fb5; box-shadow: 0 18px 30px -22px #000; }
-  html[data-theme="dark"] .sp-dg-nav button:hover { background: #2a1a4a; }
-  html[data-theme="dark"] .sp-rich th { background: #231540; }
-  html[data-theme="dark"] .sp-rich code { background: #2a1a4a; color: #e9defc; }
-  html[data-theme="dark"] .sp-rich blockquote { border-left-color: #4d3875; }
-  html[data-theme="dark"] .sp-rich pre { background: #0d0620; }
+  html[data-theme="dark"] .sp-dg-nav button:hover { background: #1d1a22; }
+  html[data-theme="dark"] .sp-rich th { background: #18161d; }
+  html[data-theme="dark"] .sp-rich code { background: #1d1a22; color: #e9defc; }
+  html[data-theme="dark"] .sp-rich blockquote { border-left-color: #322f38; }
+  html[data-theme="dark"] .sp-rich pre { background: #0a090d; }
   .sp-custom-wrap { margin-top: 40px; }
   .sp-custom { min-width: 0; overflow-wrap: anywhere; }
   :where(.sp-custom) img { max-width: 100%; height: auto; }
