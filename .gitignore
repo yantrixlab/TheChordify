@@ -5,6 +5,16 @@ dist/
 venv/
 __pycache__/
 
+# The Android app lives only on this computer: it is never pushed to GitHub (the website and back end are).
+mobile/
+
+# signing keys, their passwords and built apps: never commit these, wherever they are
+*.jks
+*.keystore
+keystore.properties
+*.aab
+*.apk
+
 # logs and local files
 *.log
 .env
