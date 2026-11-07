@@ -2615,5 +2615,16 @@ def sitemap_songs() -> Response:
 
 # Serve the built Astro site from the same origin (the Docker image copies it to STATIC_DIR).
 # Mounted last so /api and /media routes win; absent in local dev, where Astro runs its own server.
+class _SiteFiles(StaticFiles):
+    """The built site. An address the site does not have gets its own 404.html page (with a real 404 status); an unknown address under
+    /api or /media is not a page, so it stays a plain JSON 404 for the app and for scripts."""
+
+    async def get_response(self, path, scope):
+        first = path.replace("\\", "/").lstrip("/").split("/", 1)[0]  # Windows hands the path over with backslashes
+        if first in ("api", "media"):
+            raise HTTPException(status_code=404, detail="Not Found")
+        return await super().get_response(path, scope)
+
+
 if os.path.isdir(_STATIC_DIR):
-    app.mount("/", StaticFiles(directory=_STATIC_DIR, html=True), name="site")
+    app.mount("/", _SiteFiles(directory=_STATIC_DIR, html=True), name="site")

@@ -1,0 +1,203 @@
+---
+// The page for an address the site does not have. Astro builds it to /404.html, and the server (backend/app/main.py serves the built site
+// with StaticFiles in html mode) sends it with a real 404 status for any unknown page, so search engines do not index the wrong address.
+import Layout from "../layouts/Layout.astro";
+import Nav from "../components/Nav.astro";
+import Footer from "../components/Footer.astro";
+
+const strings = [0, 1, 2, 3, 4, 5];
+const frets = [100, 140, 180, 220, 260];
+const places = [
+  { href: "/search/", title: "Find chords for a song", text: "Search any song and play along with every chord.", icon: "search" },
+  { href: "/guitar-chord-chart/", title: "Chord charts", text: "Guitar, piano, ukulele and mandolin chords.", icon: "chart" },
+  { href: "/toolkit/", title: "Toolkit", text: "Tuner, metronome and chord practice.", icon: "tool" },
+  { href: "/learn/", title: "Learn", text: "Short lessons to play better, sooner.", icon: "book" },
+];
+---
+
+<Layout title="Page not found — Chord Suno" description="We could not find that page. Search for a song, browse chord charts or go back to the Chord Suno home page." noindex themeable>
+  <Nav />
+  <main id="main-content" class="nf">
+    <div class="nf-glow nf-glow-a" aria-hidden="true"></div>
+    <div class="nf-glow nf-glow-b" aria-hidden="true"></div>
+
+    <section class="nf-hero">
+      <div class="nf-copy">
+        <p class="nf-eyebrow"><span class="nf-dot"></span>Error 404</p>
+        <h1>This page is <span class="nf-grad">out of tune.</span></h1>
+        <p class="nf-lead">We could not find what you were looking for. The link may be old, mistyped, or the page may have moved.</p>
+        <p class="nf-path" id="nf-path" hidden><span>Looked for</span><code></code></p>
+
+        <form class="nf-search" action="/search/" method="get" role="search">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+          <input name="q" type="search" placeholder="Search a song or artist…" maxlength="100" enterkeyhint="search" aria-label="Search a song or artist" />
+          <button type="submit">Search</button>
+        </form>
+
+        <div class="nf-actions">
+          <a class="nf-btn nf-btn-main" href="/">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"></path><path d="M5 10v10h5v-6h4v6h5V10"></path></svg>
+            Back to home
+          </a>
+          <a class="nf-btn nf-btn-ghost" href="/contact/">Report a broken link</a>
+        </div>
+      </div>
+
+      <div class="nf-visual" aria-hidden="true">
+        <span class="nf-big">404</span>
+        <div class="nf-card">
+          <p class="nf-card-label">Chord</p>
+          <p class="nf-card-name">Not found</p>
+          <svg class="nf-neck" viewBox="0 0 240 290" role="img" aria-label="A guitar chord diagram with every string muted">
+            <!-- every string muted: there is no chord to play -->
+            {strings.map((s) => (
+              <g class="nf-x" style={`--i:${s}`}>
+                <path d={`M${s * 32 + 33} 22l14 14m0-14-14 14`} />
+              </g>
+            ))}
+            <rect class="nf-nut" x="36" y="56" width="168" height="8" rx="3"></rect>
+            {frets.map((y) => <line class="nf-fret" x1="40" x2="200" y1={y} y2={y}></line>)}
+            {strings.map((s) => <line class="nf-string" style={`--i:${s}`} x1={s * 32 + 40} x2={s * 32 + 40} y1="62" y2="262"></line>)}
+            <circle class="nf-ghost" cx="104" cy="160" r="15"></circle>
+            <text class="nf-q" x="104" y="167" text-anchor="middle">?</text>
+          </svg>
+        </div>
+      </div>
+    </section>
+
+    <section class="nf-next" aria-labelledby="nf-next-title">
+      <h2 id="nf-next-title">Try one of these instead</h2>
+      <ul>
+        {places.map((p) => (
+          <li>
+            <a href={p.href}>
+              <span class="nf-ico" aria-hidden="true">
+                {p.icon === "search" && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>}
+                {p.icon === "chart" && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"></rect><path d="M9 3v18M15 3v18M4 9h16M4 15h16"></path></svg>}
+                {p.icon === "tool" && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"></path></svg>}
+                {p.icon === "book" && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2z"></path><path d="M4 19V5M9 7h6"></path></svg>}
+              </span>
+              <span class="nf-next-text"><strong>{p.title}</strong><small>{p.text}</small></span>
+              <svg class="nf-arrow" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"></path></svg>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  </main>
+  <Footer />
+
+  <script is:inline>
+    // show the address that was not found, so the person can spot a typo
+    (function () {
+      var box = document.getElementById("nf-path");
+      if (!box) return;
+      var path = location.pathname + location.search;
+      if (path === "/" || path === "/404/" || path === "/404.html") return;
+      box.querySelector("code").textContent = location.host + (path.length > 60 ? path.slice(0, 57) + "…" : path);
+      box.hidden = false;
+    })();
+  </script>
+</Layout>
+
+<style is:global>
+  .nf { position: relative; overflow: hidden; padding: 64px 24px 104px; background: linear-gradient(180deg, #fbf7ff, #fff 46%); }
+  .nf-glow { position: absolute; z-index: 0; border-radius: 50%; filter: blur(70px); pointer-events: none; }
+  .nf-glow-a { top: -160px; left: -120px; width: 520px; height: 520px; background: #7c3aed2e; }
+  .nf-glow-b { right: -140px; top: 120px; width: 440px; height: 440px; background: #f59e0b26; }
+  .nf-hero { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr); gap: 56px; align-items: center; max-width: 1080px; margin: 0 auto; }
+
+  .nf-eyebrow { display: inline-flex; align-items: center; gap: 9px; margin: 0 0 18px; padding: 6px 14px 6px 11px; border-radius: 999px; background: var(--color-violet-soft); font: 700 12px var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-violet-deep); }
+  .nf-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--color-accent); box-shadow: 0 0 0 4px #f59e0b33; }
+  .nf-copy h1 { margin: 0 0 16px; font-size: clamp(38px, 6vw, 64px); font-weight: 800; letter-spacing: -0.045em; line-height: 1.04; color: var(--color-ink); text-wrap: balance; }
+  .nf-grad { background: linear-gradient(100deg, var(--color-violet) 10%, #c026d3 55%, var(--color-accent) 95%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .nf-lead { max-width: 520px; margin: 0 0 20px; font-size: 18px; line-height: 1.6; color: var(--color-body); }
+  .nf-path { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; max-width: 100%; margin: 0 0 26px; padding: 8px 14px; border-radius: 12px; background: #fff; border: 1px solid var(--color-hairline); font-size: 13px; color: var(--color-mute); }
+  .nf-path[hidden] { display: none; }
+  .nf-path span { font: 600 11px var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase; }
+  .nf-path code { max-width: 100%; overflow-wrap: anywhere; font: 600 13.5px var(--font-mono); color: var(--color-violet-deep); }
+
+  .nf-search { display: flex; align-items: center; gap: 10px; max-width: 520px; margin: 0 0 22px; padding: 6px 6px 6px 18px; border-radius: 999px; background: #fff; border: 1px solid #ddd3f0; box-shadow: 0 14px 34px -22px rgb(91 33 182 / 0.55); color: var(--color-mute); transition: border-color 0.15s, box-shadow 0.15s; }
+  .nf-search:focus-within { border-color: var(--color-violet); box-shadow: 0 0 0 4px #7c3aed26, 0 14px 34px -22px rgb(91 33 182 / 0.55); }
+  .nf-search input { flex: 1; min-width: 0; height: 44px; border: 0; outline: 0; background: transparent; font: 500 16px var(--font-sans); color: var(--color-ink); }
+  .nf-search input::placeholder { color: var(--color-mute); }
+  .nf-search button { height: 44px; padding: 0 22px; border: 0; border-radius: 999px; background: var(--color-ink); color: #fff; font: 650 15px var(--font-sans); cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; }
+  .nf-search button:hover { transform: translateY(-1px); box-shadow: 0 12px 24px -12px rgb(13 0 31 / 0.7); }
+
+  .nf-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+  .nf-btn { display: inline-flex; align-items: center; gap: 9px; height: 50px; padding: 0 24px; border-radius: 999px; font: 650 15.5px var(--font-sans); text-decoration: none; transition: transform 0.15s, box-shadow 0.15s, background 0.15s; }
+  .nf-btn-main { background: linear-gradient(135deg, var(--color-violet), var(--color-violet-deep)); color: #fff; box-shadow: 0 14px 30px -14px rgb(124 58 237 / 0.8); }
+  .nf-btn-main:hover { transform: translateY(-2px); box-shadow: 0 20px 36px -14px rgb(124 58 237 / 0.9); }
+  .nf-btn-ghost { background: #fff; border: 1px solid #ddd3f0; color: var(--color-violet-deep); }
+  .nf-btn-ghost:hover { background: #f4f1fb; border-color: #c9bbe8; }
+  .nf a:focus-visible, .nf button:focus-visible { outline: 3px solid var(--color-accent); outline-offset: 3px; }
+
+  .nf-visual { position: relative; display: grid; place-items: center; min-height: 420px; }
+  .nf-big { position: absolute; inset: 0; display: grid; place-items: center; font: 800 clamp(150px, 24vw, 270px)/1 var(--font-mono); letter-spacing: -0.06em; color: transparent; -webkit-text-stroke: 2px #7c3aed26; user-select: none; }
+  .nf-card { position: relative; width: min(100%, 300px); padding: 22px 22px 18px; border-radius: 26px; background: #ffffffd9; border: 1px solid #e6dcf7; box-shadow: 0 40px 70px -36px rgb(91 33 182 / 0.55), 0 2px 4px #1a05330d; backdrop-filter: blur(10px); animation: nf-float 6s ease-in-out infinite; }
+  .nf-card-label { margin: 0; font: 600 11px var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-mute); }
+  .nf-card-name { margin: 2px 0 8px; font-size: 26px; font-weight: 800; letter-spacing: -0.03em; color: var(--color-ink); }
+  .nf-neck { display: block; width: 100%; height: auto; }
+  .nf-nut { fill: var(--color-ink); }
+  .nf-fret { stroke: #cfc3e6; stroke-width: 2; }
+  .nf-string { stroke: #8b7fa8; stroke-width: 2; stroke-linecap: round; transform-box: fill-box; transform-origin: center; animation: nf-hum 2.6s ease-in-out infinite; animation-delay: calc(var(--i) * 0.18s); }
+  .nf-x path { fill: none; stroke: #dc2626; stroke-width: 3; stroke-linecap: round; }
+  .nf-x { transform-box: fill-box; transform-origin: center; animation: nf-blink 3.2s ease-in-out infinite; animation-delay: calc(var(--i) * 0.12s); }
+  .nf-ghost { fill: #7c3aed14; stroke: var(--color-violet); stroke-width: 2; stroke-dasharray: 4 5; }
+  .nf-q { font: 800 20px var(--font-sans); fill: var(--color-violet); }
+
+  .nf-next { position: relative; z-index: 1; max-width: 1080px; margin: 64px auto 0; }
+  .nf-next h2 { margin: 0 0 18px; font: 700 12px var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-mute); }
+  .nf-next ul { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin: 0; padding: 0; list-style: none; }
+  .nf-next a { position: relative; display: flex; flex-direction: column; gap: 14px; height: 100%; padding: 20px; border-radius: 20px; background: #fff; border: 1px solid var(--color-hairline); box-shadow: 0 1px 2px #1a05330a; color: inherit; text-decoration: none; transition: transform 0.18s, box-shadow 0.18s, border-color 0.18s; }
+  .nf-next a:hover { transform: translateY(-4px); border-color: #c9bbe8; box-shadow: 0 22px 40px -26px rgb(91 33 182 / 0.6); }
+  .nf-ico { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 13px; background: var(--color-violet-soft); color: var(--color-violet-deep); }
+  .nf-ico svg { width: 21px; height: 21px; }
+  .nf-next-text { display: flex; flex-direction: column; gap: 4px; padding-right: 22px; }
+  .nf-next-text strong { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; color: var(--color-ink); }
+  .nf-next-text small { font-size: 13.5px; line-height: 1.5; color: var(--color-body); }
+  .nf-arrow { position: absolute; right: 18px; bottom: 20px; color: var(--color-violet); transition: transform 0.18s; }
+  .nf-next a:hover .nf-arrow { transform: translateX(4px); }
+
+  @keyframes nf-float { 0%, 100% { transform: translateY(0) rotate(-1.2deg); } 50% { transform: translateY(-10px) rotate(0.8deg); } }
+  @keyframes nf-hum { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-1.2px); } 75% { transform: translateX(1.2px); } }
+  @keyframes nf-blink { 0%, 86%, 100% { opacity: 1; transform: scale(1); } 92% { opacity: 0.35; transform: scale(0.88); } }
+  @media (prefers-reduced-motion: reduce) { .nf-card, .nf-string, .nf-x { animation: none; } .nf-next a, .nf-btn { transition: none; } }
+
+  html[data-theme="dark"] .nf { background: linear-gradient(180deg, #100d16, #0d0c10 50%); }
+  html[data-theme="dark"] .nf-glow-a { background: #7c3aed40; }
+  html[data-theme="dark"] .nf-glow-b { background: #f59e0b22; }
+  html[data-theme="dark"] .nf-eyebrow { background: #7c3aed2e; color: #c4b5fd; }
+  html[data-theme="dark"] .nf-grad { background: linear-gradient(100deg, #a78bfa 10%, #e879f9 55%, #fbbf24 95%); -webkit-background-clip: text; background-clip: text; }
+  html[data-theme="dark"] .nf-path, html[data-theme="dark"] .nf-search, html[data-theme="dark"] .nf-next a { background: #151219; border-color: #2c2735; box-shadow: none; }
+  html[data-theme="dark"] .nf-path code { color: #c4b5fd; }
+  html[data-theme="dark"] .nf-search:focus-within { border-color: #a78bfa; box-shadow: 0 0 0 4px #a78bfa30; }
+  html[data-theme="dark"] .nf-search button { background: #f4effd; color: #1a0533; }
+  html[data-theme="dark"] .nf-btn-ghost { background: #151219; border-color: #332d3e; color: #d9ccff; }
+  html[data-theme="dark"] .nf-btn-ghost:hover { background: #1d1925; }
+  html[data-theme="dark"] .nf-big { -webkit-text-stroke-color: #a78bfa2e; }
+  html[data-theme="dark"] .nf-card { background: #17131dd9; border-color: #302a3b; box-shadow: 0 40px 70px -36px #000, 0 2px 4px #0006; }
+  html[data-theme="dark"] .nf-nut { fill: #f4effd; }
+  html[data-theme="dark"] .nf-fret { stroke: #3a3347; }
+  html[data-theme="dark"] .nf-string { stroke: #9a8fb8; }
+  html[data-theme="dark"] .nf-x path { stroke: #f87171; }
+  html[data-theme="dark"] .nf-ghost { fill: #a78bfa1f; stroke: #a78bfa; }
+  html[data-theme="dark"] .nf-q { fill: #c4b5fd; }
+  html[data-theme="dark"] .nf-next a:hover { border-color: #4a3f66; box-shadow: 0 22px 40px -26px #000; }
+  html[data-theme="dark"] .nf-ico { background: #7c3aed2e; color: #c4b5fd; }
+  html[data-theme="dark"] .nf-arrow { color: #a78bfa; }
+
+  @media (max-width: 980px) { .nf-next ul { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 820px) {
+    .nf { padding: 40px 16px 72px; }
+    .nf-hero { grid-template-columns: minmax(0, 1fr); gap: 36px; }
+    .nf-visual { min-height: 0; padding-top: 6px; }
+    .nf-big { font-size: clamp(130px, 38vw, 220px); }
+    .nf-card { width: min(100%, 260px); }
+  }
+  @media (max-width: 520px) {
+    .nf-next ul { grid-template-columns: 1fr; }
+    .nf-actions .nf-btn { flex: 1 1 100%; justify-content: center; }
+    .nf-search button { padding: 0 16px; }
+  }
+</style>
