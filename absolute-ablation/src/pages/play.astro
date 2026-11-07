@@ -223,7 +223,13 @@ import SongRating from "../components/SongRating.astro";
               </div>
             </div>
             <p id="sm-label" class="sm-label"></p>
-            <div id="sm-tiles" class="sm-tiles" role="list" aria-label="Strums in one bar"></div>
+            <div class="sm-legend">
+              <span class="sm-key is-down"><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v15M6 13l6 6 6-6"/></svg></i>Down</span>
+              <span class="sm-key is-up"><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V5M6 11l6-6 6 6"/></svg></i>Up</span>
+              <span class="sm-key is-rest"><i></i>Rest</span>
+              <span id="sm-bar" class="sm-barchip"></span>
+            </div>
+            <div id="sm-tiles" class="sm-tiles" role="group" aria-label="The strums in one bar, beat by beat"></div>
             <p id="sm-text" class="sm-text"></p>
             <details class="sm-how">
               <summary>How to play it</summary>
@@ -329,7 +335,7 @@ import SongRating from "../components/SongRating.astro";
   .sme-stroke { width: 34px; height: 40px; padding: 0; border: 1.5px dashed #ffffff30; border-radius: 10px; background: transparent; font: 800 18px/1 var(--font-sans); color: #7c6fa8; cursor: pointer; transition: transform 0.1s, background-color 0.12s; }
   .sme-stroke:active { transform: scale(0.94); }
   .sme-stroke[data-s="D"] { border: 1.5px solid #8b5cf6; background: linear-gradient(160deg, #7e3ff1, #5421b8); color: #fff; }
-  .sme-stroke[data-s="U"] { border: 1.5px solid #c4b5fd; background: #c4b5fd; color: #2e1065; }
+  .sme-stroke[data-s="U"] { border: 1.5px solid #5eead4; background: linear-gradient(160deg, #2dd4bf, #0f766e); color: #fff; }
   .sme-pat[data-sub="4"] .sme-stroke { width: 28px; height: 38px; font-size: 16px; }
   .sme-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-top: 10px; font-size: 13px; color: #c9bbf0; }
   .sme-line select { height: 32px; padding: 0 28px 0 10px; border-radius: 10px; border: 1px solid #ffffff2b; background: #1a1037; color: #fff; font: 600 13px var(--font-sans); }
@@ -347,14 +353,32 @@ import SongRating from "../components/SongRating.astro";
   @media (max-width: 640px) { .sme { padding: 12px 10px; } .sme-stroke { width: 30px; height: 38px; } .sme-pat[data-sub="4"] .sme-stroke { width: 24px; } }
   @media (prefers-reduced-motion: reduce) { .sme-stroke, .sme-btn { transition: none; } }
   .sm-label { margin: 14px 0 0 !important; font: 600 12.5px var(--font-mono) !important; letter-spacing: 0.06em; color: #b9a8e8 !important; }
-  .sm-tiles { display: grid; grid-template-columns: repeat(var(--cols, 8), minmax(0, 60px)); gap: 8px; justify-content: start; margin: 12px 0 16px; padding: 4px 0 8px; }
-  .sm-tile { position: relative; overflow: hidden; aspect-ratio: 1 / 1; display: grid; place-items: center; align-content: center; gap: 4px; border-radius: 14px; background: linear-gradient(160deg, #7e3ff1 0%, #5421b8 100%); border: 1px solid #ffffff2b; box-shadow: inset 0 1px 0 #ffffff3d, 0 8px 16px -10px #5b21b6; color: #fff; transition: transform 0.24s cubic-bezier(0.3, 1.6, 0.5, 1); }
+  .sm-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin: 12px 0 0; }
+  .sm-key { display: inline-flex; align-items: center; gap: 7px; font: 650 12px var(--font-sans); color: #cbbfe8; }
+  .sm-key i { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 7px; box-shadow: inset 0 1px 0 #ffffff40; }
+  .sm-key svg { width: 13px; height: 13px; fill: none; stroke: #fff; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+  .sm-key.is-down i { background: linear-gradient(160deg, #8b5cf6, #5b21b6); }
+  .sm-key.is-up i { background: linear-gradient(160deg, #2dd4bf, #0f766e); }
+  .sm-key.is-rest i { border: 1px dashed #ffffff4d; box-shadow: none; }
+  .sm-barchip { margin-left: auto; padding: 3px 11px; border-radius: 999px; background: #ffffff14; border: 1px solid #ffffff1f; font: 650 11.5px var(--font-mono); letter-spacing: 0.02em; color: #e4dcf5; white-space: nowrap; }
+  /* one bar: its beats side by side, between two bar lines, each beat holding its own slots (two to a beat for eighths, four for sixteenths) */
+  .sm-tiles { position: relative; display: grid; grid-template-columns: repeat(var(--beats, 4), minmax(0, 1fr)); gap: 8px; margin: 12px 0 16px; padding: 12px 18px; border-radius: 18px; background: #0d0620; border: 1px solid #ffffff14; box-shadow: inset 0 1px 0 #ffffff0d; }
+  .sm-tiles::before, .sm-tiles::after { content: ""; position: absolute; top: 12px; bottom: 12px; width: 3px; border-radius: 2px; background: #ffffff4d; }
+  .sm-tiles::before { left: 6px; }
+  .sm-tiles::after { right: 6px; }
+  .sm-beat { min-width: 0; padding: 7px 7px 8px; border-radius: 14px; background: #ffffff09; border: 1px solid #ffffff12; transition: background-color 0.15s, border-color 0.15s; }
+  .sm-beat-n { display: block; margin: 0 0 6px 2px; font: 700 10px/1 var(--font-mono); letter-spacing: 0.14em; text-transform: uppercase; color: #a898d6; transition: color 0.15s; }
+  .sm-beat.is-now { background: #fcd34d14; border-color: #fcd34d66; }
+  .sm-beat.is-now .sm-beat-n { color: #fde68a; }
+  .sm-slots { display: grid; grid-template-columns: repeat(var(--sub, 2), minmax(0, 1fr)); gap: 5px; }
+  .sm-tile { position: relative; overflow: hidden; aspect-ratio: 1 / 1.18; display: grid; place-items: center; align-content: center; gap: 4px; border-radius: 12px; background: linear-gradient(160deg, #8b5cf6 0%, #5421b8 100%); border: 1px solid #ffffff2b; box-shadow: inset 0 1px 0 #ffffff3d, 0 8px 16px -10px #5b21b6; color: #fff; transition: transform 0.24s cubic-bezier(0.3, 1.6, 0.5, 1); }
+  .sm-tile.is-up { background: linear-gradient(160deg, #2dd4bf 0%, #0f766e 100%); box-shadow: inset 0 1px 0 #ffffff3d, 0 8px 16px -10px #0d9488; }
   .sm-tile::before { content: ""; position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
   .sm-tile .sm-ar { display: grid; place-items: center; line-height: 0; }
-  .sm-tile svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
-  .sm-tile small { font: 600 10.5px/1 var(--font-mono); color: #fff; }
-  .sm-tile.is-rest { background: #1a1037; border: 1px dashed #ffffff1f; box-shadow: none; color: #9283c4; }
-  .sm-tile.is-rest small { color: #9283c4; }
+  .sm-tile svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+  .sm-tile small { font: 650 10.5px/1 var(--font-mono); color: #ffffffe6; }
+  .sm-tile.is-rest { background: #160d2e; border: 1px dashed #ffffff22; box-shadow: none; color: #8b7bbb; }
+  .sm-tile.is-rest small { color: #8b7bbb; }
   .sm-tile.is-now { z-index: 1; transform: translateY(-3px) scale(1.08); box-shadow: 0 0 0 2px #fcd34d, 0 0 14px #f59e0b88; }
   .sm-tile.is-now::before { animation: sm-flash 0.3s ease-out; }
   .sm-tile.is-rest.is-now { box-shadow: 0 0 0 2px #fcd34d66; }
@@ -375,11 +399,11 @@ import SongRating from "../components/SongRating.astro";
   @keyframes sm-down { 0% { transform: translateY(-6px); } 45% { transform: translateY(4px); } 100% { transform: translateY(0); } }
   @keyframes sm-up { 0% { transform: translateY(6px); } 45% { transform: translateY(-4px); } 100% { transform: translateY(0); } }
   @keyframes sm-drift { to { transform: translate(-36px, 26px) scale(1.12); } }
-  @media (max-width: 640px) { .sm-card { padding: 16px 14px 14px; border-radius: 18px; } .sm-tiles { gap: 6px; } .sm-tile { border-radius: 11px; } .sm-tile svg { width: 17px; height: 17px; } .sm-tile small { font-size: 9.5px; } }
-  @media (prefers-reduced-motion: reduce) { .sm-card::before, .sm-tile.is-now, .sm-tile.is-now::before, .sm-tile.is-now .sm-ar { animation: none !important; } .sm-tile { transition: none; } .sm-tile.is-now { transform: none; } }
+  @media (max-width: 640px) { .sm-card { padding: 16px 14px 14px; border-radius: 18px; } .sm-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; padding: 10px 14px; } .sm-tiles::before { left: 4px; } .sm-tiles::after { right: 4px; } .sm-beat { padding: 6px 6px 7px; } .sm-slots { gap: 4px; } .sm-tile { border-radius: 10px; } .sm-tile svg { width: 17px; height: 17px; } .sm-tile small { font-size: 9.5px; } .sm-barchip { margin-left: 0; } }
+  @media (prefers-reduced-motion: reduce) { .sm-card::before, .sm-tile.is-now, .sm-tile.is-now::before, .sm-tile.is-now .sm-ar { animation: none !important; } .sm-tile, .sm-beat, .sm-beat-n { transition: none; } .sm-tile.is-now { transform: none; } }
   /* A slow phone (see setLite): the decoration goes, the moving parts stay, and nothing but a transform or an opacity ever animates. */
   html.perf-lite .sm-card::before, html.perf-lite .sm-tile.is-now::before, html.perf-lite .sm-tile.is-now .sm-ar { animation: none !important; }
-  html.perf-lite .sm-tile { transition: none; }
+  html.perf-lite .sm-tile, html.perf-lite .sm-beat, html.perf-lite .sm-beat-n { transition: none; }
   html.perf-lite .sm-tile.is-now { box-shadow: 0 0 0 2px #fcd34d; transform: none; }
   html.perf-lite .cr-track { transition-duration: 0.2s; }
   html.perf-lite .cr-card { transition: none; }
@@ -1947,6 +1971,9 @@ import SongRating from "../components/SongRating.astro";
   let strumIdx = 0;
   let strumEasyOn = false;
   let strumTileEls: HTMLElement[] = [];
+  let strumBeatEls: HTMLElement[] = []; // the beat each slot belongs to
+  let strumBeatLit = -1;
+  let strumBarShown = -1; // the bar the counter shows
   let strumLit = -1;
   let strumSub = 2;
   let strumBar = 0; // the bar the clock was last in (the clock mostly moves forward, so the search starts here)
@@ -1999,7 +2026,10 @@ import SongRating from "../components/SongRating.astro";
     if (strumCard.hidden || !strumEditable) closeStrumEditor();
     strumTiles.replaceChildren();
     strumTileEls = [];
+    strumBeatEls = [];
     strumLit = -1;
+    strumBeatLit = -1;
+    strumBarShown = -1;
     strumFrom = 1;
     strumUntil = 0;
     if (!strum || strumList.length === 0) return;
@@ -2014,17 +2044,36 @@ import SongRating from "../components/SongRating.astro";
     pill.classList.toggle("is-heard", kind === "heard" || kind === "edited");
     const where = whereText(cur);
     strumLabel.textContent = `${strumEasyOn ? "EASY VERSION" : kind === "heard" || kind === "edited" ? "MAIN PATTERN" : kind === "guess" ? "BEST GUESS" : "SUGGESTED PATTERN"}${where && !strumEasyOn ? ` · ${where.toUpperCase()}` : ""}  ·  ${shown}`;
-    strumTiles.style.setProperty("--cols", String(Math.min(slots.length, 8)));
-    slots.forEach((kindOf, i) => {
-      const tile = el_("div", `sm-tile${kindOf === "-" ? " is-rest" : kindOf === "D" ? " is-down" : " is-up"}`);
-      tile.setAttribute("role", "listitem");
-      const within = i % strumSub;
-      const count = within === 0 ? String(i / strumSub + 1) : SUB_NAMES[strumSub][within];
-      tile.innerHTML = `<span class="sm-ar">${kindOf === "D" ? ARROW_DOWN : kindOf === "U" ? ARROW_UP : '<span aria-hidden="true">·</span>'}</span><small>${count}</small>`;
-      tile.setAttribute("aria-label", `${count}: ${kindOf === "D" ? "down-strum" : kindOf === "U" ? "up-strum" : "no strum"}`);
-      strumTiles.append(tile);
-      strumTileEls.push(tile);
-    });
+    // the bar, beat by beat: each beat is a small panel of its own slots (2 to a beat for eighths, 4 for sixteenths)
+    const beatCount = Math.max(1, Math.ceil(slots.length / strumSub));
+    strumTiles.style.setProperty("--beats", String(beatCount));
+    strumTiles.style.setProperty("--sub", String(strumSub));
+    for (let beat = 0; beat < beatCount; beat++) {
+      const group = el_("div", "sm-beat");
+      group.setAttribute("role", "group");
+      group.setAttribute("aria-label", `Beat ${beat + 1}`);
+      const head = el_("span", "sm-beat-n");
+      head.textContent = `Beat ${beat + 1}`;
+      head.setAttribute("aria-hidden", "true");
+      const row = el_("div", "sm-slots");
+      row.setAttribute("role", "list");
+      for (let within = 0; within < strumSub; within++) {
+        const i = beat * strumSub + within;
+        if (i >= slots.length) break;
+        const kindOf = slots[i];
+        const tile = el_("div", `sm-tile${kindOf === "-" ? " is-rest" : kindOf === "D" ? " is-down" : " is-up"}`);
+        tile.setAttribute("role", "listitem");
+        const count = within === 0 ? String(beat + 1) : SUB_NAMES[strumSub][within];
+        tile.innerHTML = `<span class="sm-ar">${kindOf === "D" ? ARROW_DOWN : kindOf === "U" ? ARROW_UP : '<span aria-hidden="true">·</span>'}</span><small>${count}</small>`;
+        tile.setAttribute("aria-label", `Beat ${beat + 1}, ${count}: ${kindOf === "D" ? "down-strum" : kindOf === "U" ? "up-strum" : "no strum"}`);
+        row.append(tile);
+        strumTileEls.push(tile);
+        strumBeatEls.push(group);
+      }
+      group.append(head, row);
+      strumTiles.append(group);
+    }
+    showStrumBar(0);
 
     const bpm = Math.round(strum.bpm || tempo);
     const feel = bpm < 80 ? "slow, relaxed" : bpm < 110 ? "easy" : bpm < 140 ? "upbeat" : "fast";
@@ -2276,12 +2325,20 @@ import SongRating from "../components/SongRating.astro";
   /** Lights the slot (an eighth or sixteenth note) that is playing, from the bars the grid is drawn from. */
   let strumFrom = 1; // the lit slot holds from this time...
   let strumUntil = 0; // ...to this one
+  /** The counter above the bar: which bar of the song is sounding (the bar itself is always one bar of the pattern). */
+  function showStrumBar(index: number) {
+    if (index === strumBarShown) return;
+    strumBarShown = index;
+    const chip = document.getElementById("sm-bar");
+    if (chip) chip.textContent = `Bar ${index + 1}${bars.length > 0 ? ` of ${bars.length}` : ""} · ${strum?.perBar ?? 4} beats`;
+  }
   function highlightStrum(t: number) {
     if (t >= strumFrom && t < strumUntil) return;
     if (strumTileEls.length === 0 || bars.length === 0) return;
     if (strumBar >= bars.length || t < (bars[strumBar].start ?? 0)) strumBar = 0;
     while (strumBar + 1 < bars.length && t >= (bars[strumBar + 1].start ?? Infinity)) strumBar++;
     const bar = bars[strumBar];
+    showStrumBar(strumBar);
     let slot = 0;
     if (t >= (bar.start ?? 0)) {
       let k = 0;
@@ -2309,6 +2366,13 @@ import SongRating from "../components/SongRating.astro";
     strumTileEls[strumLit]?.classList.remove("is-now");
     strumTileEls[lit].classList.add("is-now");
     strumLit = lit;
+    const beatEl = strumBeatEls[lit];
+    const previousBeat = strumBeatLit >= 0 ? strumBeatEls[strumBeatLit] : undefined;
+    if (beatEl && beatEl !== previousBeat) {
+      previousBeat?.classList.remove("is-now");
+      beatEl.classList.add("is-now");
+    }
+    strumBeatLit = lit;
   }
 
   function el_(tag: string, className: string): HTMLElement {
