@@ -10,9 +10,21 @@ const faqs = [
   ["Can I change plans?", "Yes. Cancel your current plan, and subscribe to the new one when it ends, or any time after. Pick monthly or yearly on each plan."],
   ["What does “Soon” mean next to a feature?", "It is on the way and included in the plan, but not built yet. You will get it as soon as it ships, with no extra charge."],
 ];
+
+const jsonLd = [
+  { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Chord Suno", item: "https://chordsuno.com/" },
+    { "@type": "ListItem", position: 2, name: "Pricing", item: "https://chordsuno.com/pricing/" },
+  ] },
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqs.map(([q, a]) => ({ "@type": "Question", name: q, acceptedAnswer: { "@type": "Answer", text: a } })),
+  },
+];
 ---
 
-<Layout title="Pricing — Chord Suno" description="Chord Suno plans: start free, and upgrade for more songs, more tools and more ways to play." themeable>
+<Layout title="Pricing — Chord Suno" description="Chord Suno plans: start free, and upgrade for more songs, more tools and more ways to play." jsonLd={jsonLd} themeable>
   <Nav />
   <main id="main-content" class="pg">
     <div class="pg-wrap">

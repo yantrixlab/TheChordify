@@ -4,6 +4,7 @@ import Layout from "../layouts/Layout.astro";
 import Nav from "./Nav.astro";
 import Footer from "./Footer.astro";
 import { TOOLS } from "../lib/tools/catalog";
+import { TOOL_CONTENT } from "../lib/tools/content";
 import "../styles/toolkit.css";
 
 interface Props {
@@ -27,8 +28,18 @@ const trail = [
   { name: "Toolkit", item: "https://chordsuno.com/toolkit/" },
   ...(crumb ? [{ name: crumb, item: url }] : []),
 ];
+const content = tool ? TOOL_CONTENT[tool] : undefined; // the guide and questions written for this tool
 const jsonLd = [
   { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: trail.map((t, i) => ({ "@type": "ListItem", position: i + 1, name: t.name, item: t.item })) },
+  ...(content
+    ? [
+        {
+          "@context": "https://schema.org",
+          "@type": "FAQPage",
+          mainEntity: content.faqs.map(([q, a]) => ({ "@type": "Question", name: q, acceptedAnswer: { "@type": "Answer", text: a } })),
+        },
+      ]
+    : []),
   ...(tool
     ? [
         {
@@ -76,6 +87,28 @@ const jsonLd = [
           </div>
         )}
       </div>
+
+      {content && (
+        <div class="tk-info">
+          <article class="tk-guide">
+            {content.guide.map((g) => (
+              <section>
+                <h2>{g.heading}</h2>
+                {g.body.map((p) => <p>{p}</p>)}
+              </section>
+            ))}
+          </article>
+          <section class="tk-faq" aria-labelledby="tk-faq-title">
+            <h2 id="tk-faq-title">Questions, answered</h2>
+            {content.faqs.map(([q, a]) => (
+              <details>
+                <summary>{q}</summary>
+                <p>{a}</p>
+              </details>
+            ))}
+          </section>
+        </div>
+      )}
 
       {tool && (
         <section class="tk-more" aria-labelledby="tk-more-title">
