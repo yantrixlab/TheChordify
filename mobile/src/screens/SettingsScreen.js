@@ -1,12 +1,15 @@
-import { useState } from 'react';
-import { Alert, Image, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { Alert, Image, Linking, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { errorMessage } from '../api';
+import { clearMyHistory, endOtherSessions, errorMessage, exportMyData, getMySecurity } from '../api';
 import { useAuth } from '../auth/AuthContext';
 import { Icon } from '../components/Icons';
 import { AppBar, Button, Note } from '../components/Ui';
 import { LINKS, VERSION_NAME } from '../config';
-import { radius, makeStyles, useColors, useTheme } from '../theme';
+import { shareMyData } from '../lib/exporter';
+import { chooseInstrument, INSTRUMENTS, instrumentFor, useInstrument } from '../lib/instrument';
+import { setSettings, useSettings } from '../lib/settings';
+import { radius, makeStyles, useColors } from '../theme';
 
 const MODES = [
   { id: 'system', label: 'System' },
@@ -14,17 +17,50 @@ const MODES = [
   { id: 'dark', label: 'Dark' },
 ];
 
-/** Settings and account: who is signed in (or the sign-in), the legal links and deleting the account. */
+/** The date the account was made ("memberSince" is seconds since 1970). */
+const sinceText = (seconds) => (seconds ? new Date(seconds * 1000).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : '');
+
+/** Settings and account: who is signed in (or the sign-in), what the person chooses (kept on the account too, so the website and every
+ *  phone agree), their data, the legal links and deleting the account. */
 export default function SettingsScreen({ navigation }) {
   const colors = useColors();
   const styles = useStyles();
   const insets = useSafeAreaInsets();
-  const { mode, setMode } = useTheme();
-  const { ready, user, config, plan, signInWithGoogle, signInAsReviewer, signOut, deleteAccount } = useAuth();
+  const settings = useSettings();
+  const instrument = useInstrument();
+  const { ready, user, config, plan, can, signInWithGoogle, signInAsReviewer, signOut, deleteAccount } = useAuth();
   const planName = (plan && plan.plan && plan.plan.name) || user?.planName || 'Free'; // the live plan, as the My plan screen shows it; the saved user may not have it
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
+  const [info, setInfo] = useState('');
   const [reviewer, setReviewer] = useState({ email: '', password: '' });
+  const [sessions, setSessions] = useState(null); // how many phones and browsers are signed in
+  const signedIn = !!user;
+  const userId = user ? user.id : null;
+  const mode = settings.theme;
+  const shownInstrument = instrumentFor(instrument, can);
+
+  const loadSessions = useCallback(() => {
+    if (!userId) return;
+    getMySecurity().then((s) => setSessions(s.sessions), () => {});
+  }, [userId]);
+  useEffect(() => {
+    setSessions(null);
+    loadSessions();
+  }, [loadSessions]);
+
+  /** Changes a setting; a phone that cannot reach the account keeps it and says so. */
+  const change = async (patch) => {
+    setInfo('');
+    const saved = await setSettings(patch, signedIn);
+    if (!saved) setInfo('Saved on this phone. It will go to your account when you are back online.');
+  };
+
+  const confirm = (title, message, action, label, name) =>
+    Alert.alert(title, message, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: label, style: 'destructive', onPress: () => action && run(name, action) },
+    ]);
 
   const run = async (name, task) => {
     setBusy(name);
@@ -54,6 +90,7 @@ export default function SettingsScreen({ navigation }) {
       <AppBar title="Settings" onBack={() => navigation.goBack()} />
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}>
         <Note>{error}</Note>
+        <Note tone="info">{info}</Note>
 
         {!ready ? null : user ? (
           <View style={styles.card}>
@@ -87,17 +124,129 @@ export default function SettingsScreen({ navigation }) {
           </View>
         )}
 
+        {signedIn ? (
+          <View style={[styles.card, styles.gap]}>
+            <Text style={styles.appearance}>Account and plan</Text>
+            <View style={styles.fact}>
+              <Text style={styles.factLabel}>Plan</Text>
+              <Text style={styles.factValue}>{planName}</Text>
+            </View>
+            {user.memberSince ? (
+              <View style={styles.fact}>
+                <Text style={styles.factLabel}>Member since</Text>
+                <Text style={styles.factValue}>{sinceText(user.memberSince)}</Text>
+              </View>
+            ) : null}
+            <View style={styles.fact}>
+              <Text style={styles.factLabel}>Signed in on</Text>
+              <Text style={styles.factValue}>{sessions === null ? '…' : `${sessions} ${sessions === 1 ? 'device' : 'devices'}`}</Text>
+            </View>
+            <Button title="My plan" kind="quiet" onPress={() => navigation.navigate('Tabs', { screen: 'Premium' })} style={styles.gapSmall} />
+            {sessions !== null && sessions > 1 ? (
+              <Button
+                title="Sign out of my other devices"
+                kind="quiet"
+                busy={busy === 'others'}
+                onPress={() =>
+                  confirm(
+                    'Sign out of your other devices?',
+                    'Every other phone and browser signed in to your account is signed out. This phone stays signed in.',
+                    async () => {
+                      const { ended } = await endOtherSessions();
+                      setInfo(ended === 1 ? 'Signed out of 1 other device.' : `Signed out of ${ended} other devices.`);
+                      loadSessions();
+                    },
+                    'Sign them out',
+                    'others',
+                  )
+                }
+                style={styles.gapSmall}
+              />
+            ) : null}
+          </View>
+        ) : null}
+
+        <View style={[styles.card, styles.gap]}>
+          <Text style={styles.appearance}>Chords and player</Text>
+          <Text style={styles.rowTitle}>Instrument</Text>
+          <View style={styles.modes}>
+            {INSTRUMENTS.map((item) => {
+              const locked = !!item.feature && !can(item.feature);
+              return (
+                <Pressable
+                  key={item.id}
+                  onPress={() => (locked ? setInfo('Piano, ukulele and mandolin chords come with a paid plan.') : chooseInstrument(item.id, signedIn))}
+                  style={[styles.mode, shownInstrument === item.id && styles.modeOn]}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: shownInstrument === item.id, disabled: locked }}
+                >
+                  <Text style={[styles.modeText, shownInstrument === item.id && styles.modeTextOn, locked && styles.modeLocked]} numberOfLines={1}>
+                    {item.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <View style={styles.switchRow}>
+            <View style={styles.switchText}>
+              <Text style={styles.rowTitle}>Easy chords only</Text>
+              <Text style={styles.modeHint}>Show the shapes that need no barre and sit near the nut. A chord with none keeps its usual shape.</Text>
+            </View>
+            <Switch value={settings.easyChords} onValueChange={(on) => change({ easyChords: on })} trackColor={{ false: colors.line, true: colors.accent }} thumbColor="#FFFFFF" accessibilityLabel="Easy chords only" />
+          </View>
+          <View style={styles.switchRow}>
+            <View style={styles.switchText}>
+              <Text style={styles.rowTitle}>Performance mode</Text>
+              <Text style={styles.modeHint}>Turns off animations in the player. It helps on older phones.</Text>
+            </View>
+            <Switch value={settings.lite} onValueChange={(on) => change({ lite: on })} trackColor={{ false: colors.line, true: colors.accent }} thumbColor="#FFFFFF" accessibilityLabel="Performance mode" />
+          </View>
+          {signedIn ? null : <Text style={styles.modeHint}>These stay on this phone. Sign in to keep them on your account, on the website and on your other phones.</Text>}
+        </View>
+
         <View style={[styles.card, styles.gap]}>
           <Text style={styles.appearance}>Appearance</Text>
           <View style={styles.modes}>
             {MODES.map((m) => (
-              <Pressable key={m.id} onPress={() => setMode(m.id)} style={[styles.mode, mode === m.id && styles.modeOn]} accessibilityRole="button" accessibilityState={{ selected: mode === m.id }}>
+              <Pressable key={m.id} onPress={() => change({ theme: m.id })} style={[styles.mode, mode === m.id && styles.modeOn]} accessibilityRole="button" accessibilityState={{ selected: mode === m.id }}>
                 <Text style={[styles.modeText, mode === m.id && styles.modeTextOn]}>{m.label}</Text>
               </Pressable>
             ))}
           </View>
           <Text style={styles.modeHint}>{mode === 'system' ? "Follows your phone's light or dark setting." : mode === 'dark' ? 'Easy on the eyes on stage and at night.' : 'Bright, like sheet music on paper.'}</Text>
         </View>
+
+        {signedIn ? (
+          <View style={[styles.card, styles.gap]}>
+            <Text style={styles.appearance}>Privacy and data</Text>
+            <Text style={styles.modeHint}>Your data is yours: take a copy, or clear what the app remembers about what you played.</Text>
+            <Button
+              title="Download my data"
+              kind="quiet"
+              busy={busy === 'export'}
+              onPress={() => run('export', async () => shareMyData(await exportMyData()))}
+              style={styles.gapSmall}
+            />
+            <Button
+              title="Clear my play history"
+              kind="quiet"
+              busy={busy === 'history'}
+              onPress={() =>
+                confirm(
+                  'Clear your play history?',
+                  'The list of songs you opened is emptied, on this phone and on the website. Your favourites stay.',
+                  async () => {
+                    const { removed } = await clearMyHistory();
+                    setInfo(removed === 1 ? 'Cleared 1 song from your history.' : `Cleared ${removed} songs from your history.`);
+                  },
+                  'Clear it',
+                  'history',
+                )
+              }
+              style={styles.gapSmall}
+            />
+          </View>
+        ) : null}
 
         <View style={styles.list}>
           <Link title="Privacy Policy" url={LINKS.privacy} />
@@ -152,7 +301,15 @@ const useStyles = makeStyles((colors) => ({
   modeOn: { backgroundColor: colors.accent },
   modeText: { color: colors.accentDeep, fontSize: 14.5, fontWeight: '700' },
   modeTextOn: { color: colors.onAccent },
-  modeHint: { color: colors.mute, fontSize: 13, marginTop: 10 },
+  modeHint: { color: colors.mute, fontSize: 13, lineHeight: 18, marginTop: 6 },
+  modeLocked: { opacity: 0.45 },
+  rowTitle: { color: colors.ink, fontSize: 15, fontWeight: '700', marginTop: 14 },
+  switchRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 4 },
+  switchText: { flex: 1 },
+  fact: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line },
+  factLabel: { color: colors.mute, fontSize: 14.5 },
+  factValue: { color: colors.ink, fontSize: 14.5, fontWeight: '700' },
+  gapSmall: { marginTop: 12 },
   list: { marginTop: 18, borderRadius: radius.card, backgroundColor: colors.surface, overflow: 'hidden' },
   link: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, height: 54, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line },
   linkText: { color: colors.ink, fontSize: 15.5, fontWeight: '500' },

@@ -1,7 +1,7 @@
 // Chord Suno's colours: "ivory and ink, with brass". Warm paper and charcoal neutrals and one burnt-amber accent, in a light and a dark
 // palette. The player chooses light, dark or "follow the phone" (Settings); screens read the palette with useColors() and build their
 // styles with makeStyles((colors) => ({ ... })), so a change of theme redraws them.
-import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { createContext, useContext, useMemo, useSyncExternalStore } from 'react';
 import { StyleSheet, useColorScheme } from 'react-native';
 import { getJson, setJson } from './lib/storage';
 
@@ -151,18 +151,31 @@ export function sectionColor(label, colors) {
 const KEY = 'themeMode';
 const ThemeContext = createContext({ colors: lightColors, scheme: 'light', mode: 'system', setMode: () => {} });
 
+// The chosen mode lives outside React so the account's choice (lib/settings.js) can change it without a screen being open.
+const savedMode = getJson(KEY, 'system');
+let currentMode = savedMode === 'light' || savedMode === 'dark' ? savedMode : 'system';
+const modeListeners = new Set();
+const subscribeMode = (fn) => {
+  modeListeners.add(fn);
+  return () => modeListeners.delete(fn);
+};
+
+export const getThemeMode = () => currentMode;
+/** Chooses light, dark or "follow the phone"; every screen redraws. */
+export function setThemeMode(next) {
+  if (next !== 'light' && next !== 'dark' && next !== 'system') return;
+  if (next === currentMode) return;
+  currentMode = next;
+  setJson(KEY, next);
+  modeListeners.forEach((fn) => fn());
+}
+
 /** Gives every screen the palette: the one the player chose (light or dark), or the phone's own setting. */
 export function ThemeProvider({ children }) {
   const system = useColorScheme();
-  const [mode, setModeState] = useState(() => {
-    const saved = getJson(KEY, 'system');
-    return saved === 'light' || saved === 'dark' ? saved : 'system';
-  });
+  const mode = useSyncExternalStore(subscribeMode, getThemeMode);
   const scheme = mode === 'system' ? (system === 'dark' ? 'dark' : 'light') : mode;
-  const setMode = useCallback((next) => {
-    setModeState(next);
-    setJson(KEY, next);
-  }, []);
+  const setMode = setThemeMode;
   const value = useMemo(() => ({ colors: scheme === 'dark' ? darkColors : lightColors, scheme, mode, setMode }), [scheme, mode, setMode]);
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }

@@ -3,6 +3,7 @@ import { Animated, Easing, Pressable, ScrollView, Text, View } from 'react-nativ
 import InstrumentArt from './InstrumentArt';
 import { Icon } from './Icons';
 import { Button } from './Ui';
+import { getSettings } from '../lib/settings';
 import { radius, makeStyles, useColors } from '../theme';
 
 const OPEN_MS = 210; // quick: it is a switch, not a scene
@@ -83,7 +84,7 @@ function ViewPanel({ open, wide = false, onClose, views, view, onView, instrumen
   useEffect(() => {
     Animated.timing(progress, {
       toValue: open ? 1 : 0,
-      duration: open ? OPEN_MS : CLOSE_MS,
+      duration: getSettings().lite ? 0 : open ? OPEN_MS : CLOSE_MS, // performance mode: no slide
       easing: open ? Easing.out(Easing.cubic) : Easing.in(Easing.cubic),
       useNativeDriver: true,
     }).start();

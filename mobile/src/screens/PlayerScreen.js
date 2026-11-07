@@ -23,6 +23,7 @@ import { buzz } from '../lib/buzz';
 import { buildChart, cellAt, clock, trimPickup } from '../lib/grid';
 import { METER_MAX, METER_MIN, isOwn, loadMeter, ownMeter, saveMeter } from '../lib/meter';
 import { chooseInstrument as saveInstrument, instrumentFor, INSTRUMENTS as INSTRUMENT_LIST, useInstrument } from '../lib/instrument';
+import { getSettings } from '../lib/settings';
 import { getJson, setJson } from '../lib/storage';
 import { radius, makeStyles, useColors } from '../theme';
 
@@ -144,7 +145,7 @@ export default function PlayerScreen({ route, navigation }) {
     return () => sub.remove();
   }, [viewOpen]);
   useEffect(() => {
-    Animated.timing(topAnim, { toValue: hideTop ? 0 : 1, duration: TOP_MS, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
+    Animated.timing(topAnim, { toValue: hideTop ? 0 : 1, duration: getSettings().lite ? 0 : TOP_MS, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
   }, [hideTop, topAnim]);
 
   const hasDetail = !!(result && result.chordsDetailed && result.chordsDetailed !== result.chords && result.chordsDetailed.length > 0);

@@ -84,5 +84,14 @@ async function offer(bytes, name, mime) {
   }
 }
 
-export const sharePdf = (song) => offer(buildPdf(song), fileName(song, 'chords', 'pdf'), 'application/pdf');
+/** Offers the person's own data (what the server exports) as a JSON file to save or send. */
+export function shareMyData(data) {
+  const text = JSON.stringify(data, null, 2);
+  const utf8 = unescape(encodeURIComponent(text)); // the text as UTF-8 bytes, one per character
+  const bytes = new Uint8Array(utf8.length);
+  for (let i = 0; i < utf8.length; i++) bytes[i] = utf8.charCodeAt(i);
+  return offer(bytes, 'chord-suno-my-data.json', 'application/json');
+}
+
+export const sharePdf =(song) => offer(buildPdf(song), fileName(song, 'chords', 'pdf'), 'application/pdf');
 export const shareMidi = (song, strummed = false) => offer(buildMidi(song, strummed), fileName(song, strummed ? 'chords-strummed' : 'chords', 'mid'), 'audio/midi');

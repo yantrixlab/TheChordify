@@ -4,6 +4,7 @@ import { chordNotes } from 'chordsuno-shared/chordShapes';
 import ChordDiagram from './ChordDiagram';
 import PianoChord from './PianoChord';
 import { Icon } from './Icons';
+import { getSettings, useSettings } from '../lib/settings';
 import { choiceFor, chordSequence, chordsUsed, stepPick, transposeChord, usePicks } from '../lib/diagrams';
 import { makeStyles, useColors } from '../theme';
 
@@ -21,6 +22,7 @@ const labelOf = (raw, transpose) => (raw === 'N' ? 'rest' : transposeChord(raw, 
 const Slot = memo(function Slot({ raw, transpose, capo, instrument, picks, arrows, on, scale, compact }) {
   const colors = useColors();
   const styles = useStyles();
+  useSettings(); // "easy chords only" changes which way of playing is drawn
   const fingered = raw === 'N' ? 'N' : transposeChord(raw, transpose - capo); // the shape to finger: Transpose, undone by Capo
   const choice = choiceFor(instrument, fingered, picks);
   const label = labelOf(raw, transpose);
@@ -173,7 +175,7 @@ function ChordArea({ sequence, current, instrument, transpose, capo, arrows, pic
   const goBack = useCallback(() => {
     const { current: now, browse: b } = live.current;
     if (!b) return;
-    Animated.timing(drag, { toValue: (b.frozen - now) * ITEM, duration: 320, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start(({ finished }) => {
+    Animated.timing(drag, { toValue: (b.frozen - now) * ITEM, duration: getSettings().lite ? 0 : 320, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start(({ finished }) => {
       if (!finished) return;
       setBrowse(null);
       drag.setValue(0);
@@ -206,7 +208,7 @@ function ChordArea({ sequence, current, instrument, transpose, capo, arrows, pic
         drag.setValue(Math.min(b.frozen * ITEM, Math.max((b.frozen - end) * ITEM, from + g.dx)));
       },
       onPanResponderRelease: (_, g) => {
-        Animated.decay(drag, { velocity: g.vx, deceleration: 0.996, useNativeDriver: false }).start();
+        if (!getSettings().lite) Animated.decay(drag, { velocity: g.vx, deceleration: 0.996, useNativeDriver: false }).start(); // performance mode: no coasting
         later();
       },
       onPanResponderTerminate: later,

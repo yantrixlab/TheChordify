@@ -1,10 +1,23 @@
 import { useSyncExternalStore } from 'react';
 import { chordDrawing, transposeChord } from 'chordsuno-shared/chordShapes';
+import { getSettings } from './settings';
 import { getJson, setJson } from './storage';
 
 export { transposeChord };
 
 const shapeCache = new Map();
+
+/** The same rule as the website's chord charts: a shape is easy when no finger lies across several strings and nothing is above the
+ *  fourth fret; a piano way is easy with three notes or fewer. */
+function isEasy(way) {
+  if (way.kind === 'keys') return way.voicing.notes.length <= 3;
+  const { frets, fingers } = way.shape;
+  const fretted = frets.map((f, i) => ({ fret: Number(f), finger: fingers[i] })).filter((p) => Number.isFinite(p.fret) && p.fret > 0);
+  if (fretted.some((p) => p.fret > 4)) return false;
+  const byFinger = new Map();
+  for (const p of fretted) if (p.finger) byFinger.set(p.finger, (byFinger.get(p.finger) || 0) + 1);
+  return ![...byFinger.values()].some((n) => n > 1);
+}
 
 /**
  * Every way of playing a chord on an instrument, the usual one first: [{ kind: 'frets', shape }] for the guitar, ukulele and mandolin,
@@ -12,7 +25,8 @@ const shapeCache = new Map();
  */
 export function waysFor(instrument, chord) {
   if (!chord || chord === 'N') return [];
-  const key = `${instrument}:${chord}`;
+  const easy = getSettings().easyChords; // "easy chords only" (Settings): the easy ways first, and only them when there are any
+  const key = `${easy ? 'e' : ''}${instrument}:${chord}`;
   if (shapeCache.has(key)) return shapeCache.get(key);
   let list = [];
   try {
@@ -20,6 +34,10 @@ export function waysFor(instrument, chord) {
     list = drawing.kind === 'keys' ? drawing.voicings.map((voicing) => ({ kind: 'keys', voicing })) : drawing.shapes.map((shape) => ({ kind: 'frets', shape }));
   } catch {
     list = [];
+  }
+  if (easy) {
+    const simple = list.filter(isEasy);
+    if (simple.length) list = simple; // a chord with no easy way keeps its usual ones, so something is always drawn
   }
   shapeCache.set(key, list);
   return list;

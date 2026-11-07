@@ -3,6 +3,7 @@ import { AppState } from 'react-native';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import * as api from '../api';
 import { adoptAccountInstrument } from '../lib/instrument';
+import { adoptAccountSettings } from '../lib/settings';
 import { getJson, loadToken, saveToken, setJson } from '../lib/storage';
 
 const AuthContext = createContext(null);
@@ -72,6 +73,7 @@ export function AuthProvider({ children }) {
       api.setToken(token);
       await saveToken(token);
     }
+    adoptAccountSettings(nextUser); // easy chords, performance mode and theme chosen on another device
     adoptAccountInstrument(nextUser); // the instrument they chose on another device (after the token, so a choice made before signing in can be sent)
   }, []);
 

@@ -75,7 +75,19 @@ export const getProfile = () => request('/api/me/profile');
 export const getMe = () => request('/api/auth/me');
 /** Remembers which instrument the signed-in person shows chords for (guitar, piano, ukulele or mandolin). */
 export const setMyInstrument = (instrument) => request('/api/me/instrument', { method: 'PUT', body: { instrument } });
-export const signInWithGoogle = (credential) => request('/api/auth/google', { method: 'POST', body: { credential, mobile: true } });
+/** The settings kept on the account ({ easyChords, lite, theme }): the same ones the website has. */
+export const getMySettings = () => request('/api/me/settings');
+/** Changes the settings that are sent and keeps the others; answers with all of them. */
+export const saveMySettings = (patch) => request('/api/me/settings', { method: 'PUT', body: patch });
+/** How many phones and browsers are signed in to the account: { sessions }. */
+export const getMySecurity = () => request('/api/me/security');
+/** Signs the account out of every other phone and browser, keeping this one: { ended }. */
+export const endOtherSessions = () => request('/api/me/sessions/end-others', { method: 'POST' });
+/** Empties the play history (favourites stay): { removed }. */
+export const clearMyHistory = () => request('/api/me/history', { method: 'DELETE' });
+/** Everything held about the person: the account, plan, settings, library, favourites and ratings. */
+export const exportMyData = () => request('/api/me/export', { timeout: 60000 });
+export const signInWithGoogle =(credential) => request('/api/auth/google', { method: 'POST', body: { credential, mobile: true } });
 export const signInAsReviewer = (email, password) => request('/api/auth/reviewer', { method: 'POST', body: { email, password, mobile: true } });
 export const signOut = () => request('/api/auth/logout', { method: 'POST' });
 export const deleteMyAccount = () => request('/api/me', { method: 'DELETE' });
