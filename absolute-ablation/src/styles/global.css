@@ -285,7 +285,7 @@ html[data-theme="dark"] {
 }
 /* chord diagrams (lib/tools/diagram.ts, lib/pianoDiagram.ts) take their colours from these, with the light colours as the fallback */
 html[data-theme="dark"] {
-  --dg-dot: #7c3aed; --dg-ink: #f4effc; --dg-line: #7a6aa3; --dg-label: #ffffff; --dg-x: #f87171;
+  --dg-dot: #7c3aed; --dg-ink: #f4effc; --dg-line: #4a4263; --dg-mark: #433b5c; --dg-label: #ffffff; --dg-x: #a69fba;
   --pn-white: #e9e2f7; --pn-black: #080609; --pn-line: #7a6aa3; --pn-root: #7c3aed; --pn-press: #f59e0b; --pn-ink: #ffffff;
 }
 html[data-theme="dark"] body { background: var(--color-canvas); color: var(--color-body); }

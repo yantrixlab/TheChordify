@@ -15,7 +15,7 @@ const instruments = [
 // The chord card beside the photo is a real diagram, drawn here from the same shapes as the player.
 const shape = getGuitarShape("G");
 const chordSvg = shape
-  ? diagramSvg(shape, { title: "G chord on guitar", dot: "#a78bfa", ink: "currentColor", line: "currentColor", label: "#12081f" })
+  ? diagramSvg(shape, { title: "G chord on guitar", ink: "currentColor", line: "color-mix(in srgb, currentColor 30%, transparent)" })
   : "";
 
 const features = [

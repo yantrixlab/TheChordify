@@ -610,6 +610,7 @@ import SongRating from "../components/SongRating.astro";
 
 <script>
   import { chordDrawing, chordNotes, chordKeyLabel, transposeChord, type GuitarShape, type PianoVoicing, type InstrumentId } from "../lib/chordShapes";
+  import { diagramSvg } from "../lib/tools/diagram";
   import { pianoSvg } from "../lib/pianoDiagram";
   import { instrumentFor, setInstrument } from "../lib/instrument";
   import { API_BASE, registerJam, type ExtractResult, type ChordSegment, type Bar, type Section, type StrumPattern, type StrumOne } from "../lib/api";
@@ -1660,10 +1661,8 @@ import SongRating from "../components/SongRating.astro";
   }
 
   /**
-   * Builds a real fretboard diagram (strings, frets, barre bars, finger dots) out of
-   * plain divs — no SVG. Detects barres by finding 2+ strings sharing the same
-   * finger at the same fret row and drawing one bar across them instead of
-   * separate dots, matching standard chord-chart conventions.
+   * A fretboard diagram for a guitar, ukulele or mandolin chord in a card with the chord's name under it. The drawing itself is the site's
+   * one chord diagram (lib/tools/diagram.ts): coloured fingers, a barre as one bar, the bass string picked out, and "3fr" for a shape up the neck.
    */
   function buildFretDiagram(
     label: string,
@@ -1671,13 +1670,6 @@ import SongRating from "../components/SongRating.astro";
     scale = 1,
     pick?: { index: number; count: number; step: (delta: number) => void; keyboardArrows: boolean },
   ): HTMLElement {
-    const W = 90 * scale;
-    const GRID_H = 100 * scale;
-    const ROWS = 4;
-    const strings = shape.frets.length; // 6 on the guitar, 4 on the ukulele
-    const colX = (i: number) => (W * i) / (strings - 1);
-    const rowY = (r: number) => (GRID_H * r) / ROWS;
-
     const wrap = document.createElement("div");
     wrap.className = "vc";
     wrap.style.boxSizing = "border-box";
@@ -1685,175 +1677,24 @@ import SongRating from "../components/SongRating.astro";
     wrap.style.flexDirection = "column";
     wrap.style.alignItems = "center";
     wrap.style.justifyContent = "center";
-    wrap.style.width = `${W + 24 * scale}px`;
+    wrap.style.width = `${128 * scale}px`;
     wrap.style.height = "100%";
     wrap.style.background = "var(--color-canvas)";
     wrap.style.border = "1px solid var(--color-hairline)";
     wrap.style.borderRadius = "10px";
     wrap.style.boxShadow = "0 1px 2px rgba(13, 0, 31, 0.06)";
-    wrap.style.padding = `${10 * scale}px`;
+    wrap.style.padding = `${8 * scale}px ${6 * scale}px`;
 
-    const baseFret = shape.baseFret ?? 1;
-
-    const markerRow = document.createElement("div");
-    markerRow.style.position = "relative";
-    markerRow.style.width = `${W}px`;
-    markerRow.style.height = `${14 * scale}px`;
-    markerRow.style.marginLeft = `${12 * scale}px`;
-    shape.frets.forEach((fret, i) => {
-      if (fret !== "x" && fret !== "0") return;
-      const marker = document.createElement("div");
-      marker.textContent = fret === "x" ? "×" : "○";
-      marker.style.position = "absolute";
-      marker.style.left = `${colX(i)}px`;
-      marker.style.top = "0";
-      marker.style.transform = "translateX(-50%)";
-      marker.style.fontSize = `${11 * scale}px`;
-      marker.style.color = fret === "x" ? "var(--dg-x, var(--color-error))" : "var(--color-ink)";
-      markerRow.appendChild(marker);
-    });
-    wrap.appendChild(markerRow);
-
-    const gridWrap = document.createElement("div");
-    gridWrap.style.position = "relative";
-    gridWrap.style.width = `${W + 24 * scale}px`;
-    gridWrap.style.height = `${GRID_H}px`;
-
-    const grid = document.createElement("div");
-    grid.style.position = "absolute";
-    grid.style.left = `${12 * scale}px`;
-    grid.style.top = "0";
-    grid.style.width = `${W}px`;
-    grid.style.height = `${GRID_H}px`;
-    gridWrap.appendChild(grid);
-
-    // Nut (thick top line) when the diagram starts at fret 1, otherwise a thin
-    // top line plus the starting fret number written beside row 1.
-    const nut = document.createElement("div");
-    nut.style.position = "absolute";
-    nut.style.left = "0";
-    nut.style.top = "0";
-    nut.style.width = `${W}px`;
-    nut.style.height = baseFret === 1 ? "3px" : "1px";
-    nut.style.background = "var(--color-ink)";
-    grid.appendChild(nut);
-
-    // String (vertical) lines.
-    for (let i = 0; i < strings; i++) {
-      const line = document.createElement("div");
-      line.style.position = "absolute";
-      line.style.left = `${colX(i)}px`;
-      line.style.top = "0";
-      line.style.width = "1px";
-      line.style.height = `${GRID_H}px`;
-      line.style.background = "var(--color-hairline-strong)";
-      grid.appendChild(line);
+    const board = document.createElement("div");
+    board.style.lineHeight = "0";
+    board.innerHTML = diagramSvg(shape, { compact: true, title: `${label} chord diagram` });
+    const svg = board.firstElementChild as SVGElement | null;
+    if (svg) {
+      svg.style.width = `${116 * scale}px`;
+      svg.style.height = "auto";
+      svg.style.display = "block";
     }
-    // Fret (horizontal) lines.
-    for (let r = 1; r <= ROWS; r++) {
-      const line = document.createElement("div");
-      line.style.position = "absolute";
-      line.style.left = "0";
-      line.style.top = `${rowY(r)}px`;
-      line.style.width = `${W}px`;
-      line.style.height = "1px";
-      line.style.background = "var(--color-hairline)";
-      grid.appendChild(line);
-    }
-
-    // Collect fretted positions, then group by (row, finger) to detect barres.
-    type Pos = { string: number; row: number; finger: string };
-    const positions: Pos[] = [];
-    shape.frets.forEach((fret, i) => {
-      if (fret === "x" || fret === "0") return;
-      const row = parseInt(fret, 10) - baseFret + 1;
-      if (row < 1 || row > ROWS) return;
-      positions.push({ string: i, row, finger: shape.fingers[i] || "" });
-    });
-
-    const groups = new Map<string, Pos[]>();
-    positions.forEach((p) => {
-      const key = `${p.row}-${p.finger}`;
-      const arr = groups.get(key) || [];
-      arr.push(p);
-      groups.set(key, arr);
-    });
-
-    // Fret numbers down the left, so it is clear which fret every finger and every barre goes on. The row a barre
-    // sits on (or the first row of a chord higher up the neck) is picked out in bold violet.
-    const barreRows = new Set<number>();
-    groups.forEach((group) => {
-      if (group.length >= 2 && group[0].finger) barreRows.add(group[0].row);
-    });
-    for (let r = 1; r <= ROWS; r++) {
-      const key = barreRows.has(r) || (r === 1 && baseFret > 1);
-      const num = document.createElement("div");
-      num.textContent = String(baseFret + r - 1);
-      num.style.position = "absolute";
-      num.style.left = `${-17 * scale}px`;
-      num.style.width = `${14 * scale}px`;
-      num.style.top = `${rowY(r) - GRID_H / ROWS / 2 - 8 * scale}px`;
-      num.style.height = `${16 * scale}px`;
-      num.style.lineHeight = `${16 * scale}px`;
-      num.style.textAlign = "right";
-      num.style.fontSize = `${(key ? 13 : 10) * scale}px`;
-      num.style.fontWeight = key ? "800" : "500";
-      num.style.color = key ? "var(--color-violet-deep)" : "var(--color-mute)";
-      grid.appendChild(num);
-    }
-
-    const dotSize = 18 * scale;
-    groups.forEach((group) => {
-      const rowCenter = rowY(group[0].row) - (GRID_H / ROWS) / 2;
-      if (group.length >= 2 && group[0].finger) {
-        const minString = Math.min(...group.map((p) => p.string));
-        const maxString = Math.max(...group.map((p) => p.string));
-        const bar = document.createElement("div");
-        bar.style.position = "absolute";
-        bar.style.left = `${colX(minString)}px`;
-        bar.style.top = `${rowCenter - dotSize / 2}px`;
-        bar.style.width = `${colX(maxString) - colX(minString)}px`;
-        bar.style.height = `${dotSize}px`;
-        bar.style.background = "var(--dg-dot, var(--color-ink))";
-        bar.style.borderRadius = `${dotSize / 2}px`;
-        grid.appendChild(bar);
-
-        [minString, maxString].forEach((stringIdx) => {
-          const finger = document.createElement("div");
-          finger.textContent = group[0].finger;
-          finger.style.position = "absolute";
-          finger.style.left = `${colX(stringIdx)}px`;
-          finger.style.top = `${rowCenter}px`;
-          finger.style.transform = "translate(-50%, -50%)";
-          finger.style.color = "white";
-          finger.style.fontSize = `${10 * scale}px`;
-          finger.style.fontWeight = "700";
-          grid.appendChild(finger);
-        });
-      } else {
-        group.forEach((p) => {
-          const dot = document.createElement("div");
-          dot.textContent = p.finger;
-          dot.style.position = "absolute";
-          dot.style.left = `${colX(p.string)}px`;
-          dot.style.top = `${rowCenter}px`;
-          dot.style.transform = "translate(-50%, -50%)";
-          dot.style.width = `${dotSize}px`;
-          dot.style.height = `${dotSize}px`;
-          dot.style.borderRadius = "50%";
-          dot.style.background = "var(--dg-dot, var(--color-ink))";
-          dot.style.color = "white";
-          dot.style.fontSize = `${10 * scale}px`;
-          dot.style.fontWeight = "700";
-          dot.style.display = "flex";
-          dot.style.alignItems = "center";
-          dot.style.justifyContent = "center";
-          grid.appendChild(dot);
-        });
-      }
-    });
-
-    wrap.appendChild(gridWrap);
+    wrap.appendChild(board);
     addNameAndPick(wrap, label, scale, pick);
     return wrap;
   }
