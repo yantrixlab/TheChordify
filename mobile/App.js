@@ -5,6 +5,7 @@ import { getAppConfig } from './src/api';
 import { AuthProvider, useAuth } from './src/auth/AuthContext';
 import { Button } from './src/components/Ui';
 import { VERSION_CODE } from './src/config';
+import { checkInstallReferral } from './src/lib/referral';
 import Navigation from './src/navigation';
 import { makeStyles, ThemeProvider, useColors, useTheme } from './src/theme';
 
@@ -47,6 +48,9 @@ function Root() {
 
 function Shell() {
   const { colors, scheme } = useTheme();
+  useEffect(() => {
+    checkInstallReferral(); // which influencer's link the app was installed through (first start only), and count it
+  }, []);
   return (
     <>
       <StatusBar barStyle={scheme === 'dark' ? 'light-content' : 'dark-content'} backgroundColor={colors.bg} />

@@ -87,8 +87,11 @@ export const endOtherSessions = () => request('/api/me/sessions/end-others', { m
 export const clearMyHistory = () => request('/api/me/history', { method: 'DELETE' });
 /** Everything held about the person: the account, plan, settings, library, favourites and ratings. */
 export const exportMyData = () => request('/api/me/export', { timeout: 60000 });
-export const signInWithGoogle =(credential) => request('/api/auth/google', { method: 'POST', body: { credential, mobile: true } });
-export const signInAsReviewer = (email, password) => request('/api/auth/reviewer', { method: 'POST', body: { email, password, mobile: true } });
+// `ref` is the influencer the app was installed through (lib/referral.js): the server credits a person's first sign-in to them.
+export const signInWithGoogle = (credential, ref = '') => request('/api/auth/google', { method: 'POST', body: { credential, mobile: true, ref } });
+export const signInAsReviewer = (email, password, ref = '') => request('/api/auth/reviewer', { method: 'POST', body: { email, password, mobile: true, ref } });
+/** Counts an install (or a typed code) for an influencer; the answer is the same for any name. */
+export const recordAppReferral = (slug, phoneId, source) => request('/api/ref/app', { method: 'POST', body: { slug, visitor: phoneId, source } });
 export const signOut = () => request('/api/auth/logout', { method: 'POST' });
 export const deleteMyAccount = () => request('/api/me', { method: 'DELETE' });
 

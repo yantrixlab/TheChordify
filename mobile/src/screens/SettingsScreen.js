@@ -8,6 +8,7 @@ import { AppBar, Button, Note } from '../components/Ui';
 import { LINKS, VERSION_NAME } from '../config';
 import { shareMyData } from '../lib/exporter';
 import { chooseInstrument, INSTRUMENTS, instrumentFor, useInstrument } from '../lib/instrument';
+import { getReferral, rememberReferral } from '../lib/referral';
 import { setSettings, useSettings } from '../lib/settings';
 import { radius, makeStyles, useColors } from '../theme';
 
@@ -35,6 +36,17 @@ export default function SettingsScreen({ navigation }) {
   const [info, setInfo] = useState('');
   const [reviewer, setReviewer] = useState({ email: '', password: '' });
   const [sessions, setSessions] = useState(null); // how many phones and browsers are signed in
+  const [code, setCode] = useState(''); // a creator's code, typed before signing in (lib/referral.js)
+  const [held, setHeld] = useState(getReferral);
+  const saveCode = () => {
+    if (rememberReferral(code, 'code')) {
+      setHeld(getReferral());
+      setCode('');
+      setError('');
+    } else {
+      setError('That is not a creator code. It is the name in their link, such as priya.');
+    }
+  };
   const signedIn = !!user;
   const userId = user ? user.id : null;
   const mode = settings.theme;
@@ -113,6 +125,21 @@ export default function SettingsScreen({ navigation }) {
             <Text style={styles.big}>Sign in to Chord Suno</Text>
             <Text style={styles.sub}>Keep your songs and favourites, and earn XP and badges as you play.</Text>
             <Button title="Continue with Google" busy={busy === 'google'} disabled={!!config && !config.enabled} onPress={() => run('google', signInWithGoogle)} style={styles.gap} />
+            <View style={styles.codeBox}>
+              {held ? (
+                <Text style={styles.sub}>
+                  Creator code saved: <Text style={styles.factValue}>{held.slug}</Text>. It is used when you sign in.
+                </Text>
+              ) : (
+                <>
+                  <Text style={styles.sub}>Did a creator send you? Enter their code or link.</Text>
+                  <View style={styles.codeRow}>
+                    <TextInput value={code} onChangeText={setCode} placeholder="Creator code (optional)" placeholderTextColor={colors.faint} autoCapitalize="none" autoCorrect={false} style={[styles.input, styles.codeInput]} />
+                    <Button title="Save" kind="quiet" onPress={saveCode} disabled={!code.trim()} />
+                  </View>
+                </>
+              )}
+            </View>
             {config && config.reviewerLogin ? (
               <View style={styles.reviewer}>
                 <Text style={styles.sub}>Reviewer sign-in</Text>
@@ -310,6 +337,9 @@ const useStyles = makeStyles((colors) => ({
   factLabel: { color: colors.mute, fontSize: 14.5 },
   factValue: { color: colors.ink, fontSize: 14.5, fontWeight: '700' },
   gapSmall: { marginTop: 12 },
+  codeBox: { marginTop: 18 },
+  codeRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 },
+  codeInput: { flex: 1 },
   list: { marginTop: 18, borderRadius: radius.card, backgroundColor: colors.surface, overflow: 'hidden' },
   link: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, height: 54, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line },
   linkText: { color: colors.ink, fontSize: 15.5, fontWeight: '500' },

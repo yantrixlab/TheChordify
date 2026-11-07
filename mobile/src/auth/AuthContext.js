@@ -3,6 +3,7 @@ import { AppState } from 'react-native';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import * as api from '../api';
 import { adoptAccountInstrument } from '../lib/instrument';
+import { forgetReferral, referralToSend } from '../lib/referral';
 import { adoptAccountSettings } from '../lib/settings';
 import { getJson, loadToken, saveToken, setJson } from '../lib/storage';
 
@@ -131,18 +132,20 @@ export function AuthProvider({ children }) {
       throw googleFailure(err);
     }
     if (!idToken) return null; // the person closed the window
-    const answer = await api.signInWithGoogle(idToken);
+    const answer = await api.signInWithGoogle(idToken, referralToSend());
     // A server that does not know the apps yet answers with a cookie only: nothing to keep, so do not pretend to be signed in.
     if (!answer.token) throw new Error('The server is not ready for the app yet. Please try again in a little while.');
     await remember(answer.user, answer.token);
+    forgetReferral(); // the first sign-in has used it
     return answer.user;
   }, [config, remember]);
 
   const signInAsReviewer = useCallback(
     async (email, password) => {
-      const answer = await api.signInAsReviewer(email, password);
+      const answer = await api.signInAsReviewer(email, password, referralToSend());
       if (!answer.token) throw new Error('The server is not ready for the app yet. Please try again in a little while.');
       await remember(answer.user, answer.token);
+      forgetReferral();
       return answer.user;
     },
     [remember],

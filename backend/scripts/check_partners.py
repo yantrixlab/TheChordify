@@ -211,5 +211,31 @@ d = admin.get(f"/api/admin/partners/{priya['id']}", headers=TOKEN).json()
 check("the revenue stays on the books", d["numbers"]["netMinor"] == 149900, str(d["numbers"]))
 check("and nobody is named in it", d["customers"] == [])
 
+print("== the app")
+ANDROID = {"user-agent": "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/120 Mobile Safari/537.36"}
+before = admin.get(f"/api/admin/partners/{priya['id']}", headers=TOKEN).json()["numbers"]["clicks"]
+r = fresh().get("/r/priya/app", headers=ANDROID)
+check("on an Android phone the app link opens Google Play", r.status_code == 302 and r.headers["location"].startswith("https://play.google.com/store/apps/details?id=com.yantrixlab.chordsuno"), r.headers.get("location"))
+check("with the influencer's name attached as the install referrer", r.headers["location"].endswith("&referrer=ref%3Dpriya"), r.headers.get("location"))
+r = fresh().get("/r/priya/app", headers={"user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120"})
+check("on a computer it is the website, as the ordinary link", r.status_code == 302 and r.headers["location"] == "/" and r.cookies.get("cs_ref") == "priya", str(r.headers))
+check("an unknown name opens the site", fresh().get("/r/nobody/app", headers=ANDROID).headers["location"] == "/")
+after = admin.get(f"/api/admin/partners/{priya['id']}", headers=TOKEN).json()["numbers"]["clicks"]
+check("both count as clicks", after == before + 2, f"{before} -> {after}")
+r = fresh().post("/api/ref/app", json={"slug": "priya", "visitor": "phone-abc123", "source": "install"})
+check("an app that was installed through the link tells us once", r.status_code == 200 and r.json() == {"ok": True})
+check("and it counts", admin.get(f"/api/admin/partners/{priya['id']}", headers=TOKEN).json()["numbers"]["clicks"] == after + 1)
+check("the same answer for a name that does not exist", fresh().post("/api/ref/app", json={"slug": "nobody", "visitor": "phone-abc123"}).json() == {"ok": True})
+check("no id for the phone, no count", (fresh().post("/api/ref/app", json={"slug": "priya", "visitor": ""}), admin.get(f"/api/admin/partners/{priya['id']}", headers=TOKEN).json()["numbers"]["clicks"] == after + 1)[1])
+app_client = fresh()
+r = app_client.post("/api/auth/reviewer", json={"email": "reviewer@example.com", "password": "a-long-reviewer-password", "mobile": True, "ref": "RAJ"})
+app_user = r.json()["user"]
+check("a first sign-in in the app with an influencer's name credits them", r.status_code == 200 and main.partners.partner_of(app_user["id"]) == raj["id"], r.text)
+check("the app has no cookie to carry it", "cs_ref" not in app_client.cookies)
+app_client.post("/api/auth/reviewer", json={"email": "reviewer@example.com", "password": "a-long-reviewer-password", "mobile": True, "ref": "priya"})
+check("a later sign-in cannot move the credit", main.partners.partner_of(app_user["id"]) == raj["id"])
+r = fresh().post("/api/auth/reviewer", json={"email": "reviewer@example.com", "password": "a-long-reviewer-password", "mobile": True, "ref": "no such name!"})
+check("a name that is not an influencer is ignored, and the sign-in works", r.status_code == 200)
+
 print(f"\npassed {passed}, failed {failed}")
 sys.exit(1 if failed else 0)

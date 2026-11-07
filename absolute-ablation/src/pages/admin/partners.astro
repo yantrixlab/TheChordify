@@ -24,7 +24,7 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
       <li><strong>Who gets the credit.</strong> A person is credited once, at their first sign-in, to the first influencer link they opened. If they had signed in before, they are credited when they first pay. It never moves to another influencer later.</li>
       <li><strong>Revenue</strong> is what was actually paid minus refunds, in rupees. It is recorded from Razorpay's <code>subscription.charged</code> and <code>refund.processed</code> messages, so both events must be ticked in your Razorpay webhook settings.</li>
       <li><strong>Commission</strong> is a percent of that revenue, for every payment or only a customer's first months. The flat fee is counted as a cost. Record each payment you make to an influencer under Payouts; "Owed" is what they have earned minus what you have paid.</li>
-      <li>People who use the Android app are not tracked yet: only the website is.</li>
+      <li><strong>The Android app.</strong> Give an influencer <code>chordsuno.com/r/their-name/app</code> to send people to the app: on an Android phone it opens the app on Google Play with their name attached, the app reads it after install and sends it with the first sign-in, and the install shows up as a click. Anybody can also type the influencer's name in the app's Settings before signing in. A computer or an iPhone gets the website instead. Visits inside the app after sign-in are not counted, only installs and sign-ups.</li>
     </ul>
   </section>
 
@@ -280,6 +280,11 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
     copyBtn.type = "button";
     copyBtn.addEventListener("click", () => void copy(`https://${linkOf(p.slug)}`, copyBtn));
     actions.append(copyBtn);
+    const appBtn = el("button", "adm-btn small", "Copy app link");
+    appBtn.type = "button";
+    appBtn.title = `${linkOf(p.slug)}/app: on an Android phone it opens the app on Google Play`;
+    appBtn.addEventListener("click", () => void copy(`https://${linkOf(p.slug)}/app`, appBtn));
+    actions.append(appBtn);
     if (p.handle) {
       const ig = el("a", "adm-btn small ghost", "Open Instagram");
       ig.href = `https://instagram.com/${p.handle}`;
@@ -432,7 +437,7 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
   const slugInput = $<HTMLInputElement>("f-slug");
   const preview = () => {
     const slug = slugInput.value.trim().toLowerCase().replace(/^@/, "");
-    $("f-url").textContent = slug ? `https://${linkOf(slug)}` : "";
+    $("f-url").textContent = slug ? `https://${linkOf(slug)}  ·  app: https://${linkOf(slug)}/app` : "";
   };
   slugInput.addEventListener("input", preview);
   const field = (id: string) => $<HTMLInputElement>(id);

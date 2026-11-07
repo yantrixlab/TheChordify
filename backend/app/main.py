@@ -12,7 +12,7 @@ import threading
 import time
 import uuid
 from typing import Optional
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 from fastapi import FastAPI, HTTPException, Request, Response, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
@@ -555,6 +555,7 @@ def _is_admin(request: Request) -> bool:
 class GoogleBody(BaseModel):
     credential: str
     mobile: bool = False  # the apps keep the token themselves instead of a cookie
+    ref: str = ""  # an app: the influencer's name it was installed through (from Google Play's install referrer, or typed by the person)
 
 
 @app.get("/api/auth/config")
@@ -582,7 +583,7 @@ def sign_in_with_google(body: GoogleBody, request: Request, response: Response) 
     user = accounts.sign_in(who["sub"], who["email"], who["name"], who["picture"])
     if user["disabled"]:
         raise HTTPException(status_code=403, detail="This account has been blocked.")
-    return _signed_in(user, request, response, body.mobile)
+    return _signed_in(user, request, response, body.mobile, body.ref)
 
 
 def _start_session(user: dict, request: Request, response: Response, days: int = accounts_module.SESSION_DAYS) -> str:
@@ -602,9 +603,11 @@ def _full_user(user: dict) -> dict:
     return {**_public_user(user), "plan": plan["code"], "planName": plan["name"], "instrument": user.get("instrument") or "", "settings": _settings_of(user), "settingsSaved": sorted((user.get("prefs") or {}).keys() & set(SETTINGS_DEFAULT)), "memberSince": user.get("createdAt"), **{k: snap[k] for k in ("level", "title", "ring", "stars", "xp", "intoLevel", "levelSpan", "nextLevelXp", "streak")}}
 
 
-def _signed_in(user: dict, request: Request, response: Response, mobile: bool) -> dict:
+def _signed_in(user: dict, request: Request, response: Response, mobile: bool, ref: str = "") -> dict:
     """The answer to a sign-in. The website gets a cookie; an app gets the token in the answer, to send back as a bearer token."""
     if mobile:
+        if user.get("logins", 0) <= 1:  # their first sign-in: the app says which influencer it came through, if any (an app has no cookie)
+            _credit_from_slug(user, ref)
         return {"user": _full_user(user), "token": accounts.start_session(user["id"]), "expiresInDays": accounts_module.SESSION_DAYS}
     _start_session(user, request, response)
     if user.get("logins", 0) <= 1:  # their first sign-in: they came through an influencer's link, if the cookie says so
@@ -630,6 +633,7 @@ class ReviewerBody(BaseModel):
     email: str
     password: str
     mobile: bool = False
+    ref: str = ""
 
 
 @app.post("/api/auth/reviewer")
@@ -646,7 +650,7 @@ def sign_in_as_reviewer(body: ReviewerBody, request: Request, response: Response
     user = accounts.sign_in("reviewer:" + _REVIEWER_EMAIL, _REVIEWER_EMAIL, "Razorpay reviewer", "")
     if user["disabled"]:
         raise HTTPException(status_code=403, detail="This account has been blocked.")
-    return _signed_in(user, request, response, body.mobile)
+    return _signed_in(user, request, response, body.mobile, body.ref)
 
 
 @app.get("/api/auth/me")
@@ -904,6 +908,60 @@ def _credit_from_cookie(user: dict, request: Request) -> None:
             partners.credit_user(user["id"], partner["id"])
     except Exception as exc:
         log.warning("Could not credit a partner: %s", exc)
+
+
+def _credit_from_slug(user: dict, slug: str) -> None:
+    """Credits a person to the partner an app named (the code it was installed through), if they have no partner yet. Never breaks a sign-in."""
+    try:
+        slug = (slug or "").strip().lower()
+        partner = partners.by_slug(slug) if partners_module.SLUG_RE.match(slug) else None
+        if partner and partner["active"]:
+            partners.credit_user(user["id"], partner["id"])
+    except Exception as exc:
+        log.warning("Could not credit a partner: %s", exc)
+
+
+_PLAY_STORE_URL = os.environ.get("PLAY_STORE_URL", "https://play.google.com/store/apps/details?id=com.yantrixlab.chordsuno").strip()
+
+
+@app.get("/r/{slug}/app")
+def partner_app_link(slug: str, request: Request) -> RedirectResponse:
+    """An influencer's link for the app, chordsuno.com/r/<slug>/app: on an Android phone it opens the app's page on Google Play with the
+    influencer's name attached (the app reads it after install and sends it with the first sign-in); anywhere else it is the site's own link."""
+    partner = partners.by_slug(slug) if partners_module.SLUG_RE.match(slug.strip().lower()) else None
+    if not partner or not partner["active"]:
+        return RedirectResponse("/", status_code=302)
+    if "android" not in request.headers.get("user-agent", "").lower():
+        return partner_link(slug, request)  # a computer or an iPhone: the website, counted like the ordinary link
+    response = RedirectResponse(f"{_PLAY_STORE_URL}&referrer={quote('ref=' + partner['slug'], safe='')}", status_code=302)
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        _remember_partner(request, response, partner, "play", "app-link")
+    except Exception as exc:
+        log.warning("Could not count a partner click: %s", exc)
+    return response
+
+
+class AppRefBody(BaseModel):
+    slug: str
+    visitor: str = ""
+    source: str = "install"  # "install" (Google Play's referrer) or "code" (typed by the person)
+
+
+@app.post("/api/ref/app")
+def partner_app_open(body: AppRefBody, request: Request) -> dict:
+    """An app that was installed through an influencer's link tells us once, on its first start, so the installs are counted (the app has no
+    cookie, so nothing else would count them). The same answer for any name."""
+    slug = body.slug.strip().lower()
+    partner = partners.by_slug(slug) if partners_module.SLUG_RE.match(slug) else None
+    caller = request.client.host if request.client else "unknown"
+    visitor = re.sub(r"[^A-Za-z0-9_-]", "", body.visitor)[:40]
+    if partner and partner["active"] and visitor and not _BOT_RE.search(request.headers.get("user-agent", "")) and _click_limiter.allow(caller):
+        try:
+            partners.record_click(partner["id"], visitor, "app", "app-" + (body.source if body.source in ("install", "code") else "install"))
+        except Exception as exc:
+            log.warning("Could not count an app install: %s", exc)
+    return {"ok": True}
 
 
 @app.get("/r/{slug}")
