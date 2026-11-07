@@ -226,3 +226,30 @@ export function money(minor: number, currency: string): string {
     return `${(minor / 100).toFixed(2)} ${currency}`;
   }
 }
+
+/**
+ * The switch that lets signed-in listeners change one song's strumming patterns from the player (on unless the admin turns it off).
+ * It saves as soon as it is flipped, and goes back if the server says no. `onSaved` runs after a save so a page can note it.
+ */
+export function strumSwitch(videoId: string, enabled: boolean, onSaved?: (on: boolean) => void, onError?: (message: string) => void): HTMLLabelElement {
+  const label = el("label", "adm-switch");
+  label.title = "Let signed-in listeners change this song's strumming patterns from the player. Their changes are kept as versions you can go back to.";
+  const box = el("input");
+  box.type = "checkbox";
+  box.setAttribute("role", "switch");
+  box.checked = enabled;
+  box.addEventListener("change", async () => {
+    const wanted = box.checked;
+    box.disabled = true;
+    try {
+      await adminFetch(`/api/admin/songs/${encodeURIComponent(videoId)}/strum-edit`, { method: "PUT", body: JSON.stringify({ enabled: wanted }) });
+      onSaved?.(wanted);
+    } catch (err) {
+      box.checked = !wanted;
+      onError?.(err instanceof Error ? err.message : "Could not change that.");
+    }
+    box.disabled = false;
+  });
+  label.append(box, el("i"), el("span", "", "Listeners can edit the strumming"));
+  return label;
+}

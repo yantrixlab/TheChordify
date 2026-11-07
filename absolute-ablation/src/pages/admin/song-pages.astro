@@ -90,7 +90,7 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
 </style>
 
 <script>
-  import { adminReady, adminFetch, can, el, say, number } from "../../lib/admin";
+  import { adminReady, adminFetch, can, el, say, number, strumSwitch } from "../../lib/admin";
 
   const rows = document.getElementById("rows")!;
   const empty = document.getElementById("empty")!;
@@ -340,6 +340,17 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
       chords.title = "Move chords between cells, change the strumming, go back to an earlier version";
       chords.style.cssText = "display:inline-flex;align-items:center;text-decoration:none";
       acts.append(chords);
+    }
+    if (can("songs.edit")) {
+      // may signed-in listeners change this song's strumming from the player? (on unless switched off here)
+      acts.append(
+        strumSwitch(
+          song.videoId,
+          song.strumEdit !== false,
+          (on) => say("msg", `${on ? "Listeners can now edit" : "Listeners can no longer edit"} the strumming of “${song.title}”.`, "ok"),
+          (message) => say("msg", message, "bad"),
+        ),
+      );
     }
     if (publishes) acts.append(toggle);
     else edit.remove();

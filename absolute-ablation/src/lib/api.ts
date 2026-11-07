@@ -33,7 +33,7 @@ export interface Section {
 export interface StrumOne {
   pattern: string[]; // `sub` slots to a beat ("1 & 2 & ..." or "1 e & a ..."): "D" down-strum, "U" up-strum, "-" no strum
   sub: number; // slots to a beat: 2 (eighths) or 4 (sixteenths)
-  kind: "heard" | "guess" | "typical";
+  kind: "heard" | "guess" | "typical" | "edited"; // edited: set by hand (an admin, or a listener from the player)
   confidence: number;
   where: string[]; // the kinds of section it is played in ("Verse", "Chorus"...); empty when it is the whole song
   bars: number;
@@ -68,6 +68,8 @@ export interface ExtractResult {
   sectionsPending?: boolean; // the structure model is still working: better sections will replace these
   sectionsSource?: "model"; // set once those sections have arrived
   videoId?: string; // YouTube songs: the video, so a jam session can be counted
+  strumEdit?: boolean; // YouTube songs: whether signed-in listeners may change the strumming (the admin can turn it off for a song)
+  strumToken?: string; // the fingerprint of the song as it is now, sent back with a strumming change so it is not saved over somebody else's
   tempo: number;
   beatTimes: number[];
   strum?: StrumPattern | null; // the song's main strumming pattern (songs analysed before this was added have none)

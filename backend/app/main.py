@@ -199,7 +199,17 @@ def _record_song(video_id: str, session_id: str, result: dict, meta: dict) -> No
 
 
 def _with_pending(session_id: str, result: dict) -> dict:
-    return {**result, "sectionsPending": session_id in _PENDING}
+    out = {**result, "sectionsPending": session_id in _PENDING}
+    # A song from YouTube says whether listeners may change its strumming, and carries the fingerprint a save is checked against.
+    video_id = session_id[3:] if session_id.startswith("yt_") and is_video_id(session_id[3:]) else ""
+    if video_id:
+        try:
+            out["strumEdit"] = songedit.strum_edit_on(catalog, video_id)
+            out["strumToken"] = songedit.token(result)
+        except Exception as exc:  # the switch could not be read: no editing, the song still opens
+            log.warning("Could not read the strumming switch of %s: %s", video_id, exc)
+            out["strumEdit"] = False
+    return out
 
 
 def _remove(path: Optional[str]) -> None:
@@ -2389,7 +2399,11 @@ def admin_song_pages(
     _require_perm(request, "song_pages.manage", "songs.edit", "songs.reanalyse")
     if status not in ("all", "published", "unpublished"):
         status = "all"
-    return song_pages.admin_list(search.strip()[:80], max(page, 1), min(max(pageSize, 1), 100), status, max(since, 0), max(until, 0))
+    out = song_pages.admin_list(search.strip()[:80], max(page, 1), min(max(pageSize, 1), 100), status, max(since, 0), max(until, 0))
+    flags = songedit.strum_edit_flags(catalog, [s["videoId"] for s in out.get("songs", [])])  # may listeners edit each song's strumming
+    for s in out.get("songs", []):
+        s["strumEdit"] = flags.get(s["videoId"], True)
+    return out
 
 
 @app.put("/api/admin/song-pages/{video_id}")
@@ -2485,7 +2499,22 @@ def admin_song_edit(video_id: str, request: Request) -> dict:
         "versions": songedit.version_list(songedit.load_versions(catalog, session_id)),
         "job": {"status": job.get("status"), "progress": job.get("progress"), "stage": job.get("stage"), "error": job.get("error")} if job.get("status") in ("queued", "downloading", "analyzing", "error") else None,
         "canReanalyse": actor.is_super or roles_module.allows(actor.perms, "songs.reanalyse"),
+        "userStrumEdit": songedit.strum_edit_on(catalog, video_id),
     }
+
+
+class StrumSwitchBody(BaseModel):
+    enabled: bool
+
+
+@app.put("/api/admin/songs/{video_id}/strum-edit")
+def admin_set_strum_edit(video_id: str, body: StrumSwitchBody, request: Request) -> dict:
+    """Turns on or off, for one song, the listeners' own editing of its strumming (on by default)."""
+    actor = _require_perm(request, "songs.edit")
+    _editable_song(video_id)
+    songedit.set_strum_edit(catalog, video_id, body.enabled)
+    _audit(actor, f"{'allowed' if body.enabled else 'stopped'} listeners editing the strumming of the song {video_id}")
+    return {"videoId": video_id, "enabled": body.enabled}
 
 
 @app.put("/api/admin/songs/{video_id}/edit")
@@ -2579,6 +2608,56 @@ def admin_song_reanalyse(video_id: str, request: Request) -> dict:
     out = _enqueue(request, session_id, task, staff=True)
     _audit(actor, f"started a re-analysis of the song {video_id}")
     return out
+
+
+# ---- listeners editing a song's strumming ----------------------------------------------------------------------------------
+#
+# A signed-in person may change the strumming patterns of a song (and only those: not its chords or sections) while the switch for that
+# song is on (the admin turns it off per song; it is on by default). The change shows for everybody at once, and, like the admin's edits, it
+# keeps the state before it as a version (with who made it), so the admin can see it and go back.
+
+_strum_save_limiter = RateLimiter(limit=20, window=3600.0)  # per person: twenty saves an hour
+
+
+class StrumSaveBody(BaseModel):
+    token: str
+    strum: dict
+
+
+@app.put("/api/songs/{session_id}/strumming")
+def save_strumming(session_id: str, body: StrumSaveBody, request: Request) -> dict:
+    user = _require_user(request, changes=True)
+    video_id = session_id[3:] if session_id.startswith("yt_") and is_video_id(session_id[3:]) else ""
+    if not video_id:
+        raise HTTPException(status_code=404, detail="Only songs from YouTube can be edited.")
+    if user.get("disabled"):
+        raise HTTPException(status_code=403, detail="This account has been blocked.")
+    if not songedit.strum_edit_on(catalog, video_id):
+        raise HTTPException(status_code=403, detail="Editing the strumming of this song is turned off.")
+    if not _strum_save_limiter.allow(str(user["id"])):
+        raise HTTPException(status_code=429, detail="You have saved a lot of changes. Please wait a little and try again.")
+    found_id, _song, result = _editable_song(video_id)
+    if found_id != session_id:
+        raise HTTPException(status_code=404, detail="Unknown song")
+    if body.token != songedit.token(result):
+        raise HTTPException(status_code=409, detail="The strumming of this song was changed by somebody else just now. Reload the page to see it, then edit again.")
+    try:
+        strum = songedit.clean_strum(body.strum, int(result.get("beatsPerBar") or 4), result.get("strum"))
+        if strum is None:
+            raise songedit.EditError("A song needs at least one strumming pattern.")
+    except songedit.EditError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    who = user["email"]
+    new = songedit.apply_edit(result, strum_set=True, strum=strum, by=who)
+    if songedit.token(new) == songedit.token(result):
+        return {"changed": False, "strum": result.get("strum"), "token": songedit.token(result)}
+    if not songedit.load_versions(catalog, session_id):
+        songedit.add_version(catalog, session_id, result, "Original analysis", "")
+    catalog.save_result(session_id, new)
+    songedit.add_version(catalog, session_id, new, "Strumming changed by a listener", who)
+    _after_song_edit(video_id, session_id, new)
+    log.info("Strumming of %s changed by %s", video_id, who)
+    return {"changed": True, "strum": new["strum"], "token": songedit.token(new)}
 
 
 _PAGE_HEADERS = {"Cache-Control": "public, max-age=300"}

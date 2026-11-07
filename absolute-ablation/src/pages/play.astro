@@ -214,7 +214,13 @@ import SongRating from "../components/SongRating.astro";
                 <h2 id="sm-title">Strumming pattern</h2>
                 <span id="sm-pill" class="sm-pill"></span>
               </div>
-              <div id="sm-seg" class="sm-seg" role="group" aria-label="Which pattern"></div>
+              <div class="sm-tools">
+                <button id="sm-edit" class="sm-edit" type="button" aria-expanded="false" aria-controls="sm-editor" hidden>
+                  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"></path></svg>
+                  <span>Edit strumming</span>
+                </button>
+                <div id="sm-seg" class="sm-seg" role="group" aria-label="Which pattern"></div>
+              </div>
             </div>
             <p id="sm-label" class="sm-label"></p>
             <div id="sm-tiles" class="sm-tiles" role="list" aria-label="Strums in one bar"></div>
@@ -224,6 +230,7 @@ import SongRating from "../components/SongRating.astro";
               <div id="sm-how"></div>
             </details>
             <p id="sm-note" class="sm-note"></p>
+            <div id="sm-editor" class="sme" hidden></div>
           </section>
 
           <SimilarSongs />
@@ -296,6 +303,49 @@ import SongRating from "../components/SongRating.astro";
   .sm-seg button { height: 28px; padding: 0 13px; border: 0; border-radius: 999px; background: transparent; font: 650 12px var(--font-sans); color: #c9bbf0; cursor: pointer; transition: background-color 0.15s, color 0.15s; }
   .sm-seg button:hover { color: #fff; }
   .sm-seg button.is-on { background: #fff; color: #1a0d33; }
+  .sm-tools { display: flex; align-items: center; gap: 8px 10px; flex-wrap: wrap; }
+  .sm-edit { display: inline-flex; align-items: center; gap: 7px; height: 34px; padding: 0 14px; border: 1px solid #ffffff2b; border-radius: 999px; background: #ffffff12; font: 650 12.5px var(--font-sans); color: #e9defc; cursor: pointer; transition: background-color 0.15s, border-color 0.15s; }
+  .sm-edit:hover { background: #ffffff1f; border-color: #ffffff45; color: #fff; }
+  .sm-edit[aria-expanded="true"] { background: #fcd34d26; border-color: #fcd34d66; color: #fde68a; }
+  .sm-edit:focus-visible, .sme button:focus-visible, .sme select:focus-visible, .sme input:focus-visible { outline: 2px solid #fcd34d; outline-offset: 2px; }
+
+  /* the strumming editor (signed-in listeners): patterns as rows of strokes, tapped to change */
+  .sme { margin-top: 16px; padding: 16px 16px 14px; border-radius: 16px; background: #ffffff0d; border: 1px solid #ffffff1c; }
+  .sme[hidden] { display: none; }
+  .sme h3 { margin: 0 0 4px; font-size: 16px; font-weight: 700; color: #fff; }
+  .sme .sme-hint { margin: 0 0 14px; font-size: 13.5px; line-height: 1.55; color: #c9bbf0; }
+  .sme-pat { margin: 0 0 12px; padding: 12px 14px; border-radius: 14px; background: #0f0623b3; border: 1px solid #ffffff17; }
+  .sme-pat-head { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; margin-bottom: 10px; }
+  .sme-pat-head strong { margin-right: auto; font-size: 14px; color: #fff; }
+  .sme-mini { height: 28px; padding: 0 11px; border: 1px solid #ffffff24; border-radius: 999px; background: transparent; font: 650 12px var(--font-sans); color: #d9ccff; cursor: pointer; }
+  .sme-mini:hover:not(:disabled) { background: #ffffff1a; color: #fff; }
+  .sme-mini:disabled { opacity: 0.35; cursor: not-allowed; }
+  .sme-mini.is-danger { color: #fca5a5; border-color: #f8717155; }
+  .sme-beats { display: flex; flex-wrap: wrap; gap: 8px 12px; }
+  .sme-beat { display: flex; gap: 4px; padding: 6px; border-radius: 12px; background: #ffffff0a; }
+  .sme-slot { display: grid; justify-items: center; gap: 4px; }
+  .sme-slot small { font: 600 10px/1 var(--font-mono); color: #a898d6; }
+  .sme-slot small.on { color: #fff; font-size: 11px; }
+  .sme-stroke { width: 34px; height: 40px; padding: 0; border: 1.5px dashed #ffffff30; border-radius: 10px; background: transparent; font: 800 18px/1 var(--font-sans); color: #7c6fa8; cursor: pointer; transition: transform 0.1s, background-color 0.12s; }
+  .sme-stroke:active { transform: scale(0.94); }
+  .sme-stroke[data-s="D"] { border: 1.5px solid #8b5cf6; background: linear-gradient(160deg, #7e3ff1, #5421b8); color: #fff; }
+  .sme-stroke[data-s="U"] { border: 1.5px solid #c4b5fd; background: #c4b5fd; color: #2e1065; }
+  .sme-pat[data-sub="4"] .sme-stroke { width: 28px; height: 38px; font-size: 16px; }
+  .sme-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-top: 10px; font-size: 13px; color: #c9bbf0; }
+  .sme-line select { height: 32px; padding: 0 28px 0 10px; border-radius: 10px; border: 1px solid #ffffff2b; background: #1a1037; color: #fff; font: 600 13px var(--font-sans); }
+  .sme-line label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+  .sme-line input[type="checkbox"] { width: 16px; height: 16px; accent-color: #8b5cf6; }
+  .sme-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-top: 6px; }
+  .sme-btn { height: 40px; padding: 0 20px; border: 0; border-radius: 999px; font: 700 14px var(--font-sans); cursor: pointer; transition: transform 0.12s, opacity 0.12s; }
+  .sme-btn:hover:not(:disabled) { transform: translateY(-1px); }
+  .sme-btn:disabled { opacity: 0.55; cursor: progress; }
+  .sme-save { background: #fcd34d; color: #2a1500; }
+  .sme-cancel { background: #ffffff14; color: #e9defc; }
+  .sme-add { background: transparent; border: 1px dashed #ffffff40; color: #d9ccff; }
+  .sme-msg { margin: 10px 0 0; font-size: 13.5px; line-height: 1.5; color: #c9bbf0; }
+  .sme-msg.is-bad { color: #fca5a5; }
+  @media (max-width: 640px) { .sme { padding: 12px 10px; } .sme-stroke { width: 30px; height: 38px; } .sme-pat[data-sub="4"] .sme-stroke { width: 24px; } }
+  @media (prefers-reduced-motion: reduce) { .sme-stroke, .sme-btn { transition: none; } }
   .sm-label { margin: 14px 0 0 !important; font: 600 12.5px var(--font-mono) !important; letter-spacing: 0.06em; color: #b9a8e8 !important; }
   .sm-tiles { display: grid; grid-template-columns: repeat(var(--cols, 8), minmax(0, 60px)); gap: 8px; justify-content: start; margin: 12px 0 16px; padding: 4px 0 8px; }
   .sm-tile { position: relative; overflow: hidden; aspect-ratio: 1 / 1; display: grid; place-items: center; align-content: center; gap: 4px; border-radius: 14px; background: linear-gradient(160deg, #7e3ff1 0%, #5421b8 100%); border: 1px solid #ffffff2b; box-shadow: inset 0 1px 0 #ffffff3d, 0 8px 16px -10px #5b21b6; color: #fff; transition: transform 0.24s cubic-bezier(0.3, 1.6, 0.5, 1); }
@@ -615,6 +665,9 @@ import SongRating from "../components/SongRating.astro";
   import { instrumentFor, setInstrument } from "../lib/instrument";
   import { API_BASE, registerJam, type ExtractResult, type ChordSegment, type Bar, type Section, type StrumPattern, type StrumOne } from "../lib/api";
   import { heartButton, recordPlay } from "../lib/library";
+  import { cachedUser } from "../lib/auth";
+  import { openSignIn } from "../lib/authUi";
+  import { nextStroke, resample, slotNames, defaultPattern, type Stroke } from "../lib/songEdit";
   import { can, loadPlan, nudge } from "../lib/plan";
   import { toast } from "../lib/toast";
   import { downloadMidi, downloadPdf, type ExportSong } from "../lib/exportSong";
@@ -1942,6 +1995,8 @@ import SongRating from "../components/SongRating.astro";
 
   function renderStrum() {
     strumCard.hidden = !strum || strumList.length === 0;
+    strumEditBtn.hidden = !strumEditable || strumCard.hidden; // the admin can switch editing off for a song
+    if (strumCard.hidden || !strumEditable) closeStrumEditor();
     strumTiles.replaceChildren();
     strumTileEls = [];
     strumLit = -1;
@@ -1995,6 +2050,228 @@ import SongRating from "../components/SongRating.astro";
         ? "A suggestion for this time signature, not a pattern heard in the song."
         : `${kind === "guess" ? "A rough reading of the recording. " : kind === "edited" ? "Checked and set by hand. " : "Worked out from the recording. "}Down and up strokes cannot be heard, so the usual picture is shown: the hand keeps moving down and up, so strokes on the beat are down-strums and strokes on the “&” up-strums. Lighter strokes and muted ones may be missing.`;
   }
+
+  // ---- Editing the strumming ------------------------------------------------------------------------------------------------
+  // A signed-in person can change the song's strumming patterns (and only those) while the admin has not switched editing off for the
+  // song. The change is saved for everybody; the server keeps the version before it, so the admin can go back.
+  const strumEditBtn = document.getElementById("sm-edit") as HTMLButtonElement;
+  const strumEditor = document.getElementById("sm-editor")!;
+  type DraftPattern = { pattern: Stroke[]; sub: 2 | 4; where: string[] };
+  let strumEditable = false; // the server's answer for this song
+  let strumToken = ""; // the fingerprint of the song as loaded; a save made on top of somebody else's change is refused
+  let draft: DraftPattern[] = [];
+  let editorMessage = "";
+  let editorBad = false;
+  let editorBusy = false;
+  const MAX_PATTERNS = 8;
+
+  const stroke = (s: string): Stroke => (s === "D" || s === "U" ? s : "-");
+  const strokeShown = (s: Stroke) => (s === "D" ? "↓" : s === "U" ? "↑" : "–");
+  const strokeWord = (s: Stroke) => (s === "D" ? "down" : s === "U" ? "up" : "nothing");
+
+  /** Where in the song a pattern can be played: the kinds of section the song has (Verse, Chorus...), plus what the patterns already say. */
+  function sectionKinds(): string[] {
+    const kinds = new Set<string>();
+    for (const s of sections) if (s.label && s.label !== "Silence") kinds.add(String(s.label).replace(/\s*\d+$/, ""));
+    for (const p of draft) p.where.forEach((w) => kinds.add(w));
+    return [...kinds];
+  }
+
+  function openStrumEditor() {
+    if (!cachedUser()) {
+      void openSignIn(); // editing is for people with an account, so the change can be kept with a name and not abused
+      return;
+    }
+    if (!strum) return;
+    draft = strumList.map((p) => ({ pattern: p.pattern.map(stroke), sub: p.sub === 4 ? 4 : 2, where: [...p.where] }));
+    editorMessage = "";
+    editorBad = false;
+    strumEditor.hidden = false;
+    strumEditBtn.setAttribute("aria-expanded", "true");
+    renderStrumEditor();
+    strumEditor.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+
+  function closeStrumEditor() {
+    strumEditor.hidden = true;
+    strumEditBtn.setAttribute("aria-expanded", "false");
+    strumEditor.replaceChildren();
+  }
+
+  function renderStrumEditor() {
+    if (!strum) return;
+    const perBar = strum.perBar;
+    const kinds = sectionKinds();
+    const here = document.activeElement as HTMLElement | null;
+    const keep = here && strumEditor.contains(here) ? here.dataset.keep : undefined; // so a keyboard user stays where they were after a change
+    strumEditor.replaceChildren();
+
+    const title = document.createElement("h3");
+    title.textContent = "Edit the strumming";
+    const hint = document.createElement("p");
+    hint.className = "sme-hint";
+    hint.textContent = "Tap a stroke to change it: ↓ down, ↑ up, – nothing. When you save, everybody who plays this song sees your strumming. Only the strumming can be edited here, and the earlier version is kept.";
+    strumEditor.append(title, hint);
+
+    const button = (cls: string, text: string, on: () => void, opts: { disabled?: boolean; label?: string; keep?: string } = {}) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = cls;
+      b.textContent = text;
+      b.disabled = !!opts.disabled;
+      if (opts.label) b.setAttribute("aria-label", opts.label);
+      if (opts.keep) b.dataset.keep = opts.keep;
+      b.addEventListener("click", on);
+      return b;
+    };
+    const redraw = () => renderStrumEditor();
+
+    draft.forEach((p, n) => {
+      const card = el_("div", "sme-pat");
+      card.dataset.sub = String(p.sub);
+      const head = el_("div", "sme-pat-head");
+      const name = document.createElement("strong");
+      name.textContent = n === 0 ? "Main pattern" : `Pattern ${n + 1}`;
+      head.append(
+        name,
+        button("sme-mini", "Up", () => { [draft[n - 1], draft[n]] = [draft[n], draft[n - 1]]; redraw(); }, { disabled: n === 0, label: `Move ${name.textContent} up` }),
+        button("sme-mini", "Down", () => { [draft[n + 1], draft[n]] = [draft[n], draft[n + 1]]; redraw(); }, { disabled: n === draft.length - 1, label: `Move ${name.textContent} down` }),
+        button("sme-mini", "Duplicate", () => { draft.splice(n + 1, 0, { pattern: [...p.pattern], sub: p.sub, where: [...p.where] }); redraw(); }, { disabled: draft.length >= MAX_PATTERNS, label: `Duplicate ${name.textContent}` }),
+        button("sme-mini is-danger", "Delete", () => { draft.splice(n, 1); redraw(); }, { disabled: draft.length <= 1, label: `Delete ${name.textContent}` }),
+      );
+      card.append(head);
+
+      const beatsEl = el_("div", "sme-beats");
+      const names = slotNames(p.sub);
+      for (let beat = 0; beat < perBar; beat++) {
+        const group = el_("div", "sme-beat");
+        for (let s = 0; s < p.sub; s++) {
+          const i = beat * p.sub + s;
+          const slot = el_("div", "sme-slot");
+          const b = button("sme-stroke", strokeShown(p.pattern[i]), () => {
+            p.pattern[i] = nextStroke(p.pattern[i]);
+            redraw();
+          }, { label: `Beat ${beat + 1}${names[s] ? ` ${names[s]}` : ""}: ${strokeWord(p.pattern[i])}. Tap to change.`, keep: `s${n}-${i}` });
+          b.dataset.s = p.pattern[i];
+          const small = document.createElement("small");
+          small.textContent = s === 0 ? String(beat + 1) : names[s];
+          if (s === 0) small.className = "on";
+          slot.append(b, small);
+          group.append(slot);
+        }
+        beatsEl.append(group);
+      }
+      card.append(beatsEl);
+
+      const line = el_("div", "sme-line");
+      const res = document.createElement("select");
+      res.setAttribute("aria-label", "Strokes to a beat");
+      for (const [value, text] of [["2", "Eighths (2 to a beat)"], ["4", "Sixteenths (4 to a beat)"]]) {
+        const o = document.createElement("option");
+        o.value = value;
+        o.textContent = text;
+        res.append(o);
+      }
+      res.value = String(p.sub);
+      res.dataset.keep = `r${n}`;
+      res.addEventListener("change", () => {
+        const to = Number(res.value) === 4 ? 4 : 2;
+        p.pattern = resample(p.pattern, p.sub, to);
+        p.sub = to;
+        redraw();
+      });
+      line.append(res);
+      if (kinds.length > 0) {
+        const lead = document.createElement("span");
+        lead.textContent = "Plays in:";
+        line.append(lead);
+        for (const kind of kinds) {
+          const label = document.createElement("label");
+          const box = document.createElement("input");
+          box.type = "checkbox";
+          box.checked = p.where.includes(kind);
+          box.addEventListener("change", () => {
+            const set = new Set(p.where);
+            box.checked ? set.add(kind) : set.delete(kind);
+            p.where = [...set];
+          });
+          label.append(box, kind);
+          line.append(label);
+        }
+      }
+      card.append(line);
+      strumEditor.append(card);
+    });
+
+    const actions = el_("div", "sme-actions");
+    const save = button("sme-btn sme-save", editorBusy ? "Saving…" : "Save for everyone", () => void saveStrumEdit(), { disabled: editorBusy });
+    save.dataset.keep = "save";
+    actions.append(
+      save,
+      button("sme-btn sme-cancel", "Cancel", () => { closeStrumEditor(); strumEditBtn.focus(); }, { disabled: editorBusy }),
+      button("sme-btn sme-add", "Add a pattern", () => { draft.push({ pattern: defaultPattern(perBar, 2), sub: 2, where: [] }); redraw(); }, { disabled: draft.length >= MAX_PATTERNS || editorBusy }),
+    );
+    strumEditor.append(actions);
+    const msg = el_("p", `sme-msg${editorBad ? " is-bad" : ""}`);
+    msg.setAttribute("role", "status");
+    msg.textContent = editorMessage;
+    strumEditor.append(msg);
+    if (keep) strumEditor.querySelector<HTMLElement>(`[data-keep="${keep}"]`)?.focus();
+  }
+
+  async function saveStrumEdit() {
+    if (!strum || editorBusy || !sessionId) return;
+    const empty = draft.findIndex((p) => !p.pattern.some((s) => s === "D" || s === "U"));
+    if (empty >= 0) {
+      editorMessage = `${empty === 0 ? "The main pattern" : `Pattern ${empty + 1}`} has no strokes. Tap a slot to add a down or up stroke, or delete the pattern.`;
+      editorBad = true;
+      renderStrumEditor();
+      return;
+    }
+    editorBusy = true;
+    editorMessage = "";
+    renderStrumEditor();
+    try {
+      let res: Response;
+      try {
+        res = await fetch(`${API_BASE}/api/songs/${encodeURIComponent(sessionId)}/strumming`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ token: strumToken, strum: { perBar: strum.perBar, bpm: strum.bpm, patterns: draft.map((p) => ({ pattern: p.pattern, sub: p.sub, where: p.where })) } }),
+        });
+      } catch {
+        throw new Error("Could not reach the server. Check your connection and try again.");
+      }
+      const body = await res.json().catch(() => ({}));
+      if (res.status === 401) {
+        void openSignIn();
+        throw new Error("Please sign in to save your change.");
+      }
+      if (!res.ok) throw new Error(typeof body.detail === "string" ? body.detail : `Could not save (${res.status}).`);
+      if (body.changed && body.strum) {
+        strum = body.strum;
+        strumList = body.strum.patterns?.length ? body.strum.patterns : strumList;
+        strumIdx = Math.min(strumIdx, strumList.length - 1);
+        strumEasyOn = false;
+        renderStrum();
+      }
+      strumToken = body.token ?? strumToken;
+      editorBusy = false;
+      closeStrumEditor();
+      toast({ icon: "✓", title: body.changed ? "Strumming saved" : "Nothing changed", text: body.changed ? "Everybody who plays this song now sees your strumming." : undefined });
+    } catch (err) {
+      editorBusy = false;
+      editorMessage = err instanceof Error ? err.message : "Could not save that. Please try again.";
+      editorBad = true;
+      renderStrumEditor();
+    }
+  }
+
+  strumEditBtn.addEventListener("click", () => {
+    if (strumEditor.hidden) openStrumEditor();
+    else closeStrumEditor();
+  });
 
   /** Lights the slot (an eighth or sixteenth note) that is playing, from the bars the grid is drawn from. */
   let strumFrom = 1; // the lit slot holds from this time...
@@ -2266,6 +2543,8 @@ import SongRating from "../components/SongRating.astro";
     renderChordGrid();
     renderSummary();
     renderDetails();
+    strumEditable = result.strumEdit === true;
+    strumToken = result.strumToken ?? "";
     strum = result.strum && (result.strum.v ?? 1) >= 4 && Array.isArray(result.strum.pattern) && result.strum.pattern.length >= 4 ? result.strum : null;
     strumList = strum
       ? (strum.patterns && strum.patterns.length

@@ -236,6 +236,39 @@ def clean_sections(sections: Any, bars: list, previous: Optional[list], duration
     return out
 
 
+# ---------------------------------------------------------------------------------------------------------------------------------
+# listeners editing the strumming (a switch for each song, on unless the admin turns it off)
+# ---------------------------------------------------------------------------------------------------------------------------------
+
+FLAGS_KEY = "flags:"  # kept beside the results under "flags:<video id>", which is not a valid session id, so it cannot be asked for
+
+
+def strum_edit_on(catalog: Any, video_id: str) -> bool:
+    """Whether people may change this song's strumming from the player. On by default: only a song the admin has switched off is not."""
+    data = catalog.load_result(FLAGS_KEY + video_id)
+    return not (isinstance(data, dict) and data.get("userStrumEdit") is False)
+
+
+def strum_edit_flags(catalog: Any, video_ids: list[str]) -> dict[str, bool]:
+    """strum_edit_on for many songs at once (the admin's list): {video id: bool}."""
+    out = {v: True for v in video_ids}
+    if not video_ids:
+        return out
+    marks = ",".join("?" * len(video_ids))
+    rows, _ = catalog.db.run(f"SELECT key, data FROM results WHERE key IN ({marks})", tuple(FLAGS_KEY + v for v in video_ids))
+    for row in rows:
+        try:
+            if json.loads(row["data"]).get("userStrumEdit") is False:
+                out[row["key"][len(FLAGS_KEY):]] = False
+        except (ValueError, AttributeError):
+            continue
+    return out
+
+
+def set_strum_edit(catalog: Any, video_id: str, enabled: bool) -> None:
+    catalog.save_result(FLAGS_KEY + video_id, {"userStrumEdit": bool(enabled), "at": time.time()})
+
+
 def token(result: dict) -> str:
     """A short fingerprint of what an editor can change, so a save made on top of somebody else's change can be told apart.
     The sections count only once an editor has changed them (the detector's own refinement of them does not change the fingerprint)."""
