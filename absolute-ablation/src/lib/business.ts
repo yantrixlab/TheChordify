@@ -11,6 +11,8 @@ export const business = {
   /** The registered address, on one line (for example "12 Park Street, Kolkata, West Bengal 700016, India"). */
   address: "",
   country: "India",
+  /** The official pages of Chord Suno elsewhere. The footer links to them, and search engines read them as the same entity (sameAs). */
+  social: { telegram: "https://t.me/chordsuno", youtube: "https://www.youtube.com/@chordsuno" },
   /** Google Analytics 4 measurement id (from Admin > Data streams in Google Analytics). Empty turns analytics off. */
   analyticsId: "G-V9JWJZNYZ0",
   /** The person who answers privacy complaints (India's rules ask for a named Grievance Officer). Leave empty to leave the name out. */

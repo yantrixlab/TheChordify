@@ -11,6 +11,7 @@ import Features from "../components/Features.astro";
 import Pricing from "../components/Pricing.astro";
 import CTABand from "../components/CTABand.astro";
 import Footer from "../components/Footer.astro";
+import { business } from "../lib/business";
 
 // What the search result shows (about 60 and 155 characters: longer is cut off). The words people type most are at the front.
 const title = "Chord Finder: Get the Chords of Any Song, Free — Chord Suno";
@@ -32,6 +33,7 @@ const jsonLd = [
     url: "https://chordsuno.com/",
     logo: "https://chordsuno.com/icon-512.png",
     email: "yantrixlab@gmail.com",
+    sameAs: [business.social.youtube, business.social.telegram],
   },
   {
     "@context": "https://schema.org",

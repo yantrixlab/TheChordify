@@ -15,7 +15,7 @@ export interface Copy {
 
 export const COPY: Record<InstrumentKey, Copy> = {
   guitar: {
-    chartTitle: "Guitar Chord Chart: Every Guitar Chord with Diagrams — Chord Suno",
+    chartTitle: "Guitar Chord Chart: All Chords with Diagrams — Chord Suno",
     chartDescription: "A guitar chord chart with a diagram for every major, minor, 7th, sus, diminished and extended chord on all twelve notes, with other ways to play each one. Free.",
     h1: "Guitar chord chart: every guitar chord with a diagram",
     lead: "Every guitar chord on all twelve notes: major, minor, 6th, 7th, suspended, diminished, augmented and the extended 9th, 11th and 13th chords. Pick a note for all of its chords with other ways to play each, or search for one by name.",
@@ -31,7 +31,7 @@ export const COPY: Record<InstrumentKey, Copy> = {
     ],
   },
   piano: {
-    chartTitle: "Piano Chord Chart: Every Piano Chord on the Keyboard — Chord Suno",
+    chartTitle: "Piano Chord Chart: All Chords on the Keyboard — Chord Suno",
     chartDescription: "A piano chord chart with a keyboard diagram for every major, minor, 7th, sus, diminished and extended chord on all twelve notes, with their inversions. Free.",
     h1: "Piano chord chart: every piano chord on the keyboard",
     lead: "Every piano chord on all twelve notes, drawn on a keyboard with the keys to press named, and the inversions of each. Pick a note for all of its chords, or search for one by name.",
@@ -47,7 +47,7 @@ export const COPY: Record<InstrumentKey, Copy> = {
     ],
   },
   ukulele: {
-    chartTitle: "Ukulele Chord Chart: Every Uke Chord with Diagrams — Chord Suno",
+    chartTitle: "Ukulele Chord Chart: All Chords with Diagrams — Chord Suno",
     chartDescription: "A ukulele chord chart with a diagram for every major, minor, 7th, sus, diminished and extended chord on all twelve notes, with other ways to play each. Free.",
     h1: "Ukulele chord chart: every uke chord with a diagram",
     lead: "Every ukulele chord on all twelve notes, in standard G C E A tuning: major, minor, 6th, 7th, suspended, diminished, augmented and the extended chords. Pick a note for all of its chords with other ways to play each, or search for one by name.",
@@ -63,7 +63,7 @@ export const COPY: Record<InstrumentKey, Copy> = {
     ],
   },
   mandolin: {
-    chartTitle: "Mandolin Chord Chart: Every Mandolin Chord with Diagrams — Chord Suno",
+    chartTitle: "Mandolin Chord Chart: All Chords with Diagrams — Chord Suno",
     chartDescription: "A mandolin chord chart with a diagram for every major, minor, 7th, sus, diminished and extended chord on all twelve notes, in G D A E tuning. Free.",
     h1: "Mandolin chord chart: every mandolin chord with a diagram",
     lead: "Every mandolin chord on all twelve notes, in standard G D A E tuning: major, minor, 6th, 7th, suspended, diminished, augmented and the extended chords. Pick a note for all of its chords with other ways to play each, or search for one by name.",

@@ -22,10 +22,15 @@ const url = `https://chordsuno.com${path}`;
 const today = new Date().toISOString().slice(0, 10);
 const showSymbol = c.label !== root.short;
 
-// the title is about 60 characters: the full form where it fits, then shorter ones
+// the title is at most 60 characters (search results cut it there): the full form where it fits, then shorter ones
 const named = `${c.titleName}${showSymbol ? ` (${c.label})` : ""}`;
-const candidates = [`${named} Chord on ${info.name}: Notes & Diagrams — Chord Suno`, `${named} Chord on ${info.name} — Chord Suno`, `${c.label} Chord on ${info.name}: Notes & Diagrams — Chord Suno`];
-const title = candidates.find((t) => t.length <= 64) ?? candidates[candidates.length - 1];
+const candidates = [
+  `${named} Chord on ${info.name}: Notes & Diagrams — Chord Suno`,
+  `${named} Chord on ${info.name} — Chord Suno`,
+  `${c.label} Chord on ${info.name}: Notes & Diagrams — Chord Suno`,
+  `${c.label} Chord on ${info.name} — Chord Suno`,
+];
+const title = candidates.find((t) => t.length <= 60) ?? candidates[candidates.length - 1];
 const description = `${c.label} chord on ${lower}: ${c.notesText}. Diagrams, fingering and ${c.voicings.length} way${c.voicings.length === 1 ? "" : "s"} to play ${c.titleName}, with its notes, formula and the chords that go with it.`;
 const how = instrument === "piano" ? `Press ${first?.notes?.split(" ").join(", ")} together.` : `The usual shape on ${lower} is ${first?.frets}: the fret on each string, in the order ${info.strings} (x is a string that is not played and 0 is an open string).`;
 const lead = `${c.label}${c.altLabel ? ` (also ${c.altLabel})` : ""} is the ${c.words} chord: ${c.notes.map((n) => n.note).join(", ")}, with the formula ${c.formula}. ${how}`;

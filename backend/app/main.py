@@ -40,6 +40,7 @@ from . import songedit
 from .store import SongStore
 from . import trending as trending_shelves
 from . import youtube
+from .wwwredirect import WwwRedirect
 from .youtube import InvalidUrlError, VideoNotDownloadable, YouTubeBlocked, download_audio, extract_video_id, is_video_id, session_id_for_url, video_info
 
 log = logging.getLogger("thechordify.api")
@@ -122,6 +123,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# www.chordsuno.com is the same site: send it to chordsuno.com (added last, so it runs before everything else)
+app.add_middleware(WwwRedirect)
 
 app.mount("/media", StaticFiles(directory=UPLOAD_DIR), name="media")
 

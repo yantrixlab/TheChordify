@@ -19,9 +19,34 @@ interface Props {
 }
 
 const { title, description, heading, sub, eyebrow = "Toolkit", feature, tool = "", crumb } = Astro.props;
+
+// structured data: where the page sits in the site, and (on a tool's own page) that it is a web app
+const url = new URL(Astro.url.pathname, "https://chordsuno.com").href;
+const trail = [
+  { name: "Chord Suno", item: "https://chordsuno.com/" },
+  { name: "Toolkit", item: "https://chordsuno.com/toolkit/" },
+  ...(crumb ? [{ name: crumb, item: url }] : []),
+];
+const jsonLd = [
+  { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: trail.map((t, i) => ({ "@type": "ListItem", position: i + 1, name: t.name, item: t.item })) },
+  ...(tool
+    ? [
+        {
+          "@context": "https://schema.org",
+          "@type": "WebApplication",
+          name: `${heading} — Chord Suno`,
+          url,
+          description,
+          applicationCategory: "MusicApplication",
+          operatingSystem: "Any (runs in the browser)",
+          provider: { "@type": "Organization", name: "Chord Suno", url: "https://chordsuno.com/" },
+        },
+      ]
+    : []),
+];
 ---
 
-<Layout title={title} description={description} themeable>
+<Layout title={title} description={description} jsonLd={jsonLd} themeable>
   <Nav />
   <main id="main-content" class="tk" data-feature={feature ?? ""} data-tool={tool}>
     <div class="tk-wrap">

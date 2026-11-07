@@ -13,7 +13,7 @@ import { pianoSvg } from "../../lib/pianoDiagram";
 const url = "https://chordsuno.com/modes/";
 const today = new Date().toISOString().slice(0, 10);
 const title = "Musical Modes Chart: All 7 Modes in All 12 Keys — Chord Suno";
-const description = "All seven musical modes (Ionian, Dorian, Phrygian, Lydian, Mixolydian, Aeolian, Locrian) in all 12 keys: every note, the formulas, the chords and what each sounds like.";
+const description = "The seven musical modes, from Ionian to Locrian, in all 12 keys: every note, the formulas, the chords and what each sounds like.";
 const order = [...MODES].sort((a, b) => a.brightness - b.brightness);
 const list = (names: string[]) => names.join(", ").replace(/, ([^,]*)$/, " and $1");
 const inC = (m: (typeof MODES)[number]) => scalePcs(0, m).map((p) => SHARP[p]).join(" ");

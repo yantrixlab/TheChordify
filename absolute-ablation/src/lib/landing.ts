@@ -135,7 +135,7 @@ export const LANDING: Landing[] = [
   // ------------------------------------------------------------------------------------------------------------------------------
   {
     slug: "guitar-chord-finder",
-    title: "Guitar Chord Finder from YouTube: Any Song, Free — Chord Suno",
+    title: "Guitar Chord Finder from YouTube: Any Song — Chord Suno",
     description: "A guitar chord finder for any YouTube song: get the guitar chords with diagrams, key, tempo and strumming pattern, synced to the music. Free to start.",
     nav: "Guitar chord finder",
     eyebrow: "Guitar chord finder",
