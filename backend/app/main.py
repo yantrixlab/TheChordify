@@ -2394,12 +2394,15 @@ class SongPageBody(BaseModel):
 
 @app.get("/api/admin/song-pages")
 def admin_song_pages(
-    request: Request, search: str = "", page: int = 1, pageSize: int = 25, status: str = "all", since: float = 0, until: float = 0
+    request: Request, search: str = "", page: int = 1, pageSize: int = 25, status: str = "all", since: float = 0, until: float = 0,
+    sort: str = "newest", flag: str = "",
 ) -> dict:
     _require_perm(request, "song_pages.manage", "songs.edit", "songs.reanalyse")
     if status not in ("all", "published", "unpublished"):
         status = "all"
-    out = song_pages.admin_list(search.strip()[:80], max(page, 1), min(max(pageSize, 1), 100), status, max(since, 0), max(until, 0))
+    if flag not in ("", "edited", "older", "strumoff"):
+        flag = ""
+    out = song_pages.admin_list(search.strip()[:80], max(page, 1), min(max(pageSize, 1), 100), status, max(since, 0), max(until, 0), sort, flag)
     flags = songedit.strum_edit_flags(catalog, [s["videoId"] for s in out.get("songs", [])])  # may listeners edit each song's strumming
     for s in out.get("songs", []):
         s["strumEdit"] = flags.get(s["videoId"], True)

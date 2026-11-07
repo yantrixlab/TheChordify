@@ -566,13 +566,38 @@ class SongPages:
             n += 1
             slug = f"{base}-{n}"
 
+    # how the admin's list can be ordered (newest first unless asked otherwise); every order ends on the video id so pages never repeat a song
+    _SORTS = {
+        "newest": "s.created_at DESC",
+        "oldest": "s.created_at ASC",
+        "played": "s.jams DESC, s.created_at DESC",
+        "updated": "s.updated_at DESC",
+        "title": "LOWER(s.title) ASC",
+    }
+
     def admin_list(
-        self, search: str = "", page: int = 1, size: int = 25, status: str = "all", since: float = 0.0, until: float = 0.0
+        self, search: str = "", page: int = 1, size: int = 25, status: str = "all", since: float = 0.0, until: float = 0.0,
+        sort: str = "newest", flag: str = "",
     ) -> dict:
         """The catalog for the admin. `status` is all, published or unpublished; `since`/`until` (seconds, 0 = open) limit it to
-        songs first chordified in that stretch of time."""
+        songs first chordified in that stretch of time; `sort` is newest (the default: the song chordified last comes first), oldest,
+        played, updated or title; `flag` narrows it to the songs an editor changed by hand ("edited"), the ones still on an older
+        detector ("older") or the ones whose strumming listeners may not edit ("strumoff")."""
 
+        joins = "LEFT JOIN song_pages p ON p.video_id = s.video_id"
         where, params = [], []
+        if flag in ("edited", "older"):
+            joins += " LEFT JOIN results r ON r.key = s.session_id"
+        if flag == "edited":
+            where.append("r.data LIKE ?")
+            params.append('%"edited": %')
+        elif flag == "older":  # not by the current detector and not changed by hand (the same test as the "Older analysis" mark)
+            where.append("(r.data IS NULL OR (r.data NOT LIKE ? AND r.data NOT LIKE ?))")
+            params += [f'%"analysisVersion": {self._version}%', '%"edited": %']
+        elif flag == "strumoff":
+            joins += " LEFT JOIN results f ON f.key = 'flags:' || s.video_id"
+            where.append("f.data LIKE ?")
+            params.append('%"userStrumEdit": false%')
         if search:
             where.append("(LOWER(s.title) LIKE ? OR LOWER(s.artist) LIKE ?)")
             like = f"%{search.lower()}%"
@@ -588,12 +613,13 @@ class SongPages:
             where.append("s.created_at < ?")
             params.append(until)
         clause = ("WHERE " + " AND ".join(where)) if where else ""
-        base = f"FROM songs s LEFT JOIN song_pages p ON p.video_id = s.video_id {clause}"
+        base = f"FROM songs s {joins} {clause}"
+        order = self._SORTS.get(sort, self._SORTS["newest"])
         total, _ = self._db.run(f"SELECT COUNT(*) AS n {base}", tuple(params))
         rows, _ = self._db.run(
             f"""SELECT s.*, p.slug AS page_slug, p.title AS page_title, p.artist AS page_artist, p.intro AS page_intro,
                        p.published_at AS page_published_at
-                {base} ORDER BY (p.video_id IS NULL), s.jams DESC, s.updated_at DESC LIMIT ? OFFSET ?""",
+                {base} ORDER BY {order}, s.video_id LIMIT ? OFFSET ?""",
             tuple(params) + (size, max(page - 1, 0) * size),
         )
         # which of these songs were analysed by the current detector (the others still open, but an admin can re-analyse them)
@@ -633,9 +659,14 @@ class SongPages:
                     "publishedAt": r["page_published_at"],
                     "analysed": r["session_id"] in current,
                     "edited": r["session_id"] in edited,  # an editor changed its chords or strumming by hand
+                    "chordifiedAt": r["created_at"],  # when the song was first chordified on the site
+                    "updatedAt": r["updated_at"],
                 }
             )
-        return {"songs": songs, "total": total[0]["n"], "published": self.count()}
+        everything, _ = self._db.run("SELECT COUNT(*) AS n FROM songs")
+        published = self.count()
+        # the whole catalog's sizes, whatever is filtered, for the tabs above the list
+        return {"songs": songs, "total": total[0]["n"], "published": published, "counts": {"all": everything[0]["n"], "published": published, "notPublished": everything[0]["n"] - published}}
 
     def count(self) -> int:
         rows, _ = self._db.run("SELECT COUNT(*) AS n FROM song_pages")

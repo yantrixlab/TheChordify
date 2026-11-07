@@ -7,53 +7,148 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
   active="songpages"
   lead="Every chordified song. Publish the ones that should get a public page that search engines can list, fix a song's chords and strumming by hand, or run the detector on it again. Only the songs you publish are shown on the site's /songs/ pages and sitemap."
 >
-  <div class="sp-filters">
-    <div class="sp-seg" id="status" role="group" aria-label="Show">
-      <button type="button" data-v="all" class="is-on">All</button>
-      <button type="button" data-v="published">Published</button>
-      <button type="button" data-v="unpublished">Not published</button>
+  <section class="sp-toolbar" aria-label="Find songs">
+    <div class="sp-find">
+      <label class="sp-search">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+        <input id="search" type="search" placeholder="Search by song or artist" aria-label="Search songs" autocomplete="off" />
+        <button id="search-clear" type="button" aria-label="Clear the search" hidden>×</button>
+      </label>
+      <label class="sp-sort">
+        <span>Sort by</span>
+        <select id="sort" aria-label="Sort songs">
+          <option value="newest">Newest chordified</option>
+          <option value="oldest">Oldest chordified</option>
+          <option value="played">Most played</option>
+          <option value="updated">Recently changed</option>
+          <option value="title">Title A–Z</option>
+        </select>
+      </label>
     </div>
-    <div class="sp-seg" id="when" role="group" aria-label="Chordified">
-      <button type="button" data-v="today">Today</button>
-      <button type="button" data-v="yesterday">Yesterday</button>
-      <button type="button" data-v="week">Last 7 days</button>
-      <button type="button" data-v="month">Last 30 days</button>
-      <button type="button" data-v="all" class="is-on">Lifetime</button>
+
+    <div class="sp-groups">
+      <div class="sp-group">
+        <span class="sp-gl">Show</span>
+        <div class="sp-seg" id="status" role="group" aria-label="Page status">
+          <button type="button" data-v="all" class="is-on" aria-pressed="true">All <b id="n-all"></b></button>
+          <button type="button" data-v="published" aria-pressed="false">Published <b id="n-published"></b></button>
+          <button type="button" data-v="unpublished" aria-pressed="false">Not published <b id="n-unpublished"></b></button>
+        </div>
+      </div>
+      <div class="sp-group">
+        <span class="sp-gl">Chordified</span>
+        <div class="sp-seg" id="when" role="group" aria-label="When it was first chordified">
+          <button type="button" data-v="all" class="is-on" aria-pressed="true">Any time</button>
+          <button type="button" data-v="today" aria-pressed="false">Today</button>
+          <button type="button" data-v="yesterday" aria-pressed="false">Yesterday</button>
+          <button type="button" data-v="week" aria-pressed="false">7 days</button>
+          <button type="button" data-v="month" aria-pressed="false">30 days</button>
+        </div>
+      </div>
+      <div class="sp-group">
+        <span class="sp-gl">Needs a look</span>
+        <div class="sp-chips" id="flag" role="group" aria-label="Quick filters">
+          <button type="button" class="sp-chip" data-v="edited" aria-pressed="false" title="Songs whose chords or strumming were changed by hand">Edited by hand</button>
+          <button type="button" class="sp-chip" data-v="older" aria-pressed="false" title="Songs still on an older chord detector; re-analysing them may improve the chords">Older analysis</button>
+          <button type="button" class="sp-chip" data-v="strumoff" aria-pressed="false" title="Songs whose strumming listeners cannot edit">Strumming edits off</button>
+        </div>
+      </div>
+      <button id="reset" type="button" class="sp-reset" hidden>Clear filters</button>
     </div>
-  </div>
-  <div class="adm-row sp-bar">
-    <input id="search" type="search" placeholder="Search by song or artist" aria-label="Search songs" autocomplete="off" />
-    <span id="count" class="adm-hint" role="status" style="margin:0"></span>
-  </div>
-  <p class="adm-hint" style="margin:8px 0 0">The time filter is when a song was first chordified on the site.</p>
+    <p id="count" class="sp-summary" role="status"></p>
+  </section>
 
   <div id="rows" class="sp-list"></div>
-  <p id="empty" class="adm-empty" hidden></p>
+  <div id="empty-box" class="sp-empty" hidden>
+    <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l11-2v13"></path><circle cx="6.5" cy="18" r="2.5"></circle><circle cx="17.5" cy="16" r="2.5"></circle></svg>
+    <p id="empty"></p>
+    <button id="empty-reset" type="button" class="adm-btn ghost small">Clear filters</button>
+  </div>
 
-  <div class="adm-row" style="margin-top:14px;justify-content:space-between">
+  <nav class="sp-pager" aria-label="Pages">
     <button id="prev" type="button" class="adm-btn ghost small">← Previous</button>
     <span id="page" class="adm-hint" style="margin:0"></span>
     <button id="next" type="button" class="adm-btn ghost small">Next →</button>
-  </div>
+  </nav>
+
   <p id="msg" class="adm-msg" role="status"></p>
 </AdminLayout>
 
 <style is:global>
-  .sp-bar #search { max-width: 360px; }
-  .sp-filters { display: flex; flex-wrap: wrap; gap: 12px 18px; margin-bottom: 14px; }
+  /* ---- the toolbar: search, sort, and the filters ---- */
+  .sp-toolbar { display: grid; gap: 16px; margin: 0 0 20px; padding: 18px; border-radius: 20px; background: #fff; border: 1px solid var(--color-hairline); box-shadow: 0 1px 2px #1a05330a; }
+  .sp-find { display: flex; flex-wrap: wrap; gap: 12px; }
+  .sp-search { flex: 1 1 320px; display: flex; align-items: center; gap: 10px; height: 46px; padding: 0 8px 0 14px; border: 1.5px solid var(--color-hairline); border-radius: 14px; background: #fcfaff; color: var(--color-mute); transition: border-color 0.15s, box-shadow 0.15s, background-color 0.15s; }
+  .sp-search:focus-within { border-color: var(--color-violet); background: #fff; box-shadow: 0 0 0 4px #7c3aed1f; }
+  .adm-main .sp-search input[type="search"] { flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; outline: 0; border-radius: 0; background: transparent; box-shadow: none; font: 500 15px var(--font-sans); color: var(--color-ink); }
+  .sp-search button { width: 32px; height: 32px; border: 0; border-radius: 50%; background: transparent; font-size: 20px; line-height: 1; color: var(--color-mute); cursor: pointer; }
+  .sp-search button:hover { background: var(--color-violet-soft); color: var(--color-violet-deep); }
+  .sp-sort { display: flex; align-items: center; gap: 10px; font: 600 13px var(--font-sans); color: var(--color-body); }
+  .adm-main .sp-sort select { width: auto; min-width: 190px; height: 46px; border-radius: 14px; font: 600 14px var(--font-sans); }
+  .sp-groups { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px 24px; }
+  .sp-group { display: grid; gap: 7px; }
+  .sp-gl { font: 700 10.5px var(--font-mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-mute); }
   .sp-seg { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; border-radius: 999px; background: var(--color-violet-soft); }
-  .sp-seg button { height: 32px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent; font: 650 13px var(--font-sans); color: var(--color-violet-deep); cursor: pointer; white-space: nowrap; }
+  .sp-seg button { display: inline-flex; align-items: center; height: 34px; padding: 0 14px; border: 0; border-radius: 999px; background: transparent; font: 650 13px var(--font-sans); color: var(--color-violet-deep); cursor: pointer; white-space: nowrap; transition: background-color 0.12s, color 0.12s; }
   .sp-seg button:hover { color: var(--color-ink); }
   .sp-seg button.is-on { background: #fff; color: var(--color-ink); box-shadow: 0 1px 3px rgb(26 5 51 / 0.16); }
-  .sp-list { display: grid; gap: 12px; margin-top: 14px; }
-  .sp-item { background: #fff; border: 1px solid var(--color-hairline); border-radius: 16px; box-shadow: 0 1px 2px #1a05330a; }
-  .sp-line { display: grid; grid-template-columns: 96px minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 12px 16px 12px 12px; }
-  .sp-line img { display: block; width: 96px; height: 54px; object-fit: cover; border-radius: 10px; background: #f3eeff; }
-  .sp-name strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; color: var(--color-ink); }
-  .sp-name small { display: block; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; color: var(--color-mute); }
-  .sp-name .sp-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; align-items: center; }
-  .sp-name .sp-meta i { padding: 1px 7px; border-radius: 6px; background: #f4f1fb; font: 600 11.5px var(--font-mono); font-style: normal; color: var(--color-violet-deep); }
-  .sp-acts { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+  .sp-seg b { margin-left: 7px; padding: 0 7px; border-radius: 999px; background: #1a05330f; font: 700 11px/18px var(--font-mono); color: var(--color-body); }
+  .sp-seg b:empty { display: none; }
+  .sp-seg button.is-on b { background: var(--color-violet-soft); color: var(--color-violet-deep); }
+  .sp-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .sp-chip { height: 40px; padding: 0 15px; border: 1.5px solid var(--color-hairline); border-radius: 999px; background: #fff; font: 650 13px var(--font-sans); color: var(--color-body); cursor: pointer; transition: background-color 0.12s, border-color 0.12s, color 0.12s; }
+  .sp-chip:hover { border-color: #c9bbe8; color: var(--color-ink); }
+  .sp-chip[aria-pressed="true"] { border-color: var(--color-violet); background: var(--color-violet); color: #fff; }
+  .sp-reset { height: 40px; padding: 0 6px; border: 0; background: transparent; font: 650 13px var(--font-sans); color: var(--color-violet-deep); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+  .sp-reset[hidden] { display: none; }
+  .sp-summary { margin: 0; padding-top: 14px; border-top: 1px solid #f1eaf9; font-size: 13.5px; color: var(--color-body); }
+  .sp-summary strong { color: var(--color-ink); }
+  .sp-seg button:focus-visible, .sp-chip:focus-visible, .sp-reset:focus-visible, .sp-link:focus-visible, .sp-thumb:focus-visible { outline: 3px solid #7c3aed66; outline-offset: 2px; }
+
+  /* ---- a song ---- */
+  .sp-list { display: grid; gap: 14px; }
+  .sp-card { overflow: hidden; border-radius: 20px; background: #fff; border: 1px solid var(--color-hairline); box-shadow: 0 1px 2px #1a05330a; transition: border-color 0.15s, box-shadow 0.15s; }
+  .sp-card:hover { border-color: #d3c4f0; box-shadow: 0 18px 34px -26px rgb(91 33 182 / 0.55); }
+  .sp-main { display: grid; grid-template-columns: 176px minmax(0, 1fr) 178px; gap: 22px; align-items: start; padding: 18px; }
+  .sp-thumb { position: relative; display: block; overflow: hidden; aspect-ratio: 16 / 9; border-radius: 12px; background: #f3eeff; box-shadow: 0 8px 18px -12px #1a053366; }
+  .sp-thumb img { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform 0.25s; }
+  .sp-card:hover .sp-thumb img { transform: scale(1.04); }
+  .sp-thumb .sp-open { position: absolute; inset: auto 8px 8px auto; padding: 3px 9px; border-radius: 999px; background: #0d0019cc; font: 650 11px var(--font-sans); color: #fff; opacity: 0; transition: opacity 0.15s; }
+  .sp-thumb:hover .sp-open, .sp-thumb:focus-visible .sp-open { opacity: 1; }
+  .sp-info { min-width: 0; }
+  .sp-title { margin: 0; font-size: 18px; font-weight: 750; letter-spacing: -0.02em; line-height: 1.25; color: var(--color-ink); overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .sp-artist { margin: 3px 0 0; font-size: 14px; color: var(--color-body); overflow-wrap: anywhere; }
+  .sp-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 11px; }
+  .sp-tag { display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; border-radius: 999px; background: #f1f5f9; font: 700 11px var(--font-sans); letter-spacing: 0.02em; color: #475569; white-space: nowrap; }
+  .sp-tag::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0.85; }
+  .sp-tag.ok { background: #d1fae5; color: #047857; }
+  .sp-tag.violet { background: var(--color-violet-soft); color: var(--color-violet-deep); }
+  .sp-tag.warn { background: #fef3c7; color: #92400e; }
+  .sp-tag.new { background: #dbeafe; color: #1d4ed8; }
+  .sp-tag.off { background: #fee2e2; color: #991b1b; }
+  .sp-facts { display: grid; grid-template-columns: repeat(4, auto); justify-content: start; gap: 8px 28px; margin: 14px 0 0; }
+  .sp-facts dt { font: 600 10.5px var(--font-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-mute); }
+  .sp-facts dd { margin: 2px 0 0; font-size: 14px; font-weight: 700; color: var(--color-ink); white-space: nowrap; }
+  .sp-facts dd small { font-size: 13px; font-weight: 600; color: var(--color-body); }
+  .sp-chords { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 12px; }
+  .sp-chords span { padding: 2px 8px; border-radius: 7px; background: #f4f1fb; font: 700 12px var(--font-mono); color: var(--color-violet-deep); }
+  .sp-actions { display: grid; gap: 8px; align-content: start; }
+  .sp-actions .adm-btn { display: inline-flex; align-items: center; justify-content: center; width: 100%; height: 42px; text-decoration: none; }
+  .sp-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 18px; padding: 8px 14px 8px 18px; border-top: 1px solid #f1eaf9; background: #fcfaff; }
+  .sp-foot:empty { display: none; }
+  .sp-links { display: flex; flex-wrap: wrap; gap: 2px; margin-left: auto; }
+  .sp-link { display: inline-flex; align-items: center; gap: 5px; height: 34px; padding: 0 12px; border: 0; border-radius: 10px; background: transparent; font: 650 13px var(--font-sans); color: var(--color-violet-deep); text-decoration: none; cursor: pointer; }
+  .sp-link:hover:not(:disabled) { background: var(--color-violet-soft); }
+  .sp-link:disabled { opacity: 0.5; cursor: progress; }
+  .sp-link.is-danger { color: #b91c1c; }
+  .sp-link.is-danger:hover:not(:disabled) { background: #fee2e2; }
+  .sp-skel { height: 152px; border-radius: 20px; border: 1px solid var(--color-hairline); background: linear-gradient(100deg, #fff 30%, #f6f1ff 50%, #fff 70%) 0 0 / 220% 100%; animation: sp-shimmer 1.3s linear infinite; }
+  @keyframes sp-shimmer { to { background-position: -120% 0; } }
+  .sp-empty { display: grid; justify-items: center; gap: 10px; margin-top: 14px; padding: 46px 20px; border: 1.5px dashed #d8cbf2; border-radius: 20px; text-align: center; color: var(--color-mute); }
+  .sp-empty[hidden] { display: none; }
+  .sp-empty p { margin: 0; max-width: 460px; font-size: 15px; line-height: 1.55; color: var(--color-body); }
+  .sp-pager { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; }
+  @media (prefers-reduced-motion: reduce) { .sp-skel { animation: none; } .sp-card, .sp-thumb img, .sp-search { transition: none; } .sp-card:hover .sp-thumb img { transform: none; } }
   .sp-edit { display: grid; gap: 12px; padding: 14px 16px 16px; border-top: 1px solid #f1eaf9; }
   .sp-edit[hidden] { display: none; }
   .sp-edit label { display: grid; gap: 5px; font: 600 12.5px var(--font-sans); color: var(--color-body); }
@@ -81,10 +176,27 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
   .adm-main .rt-code { display: block; min-height: 190px; max-height: 420px; border: 0; border-radius: 0; font: 500 13px/1.6 var(--font-mono); resize: vertical; box-shadow: none; }
   .adm-main .rt-code:focus { box-shadow: none; }
   .rt-help { margin: 6px 0 0; font-size: 12.5px; color: var(--color-mute); }
+  @media (max-width: 1040px) {
+    .sp-main { grid-template-columns: 150px minmax(0, 1fr); }
+    .sp-actions { grid-column: 1 / -1; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+  }
   @media (max-width: 680px) {
-    .sp-line { grid-template-columns: 72px minmax(0, 1fr); }
-    .sp-line img { width: 72px; height: 42px; }
-    .sp-acts { grid-column: 1 / -1; justify-content: flex-start; }
+    .sp-toolbar { gap: 12px; padding: 14px; }
+    .sp-groups { gap: 10px; }
+    .sp-group { min-width: 0; max-width: 100%; }
+    .sp-seg, .sp-chips { flex-wrap: nowrap; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+    .sp-seg::-webkit-scrollbar, .sp-chips::-webkit-scrollbar { display: none; }
+    .sp-chips { padding: 2px 1px; }
+    .sp-seg button, .sp-chip { flex: none; }
+    .sp-search { flex-basis: 100%; }
+    .sp-gl { font-size: 10px; }
+    .sp-sort { width: 100%; }
+    .adm-main .sp-sort select { flex: 1; min-width: 0; }
+    .sp-main { grid-template-columns: 104px minmax(0, 1fr); gap: 14px; padding: 14px; }
+    .sp-title { font-size: 16px; }
+    .sp-facts { grid-template-columns: repeat(2, auto); }
+    .sp-foot { padding: 8px 10px 8px 14px; }
+    .sp-links { margin-left: 0; }
     .sp-edit .two { grid-template-columns: 1fr; }
   }
 </style>
@@ -103,6 +215,14 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
   const whenBar = document.getElementById("when")!;
   let status = "all";
   let when = "all";
+  let flag = ""; // the quick filter: edited, older or strumoff (none by default)
+  let sort = "newest"; // the song chordified last comes first
+  const sortEl = document.getElementById("sort") as HTMLSelectElement;
+  const flagBar = document.getElementById("flag")!;
+  const resetBtn = document.getElementById("reset") as HTMLButtonElement;
+  const clearSearch = document.getElementById("search-clear") as HTMLButtonElement;
+  const emptyBox = document.getElementById("empty-box")!;
+  const emptyReset = document.getElementById("empty-reset") as HTMLButtonElement;
 
   /** The start and end of the chosen stretch, in seconds, in the admin's own time zone (0 = no limit). */
   function range(): { since: number; until: number } {
@@ -119,21 +239,70 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
   }
 
   const label: Record<string, string> = { today: "today", yesterday: "yesterday", week: "in the last 7 days", month: "in the last 30 days" };
-  function bind(bar: HTMLElement, set: (v: string) => void) {
-    bar.querySelectorAll<HTMLButtonElement>("button").forEach((b) =>
-      b.addEventListener("click", () => {
-        bar.querySelectorAll("button").forEach((o) => o.classList.toggle("is-on", o === b));
-        set(b.dataset.v ?? "all");
-        page = 1;
-        load();
-      }),
-    );
-  }
+  const flagLabel: Record<string, string> = { edited: "edited by hand", older: "on an older analysis", strumoff: "with strumming edits off" };
 
   const SIZE = 20;
   let page = 1;
   let query = "";
   let latest = 0;
+
+  /** Shows which button of a group is chosen (for the eye and for screen readers). */
+  function mark(bar: HTMLElement, value: string) {
+    bar.querySelectorAll<HTMLButtonElement>("button").forEach((b) => {
+      const on = (b.dataset.v ?? "") === value;
+      b.classList.toggle("is-on", on);
+      b.setAttribute("aria-pressed", String(on));
+    });
+  }
+  /** A group of buttons that sets one filter. In a `toggle` group, pressing the chosen one again clears it. */
+  function bind(bar: HTMLElement, get: () => string, set: (v: string) => void, toggle = false) {
+    bar.querySelectorAll<HTMLButtonElement>("button").forEach((b) =>
+      b.addEventListener("click", () => {
+        const value = b.dataset.v ?? "";
+        const chosen = toggle && get() === value ? "" : value;
+        set(chosen);
+        mark(bar, chosen);
+        page = 1;
+        syncFilterUi();
+        load();
+      }),
+    );
+  }
+  const filtered = () => status !== "all" || when !== "all" || flag !== "" || query !== "";
+  function syncFilterUi() {
+    resetBtn.hidden = !filtered();
+    clearSearch.hidden = !search.value;
+  }
+  function resetFilters() {
+    status = "all";
+    when = "all";
+    flag = "";
+    query = "";
+    search.value = "";
+    mark(statusBar, "all");
+    mark(whenBar, "all");
+    mark(flagBar, "");
+    page = 1;
+    syncFilterUi();
+    load();
+  }
+
+  /** How long ago, in words a person says ("5 min ago", "3 days ago"); an older date is written out. */
+  function ago(seconds: number): string {
+    const diff = Date.now() / 1000 - seconds;
+    if (diff < 60) return "just now";
+    if (diff < 3600) return `${Math.floor(diff / 60)} min ago`;
+    if (diff < 86400) {
+      const h = Math.floor(diff / 3600);
+      return `${h} hour${h === 1 ? "" : "s"} ago`;
+    }
+    if (diff < 7 * 86400) {
+      const d = Math.floor(diff / 86400);
+      return d === 1 ? "Yesterday" : `${d} days ago`;
+    }
+    return new Date(seconds * 1000).toLocaleDateString([], { dateStyle: "medium" });
+  }
+  const fullDate = (seconds: number) => new Date(seconds * 1000).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
 
   /** The page's own words as HTML that is safe to show in the editor (the server cleans it again before it is saved or shown). */
   function tidy(html: string): string {
@@ -267,41 +436,73 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
     return wrap;
   }
 
-  function item(song: any): HTMLElement {
-    const box = el("article", "sp-item");
+  const tag = (text: string, kind = "", hint = "") => {
+    const t = el("span", `sp-tag ${kind}`.trim(), text);
+    if (hint) t.title = hint;
+    return t;
+  };
 
+  function item(song: any): HTMLElement {
+    const box = el("article", "sp-card");
+    const fresh = song.chordifiedAt && Date.now() / 1000 - song.chordifiedAt < 86400;
+
+    // the cover: opens the song in the player
+    const thumb = el("a", "sp-thumb");
+    thumb.href = `/play/?session=${encodeURIComponent(song.sessionId)}`;
+    thumb.target = "_blank";
+    thumb.rel = "noopener";
+    thumb.setAttribute("aria-label", `Open “${song.title}” in the player`);
     const img = el("img");
     img.alt = "";
     img.loading = "lazy";
     img.src = song.thumbnail;
+    thumb.append(img, el("span", "sp-open", "Open in player ↗"));
 
-    const name = el("div", "sp-name");
-    name.append(
-      el("strong", "", song.published ? song.pageTitle : song.title),
-      el("small", "", (song.published ? song.pageArtist : song.artist) || "Unknown artist"),
-    );
-    const meta = el("div", "sp-meta");
-    meta.append(el("span", `adm-pill ${song.published ? "ok" : ""}`, song.published ? "Published" : "Not published"));
-    if (song.edited) meta.append(el("span", "adm-pill violet", "Edited by hand"));
-    else if (!song.analysed) meta.append(el("span", "adm-pill warn", "Older analysis"));
-    if (song.key) meta.append(el("i", "", song.key));
-    if (song.tempo) meta.append(el("i", "", `${Math.round(song.tempo)} BPM`));
-    meta.append(el("i", "", `${number(song.jams)} plays`));
-    for (const chord of song.chords.slice(0, 5)) meta.append(el("i", "", chord));
-    name.append(meta);
+    // what it is: the name, where it stands, and what it sounds like
+    const info = el("div", "sp-info");
+    const shownTitle = song.published ? song.pageTitle : song.title;
+    const title = el("h3", "sp-title", shownTitle);
+    title.title = shownTitle;
+    const artist = el("p", "sp-artist", (song.published ? song.pageArtist : song.artist) || "Unknown artist");
+    const tags = el("div", "sp-tags");
+    tags.append(song.published ? tag("Published", "ok", "This song has a public page") : tag("Not published", "", "No public page yet"));
+    if (fresh) tags.append(tag("New", "new", "Chordified in the last 24 hours"));
+    if (song.edited) tags.append(tag("Edited by hand", "violet", "An editor or a listener changed its chords or strumming"));
+    else if (!song.analysed) tags.append(tag("Older analysis", "warn", "Made by an older detector. Re-analyse it to use the latest one."));
+    if (song.strumEdit === false) tags.append(tag("Strumming edits off", "off", "Listeners cannot change this song's strumming"));
 
-    const acts = el("div", "sp-acts");
+    const facts = el("dl", "sp-facts");
+    const fact = (name: string, value: string, hint = "") => {
+      const wrap = el("div");
+      const dd = el("dd", "", value);
+      if (hint) dd.title = hint;
+      wrap.append(el("dt", "", name), dd);
+      facts.append(wrap);
+    };
+    fact("Key", song.key || "—");
+    fact("Tempo", song.tempo ? `${Math.round(song.tempo)} BPM` : "—");
+    fact("Plays", number(song.jams));
+    fact("Chordified", song.chordifiedAt ? ago(song.chordifiedAt) : "—", song.chordifiedAt ? fullDate(song.chordifiedAt) : "");
+
+    info.append(title, artist, tags, facts);
+    if (song.chords.length > 0) {
+      const chords = el("div", "sp-chords");
+      chords.setAttribute("aria-label", "Main chords");
+      for (const chord of song.chords.slice(0, 8)) chords.append(el("span", "", chord));
+      info.append(chords);
+    }
+
+    // the page's own words (shown when the Publish / Edit page button is pressed)
     const edit = el("div", "sp-edit");
     edit.hidden = true;
-
-    const title = el("input");
-    title.type = "text";
-    title.maxLength = 120;
-    title.value = song.published ? song.pageTitle : song.title;
-    const artist = el("input");
-    artist.type = "text";
-    artist.maxLength = 120;
-    artist.value = song.published ? song.pageArtist : song.artist;
+    const nameInput = el("input");
+    nameInput.type = "text";
+    nameInput.maxLength = 120;
+    nameInput.value = song.published ? song.pageTitle : song.title;
+    const artistInput = el("input");
+    artistInput.type = "text";
+    artistInput.maxLength = 120;
+    artistInput.value = song.published ? song.pageArtist : song.artist;
     const slug = el("input");
     slug.type = "text";
     slug.maxLength = 100;
@@ -311,7 +512,7 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
     slug.addEventListener("input", () => (url.textContent = `https://chordsuno.com/songs/${slug.value || "…"}/`));
 
     const two = el("div", "two");
-    two.append(field("Song name (as the page should show it)", title), field("Artist", artist));
+    two.append(field("Song name (as the page should show it)", nameInput), field("Artist", artistInput));
     const save = el("button", "adm-btn small", song.published ? "Save changes" : "Publish page");
     save.type = "button";
     save.addEventListener("click", async () => {
@@ -319,7 +520,7 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
       try {
         const done = await adminFetch(`/api/admin/song-pages/${encodeURIComponent(song.videoId)}`, {
           method: "PUT",
-          body: JSON.stringify({ title: title.value, artist: artist.value, slug: slug.value, intro: intro.value() }),
+          body: JSON.stringify({ title: nameInput.value, artist: artistInput.value, slug: slug.value, intro: intro.value() }),
         });
         say("msg", `Published at ${done.url}`, "ok");
         await load();
@@ -330,57 +531,55 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
     });
     edit.append(two, field("Page address", slug), url, intro.el, save);
 
-    const toggle = el("button", `adm-btn small ${song.published ? "ghost" : ""}`, song.published ? "Edit" : "Publish…");
-    toggle.type = "button";
-    toggle.addEventListener("click", () => (edit.hidden = !edit.hidden));
-    const publishes = can("song_pages.manage");
+    // the buttons: the main job (edit the chords), the public page, and below them the less common ones
+    const actions = el("div", "sp-actions");
     if (can("songs.edit")) {
-      const chords = el("a", "adm-btn small", "Edit chords");
-      chords.href = `/admin/song-edit/?v=${encodeURIComponent(song.videoId)}`;
-      chords.title = "Move chords between cells, change the strumming, go back to an earlier version";
-      chords.style.cssText = "display:inline-flex;align-items:center;text-decoration:none";
-      acts.append(chords);
+      const chordsBtn = el("a", "adm-btn", "Edit chords");
+      chordsBtn.href = `/admin/song-edit/?v=${encodeURIComponent(song.videoId)}`;
+      chordsBtn.title = "Move chords between cells, change the strumming, go back to an earlier version";
+      actions.append(chordsBtn);
     }
+    const publishes = can("song_pages.manage");
+    if (publishes) {
+      const toggle = el("button", `adm-btn ${song.published ? "ghost" : "ghost"}`, song.published ? "Edit page" : "Publish page…");
+      toggle.type = "button";
+      toggle.setAttribute("aria-expanded", "false");
+      toggle.addEventListener("click", () => {
+        edit.hidden = !edit.hidden;
+        toggle.setAttribute("aria-expanded", String(!edit.hidden));
+      });
+      actions.append(toggle);
+    } else edit.remove();
+
+    const foot = el("div", "sp-foot");
     if (can("songs.edit")) {
       // may signed-in listeners change this song's strumming from the player? (on unless switched off here)
-      acts.append(
+      foot.append(
         strumSwitch(
           song.videoId,
           song.strumEdit !== false,
-          (on) => say("msg", `${on ? "Listeners can now edit" : "Listeners can no longer edit"} the strumming of “${song.title}”.`, "ok"),
+          (on) => {
+            song.strumEdit = on;
+            const gone = tags.querySelector(".sp-tag.off");
+            if (on) gone?.remove();
+            else if (!gone) tags.append(tag("Strumming edits off", "off", "Listeners cannot change this song's strumming"));
+            say("msg", `${on ? "Listeners can now edit" : "Listeners can no longer edit"} the strumming of “${song.title}”.`, "ok");
+          },
           (message) => say("msg", message, "bad"),
         ),
       );
     }
-    if (publishes) acts.append(toggle);
-    else edit.remove();
+    const links = el("div", "sp-links");
     if (song.published) {
-      const view = el("a", "adm-btn ghost small", "View page");
+      const view = el("a", "sp-link", "View page ↗");
       view.href = `/songs/${song.slug}/`;
       view.target = "_blank";
       view.rel = "noopener";
-      view.style.cssText = "display:inline-flex;align-items:center;text-decoration:none";
-      const off = el("button", "adm-btn danger small", "Unpublish");
-      off.type = "button";
-      off.addEventListener("click", async () => {
-        if (!confirm(`Unpublish “${song.pageTitle}”? Its page stops working and leaves the sitemap; search engines drop it over time.`)) return;
-        off.disabled = true;
-        try {
-          await adminFetch(`/api/admin/song-pages/${encodeURIComponent(song.videoId)}`, { method: "DELETE" });
-          say("msg", `“${song.pageTitle}” is unpublished.`, "ok");
-          await load();
-        } catch (err) {
-          say("msg", err instanceof Error ? err.message : "Could not unpublish that.", "bad");
-          off.disabled = false;
-        }
-      });
-      acts.append(view);
-      if (publishes) acts.append(off);
+      links.append(view);
     }
-
     if (can("songs.reanalyse")) {
       // Runs the current detector on the song again (it needs the audio from YouTube). The chords it replaces are kept as a version.
-      const again = el("button", "adm-btn ghost small", "Re-analyse");
+      const again = el("button", "sp-link", "Re-analyse");
       again.type = "button";
       again.title = "Run the latest chord detector on this song again; the version it replaces is kept";
       again.addEventListener("click", async () => {
@@ -395,61 +594,120 @@ import AdminLayout from "../../layouts/AdminLayout.astro";
           again.disabled = false;
         }
       });
-      acts.append(again);
+      links.append(again);
     }
+    if (song.published && publishes) {
+      const off = el("button", "sp-link is-danger", "Unpublish");
+      off.type = "button";
+      off.addEventListener("click", async () => {
+        if (!confirm(`Unpublish “${song.pageTitle}”? Its page stops working and leaves the sitemap; search engines drop it over time.`)) return;
+        off.disabled = true;
+        try {
+          await adminFetch(`/api/admin/song-pages/${encodeURIComponent(song.videoId)}`, { method: "DELETE" });
+          say("msg", `“${song.pageTitle}” is unpublished.`, "ok");
+          await load();
+        } catch (err) {
+          say("msg", err instanceof Error ? err.message : "Could not unpublish that.", "bad");
+          off.disabled = false;
+        }
+      });
+      links.append(off);
+    }
+    if (links.children.length > 0) foot.append(links);
 
-    const line = el("div", "sp-line");
-    line.append(img, name, acts);
-    box.append(line, edit);
+    const main = el("div", "sp-main");
+    main.append(thumb, info);
+    if (actions.children.length > 0) main.append(actions);
+    box.append(main, foot, edit);
     return box;
+  }
+
+  /** What the list says when nothing matches, in terms of the filters that are on. */
+  function emptyText(): string {
+    if (query) return `No song matches “${query}”${filtered() && (status !== "all" || when !== "all" || flag) ? " with these filters" : ""}.`;
+    const bits = [
+      flag ? flagLabel[flag] : "",
+      status === "published" ? "published" : status === "unpublished" ? "not published" : "",
+      when !== "all" ? `chordified ${label[when]}` : "",
+    ].filter(Boolean);
+    if (bits.length > 0) return `No song is ${bits.join(" and ")}.`;
+    return "No song has been chordified yet. Songs appear here once somebody has opened them.";
   }
 
   async function load() {
     const mine = ++latest;
+    rows.setAttribute("aria-busy", "true");
+    if (rows.children.length === 0) rows.replaceChildren(...Array.from({ length: 3 }, () => el("div", "sp-skel")));
     try {
       const data = await adminFetch(
-        `/api/admin/song-pages?search=${encodeURIComponent(query)}&page=${page}&pageSize=${SIZE}&status=${status}&since=${range().since}&until=${range().until}`,
+        `/api/admin/song-pages?search=${encodeURIComponent(query)}&page=${page}&pageSize=${SIZE}&status=${status}&since=${range().since}&until=${range().until}&sort=${sort}&flag=${flag}`,
       );
       if (mine !== latest) return;
       rows.replaceChildren(...data.songs.map(item));
+      rows.removeAttribute("aria-busy");
       const pages = Math.max(1, Math.ceil(data.total / SIZE));
-      countEl.textContent = `${number(data.total)} song${data.total === 1 ? "" : "s"} · ${number(data.published)} published`;
+      const from = data.total === 0 ? 0 : (page - 1) * SIZE + 1;
+      const to = Math.min(page * SIZE, data.total);
+      countEl.replaceChildren(
+        data.total === 0 ? "No songs" : `Showing `,
+        ...(data.total === 0 ? [] : [el("strong", "", `${number(from)}–${number(to)}`), ` of `, el("strong", "", number(data.total)), ` song${data.total === 1 ? "" : "s"}`]),
+        filtered() ? " (filtered)" : "",
+      );
+      if (data.counts) {
+        document.getElementById("n-all")!.textContent = number(data.counts.all);
+        document.getElementById("n-published")!.textContent = number(data.counts.published);
+        document.getElementById("n-unpublished")!.textContent = number(data.counts.notPublished);
+      }
       pageEl.textContent = `Page ${page} of ${pages}`;
       prev.disabled = page <= 1;
       next.disabled = page >= pages;
-      empty.hidden = data.songs.length > 0;
-      empty.textContent = query
-        ? `No song matches “${query}”.`
-        : status === "published"
-          ? `No published song${when === "all" ? " yet" : ` was chordified ${label[when]}`}.`
-          : status === "unpublished"
-            ? `Every song${when === "all" ? "" : ` chordified ${label[when]}`} is published.`
-            : when !== "all"
-              ? `No song was chordified ${label[when]}.`
-              : "No song has been chordified yet. Songs appear here once somebody has opened them.";
+      emptyBox.hidden = data.songs.length > 0;
+      emptyReset.hidden = !filtered();
+      empty.textContent = emptyText();
     } catch (err) {
+      if (mine === latest) rows.replaceChildren();
       say("msg", err instanceof Error ? err.message : "Could not load the songs.", "bad");
     }
   }
 
   let timer: number | undefined;
   search.addEventListener("input", () => {
+    syncFilterUi();
     window.clearTimeout(timer);
     timer = window.setTimeout(() => {
       query = search.value.trim();
       page = 1;
+      syncFilterUi();
       load();
     }, 250);
   });
-  bind(statusBar, (v) => (status = v));
-  bind(whenBar, (v) => (when = v));
+  clearSearch.addEventListener("click", () => {
+    search.value = "";
+    query = "";
+    page = 1;
+    syncFilterUi();
+    load();
+    search.focus();
+  });
+  sortEl.addEventListener("change", () => {
+    sort = sortEl.value;
+    page = 1;
+    load();
+  });
+  bind(statusBar, () => status, (v) => (status = v || "all"));
+  bind(whenBar, () => when, (v) => (when = v || "all"));
+  bind(flagBar, () => flag, (v) => (flag = v), true);
+  resetBtn.addEventListener("click", resetFilters);
+  emptyReset.addEventListener("click", resetFilters);
   prev.addEventListener("click", () => {
     page -= 1;
     load();
+    window.scrollTo({ top: 0, behavior: "smooth" });
   });
   next.addEventListener("click", () => {
     page += 1;
     load();
+    window.scrollTo({ top: 0, behavior: "smooth" });
   });
 
   adminReady().then(load);
