@@ -2,6 +2,19 @@
 
 import { spectrum } from "./chroma";
 
+// The tuner asks for the spectrum of the same stretch of sound three times in a tick (which string, how in tune, is it a string at
+// all); this keeps the last one so it is worked out once. The stretch is recognised by a fingerprint of its samples, since the
+// microphone's buffer is the same array refilled each time.
+let memo: { fingerprint: number; n: number; mag: Float32Array } | null = null;
+function spectrumOf(buf: Float32Array, n: number): Float32Array {
+  let fingerprint = buf.length;
+  for (let i = 0; i < buf.length; i += 61) fingerprint += buf[i] * (1 + (i % 7));
+  if (memo && memo.n === n && memo.fingerprint === fingerprint) return memo.mag;
+  const mag = spectrum(buf, n);
+  memo = { fingerprint, n, mag };
+  return mag;
+}
+
 export interface Pitch {
   freq: number; // Hz
   clarity: number; // 0 to 1: how clean and steady the note is
@@ -80,7 +93,7 @@ export function detectPitch(buf: Float32Array, sampleRate: number, fmin = 50, fm
  */
 export function pickFundamental(buf: Float32Array, sampleRate: number, freq: number, fmin: number, fmax: number): number {
   const n = 16384;
-  const mag = spectrum(buf, n);
+  const mag = spectrumOf(buf, n);
   const binHz = sampleRate / n;
   const at = (hz: number) => {
     const centre = Math.round(hz / binHz);
@@ -162,7 +175,7 @@ export function fundamentalOffset(points: { h: number; c: number; w: number }[],
  */
 export function matchString(buf: Float32Array, sampleRate: number, strings: number[], a4: number, yin: number | null, only: number | null = null): number | null {
   const n = 16384;
-  const mag = spectrum(buf, n);
+  const mag = spectrumOf(buf, n);
   const binHz = sampleRate / n;
   const lo = Math.max(2, Math.floor(50 / binHz));
   const hi = Math.min(mag.length - 2, Math.floor(2400 / binHz));
@@ -234,6 +247,40 @@ export function matchString(buf: Float32Array, sampleRate: number, strings: numb
     if (near) return near.midi + near.cents / 100;
   }
   return null;
+}
+
+/**
+ * How much the sound is a plucked string: a string's energy sits in a series of peaks at 1, 2, 3, 4... times its pitch, and nearly
+ * all of it does. A drum's sound is a thump (one low peak that slides down as it dies away) or a rush of noise, and a drum
+ * membrane's overtones are not whole multiples of its pitch. `share` is the part of the sound's energy that lies on the series of
+ * `f0` (0 to 1); `present` is how many of its first six overtones stand clearly above the rest.
+ */
+export function harmonicShape(buf: Float32Array, sampleRate: number, f0: number): { share: number; present: number } {
+  const n = 16384;
+  const mag = spectrumOf(buf, n);
+  const binHz = sampleRate / n;
+  const lo = Math.max(2, Math.floor(50 / binHz));
+  const hi = Math.min(mag.length - 2, Math.floor(3000 / binHz));
+  let top = 0;
+  let total = 0;
+  for (let j = lo; j <= hi; j++) {
+    total += mag[j] * mag[j];
+    if (mag[j] > top) top = mag[j];
+  }
+  if (top === 0 || total === 0) return { share: 0, present: 0 };
+  let on = 0;
+  let present = 0;
+  for (let h = 1; h <= 12 && h * f0 <= 3000; h++) {
+    const centre = (h * f0) / binHz;
+    const reach = Math.max(2, (h * f0 * 0.025) / binHz);
+    let best = 0;
+    for (let j = Math.max(lo, Math.ceil(centre - reach)); j <= Math.min(hi, Math.floor(centre + reach)); j++) {
+      on += mag[j] * mag[j];
+      if (mag[j] > best) best = mag[j];
+    }
+    if (h <= 6 && best >= 0.1 * top) present++;
+  }
+  return { share: Math.min(1, on / total), present };
 }
 
 // ---- notes ---------------------------------------------------------------------------------------------------------

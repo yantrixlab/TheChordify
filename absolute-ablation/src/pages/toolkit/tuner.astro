@@ -283,9 +283,9 @@ import ToolShell from "../../components/ToolShell.astro";
 </style>
 
 <script>
-  import { INSTRUMENTS, analysisSize, detectPitch, matchString, pickFundamental, freqFromMidi, midiFromName, noteFromFreq, type Instrument } from "../../lib/tools/pitch";
+  import { INSTRUMENTS, analysisSize, detectPitch, harmonicShape, matchString, pickFundamental, freqFromMidi, midiFromName, noteFromFreq, type Instrument } from "../../lib/tools/pitch";
   import { MicError, NoiseGate, SILENT_MIC_TEXT, SilenceWatch, audioContext, fillMicPicker, levelPercent, openMic, resumeAudio, rms, type Mic } from "../../lib/tools/audio";
-  import { StringTracker } from "../../lib/tools/tracker";
+  import { StringGuard, StringTracker } from "../../lib/tools/tracker";
   import { initGate } from "../../lib/tools/gate";
   import { AXIS_X, BOARD_W, GAUGE_Y, HEAD_TOP, buttonNote, instrumentTitle, layoutFor, tuningRows, type Layout } from "../../lib/tools/tunerLayout";
   import { toast } from "../../lib/toast";
@@ -425,6 +425,7 @@ import ToolShell from "../../components/ToolShell.astro";
 
   // ---- the gauge: a bubble that slides along the line, a trail of where it has been ---------------------------------------------
   const tracker = new StringTracker({ strings: [], target: null, tol: 5 });
+  const guard = new StringGuard(); // only a played string moves the gauge: a drum, a clap or a voice does not
   const bubble = $("tt-bubble");
   const tag = $("tt-tag");
   const centsEl = $("tt-cents");
@@ -569,6 +570,7 @@ import ToolShell from "../../components/ToolShell.astro";
 
   function syncTracker() {
     tracker.opts = { strings: strings(), target: prefs.auto ? null : target, tol: prefs.tol };
+    guard.reset();
     tracker.release();
     paintStates();
   }
@@ -802,6 +804,7 @@ import ToolShell from "../../components/ToolShell.astro";
     paintNote();
   }
   function release() {
+    guard.reset();
     tracker.release();
     tunedFor = 0;
     paintStates();
@@ -875,12 +878,19 @@ import ToolShell from "../../components/ToolShell.astro";
     let pitch = open ? detectPitch(buf, sr, inst.fmin, inst.fmax) : null;
     if (pitch && pitch.clarity < 0.75) pitch = null;
     if (pitch) {
-      lastHeard = now;
       // which string is sounding comes from the spectrum, so a string ringing in sympathy cannot take over
       const list = strings();
       let m = list.length ? matchString(buf, sr, list, prefs.a4, pitch.freq, prefs.auto ? null : target) : null;
       if (m === null) m = 69 + 12 * Math.log2(pickFundamental(buf, sr, pitch.freq, inst.fmin, inst.fmax) / prefs.a4);
-      consider(m, pitch.clarity);
+      // is it a string at all? (a steady pitch with its overtone series; any note is let through on steadiness alone)
+      const shape = list.length ? harmonicShape(buf, sr, freqFromMidi(m, prefs.a4)) : { share: 1, present: 6 };
+      const pass = guard.push(m, pitch.clarity, shape.share, shape.present, now);
+      if (pass.length) lastHeard = now;
+      for (const reading of pass) consider(reading, pitch.clarity);
+      if (!pass.length && tracker.lock >= 0 && now - lastHeard > 700) {
+        release();
+        setHint(announced ? "All strings in tune!" : idleHint());
+      }
     } else if (tracker.lock >= 0 && now - lastHeard > 700) {
       release();
       setHint(announced ? "All strings in tune!" : idleHint());

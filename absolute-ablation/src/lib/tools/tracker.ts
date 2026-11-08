@@ -159,3 +159,57 @@ export class StringTracker {
     this.recent = [];
   }
 }
+
+/**
+ * Lets only a played string through to the tracker. A drum (a tom or a kick especially) has a pitch too, and for a moment the
+ * detector finds it; so does a clap, a cough or a word. What sets a string apart is that it keeps one steady pitch, and that nearly
+ * all of its sound lies on the series of overtones at 1, 2, 3, 4... times that pitch (a drum's overtones are not whole multiples,
+ * and its pitch slides as it dies away). So a sound is believed to be a string once several readings in a row agree on the pitch
+ * and each shows that series; after that it is believed until the pitch jumps, the series is lost or the sound stops.
+ */
+export class StringGuard {
+  private seq: { m: number; t: number }[] = [];
+  private open = false;
+
+  /**
+   * One reading: the pitch (a midi number with a fraction), how clean it is (0 to 1), the share of the sound on the overtone series
+   * (0 to 1) and how many of the first six overtones are present. Returns the readings to hand on to the tracker, which is
+   * several of them at the moment a string is first believed, then one at a time, and none while the sound is not a string.
+   */
+  push(m: number, clarity: number, share: number, present: number, now: number): number[] {
+    const last = this.seq[this.seq.length - 1];
+    if (last && now - last.t > 160) this.reset(); // a pause: whatever comes next is a new sound
+    if (this.open) {
+      const near = Math.abs(m - this.centre()) <= 0.6;
+      if (clarity < 0.7 || share < 0.55 || present < 1 || !near) {
+        this.reset();
+        return [];
+      }
+      this.seq.push({ m, t: now });
+      if (this.seq.length > 6) this.seq.shift();
+      return [m];
+    }
+    if (clarity < 0.8 || share < 0.78 || present < 2) {
+      this.seq = [];
+      return [];
+    }
+    this.seq.push({ m, t: now });
+    if (this.seq.length > 6) this.seq.shift();
+    if (this.seq.length < 4) return [];
+    const recent = this.seq.slice(-4).map((r) => r.m);
+    if (Math.max(...recent) - Math.min(...recent) > 0.3) return []; // still sliding: a drum, a voice, a hand on the string
+    this.open = true;
+    return recent;
+  }
+
+  /** The pitch the recent readings agree on. */
+  private centre(): number {
+    const ms = this.seq.map((r) => r.m).sort((a, b) => a - b);
+    return ms[ms.length >> 1];
+  }
+
+  reset() {
+    this.seq = [];
+    this.open = false;
+  }
+}
