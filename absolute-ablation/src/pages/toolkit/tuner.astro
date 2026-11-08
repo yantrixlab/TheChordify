@@ -337,9 +337,6 @@ import ToolShell from "../../components/ToolShell.astro";
     if (layout.picture) {
       const p = layout.picture;
       const picture = document.createElement("picture");
-      const source = document.createElement("source");
-      source.type = "image/avif";
-      source.srcset = p.avif;
       const img = document.createElement("img");
       img.src = p.webp;
       img.alt = "";
@@ -347,7 +344,13 @@ import ToolShell from "../../components/ToolShell.astro";
       img.height = p.h;
       img.decoding = "async";
       picture.style.cssText = `left:${pctX(p.x)};top:${pctY(p.y)};width:${(p.w / BOARD_W) * 100}%`;
-      picture.append(source, img);
+      if (p.avif) {
+        const source = document.createElement("source");
+        source.type = "image/avif";
+        source.srcset = p.avif;
+        picture.append(source);
+      }
+      picture.append(img);
       art.append(picture);
     } else if (layout.drawn) {
       art.insertAdjacentHTML("beforeend", layout.drawn);

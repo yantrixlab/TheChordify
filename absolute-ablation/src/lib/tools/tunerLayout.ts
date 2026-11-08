@@ -30,7 +30,7 @@ export interface Layout {
   kind: HeadKind;
   height: number; // the board's height in units
   nutY: number;
-  picture?: { avif: string; webp: string; x: number; y: number; w: number; h: number; label: string };
+  picture?: { avif?: string; webp: string; x: number; y: number; w: number; h: number; label: string };
   /** For a drawn headstock: SVG to put on the board (an instrument with no picture). */
   drawn?: string;
   strings: StringSpot[];
@@ -40,15 +40,17 @@ export interface Layout {
 
 const move = (dx: number, dy: number, p: Point): Point => ({ x: p.x + dx, y: p.y + dy });
 
-// the acoustic picture is 411 x 770 and its nut centre is at x = 205.5, so it is put at x = 144.5 to bring that onto the board's axis
-const ACOUSTIC = { dx: AXIS_X - 205.5, dy: HEAD_TOP, w: 411, h: 770, cropAt: 690 };
+// the acoustic picture (acoustic-guitar.webp) is 822 x 1495 pixels, drawn 411 x 747.5 units; its nut centre is at x = 205.5, so it is put at
+// x = 144.5 to bring that onto the board's axis. The positions below were measured on it, in the picture's own units (pixels / 2).
+const ACOUSTIC = { dx: AXIS_X - 205.5, dy: HEAD_TOP, w: 411, h: 747.5, cropAt: 668 };
+// each string's line was fitted to the string in the picture: where it leaves its pin and where it crosses the nut
 const ACOUSTIC_STRINGS: { post: Point; nut: Point; peg: Point; side: "left" | "right" }[] = [
-  { post: { x: 113, y: 382 }, nut: { x: 137, y: 595 }, peg: { x: 37, y: 376 }, side: "left" }, // E2
-  { post: { x: 117, y: 254 }, nut: { x: 165, y: 595 }, peg: { x: 40, y: 256 }, side: "left" }, // A2
-  { post: { x: 111, y: 122 }, nut: { x: 192, y: 595 }, peg: { x: 35, y: 133 }, side: "left" }, // D3
-  { post: { x: 300, y: 124 }, nut: { x: 220, y: 595 }, peg: { x: 376, y: 135 }, side: "right" }, // G3
-  { post: { x: 294, y: 254 }, nut: { x: 247, y: 595 }, peg: { x: 369, y: 256 }, side: "right" }, // B3
-  { post: { x: 299, y: 382 }, nut: { x: 274, y: 595 }, peg: { x: 376, y: 379 }, side: "right" }, // E4
+  { post: { x: 122.3, y: 364 }, nut: { x: 146.3, y: 572.5 }, peg: { x: 31, y: 365 }, side: "left" }, // E2
+  { post: { x: 124.8, y: 254 }, nut: { x: 168, y: 572.5 }, peg: { x: 35, y: 258.5 }, side: "left" }, // A2
+  { post: { x: 123, y: 142.5 }, nut: { x: 191.2, y: 572.5 }, peg: { x: 30, y: 154 }, side: "left" }, // D3
+  { post: { x: 287.9, y: 140.5 }, nut: { x: 222.3, y: 572.5 }, peg: { x: 381, y: 154 }, side: "right" }, // G3
+  { post: { x: 286, y: 253.5 }, nut: { x: 246.1, y: 572.5 }, peg: { x: 376, y: 257.5 }, side: "right" }, // B3
+  { post: { x: 290.3, y: 363.5 }, nut: { x: 267.4, y: 572.5 }, peg: { x: 382.5, y: 365 }, side: "right" }, // E4
 ];
 
 // the electric picture is 607 x 882, nut centre at x = 277.5, all six tuners on one side
@@ -68,8 +70,8 @@ function guitarLayout(kind: "acoustic" | "electric"): Layout {
     return {
       kind,
       height: dy + cropAt,
-      nutY: 595 + dy,
-      picture: { avif: "/tuner/acoustic-headstock.avif", webp: "/tuner/acoustic-headstock.webp", x: dx, y: dy, w, h, label: "An acoustic guitar's headstock with six tuning pegs" },
+      nutY: 572.5 + dy,
+      picture: { webp: "/tuner/acoustic-guitar.webp", x: dx, y: dy, w, h, label: "An acoustic guitar's headstock with six tuning pegs" },
       strings: ACOUSTIC_STRINGS.map((s) => ({
         post: move(dx, dy, s.post),
         nut: move(dx, dy, s.nut),
