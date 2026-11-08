@@ -552,7 +552,7 @@ import ToolShell from "../../components/ToolShell.astro";
     const dt = lastFrame ? Math.min(0.1, (t - lastFrame) / 1000) : 0.016;
     lastFrame = t;
     const lock = tracker.lock;
-    const goal = lock >= 0 ? tracker.cents : 0;
+    const goal = lock >= 0 && !tracker.ok ? tracker.cents : 0; // in tune: the bubble settles on the line, however far inside the margin the string is
     [shown, speed] = reduced ? [goal, 0] : glide(shown, goal, speed, lock >= 0 ? 0.3 : 0.5, dt);
     bubble.style.left = bubbleLeft(shown);
     if (lock >= 0 && signal > 0 && t - lastTrail > 38) {
