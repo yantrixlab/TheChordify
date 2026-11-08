@@ -53,15 +53,16 @@ const ACOUSTIC_STRINGS: { post: Point; nut: Point; peg: Point; side: "left" | "r
   { post: { x: 290.3, y: 363.5 }, nut: { x: 267.4, y: 572.5 }, peg: { x: 382.5, y: 365 }, side: "right" }, // E4
 ];
 
-// the electric picture is 607 x 882, nut centre at x = 277.5, all six tuners on one side
-const ELECTRIC = { dx: AXIS_X - 277.5, dy: HEAD_TOP, w: 607, h: 882, cropAt: 700 };
+// the electric picture (electric-guitar.webp) is 668 x 1497 pixels, drawn 334 x 748.5 units, with all six tuners on one side. It is put so that the
+// middle of its nut (x = 163.4) is on the board's axis. Positions were measured on it (pixels / 2); each string's line was fitted to the string.
+const ELECTRIC = { dx: AXIS_X - 163.4, dy: HEAD_TOP, w: 334, h: 748.5, cropAt: 660 };
 const ELECTRIC_STRINGS: { post: Point; nut: Point; peg: Point }[] = [
-  { post: { x: 205, y: 517 }, nut: { x: 223, y: 643 }, peg: { x: 150, y: 483 } }, // E2
-  { post: { x: 229, y: 448 }, nut: { x: 247, y: 643 }, peg: { x: 175, y: 413 } }, // A2
-  { post: { x: 252, y: 379 }, nut: { x: 268, y: 643 }, peg: { x: 195, y: 347 } }, // D3
-  { post: { x: 273, y: 311 }, nut: { x: 289, y: 643 }, peg: { x: 217, y: 283 } }, // G3
-  { post: { x: 295, y: 237 }, nut: { x: 310, y: 643 }, peg: { x: 238, y: 215 } }, // B3
-  { post: { x: 315, y: 168 }, nut: { x: 332, y: 643 }, peg: { x: 260, y: 143 } }, // E4
+  { post: { x: 104, y: 447.5 }, nut: { x: 111.5, y: 575 }, peg: { x: 32.5, y: 421 } }, // E2
+  { post: { x: 125, y: 376 }, nut: { x: 131.7, y: 575 }, peg: { x: 54, y: 352.5 } }, // A2
+  { post: { x: 146.8, y: 306 }, nut: { x: 152, y: 575 }, peg: { x: 75, y: 283.5 } }, // D3
+  { post: { x: 168.5, y: 236 }, nut: { x: 172, y: 575 }, peg: { x: 97.5, y: 214 } }, // G3
+  { post: { x: 190.8, y: 167.5 }, nut: { x: 194.8, y: 575 }, peg: { x: 120, y: 145 } }, // B3
+  { post: { x: 212.8, y: 95 }, nut: { x: 215.3, y: 575 }, peg: { x: 142.5, y: 77.5 } }, // E4
 ];
 
 function guitarLayout(kind: "acoustic" | "electric"): Layout {
@@ -84,13 +85,13 @@ function guitarLayout(kind: "acoustic" | "electric"): Layout {
   return {
     kind,
     height: dy + cropAt,
-    nutY: 643 + dy,
-    picture: { avif: "/tuner/electric-headstock.avif", webp: "/tuner/electric-headstock.webp", x: dx, y: dy, w, h, label: "An electric guitar's headstock with six tuning pegs in a row" },
+    nutY: 575 + dy,
+    picture: { webp: "/tuner/electric-guitar.webp", x: dx, y: dy, w, h, label: "An electric guitar's headstock with six tuning pegs in a row" },
     strings: ELECTRIC_STRINGS.map((s) => ({
       post: move(dx, dy, s.post),
       nut: move(dx, dy, s.nut),
       peg: move(dx, dy, s.peg),
-      button: { x: 92, y: s.peg.y + dy },
+      button: { x: 140, y: s.peg.y + dy },
     })),
   };
 }
