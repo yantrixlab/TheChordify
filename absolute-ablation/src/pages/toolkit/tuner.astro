@@ -286,6 +286,7 @@ import ToolShell from "../../components/ToolShell.astro";
   import { INSTRUMENTS, analysisSize, detectPitch, harmonicShape, matchString, pickFundamental, freqFromMidi, midiFromName, noteFromFreq, type Instrument } from "../../lib/tools/pitch";
   import { MicError, NoiseGate, SILENT_MIC_TEXT, SilenceWatch, audioContext, fillMicPicker, levelPercent, openMic, resumeAudio, rms, type Mic } from "../../lib/tools/audio";
   import { StringGuard, StringTracker } from "../../lib/tools/tracker";
+  import { sampleFor } from "../../lib/tools/guitarSamples";
   import { initGate } from "../../lib/tools/gate";
   import { AXIS_X, BOARD_W, GAUGE_Y, HEAD_TOP, buttonNote, instrumentTitle, layoutFor, tuningRows, type Layout } from "../../lib/tools/tunerLayout";
   import { toast } from "../../lib/toast";
@@ -410,7 +411,7 @@ import ToolShell from "../../components/ToolShell.astro";
       syncTracker();
       drawTargetHints();
     }
-    void playTone(freqFromMidi(midi, prefs.a4));
+    void playString(midi);
     const b = spots[i].button;
     b.classList.remove("pop");
     void b.offsetWidth;
@@ -664,6 +665,7 @@ import ToolShell from "../../components/ToolShell.astro";
     syncTracker();
     placeholders();
     setHint(idleHint());
+    preloadSamples();
   }
   $("tt-back").addEventListener("click", () => {
     panelView = "instruments";
@@ -691,6 +693,7 @@ import ToolShell from "../../components/ToolShell.astro";
       drawKind();
       buildBoard();
       syncTracker();
+      preloadSamples();
     }),
   );
   const drawKind = () => all<HTMLButtonElement>("#tt-kind button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.kind === prefs.head)));
@@ -764,6 +767,58 @@ import ToolShell from "../../components/ToolShell.astro";
       });
       quietUntil = performance.now() + (notes.length - 1) * gap * 1000 + (all ? 1500 : 1000);
     } catch { /* no audio: the tuner works without the chime */ }
+  }
+
+  // ---- the string's note: a recording of a real guitar (the headstock that is shown, acoustic or electric), else a plain tone ----------
+  const samples = new Map<string, Promise<AudioBuffer | null>>();
+  function loadSample(kind: string, name: string): Promise<AudioBuffer | null> {
+    const key = `${kind}-${name}`;
+    let found = samples.get(key);
+    if (!found) {
+      found = (async () => {
+        try {
+          const response = await fetch(`/tuner/sounds/${key}.mp3`);
+          if (!response.ok) return null;
+          const ctx = await resumeAudio();
+          return await ctx.decodeAudioData(await response.arrayBuffer());
+        } catch {
+          return null;
+        }
+      })();
+      samples.set(key, found);
+    }
+    return found;
+  }
+  /** Fetches the recordings of the guitar on show in the background, so the first press of a string plays at once. */
+  function preloadSamples() {
+    if (!(instrument().id === "guitar" && strings().length === 6)) return;
+    for (const midi of strings()) {
+      const pick = sampleFor(midi, prefs.head, prefs.a4);
+      if (pick) void loadSample(prefs.head, pick.name);
+    }
+  }
+  async function playString(midi: number) {
+    if (instrument().id === "guitar" && strings().length === 6) {
+      const pick = sampleFor(midi, prefs.head, prefs.a4);
+      const buffer = pick ? await loadSample(prefs.head, pick.name) : null;
+      if (pick && buffer) {
+        const ctx = await resumeAudio();
+        tone?.stop();
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+        source.playbackRate.value = pick.rate;
+        const out = ctx.createGain();
+        out.gain.value = 0.9;
+        source.connect(out);
+        out.connect(ctx.destination);
+        source.start();
+        tone = { stop() { out.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.04); try { source.stop(ctx.currentTime + 0.3); } catch { /* already over */ } } };
+        // the tuner does not listen to its own speaker: the recording would be heard as a string being played (and be ticked off as tuned)
+        quietUntil = performance.now() + pick.seconds * 1000 + 300;
+        return;
+      }
+    }
+    void playTone(freqFromMidi(midi, prefs.a4));
   }
 
   // ---- a reference tone ------------------------------------------------------------------------------------------------------
@@ -946,6 +1001,7 @@ import ToolShell from "../../components/ToolShell.astro";
   drawKind();
   if (!INSTRUMENTS.some((i) => i.id === prefs.instrument)) prefs.instrument = "guitar";
   after();
+  preloadSamples();
   // draw once so the bubble and the note are in place before the microphone is on
   lastFrame = 0;
   requestAnimationFrame((t) => { frame(t); if (!mic) window.setTimeout(() => cancelAnimationFrame(anim), 400); });
