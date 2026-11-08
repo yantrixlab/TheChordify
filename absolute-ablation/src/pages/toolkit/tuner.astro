@@ -274,7 +274,7 @@ import ToolShell from "../../components/ToolShell.astro";
 </style>
 
 <script>
-  import { INSTRUMENTS, detectPitch, matchString, pickFundamental, freqFromMidi, midiFromName, noteFromFreq, type Instrument } from "../../lib/tools/pitch";
+  import { INSTRUMENTS, analysisSize, detectPitch, matchString, pickFundamental, freqFromMidi, midiFromName, noteFromFreq, type Instrument } from "../../lib/tools/pitch";
   import { MicError, NoiseGate, SILENT_MIC_TEXT, SilenceWatch, audioContext, fillMicPicker, levelPercent, openMic, resumeAudio, rms, type Mic } from "../../lib/tools/audio";
   import { StringTracker } from "../../lib/tools/tracker";
   import { initGate } from "../../lib/tools/gate";
@@ -544,7 +544,7 @@ import ToolShell from "../../components/ToolShell.astro";
     lastFrame = t;
     const lock = tracker.lock;
     const goal = lock >= 0 ? tracker.cents : 0;
-    [shown, speed] = reduced ? [goal, 0] : glide(shown, goal, speed, lock >= 0 ? 0.16 : 0.5, dt);
+    [shown, speed] = reduced ? [goal, 0] : glide(shown, goal, speed, lock >= 0 ? 0.3 : 0.5, dt);
     bubble.style.left = bubbleLeft(shown);
     if (lock >= 0 && signal > 0 && t - lastTrail > 38) {
       lastTrail = t;
@@ -630,7 +630,7 @@ import ToolShell from "../../components/ToolShell.astro";
     panelView = "tunings";
     save();
     after();
-    if (mic) mic.analyser.fftSize = instrument().fmin < 50 ? 8192 : 4096;
+    if (mic) mic.analyser.fftSize = analysisSize(instrument().fmin);
   }
   function chooseTuning(index: number) {
     prefs.tuning = index;
@@ -839,7 +839,7 @@ import ToolShell from "../../components/ToolShell.astro";
     const error = $("error");
     error.hidden = true;
     try {
-      mic = await openMic(instrument().fmin < 50 ? 8192 : 4096);
+      mic = await openMic(analysisSize(instrument().fmin));
     } catch (err) {
       error.textContent = err instanceof MicError ? err.message : "The microphone could not be started.";
       error.hidden = false;

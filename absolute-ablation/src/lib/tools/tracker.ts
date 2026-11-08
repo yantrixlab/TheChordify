@@ -78,6 +78,7 @@ export class StringTracker {
   }
 
   private settle(idx: number, cents: number, force = false, clarity = 1): boolean {
+    if (force || this.lock < 0 || idx !== this.lock) this.recent = [];
     if (force) {
       this.lock = idx;
       this.cents = cents;
@@ -121,9 +122,20 @@ export class StringTracker {
       this.outliers = 0;
     } else {
       this.outliers = 0;
-      this.cents += (cents - this.cents) * 0.35;
+      // the median of the last few readings, so one stray reading cannot move it, eased towards, so it glides rather than hops
+      const m = this.median(cents);
+      this.cents += (m - this.cents) * 0.3;
     }
     return this.judge(false);
+  }
+
+  private recent: number[] = [];
+
+  private median(next: number): number {
+    this.recent.push(next);
+    if (this.recent.length > 5) this.recent.shift();
+    const sorted = this.recent.slice().sort((x, y) => x - y);
+    return sorted[sorted.length >> 1];
   }
 
   private judge(changed: boolean): boolean {
@@ -144,5 +156,6 @@ export class StringTracker {
     this.candCount = 0;
     this.outliers = 0;
     this.jump = 0;
+    this.recent = [];
   }
 }

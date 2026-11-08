@@ -11,6 +11,13 @@ export interface Pitch {
  * The YIN method: how well the signal lines up with a copy of itself shifted by a candidate period. The shift where it lines up
  * best is one period of the note. Needs at least 2 * (sampleRate / fmin) samples to see the lowest note.
  */
+/**
+ * How many samples to listen to at once for an instrument whose lowest note is `fmin`. A longer stretch gives a steadier reading
+ * (a guitar's low E read from 85 ms of sound wanders by a few cents as the note dies away; from 170 ms it holds still), a shorter
+ * one reacts faster. Anything that goes below about 150 Hz gets the longer one.
+ */
+export const analysisSize = (fmin: number): number => (fmin < 150 ? 8192 : 4096);
+
 export function detectPitch(buf: Float32Array, sampleRate: number, fmin = 50, fmax = 1400): Pitch | null {
   const window = buf.length >> 1;
   const tauMin = Math.max(2, Math.floor(sampleRate / fmax));
