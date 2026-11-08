@@ -30,6 +30,8 @@ export interface Layout {
   kind: HeadKind;
   height: number; // the board's height in units
   nutY: number;
+  /** Where the line down the middle of the board stops: it runs from the top of the board down to the headstock, and a little under it. */
+  lineEnd: number;
   picture?: { avif?: string; webp: string; x: number; y: number; w: number; h: number; label: string };
   /** For a drawn headstock: SVG to put on the board (an instrument with no picture). */
   drawn?: string;
@@ -72,6 +74,7 @@ function guitarLayout(kind: "acoustic" | "electric"): Layout {
       kind,
       height: dy + cropAt,
       nutY: 572.5 + dy,
+      lineEnd: dy + 1.5 + 1.5, // the picture's top edge at the axis is 1.5 units down
       picture: { webp: "/tuner/acoustic-guitar.webp", x: dx, y: dy, w, h, label: "An acoustic guitar's headstock with six tuning pegs" },
       strings: ACOUSTIC_STRINGS.map((s) => ({
         post: move(dx, dy, s.post),
@@ -86,6 +89,7 @@ function guitarLayout(kind: "acoustic" | "electric"): Layout {
     kind,
     height: dy + cropAt,
     nutY: 575 + dy,
+    lineEnd: dy + 72.5 + 1.5, // the electric headstock's edge at the axis (the top tuner) is 72.5 units down: the line runs down to it
     picture: { webp: "/tuner/electric-guitar.webp", x: dx, y: dy, w, h, label: "An electric guitar's headstock with six tuning pegs in a row" },
     strings: ELECTRIC_STRINGS.map((s) => ({
       post: move(dx, dy, s.post),
@@ -155,13 +159,13 @@ function drawnLayout(count: number): Layout {
     ${neck}${stringLines}${posts}${knobs}
     <rect x="0" y="${fadeEnd - 1}" width="${BOARD_W}" height="1" fill="none"/>
   </svg>`;
-  return { kind: "generic", height, nutY, drawn, strings: spots };
+  return { kind: "generic", height, nutY, lineEnd: top + 2, drawn, strings: spots };
 }
 
 /** The board for an instrument: a guitar gets its picture (acoustic or electric), the others a drawn headstock, and "any note" has none. */
 export function layoutFor(inst: Instrument, tuning: Tuning, head: "acoustic" | "electric"): Layout {
   const n = tuning.notes.length;
-  if (n === 0) return { kind: "none", height: 360, nutY: 340, strings: [] };
+  if (n === 0) return { kind: "none", height: 360, nutY: 340, lineEnd: HEAD_TOP, strings: [] };
   if (inst.id === "guitar" && n === 6) return guitarLayout(head);
   return drawnLayout(n);
 }

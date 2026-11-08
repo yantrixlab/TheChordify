@@ -190,7 +190,7 @@ import ToolShell from "../../components/ToolShell.astro";
   .tt-end { font-size: max(12px, calc(20 * var(--u))); }
   .tt-end-l { left: calc(54 / 700 * 100%); }
   .tt-end-r { right: calc(54 / 700 * 100%); }
-  .tt-line { left: 50%; top: 0; bottom: 0; width: 2px; transform: translateX(-50%); background: #c3c8ea; opacity: 0.5; border-radius: 2px; -webkit-mask-image: linear-gradient(180deg, transparent, #000 14%); mask-image: linear-gradient(180deg, transparent, #000 14%); transition: background-color 0.25s, opacity 0.25s, box-shadow 0.25s; }
+  .tt-line { left: 50%; top: 0; height: calc(var(--lineend, 205) / var(--head, 205) * 100%); width: 2px; transform: translateX(-50%); background: #c3c8ea; opacity: 0.5; border-radius: 2px; -webkit-mask-image: linear-gradient(180deg, transparent, #000 14%); mask-image: linear-gradient(180deg, transparent, #000 14%); transition: background-color 0.25s, opacity 0.25s, box-shadow 0.25s; }
   .tt.ok .tt-line { background: #34d399; opacity: 1; box-shadow: 0 0 12px 1px #10b981aa; }
   .tt-bubble { left: 50%; top: calc(var(--gy) / var(--head) * 100%); display: grid; place-items: center; width: max(44px, calc(60 * var(--u))); height: max(44px, calc(60 * var(--u))); margin: 0; border-radius: 50%; background: #0b1020; border: 3px solid #fff; box-shadow: 0 8px 22px -6px #000a, 0 0 0 0 transparent; transform: translate(-50%, -50%); will-change: left, transform; transition: border-color 0.2s, background-color 0.2s, box-shadow 0.2s; }
   .tt-bubble::after { content: ""; position: absolute; left: 50%; top: 100%; width: 0; height: 0; margin: 2px 0 0 -7px; border-left: 7px solid transparent; border-right: 7px solid transparent; border-top: 10px solid var(--ring, #ffffffd9); transition: border-top-color 0.2s; }
@@ -327,6 +327,7 @@ import ToolShell from "../../components/ToolShell.astro";
     const list = strings();
     board.style.setProperty("--bh", String(layout.height));
     board.style.setProperty("--head", String(HEAD_TOP));
+    board.style.setProperty("--lineend", String(layout.lineEnd));
     board.style.setProperty("--gy", String(GAUGE_Y));
     board.style.setProperty("--fade", `${Math.round((150 / layout.height) * 100)}%`);
     board.dataset.kind = layout.kind;
