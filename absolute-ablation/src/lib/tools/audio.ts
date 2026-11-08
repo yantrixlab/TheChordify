@@ -157,7 +157,9 @@ export class NoiseGate {
     const dt = this.last ? Math.min(1000, now - this.last) : 0;
     this.last = now;
     // the room's level drops to a quiet moment at once and creeps up slowly, so a long chord does not become the "room"
-    this.floor = this.floor === 0 ? level : Math.min(level, this.floor * (1 + (0.06 * dt) / 1000));
+    // (a microphone that sends perfect silence has a level of exactly 0: the room is never quieter than a tiny hiss, or the first note
+    // played would be taken for the room and the gate would never open)
+    this.floor = this.floor === 0 ? Math.max(level, 0.0002) : Math.max(0.0002, Math.min(level, this.floor * (1 + (0.06 * dt) / 1000)));
     if (now - this.since < 350) return false; // learning the room first
     return level > Math.max(0.0006, this.floor * this.ratio);
   }

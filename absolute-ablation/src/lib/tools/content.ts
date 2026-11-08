@@ -15,15 +15,16 @@ export const TOOL_CONTENT: Record<string, ToolContent> = {
       {
         heading: "How to tune your instrument",
         body: [
-          "Press Start and allow the microphone, then pluck one open string at a time. The board shows the note it hears and slides up when the string is sharp and down when it is flat. When the note settles in the middle, the string is in tune and is marked as done.",
+          "Press Start and allow the microphone, then pluck one open string at a time. With Auto on, the tuner works out which string you played and lights it up on the guitar. A bubble slides along a line to show how far off the string is, in cents: left of the middle is flat (tune up), right is sharp (tune down). When the bubble sits on the line it turns green with a tick, and the string is marked as tuned.",
+          "Prefer to choose the string yourself? Switch Auto off and tap the string you want. Tapping a string always plays its note, so you can tune by ear as well.",
           "Tune from the lowest string to the highest and tighten each string up to the note instead of loosening down to it: it holds its pitch better. Check the first string again at the end, because tightening the others can pull it slightly out.",
         ],
       },
       {
         heading: "Instruments and tunings",
         body: [
-          "Pick guitar, bass, ukulele, violin, mandolin or banjo, or choose Any note to tune something else. Guitar has standard tuning (E A D G B E), half step down, full step down, Drop D, DADGAD, Open G, Open D and Open E. Bass has 4 and 5 string tunings and the ukulele has standard and baritone.",
-          "The reference tone plays the target note so you can tune by ear as well. Concert pitch (A4) is 440 Hz by default and can be moved between 415 and 466 Hz for orchestras or baroque music.",
+          "Pick Acoustic or Electric to match your guitar, then choose an instrument and tuning from the list: guitar, bass, ukulele, violin, mandolin or banjo, or Any note to tune something else. Guitar has standard tuning (E A D G B E), half step down, full step down, Drop D, DADGAD, Open G, Open D and Open E. Bass has 4 and 5 string tunings and the ukulele has standard and baritone.",
+          "How close counts as in tune is up to you: Strict is within 2 cents, Normal within 3, Relaxed within 5 and Loose within 10 (a cent is a hundredth of a semitone). Concert pitch (A4) is 440 Hz by default and can be moved between 415 and 466 Hz for orchestras or baroque music.",
         ],
       },
       {
@@ -34,7 +35,7 @@ export const TOOL_CONTENT: Record<string, ToolContent> = {
       },
     ],
     faqs: [
-      ["How do I tune a guitar with this tuner?", "Press Start, allow the microphone and pluck one open string at a time, from the lowest to the highest. Turn the tuning peg until the note sits in the middle of the board and the string is marked as tuned."],
+      ["How do I tune a guitar with this tuner?", "Press Start, allow the microphone and pluck one open string at a time, from the lowest to the highest. Turn the tuning peg until the bubble sits on the line, turns green and shows a tick. The string is then marked as tuned."],
       ["Which instruments and tunings does it support?", "Guitar, bass, ukulele, violin, mandolin and banjo, plus an Any note mode. Guitar tunings include standard, half step down, full step down, Drop D, DADGAD, Open G, Open D and Open E."],
       ["Does it record what I play?", "No. The pitch is worked out on your device and the sound is not recorded, uploaded or stored."],
       ["What is A4 and when would I change it?", "A4 is the reference pitch, 440 Hz by default. You can set it anywhere from 415 to 466 Hz, for example 442 Hz for some orchestras or 415 Hz for baroque music."],

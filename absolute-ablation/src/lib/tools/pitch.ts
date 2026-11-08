@@ -110,6 +110,37 @@ export function pickFundamental(buf: Float32Array, sampleRate: number, freq: num
 }
 
 /**
+ * How far the string's pitch (its fundamental) is from the note, from how far each of its overtones is from where it would be.
+ *
+ * Two things pull the overtones off the pitch. A peak is placed to about the same number of Hz whichever overtone it is, so on a
+ * higher overtone the same error in Hz is a smaller error in cents: higher overtones are worth more, in proportion to their square.
+ * And a real string is stiff, so its overtones run a little sharp, more the higher they are (the offset grows with the square of the
+ * overtone's number). Taking the plain average would read the string a little sharp, and trusting only the lowest overtone would be
+ * noisy. So this fits both at once: each overtone's offset is the pitch's offset plus a stiffness term that grows with the square of
+ * its number. The stiffness is held near what a guitar string usually has unless the sound says otherwise, and the answer is the
+ * pitch's offset with the stiffness taken out.
+ */
+export function fundamentalOffset(points: { h: number; c: number; w: number }[], stiff = 0.045, hold = 800): number {
+  let s0 = 0;
+  let s2 = 0;
+  let s4 = 0;
+  let t0 = 0;
+  let t2 = 0;
+  for (const { h, c, w } of points) {
+    const weight = w * h * h;
+    s0 += weight;
+    s2 += weight * h * h;
+    s4 += weight * h * h * h * h;
+    t0 += weight * c;
+    t2 += weight * c * h * h;
+  }
+  s4 += hold; // the stiffness is held near `stiff` (cents per overtone number squared)
+  t2 += hold * stiff;
+  const det = s0 * s4 - s2 * s2;
+  return det > 1e-9 ? (t0 * s4 - s2 * t2) / det : t0 / (s0 || 1);
+}
+
+/**
  * Which of an instrument's strings is being played, and how far off it is.
  *
  * A pitch detector alone is fooled in two ways: a string ringing in sympathy with another (the open A shakes when the high E is
@@ -157,6 +188,7 @@ export function matchString(buf: Float32Array, sampleRate: number, strings: numb
     let errWeight = 0;
     let lowSum = 0;
     let lowWeight = 0;
+    const points: { h: number; c: number; w: number }[] = [];
     for (const p of peaks) {
       const h = Math.round(p.hz / f);
       if (h < 1 || h > 6) continue;
@@ -170,12 +202,15 @@ export function matchString(buf: Float32Array, sampleRate: number, strings: numb
       if (h <= 4) {
         lowSum += c * p.mag;
         lowWeight += p.mag;
+        const same = points.find((q) => q.h === h);
+        if (!same) points.push({ h, c, w: p.mag / top });
+        else if (p.mag / top > same.w) Object.assign(same, { c, w: p.mag / top });
       }
     }
     if (!errWeight) continue;
     const presence = [1, 2, 3, 4].filter((h) => present.has(h)).length / 4;
     const score = (covered / total) * (0.5 + 0.5 * presence) + 0.3 * Math.min(1, fundamental / top);
-    const error = lowWeight ? lowSum / lowWeight : errSum / errWeight;
+    const error = points.length ? fundamentalOffset(points) : lowWeight ? lowSum / lowWeight : errSum / errWeight;
     if (!best || score > best.score) best = { midi, score, error };
   }
   if (best && best.score >= 0.4) return best.midi + best.error / 100;
