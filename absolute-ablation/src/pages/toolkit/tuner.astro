@@ -238,6 +238,8 @@ import ToolShell from "../../components/ToolShell.astro";
   .tt-load-cap i { display: inline-block; width: 4px; height: 4px; margin-left: 4px; border-radius: 50%; background: currentColor; animation: tt-dot 1.2s ease-in-out infinite; }
   .tt-load-cap i:nth-child(2) { animation-delay: 0.2s; }
   .tt-load-cap i:nth-child(3) { animation-delay: 0.4s; }
+  .tt-board, .tt-board img { -webkit-touch-callout: none; -webkit-user-drag: none; user-select: none; }
+  .tt-board img { pointer-events: none; }
   .tt-art picture img { opacity: 0; transition: opacity 0.6s ease; }
   .tt-board:not(.loading) .tt-art picture img { opacity: 1; }
   @keyframes tt-lq { from { opacity: 0.5; } to { opacity: 0.9; } }
@@ -376,6 +378,7 @@ import ToolShell from "../../components/ToolShell.astro";
       if (p.small) img.srcset = `${p.small} 1x, ${p.webp} 2x`;
       img.src = p.small ?? p.webp;
       img.fetchPriority = "high";
+      img.draggable = false;
       img.alt = "";
       img.width = p.w;
       img.height = p.h;
@@ -481,6 +484,11 @@ import ToolShell from "../../components/ToolShell.astro";
     canvas.height = Math.round(h * ratio);
   }
   new ResizeObserver(sizeBoard).observe(board);
+
+  // The headstock pictures are not for saving: no right-click menu on the board (so no "Save image as" or "Copy image"), and nothing on it can be dragged
+  // out. (A picture a browser shows can always be fetched by someone who knows how; this keeps the usual ways of saving it closed.)
+  board.addEventListener("contextmenu", (e) => e.preventDefault());
+  board.addEventListener("dragstart", (e) => e.preventDefault());
 
   /** A string was pressed: it is heard, and in manual mode it becomes the one to tune. */
   function pickString(i: number) {
