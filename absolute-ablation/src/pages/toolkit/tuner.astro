@@ -109,6 +109,14 @@ import ToolShell from "../../components/ToolShell.astro";
           <input id="sens" class="tk-range" type="range" min="0" max="100" value="55" />
           <p class="tk-hint">Turn it up in a quiet room or for a soft instrument, down if the room is noisy.</p>
         </div>
+        <div class="tk-field">
+          <p class="tk-label">Sound when a string is in tune</p>
+          <div class="tk-seg" id="sound" role="group" aria-label="Success sound">
+            <button type="button" data-sound="on" aria-pressed="true">On</button>
+            <button type="button" data-sound="off" aria-pressed="false">Off</button>
+          </div>
+          <p class="tk-hint">A short chime when a string holds in tune, and a longer one when every string is done.</p>
+        </div>
       </div>
     </section>
   </div>
@@ -182,7 +190,8 @@ import ToolShell from "../../components/ToolShell.astro";
   .tt-end { font-size: max(12px, calc(20 * var(--u))); }
   .tt-end-l { left: calc(54 / 700 * 100%); }
   .tt-end-r { right: calc(54 / 700 * 100%); }
-  .tt-line { left: 50%; top: calc(var(--gy) / var(--head) * 100%); bottom: 0; width: 2px; transform: translateX(-50%); background: linear-gradient(180deg, #ffffffb0, #ffffff30 70%, #ffffff55); border-radius: 2px; }
+  .tt-line { left: 50%; top: 0; bottom: 0; width: 2px; transform: translateX(-50%); background: #c3c8ea; opacity: 0.5; border-radius: 2px; -webkit-mask-image: linear-gradient(180deg, transparent, #000 14%); mask-image: linear-gradient(180deg, transparent, #000 14%); transition: background-color 0.25s, opacity 0.25s, box-shadow 0.25s; }
+  .tt.ok .tt-line { background: #34d399; opacity: 1; box-shadow: 0 0 12px 1px #10b981aa; }
   .tt-bubble { left: 50%; top: calc(var(--gy) / var(--head) * 100%); display: grid; place-items: center; width: max(44px, calc(60 * var(--u))); height: max(44px, calc(60 * var(--u))); margin: 0; border-radius: 50%; background: #0b1020; border: 3px solid #fff; box-shadow: 0 8px 22px -6px #000a, 0 0 0 0 transparent; transform: translate(-50%, -50%); will-change: left, transform; transition: border-color 0.2s, background-color 0.2s, box-shadow 0.2s; }
   .tt-bubble::after { content: ""; position: absolute; left: 50%; top: 100%; width: 0; height: 0; margin: 2px 0 0 -7px; border-left: 7px solid transparent; border-right: 7px solid transparent; border-top: 10px solid var(--ring, #ffffffd9); transition: border-top-color 0.2s; }
   .tt-bubble b { font: 800 max(14px, calc(21 * var(--u))) / 1 var(--font-sans); color: #fff; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
@@ -287,9 +296,9 @@ import ToolShell from "../../components/ToolShell.astro";
   const SVGNS = "http://www.w3.org/2000/svg";
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  interface Prefs { instrument: string; tuning: number; a4: number; tol: number; sens: number; head: "acoustic" | "electric"; auto: boolean }
+  interface Prefs { instrument: string; tuning: number; a4: number; tol: number; sens: number; head: "acoustic" | "electric"; auto: boolean; sound: boolean }
   const KEY = "cs-tuner";
-  let prefs: Prefs = { instrument: "guitar", tuning: 0, a4: 440, tol: 3, sens: 55, head: "acoustic", auto: true };
+  let prefs: Prefs = { instrument: "guitar", tuning: 0, a4: 440, tol: 3, sens: 55, head: "acoustic", auto: true, sound: true };
   try { prefs = { ...prefs, ...JSON.parse(localStorage.getItem(KEY) || "{}") }; } catch { /* first visit */ }
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(prefs)); } catch { /* storage is off */ } };
 
@@ -717,6 +726,44 @@ import ToolShell from "../../components/ToolShell.astro";
   sens.addEventListener("input", () => { prefs.sens = Number(sens.value); noiseGate.sensitivity = prefs.sens; drawSens(); save(); });
   drawSens();
 
+  const drawSound = () => all<HTMLButtonElement>("[data-sound]").forEach((b) => b.setAttribute("aria-pressed", String((b.dataset.sound === "on") === prefs.sound)));
+  all<HTMLButtonElement>("[data-sound]").forEach((b) => b.addEventListener("click", () => { prefs.sound = b.dataset.sound === "on"; save(); drawSound(); if (prefs.sound) void chime(false); }));
+  drawSound();
+
+  // ---- the success chime: a short two-note ring when a string holds in tune, a longer rising run when every string is done -----
+  let quietUntil = 0; // the microphone ignores the speakers for a moment so it does not hear the chime as a note
+  async function chime(all: boolean) {
+    if (!prefs.sound) return;
+    try {
+      const ctx = await resumeAudio();
+      const notes = all ? [523.25, 659.25, 783.99, 1046.5] : [783.99, 1046.5];
+      const gap = all ? 0.1 : 0.11;
+      const master = ctx.createGain();
+      master.gain.value = 0.2;
+      master.connect(ctx.destination);
+      const t0 = ctx.currentTime + 0.02;
+      notes.forEach((f, i) => {
+        const at = t0 + i * gap;
+        const last = i === notes.length - 1;
+        const len = last ? (all ? 1.1 : 0.7) : 0.35;
+        [[1, 1], [2, 0.18], [3, 0.06]].forEach(([h, a]) => {
+          const o = ctx.createOscillator();
+          const g = ctx.createGain();
+          o.type = "sine";
+          o.frequency.value = f * h;
+          g.gain.setValueAtTime(0.0001, at);
+          g.gain.exponentialRampToValueAtTime(a, at + 0.012);
+          g.gain.exponentialRampToValueAtTime(0.0001, at + len);
+          o.connect(g);
+          g.connect(master);
+          o.start(at);
+          o.stop(at + len + 0.05);
+        });
+      });
+      quietUntil = performance.now() + (notes.length - 1) * gap * 1000 + (all ? 1500 : 1000);
+    } catch { /* no audio: the tuner works without the chime */ }
+  }
+
   // ---- a reference tone ------------------------------------------------------------------------------------------------------
   let tone: { stop(): void } | null = null;
   async function playTone(freq: number) {
@@ -765,6 +812,7 @@ import ToolShell from "../../components/ToolShell.astro";
   function capture() {
     const gi = tracker.lock;
     tunedFor = tracker.ok ? tunedFor + 1 : 0;
+    if (tunedFor === 10) void chime(false); // together with the tick that appears on the bubble
     if (gi < 0 || !spots.length) return; // (any-note mode has no strings to tick off)
     held[gi] = tracker.ok ? held[gi] + 1 : 0;
     off[gi] = Math.abs(tracker.cents) > Math.max(15, prefs.tol * 3) ? off[gi] + 1 : 0;
@@ -777,6 +825,7 @@ import ToolShell from "../../components/ToolShell.astro";
       drawProgress();
       if (done.every(Boolean) && !announced) {
         announced = true;
+        window.setTimeout(() => void chime(true), 450);
         setHint("All strings in tune!");
         toast({ icon: "🎸", title: "All strings in tune", text: "Nicely done. Time to play.", ms: 4000 });
       }
@@ -815,6 +864,10 @@ import ToolShell from "../../components/ToolShell.astro";
     const level = rms(buf);
     const now = performance.now();
     const open = noiseGate.update(level, now);
+    if (now < quietUntil) {
+      lastHeard = now; // the chime is playing: hear nothing, and do not let go of the string
+      return;
+    }
     $("tt-level").style.width = `${levelPercent(level)}%`;
     $("tt-level").classList.toggle("open", open);
     $("mic-warn").hidden = !silence.feed(level, now);
