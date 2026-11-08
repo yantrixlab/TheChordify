@@ -5,6 +5,7 @@
 // pixels) and then moved onto the board.
 
 import { noteLabel, midiFromName, type Instrument, type Tuning } from "./pitch";
+import { ACOUSTIC_PREVIEW, ELECTRIC_PREVIEW } from "./tunerPreviews";
 
 export const BOARD_W = 700;
 export const AXIS_X = 350; // the line down the middle of the board, over the middle of the nut
@@ -32,7 +33,7 @@ export interface Layout {
   nutY: number;
   /** Where the line down the middle of the board stops: it runs from the top of the board down to the headstock, and a little under it. */
   lineEnd: number;
-  picture?: { avif?: string; webp: string; x: number; y: number; w: number; h: number; label: string };
+  picture?: { avif?: string; webp: string; /** the same picture at half the size, for screens that are not high-density */ small?: string; /** a tiny blurred preview to show while it loads */ preview?: string; x: number; y: number; w: number; h: number; label: string };
   /** For a drawn headstock: SVG to put on the board (an instrument with no picture). */
   drawn?: string;
   strings: StringSpot[];
@@ -75,7 +76,7 @@ function guitarLayout(kind: "acoustic" | "electric"): Layout {
       height: dy + cropAt,
       nutY: 572.5 + dy,
       lineEnd: dy + 1.5 + 1.5, // the picture's top edge at the axis is 1.5 units down
-      picture: { webp: "/tuner/acoustic-guitar.webp", x: dx, y: dy, w, h, label: "An acoustic guitar's headstock with six tuning pegs" },
+      picture: { webp: "/tuner/acoustic-guitar.webp", small: "/tuner/acoustic-guitar-1x.webp", preview: ACOUSTIC_PREVIEW, x: dx, y: dy, w, h, label: "An acoustic guitar's headstock with six tuning pegs" },
       strings: ACOUSTIC_STRINGS.map((s) => ({
         post: move(dx, dy, s.post),
         nut: move(dx, dy, s.nut),
@@ -90,7 +91,7 @@ function guitarLayout(kind: "acoustic" | "electric"): Layout {
     height: dy + cropAt,
     nutY: 575 + dy,
     lineEnd: dy + 72.5 + 1.5, // the electric headstock's edge at the axis (the top tuner) is 72.5 units down: the line runs down to it
-    picture: { webp: "/tuner/electric-guitar.webp", x: dx, y: dy, w, h, label: "An electric guitar's headstock with six tuning pegs in a row" },
+    picture: { webp: "/tuner/electric-guitar.webp", small: "/tuner/electric-guitar-1x.webp", preview: ELECTRIC_PREVIEW, x: dx, y: dy, w, h, label: "An electric guitar's headstock with six tuning pegs in a row" },
     strings: ELECTRIC_STRINGS.map((s) => ({
       post: move(dx, dy, s.post),
       nut: move(dx, dy, s.nut),

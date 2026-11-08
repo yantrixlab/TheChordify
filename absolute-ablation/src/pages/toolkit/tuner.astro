@@ -11,6 +11,21 @@ import ToolShell from "../../components/ToolShell.astro";
   tool="tuner"
   crumb="Tuner"
 >
+  <link rel="preload" as="image" imagesrcset="/tuner/acoustic-guitar-1x.webp 1x, /tuner/acoustic-guitar.webp 2x" fetchpriority="high" />
+  <script is:inline>
+    // the electric headstock, if that is the one this visitor used last: fetched now, while the page is still being built
+    try {
+      var saved = JSON.parse(localStorage.getItem("cs-tuner") || "{}");
+      if (saved.head === "electric" && (saved.instrument || "guitar") === "guitar") {
+        var hint = document.createElement("link");
+        hint.rel = "preload";
+        hint.as = "image";
+        hint.setAttribute("imagesrcset", "/tuner/electric-guitar-1x.webp 1x, /tuner/electric-guitar.webp 2x");
+        hint.setAttribute("fetchpriority", "high");
+        document.head.appendChild(hint);
+      }
+    } catch (e) { /* storage is off */ }
+  </script>
   <div class="tt" id="tt">
     <div class="tt-main">
       <aside class="tt-panel" aria-label="Instrument and tuning">
@@ -66,6 +81,7 @@ import ToolShell from "../../components/ToolShell.astro";
           </div>
           <div class="tt-note" id="tt-note" aria-hidden="true"></div>
           <div class="tt-hz" id="tt-hz" aria-hidden="true">&nbsp;</div>
+          <div class="tt-load" id="tt-load" aria-hidden="true"></div>
           <div class="tt-art" id="tt-art"></div>
           <svg class="tt-over" id="tt-over" aria-hidden="true"></svg>
           <div class="tt-strings" id="tt-strings" role="group" aria-label="Strings"></div>
@@ -211,6 +227,24 @@ import ToolShell from "../../components/ToolShell.astro";
   .tt-hz { left: 50%; top: calc((var(--gy) + 74 + 66) / var(--bh) * 100%); transform: translateX(-50%); font: 600 max(11px, calc(15 * var(--u))) var(--font-mono); color: #8e96c9; white-space: nowrap; }
 
   /* the picture of the guitar, fading out at the bottom */
+  /* the headstock while its picture loads: a blurred preview, the strings being plucked in turn, and a quiet line of text */
+  .tt-load { inset: 0; overflow: hidden; overflow: clip; pointer-events: none; opacity: 0; transition: opacity 0.5s ease 0.15s; }
+  .tt-board.loading .tt-load { opacity: 1; transition-delay: 0s; }
+  .tt-lq { position: absolute; height: auto; filter: blur(7px) saturate(1.1); transform: scale(1.02); opacity: 0.8; animation: tt-lq 1.5s ease-in-out infinite alternate; -webkit-mask-image: linear-gradient(180deg, #000 calc(100% - 14%), transparent 100%); mask-image: linear-gradient(180deg, #000 calc(100% - 14%), transparent 100%); }
+  .tt-pluck { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .tt-pluck path { fill: none; stroke: #dfe4ff; stroke-width: 2.6; stroke-linecap: round; opacity: 0.85; filter: drop-shadow(0 0 5px #8b93ff99); vector-effect: non-scaling-stroke; }
+  .tt-pluck circle { fill: #a5b4fc; opacity: 0.35; transform-box: fill-box; transform-origin: center; animation: tt-ping 1.3s ease-out infinite; }
+  .tt-load-cap { position: absolute; left: 50%; margin: 0; transform: translateX(-50%); font: 700 calc(11px + 2 * var(--u, 0.8px)) var(--font-sans); letter-spacing: 0.22em; text-transform: uppercase; color: #aab3ee; white-space: nowrap; text-shadow: 0 2px 12px #000a; }
+  .tt-load-cap i { display: inline-block; width: 4px; height: 4px; margin-left: 4px; border-radius: 50%; background: currentColor; animation: tt-dot 1.2s ease-in-out infinite; }
+  .tt-load-cap i:nth-child(2) { animation-delay: 0.2s; }
+  .tt-load-cap i:nth-child(3) { animation-delay: 0.4s; }
+  .tt-art picture img { opacity: 0; transition: opacity 0.6s ease; }
+  .tt-board:not(.loading) .tt-art picture img { opacity: 1; }
+  @keyframes tt-lq { from { opacity: 0.5; } to { opacity: 0.9; } }
+  @keyframes tt-ping { 0% { transform: scale(0.6); opacity: 0.7; } 100% { transform: scale(3.2); opacity: 0; } }
+  @keyframes tt-dot { 0%, 80%, 100% { opacity: 0.25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
+  @media (prefers-reduced-motion: reduce) { .tt-lq, .tt-pluck circle, .tt-load-cap i { animation: none; } .tt-art picture img { transition: none; } }
+
   .tt-art { inset: 0; overflow: hidden; overflow: clip; pointer-events: none; -webkit-mask-image: linear-gradient(180deg, #000 calc(100% - var(--fade, 14%)), transparent 100%); mask-image: linear-gradient(180deg, #000 calc(100% - var(--fade, 14%)), transparent 100%); }
   .tt-art > * { position: absolute; display: block; }
   .tt-art img, .tt-art picture, .tt-art .tt-drawn { width: 100%; height: auto; }
@@ -339,7 +373,9 @@ import ToolShell from "../../components/ToolShell.astro";
       const p = layout.picture;
       const picture = document.createElement("picture");
       const img = document.createElement("img");
-      img.src = p.webp;
+      if (p.small) img.srcset = `${p.small} 1x, ${p.webp} 2x`;
+      img.src = p.small ?? p.webp;
+      img.fetchPriority = "high";
       img.alt = "";
       img.width = p.w;
       img.height = p.h;
@@ -353,7 +389,10 @@ import ToolShell from "../../components/ToolShell.astro";
       }
       picture.append(img);
       art.append(picture);
+      showLoading(p, layout, img);
     } else if (layout.drawn) {
+      board.classList.remove("loading");
+      $("tt-load").replaceChildren();
       art.insertAdjacentHTML("beforeend", layout.drawn);
     }
 
@@ -393,6 +432,42 @@ import ToolShell from "../../components/ToolShell.astro";
     sizeBoard();
     drawProgress();
     drawTargetHints();
+  }
+
+  /**
+   * While the headstock picture is on its way: a blurred preview of it, with the six strings being plucked one after the other and a short
+   * "Tuning up" line. The sharp picture fades in over it as soon as it has loaded, and the whole thing then fades away.
+   */
+  function showLoading(p: NonNullable<Layout["picture"]>, l: Layout, img: HTMLImageElement) {
+    const holder = $("tt-load");
+    holder.replaceChildren();
+    if (img.complete && img.naturalWidth) {
+      board.classList.remove("loading");
+      return;
+    }
+    board.classList.add("loading");
+    const left = pctX(p.x);
+    const top = pctY(p.y);
+    const width = `${(p.w / BOARD_W) * 100}%`;
+    const strings = l.strings
+      .map((s, i) => {
+        const dx = (i % 2 ? -1 : 1) * 10;
+        const mx = (s.post.x + s.nut.x) / 2;
+        const my = (s.post.y + s.nut.y) / 2;
+        const straight = `M${s.post.x} ${s.post.y} Q${mx} ${my} ${s.nut.x} ${s.nut.y}`;
+        const bent = `M${s.post.x} ${s.post.y} Q${mx + dx} ${my} ${s.nut.x} ${s.nut.y}`;
+        const bentOther = `M${s.post.x} ${s.post.y} Q${mx - dx} ${my} ${s.nut.x} ${s.nut.y}`;
+        const wave = reduced ? "" : `<animate attributeName="d" dur="1.3s" begin="${(i * 0.16).toFixed(2)}s" repeatCount="indefinite" values="${straight};${bent};${straight};${bentOther};${straight}" keyTimes="0;.25;.5;.75;1" calcMode="spline" keySplines=".4 0 .6 1;.4 0 .6 1;.4 0 .6 1;.4 0 .6 1"/>`;
+        return `<path d="${straight}">${wave}</path><circle cx="${s.nut.x}" cy="${s.nut.y}" r="4" style="animation-delay:${(i * 0.16).toFixed(2)}s"/>`;
+      })
+      .join("");
+    holder.innerHTML =
+      `<img class="tt-lq" alt="" src="${p.preview ?? ""}" style="left:${left};top:${top};width:${width}"/>` +
+      `<svg class="tt-pluck" viewBox="0 0 ${BOARD_W} ${l.height}" preserveAspectRatio="none">${strings}</svg>` +
+      `<p class="tt-load-cap" style="top:${pctY(l.nutY - 330)}">Tuning up<i></i><i></i><i></i></p>`;
+    const done = () => board.classList.remove("loading");
+    img.addEventListener("load", done, { once: true });
+    img.addEventListener("error", done, { once: true });
   }
 
   function sizeBoard() {
