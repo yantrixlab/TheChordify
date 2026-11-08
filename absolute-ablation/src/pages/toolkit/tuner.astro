@@ -10,6 +10,7 @@ import ToolShell from "../../components/ToolShell.astro";
   feature="tuner"
   tool="tuner"
   crumb="Tuner"
+  compact
 >
   <link rel="preload" as="image" imagesrcset="/tuner/acoustic-guitar-1x.webp 1x, /tuner/acoustic-guitar.webp 2x" fetchpriority="high" />
   <script is:inline>
@@ -195,7 +196,8 @@ import ToolShell from "../../components/ToolShell.astro";
   .tt-hint { min-height: 22px; margin: 12px 0 0; text-align: center; font: 500 13.5px var(--font-sans); color: #b4bae0; }
 
   /* ---- the board: everything is placed in a 700-unit-wide drawing that scales with the screen (--u is one unit in pixels) ---- */
-  .tt-board { position: relative; width: 100%; max-width: 700px; margin: 0 auto; overflow: hidden; overflow: clip; aspect-ratio: 700 / var(--bh, 900); user-select: none; }
+  /* the board is as large as fits the screen: its height (from the aspect ratio) plus the menu and the bars around it should not be taller than the window */
+  .tt-board { position: relative; width: min(100%, 700px, max(440px, calc((100svh - 240px) * 700 / var(--bh, 873)))); margin: 0 auto; overflow: hidden; overflow: clip; aspect-ratio: 700 / var(--bh, 900); user-select: none; }
   .tt-board > * { position: absolute; }
   .tt-gauge { left: 0; top: 0; width: 100%; height: calc(var(--head, 205) / var(--bh, 900) * 100%); pointer-events: none; }
   .tt-gauge > * { position: absolute; }

@@ -17,9 +17,11 @@ interface Props {
   feature?: string;
   tool?: string;
   crumb?: string;
+  /** A tool that fills the screen (the tuner): the heading, the breadcrumb and the intro stay for search engines and screen readers but are not shown. */
+  compact?: boolean;
 }
 
-const { title, description, heading, sub, eyebrow = "Toolkit", feature, tool = "", crumb } = Astro.props;
+const { title, description, heading, sub, eyebrow = "Toolkit", feature, tool = "", crumb, compact = false } = Astro.props;
 
 // structured data: where the page sits in the site, and (on a tool's own page) that it is a web app
 const url = new URL(Astro.url.pathname, "https://chordsuno.com").href;
@@ -59,7 +61,7 @@ const jsonLd = [
 
 <Layout title={title} description={description} jsonLd={jsonLd} themeable>
   <Nav />
-  <main id="main-content" class="tk" data-feature={feature ?? ""} data-tool={tool}>
+  <main id="main-content" class={compact ? "tk tk-compact" : "tk"} data-feature={feature ?? ""} data-tool={tool}>
     <div class="tk-wrap">
       <nav class="tk-crumbs" aria-label="Breadcrumb">
         <a href="/toolkit/">Toolkit</a>

@@ -11,6 +11,9 @@
 .tk-head p { margin: 0; font-size: 17px; line-height: 1.6; color: var(--color-body); }
 
 .tk-stage { position: relative; }
+/* a tool that fills the screen: no title block on show (it stays in the page for search engines and screen readers) and less space above the tool */
+.tk-compact { padding-top: 16px; }
+.tk-compact .tk-crumbs, .tk-compact .tk-head { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .tk-body.is-gated { filter: blur(7px) saturate(0.6); opacity: 0.5; pointer-events: none; user-select: none; }
 .tk-gate { position: absolute; inset: 0; z-index: 5; display: grid; place-items: start center; padding: 70px 18px; }
 .tk-gate[hidden] { display: none; }
