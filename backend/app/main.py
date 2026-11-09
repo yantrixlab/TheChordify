@@ -38,6 +38,7 @@ from .similar import shelf as similar_shelf
 from .songpages import SongPages
 from . import songedit
 from .store import SongStore
+from . import discover
 from . import trending as trending_shelves
 from . import youtube
 from .wwwredirect import WwwRedirect
@@ -2096,6 +2097,75 @@ def trending(response: Response) -> dict:
         out.insert(0, {"id": "popular", "title": "Popular on Chord Suno", "about": "What people are jamming to", "songs": favourites})
     response.headers["Cache-Control"] = "public, max-age=120"
     return {"shelves": out, "updatedAt": trending_shelves.updated_at()}
+
+
+_home_limiter = RateLimiter(limit=60, window=60.0)
+# Where a visitor is: a header that the server in front of this one adds (Cloudflare and others do), else the country their browser guessed.
+_COUNTRY_HEADERS = ("cf-ipcountry", "x-vercel-ip-country", "cloudfront-viewer-country", "x-country-code", "x-appengine-country", "x-geo-country")
+
+
+def _country_of(request: Request, asked: str) -> str:
+    """The visitor's country as a two-letter code, or "" when nothing says."""
+    for name in _COUNTRY_HEADERS:
+        value = (request.headers.get(name) or "").strip().upper()
+        if len(value) == 2 and value.isalpha() and value not in ("XX", "T1"):
+            return value
+    value = (asked or "").strip().upper()
+    return value if len(value) == 2 and value.isalpha() else ""
+
+
+def _with_known(songs: list[dict]) -> list[dict]:
+    known = catalog.lookup([song["videoId"] for song in songs])
+    return [{**song, **known.get(song["videoId"], {})} for song in songs]
+
+
+@app.get("/api/home/country")
+def home_country(request: Request, response: Response, country: str = "") -> dict:
+    """The songs most watched today in the visitor's country, for a shelf on the home page (none when the country has no chart)."""
+    response.headers["Cache-Control"] = "private, max-age=600"
+    code = _country_of(request, country)
+    if not code or not _home_limiter.allow(request.client.host if request.client else "unknown"):
+        return {"country": code, "songs": []}
+    return {"country": code, "songs": _with_known(discover.country_songs(code))}
+
+
+@app.get("/api/home/artists")
+def home_artists(request: Request, response: Response, country: str = "") -> dict:
+    """The artists people in the visitor's country listen to most, with their pictures, for the artists grid at the bottom of the home page."""
+    response.headers["Cache-Control"] = "private, max-age=600"
+    code = _country_of(request, country)
+    if not _home_limiter.allow(request.client.host if request.client else "unknown"):
+        return {"country": code, "artists": []}
+    return {"country": code, "artists": discover.artists(code or discover.GLOBAL)}
+
+
+@app.get("/api/home/taste")
+def home_taste(request: Request, response: Response, seeds: str = "") -> dict:
+    """Songs picked for the visitor, for the first shelf on the home page: songs like the ones they played or kept, never the ones they already
+    know. A signed-in visitor's library is the source; a browser that is not signed in sends the songs it opened lately (`seeds`, video ids).
+    Nothing is returned for somebody with no history, so the shelf is simply not shown."""
+    response.headers["Cache-Control"] = "private, no-store"
+    chosen: list[str] = []
+    known: set[str] = set()
+    user = _session_user(request)
+    if user:
+        favourites, _n = engagement.list_items(user["id"], "favorites", 4, 0)
+        history, _n = engagement.list_items(user["id"], "history", 60, 0)
+        known = {i["videoId"] for i in favourites + history if i.get("videoId")}
+        for a, b in zip(history[:4] + [None] * 4, favourites[:4] + [None] * 4):
+            for item in (a, b):
+                if item and is_video_id(item.get("videoId") or ""):
+                    chosen.append(item["videoId"])
+    for part in seeds.split(",")[:6]:
+        part = part.strip()
+        if is_video_id(part):
+            known.add(part)
+            chosen.append(part)
+    chosen = list(dict.fromkeys(chosen))[: discover.MAX_SEEDS]
+    if not chosen or not _home_limiter.allow(request.client.host if request.client else "unknown"):
+        return {"songs": [], "basedOn": []}
+    songs, based = discover.taste(chosen, known)
+    return {"songs": _with_known(songs), "basedOn": based[:2]}
 
 
 _similar_limiter = RateLimiter(limit=20, window=60.0)

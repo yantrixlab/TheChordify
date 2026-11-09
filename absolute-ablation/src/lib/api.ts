@@ -257,3 +257,33 @@ export async function getTrending(): Promise<TrendingShelf[]> {
   if (!res.ok) return [];
   return (await res.json()).shelves ?? [];
 }
+
+/** Songs picked for this visitor (like the ones they played or kept, not the ones they know): empty for somebody with no history. */
+export async function getTasteShelf(seeds: string[]): Promise<{ songs: SongHit[]; basedOn: string[] }> {
+  const res = await fetchApi(`${API_BASE}/api/home/taste?seeds=${encodeURIComponent(seeds.join(","))}`);
+  if (!res.ok) return { songs: [], basedOn: [] };
+  const data = await res.json();
+  return { songs: data.songs ?? [], basedOn: data.basedOn ?? [] };
+}
+
+/** What is most watched today in the visitor's country (`guess` is the browser's own idea of it; the server may know better). */
+export async function getCountryShelf(guess: string): Promise<{ country: string; songs: SongHit[] }> {
+  const res = await fetchApi(`${API_BASE}/api/home/country?country=${encodeURIComponent(guess)}`);
+  if (!res.ok) return { country: "", songs: [] };
+  const data = await res.json();
+  return { country: data.country ?? "", songs: data.songs ?? [] };
+}
+
+export interface ArtistHit {
+  name: string;
+  image: string;
+  id: string;
+  subscribers: string;
+}
+
+/** The artists people in the visitor's country listen to most, with their pictures. */
+export async function getHomeArtists(guess: string): Promise<ArtistHit[]> {
+  const res = await fetchApi(`${API_BASE}/api/home/artists?country=${encodeURIComponent(guess)}`);
+  if (!res.ok) return [];
+  return (await res.json()).artists ?? [];
+}

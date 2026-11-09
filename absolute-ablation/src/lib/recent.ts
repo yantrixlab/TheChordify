@@ -1,5 +1,5 @@
 // What this browser looked for lately: the songs that were opened and the searches that were typed, newest first, up to
-// MAX of them. They live in this browser only (localStorage), so they work without signing in and are never sent anywhere.
+// MAX of them. They live in this browser only (localStorage), so they work without signing in. The one thing that leaves it: the home page sends the ids of the last few songs opened (not the searches) to pick suggestions "based on your taste", for that request only.
 const KEY = "cs-recent-v1";
 export const MAX_RECENT = 15;
 
