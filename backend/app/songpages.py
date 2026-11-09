@@ -20,6 +20,8 @@ import unicodedata
 from html.parser import HTMLParser
 from typing import Optional
 
+from .chordsongs import chord_page
+
 log = logging.getLogger("chordify.songpages")
 
 SITE = "https://chordsuno.com"
@@ -795,7 +797,12 @@ class SongPages:
         if duration:
             facts.append(("Length", _minutes(duration)))
         facts_html = "".join(f"<div><dt>{_esc(k)}</dt><dd>{_esc(v)}</dd></div>" for k, v in facts)
-        chips = "".join(f"<span>{_esc(c)}</span>" for c in used[:24])
+        # each chord is a link to its chord page (how to finger it, its notes), which links back to the songs that use it
+        def chip(c: str) -> str:
+            page = chord_page(c)
+            return f'<span><a href="{page}" title="How to play {_esc(c)}">{_esc(c)}</a></span>' if page else f"<span>{_esc(c)}</span>"
+
+        chips = "".join(chip(c) for c in used[:24])
         # the diagrams are drawn in the browser (the same shapes as the player); the name is here for everyone else
         diagrams = "".join(
             f'<figure class="sp-dg" data-chord="{_esc(c)}"><div class="sp-dg-art" aria-hidden="true"></div>'

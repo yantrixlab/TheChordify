@@ -597,3 +597,19 @@ html[data-theme="dark"] .mk .k.on.root rect { fill: #7c3aed; stroke: #7c3aed; }
 @media (max-width: 520px) { .cp-v { grid-template-columns: minmax(0, 1fr); } .cp-art:not(.is-keys) { max-width: 180px; } }
 html[data-theme="dark"] .cp-easy { background: #0f3a2c; color: #6ee7b7; }
 html[data-theme="dark"] .cc-open:hover { background: #7c3aed; color: #fff; }
+
+/* songs that use the chord: filled in by the server on each chord page that has songs */
+.cs-song-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 16px; margin-top: 18px; }
+.cs-song { display: flex; flex-direction: column; overflow: hidden; border-radius: 18px; background: #fff; border: 1px solid var(--ch-line); text-decoration: none; transition: transform 0.2s var(--ch-ease), box-shadow 0.2s, border-color 0.2s; }
+.cs-song:hover { transform: translateY(-3px); border-color: var(--ch-violet); box-shadow: 0 16px 30px -18px #7c3aed99; }
+.cs-song img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; background: #efe8fb; }
+.cs-song-body { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px 14px; }
+.cs-song-body strong { font-size: 15.5px; line-height: 1.3; letter-spacing: -0.01em; color: var(--color-ink); }
+.cs-song-body small { font-size: 13.5px; color: var(--ch-mute); }
+.cs-song-facts { font: 600 12px var(--font-mono); color: var(--ch-mute); }
+.cs-song-chords { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+.cs-song-chords i { font: 700 12px var(--font-mono); font-style: normal; padding: 2px 8px; border-radius: 8px; background: #f1eaff; color: var(--ch-deep); }
+.cs-song-more { margin: 18px 0 0; font-weight: 650; }
+html[data-theme="dark"] .cs-song { background: #131116; border-color: #2b2540; }
+html[data-theme="dark"] .cs-song img { background: #1c1730; }
+html[data-theme="dark"] .cs-song-chords i { background: #2a2145; color: #c9b8ff; }

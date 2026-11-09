@@ -36,6 +36,7 @@ from .search import RateLimiter, SearchUnavailable, clean_query, find_video, rad
 from .sections_ai import status as section_model_status
 from .similar import shelf as similar_shelf
 from .songpages import SongPages
+from .chordsongs import ChordSongs, INSTRUMENTS as _CHORD_INSTRUMENTS
 from . import songedit
 from .store import SongStore
 from . import discover
@@ -2763,6 +2764,38 @@ def song_page_slash(slug: str) -> RedirectResponse:
 @app.get("/sitemap-songs.xml")
 def sitemap_songs() -> Response:
     return Response(song_pages.sitemap(), media_type="application/xml", headers=_PAGE_HEADERS)
+
+
+# The chord pages are built into the site; each has a slot the server fills with the published songs that use the chord (chordsongs.py).
+chord_songs = ChordSongs(song_pages)
+_CHORD_PART = re.compile(r"[a-z0-9-]{1,40}")
+
+
+def _chord_page_route(instrument: str) -> None:
+    @app.get(f"/{instrument}-chords/{{note}}/{{kind}}/", response_class=HTMLResponse, name=f"chord_page_{instrument}")
+    def chord_page(note: str, kind: str) -> HTMLResponse:
+        path = os.path.join(_STATIC_DIR, f"{instrument}-chords", note, kind, "index.html")
+        try:
+            if not (_CHORD_PART.fullmatch(note) and _CHORD_PART.fullmatch(kind)):
+                raise OSError
+            with open(path, "r", encoding="utf-8") as f:
+                html = f.read()
+        except OSError:  # not a chord page: the site's own 404 page, as for any other address it does not have
+            try:
+                with open(os.path.join(_STATIC_DIR, "404.html"), "r", encoding="utf-8") as f:
+                    return HTMLResponse(f.read(), status_code=404)
+            except OSError:
+                raise HTTPException(status_code=404, detail="Not found")
+        try:
+            html = chord_songs.fill(html)
+        except Exception:  # the songs are a bonus: the chord page must never fail because of them
+            log.exception("Could not add the songs to %s", path)
+            html = re.sub(r'<div class="cs-songs-slot"[^>]*></div>', "", html, count=1)
+        return HTMLResponse(html, headers=_PAGE_HEADERS)
+
+
+for _instrument in _CHORD_INSTRUMENTS:
+    _chord_page_route(_instrument)
 
 
 # Serve the built Astro site from the same origin (the Docker image copies it to STATIC_DIR).

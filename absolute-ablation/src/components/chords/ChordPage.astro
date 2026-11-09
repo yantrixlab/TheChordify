@@ -155,6 +155,9 @@ const art = c.voicings.slice(0, 3).map((v) => ({ svg: v.svg, label: v.label, sub
       )
     }
 
+    <!-- the server fills this with the published songs that use the chord (backend/app/chordsongs.py); empty when there are none -->
+    <div class="cs-songs-slot" data-chord={`${root.name}:${kind.suffix}`}></div>
+
     <section class="ch-in ch-sec" id="more">
       <span class="ch-kicker" data-reveal>Keep going</span>
       <h2 data-reveal style="--i: 1">{kind.name[0].toUpperCase() + kind.name.slice(1)} chords on other notes</h2>
