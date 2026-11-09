@@ -1,6 +1,7 @@
 // The sign-in window, and the account menu that replaces "Log in" / "Start free" once somebody is signed in.
 // Every page has the menu (Nav.astro), so this is started from there.
-import { cachedUser, getAuthConfig, getMe, renderGoogleButton, signInAsReviewer, signOut } from "./auth";
+import { cachedUser, cancelOneTap, getAuthConfig, getMe, promptOneTap, renderGoogleButton, signInAsReviewer, signOut } from "./auth";
+import { toast } from "./toast";
 import type { AuthUser } from "./auth";
 import { levelFraction, levelRing } from "./levelRing";
 import "./settings"; // applies the theme and the choices made on another device on every page that has the menu
@@ -67,6 +68,7 @@ function reviewerForm(): HTMLElement {
 }
 
 export async function openSignIn() {
+  cancelOneTap(); // two sign-in offers at once would only be confusing
   if (dialog) return;
   returnFocus = document.activeElement as HTMLElement | null;
   const backdrop = el("div", "au-backdrop");
@@ -309,6 +311,58 @@ function render(user: AuthUser | null) {
   });
 }
 
+// ---- Google's one-tap prompt ------------------------------------------------------------------------------------------------------
+// A few seconds after somebody who is not signed in has landed on a page, Google's own card (or Chrome's account chooser) appears at the top
+// right with the Google account they already use: one click to sign in. It is left alone when it would be in the way (the sign-in window is
+// open, the tab is in the background, a page where somebody is in the middle of something), and a visitor who says no is not asked again for
+// a while: two days, then a week, then a month.
+const ONE_TAP_DELAY = 3500;
+const ONE_TAP_KEY = "cs-onetap";
+const NOT_HERE = /^\/(admin|processing|delete-account)(\/|$)/;
+
+function oneTapQuiet(): boolean {
+  try {
+    const saved = JSON.parse(localStorage.getItem(ONE_TAP_KEY) || "{}");
+    return Number(saved.until) > Date.now();
+  } catch {
+    return false;
+  }
+}
+
+function oneTapDismissed() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(ONE_TAP_KEY) || "{}");
+    const strikes = Math.min(3, (Number(saved.strikes) || 0) + 1);
+    const days = [2, 7, 30][strikes - 1];
+    localStorage.setItem(ONE_TAP_KEY, JSON.stringify({ strikes, until: Date.now() + days * 86400000 }));
+  } catch {
+    // no storage: it may be offered again on the next page
+  }
+}
+
+let oneTapScheduled = false;
+function scheduleOneTap() {
+  if (oneTapScheduled || NOT_HERE.test(location.pathname) || oneTapQuiet()) return;
+  oneTapScheduled = true;
+  const offer = () => {
+    if (cachedUser() || dialog) return; // signed in meanwhile, or the sign-in window is open
+    if (document.visibilityState !== "visible") {
+      document.addEventListener("visibilitychange", () => window.setTimeout(offer, 1000), { once: true });
+      return;
+    }
+    void promptOneTap(
+      (user) => {
+        const first = (user.name || user.email).split(" ")[0];
+        toast({ icon: "👋", title: `Welcome, ${first}`, text: "You are signed in.", ms: 3500 });
+      },
+      (end) => {
+        if (end === "dismissed") oneTapDismissed();
+      },
+    );
+  };
+  window.setTimeout(offer, ONE_TAP_DELAY);
+}
+
 export function initAuthUi() {
   noteReferral(); // a page opened from an influencer's link (?ref=name)
   document.querySelectorAll<HTMLElement>('[data-auth="open"]').forEach((button) =>
@@ -322,5 +376,8 @@ export function initAuthUi() {
   );
   window.addEventListener("auth-change", (event) => render((event as CustomEvent<AuthUser | null>).detail));
   render(cachedUser()); // straight away, from what was remembered
-  getMe().then(render); // then what the server says
+  getMe().then((user) => {
+    render(user); // then what the server says
+    if (!user) scheduleOneTap();
+  });
 }

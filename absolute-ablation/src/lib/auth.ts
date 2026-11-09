@@ -183,6 +183,77 @@ export async function signInAsReviewer(email: string, password: string): Promise
   return full ?? body.user;
 }
 
+/** Gives Google's library the client id and the one place a sign-in is handed to (once per page: the button and One Tap share it). */
+function initialiseGoogle(clientId: string) {
+  if (initialisedFor === clientId) return;
+  (window as any).google.accounts.id.initialize({
+    client_id: clientId,
+    callback: (response: { credential: string }) => onCredential(response.credential),
+    cancel_on_tap_outside: false, // the prompt is offered by itself, so a click on the page must not make it vanish
+    use_fedcm_for_prompt: true, // Chrome's own account chooser at the top right, where it can; Google's card in the same corner elsewhere
+    itp_support: true,
+  });
+  initialisedFor = clientId;
+}
+
+/** How Google's prompt ended, so the caller can leave a visitor alone who said no. */
+export type OneTapEnd = "shown" | "dismissed" | "unavailable" | "signedIn";
+
+/**
+ * Offers Google's one-tap sign-in: the card (or Chrome's account chooser) at the top right of the page with the Google account the visitor
+ * is already using, one click to continue. `onUser` runs once the server has accepted the sign-in; `done` says how the prompt ended.
+ * Does nothing (and says "unavailable") when sign-in is not switched on or Google cannot be loaded.
+ */
+export async function promptOneTap(onUser: (user: AuthUser) => void, done: (end: OneTapEnd) => void): Promise<void> {
+  const config = await getAuthConfig();
+  if (!config.enabled || !config.googleClientId) return done("unavailable");
+  try {
+    await loadGoogle();
+  } catch {
+    return done("unavailable");
+  }
+  onCredential = async (credential) => {
+    try {
+      const user = await sendCredential(credential);
+      done("signedIn");
+      onUser(user);
+    } catch {
+      done("dismissed");
+    }
+  };
+  initialiseGoogle(config.googleClientId);
+  (window as any).google.accounts.id.prompt((moment: any) => {
+    const call = (name: string): boolean => {
+      try {
+        return typeof moment?.[name] === "function" && !!moment[name]();
+      } catch {
+        return false;
+      }
+    };
+    const reason = (name: string): string => {
+      try {
+        return typeof moment?.[name] === "function" ? String(moment[name]() || "") : "";
+      } catch {
+        return "";
+      }
+    };
+    if (call("isDisplayed")) return done("shown");
+    if (call("isNotDisplayed")) return done(reason("getNotDisplayedReason") === "suppressed_by_user" ? "dismissed" : "unavailable");
+    // only a visitor's own "no" counts (the card closed, or a click outside it); a prompt that failed or was taken away by the page does not
+    if (call("isSkippedMoment")) return done(["user_cancel", "tap_outside"].includes(reason("getSkippedReason")) ? "dismissed" : "unavailable");
+    if (call("isDismissedMoment")) return done("unavailable");
+  });
+}
+
+/** Takes the one-tap prompt away (the sign-in window is opening, or the visitor has just signed in). */
+export function cancelOneTap() {
+  try {
+    (window as any).google?.accounts?.id?.cancel();
+  } catch {
+    // nothing was showing
+  }
+}
+
 /**
  * Draws Google's "Continue with Google" button in `target`. `onUser` runs once the server has accepted the sign-in.
  * Returns false when sign-in is not switched on, so the caller can say so instead of leaving a blank space.
@@ -208,14 +279,7 @@ export async function renderGoogleButton(
       onError(err instanceof Error ? err.message : "Sign-in did not work. Please try again.");
     }
   };
-  if (initialisedFor !== config.googleClientId) {
-    google.accounts.id.initialize({
-      client_id: config.googleClientId,
-      callback: (response: { credential: string }) => onCredential(response.credential),
-      cancel_on_tap_outside: true,
-    });
-    initialisedFor = config.googleClientId;
-  }
+  initialiseGoogle(config.googleClientId);
   target.replaceChildren();
   google.accounts.id.renderButton(target, {
     theme: "outline",
