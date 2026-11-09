@@ -1,6 +1,6 @@
 // The sign-in window, and the account menu that replaces "Log in" / "Start free" once somebody is signed in.
 // Every page has the menu (Nav.astro), so this is started from there.
-import { cachedUser, cancelOneTap, getAuthConfig, getMe, promptOneTap, renderGoogleButton, signInAsReviewer, signOut } from "./auth";
+import { cachedUser, getAuthConfig, getMe, renderGoogleButton, signInAsReviewer, signOut } from "./auth";
 import { toast } from "./toast";
 import type { AuthUser } from "./auth";
 import { levelFraction, levelRing } from "./levelRing";
@@ -68,7 +68,7 @@ function reviewerForm(): HTMLElement {
 }
 
 export async function openSignIn() {
-  cancelOneTap(); // two sign-in offers at once would only be confusing
+  closeNudge(); // two sign-in offers at once would only be confusing
   if (dialog) return;
   returnFocus = document.activeElement as HTMLElement | null;
   const backdrop = el("div", "au-backdrop");
@@ -311,56 +311,104 @@ function render(user: AuthUser | null) {
   });
 }
 
-// ---- Google's one-tap prompt ------------------------------------------------------------------------------------------------------
-// A few seconds after somebody who is not signed in has landed on a page, Google's own card (or Chrome's account chooser) appears at the top
-// right with the Google account they already use: one click to sign in. It is left alone when it would be in the way (the sign-in window is
-// open, the tab is in the background, a page where somebody is in the middle of something), and a visitor who says no is not asked again for
-// a while: two days, then a week, then a month.
-const ONE_TAP_DELAY = 3500;
-const ONE_TAP_KEY = "cs-onetap";
+// ---- the sign-in card at the top right ---------------------------------------------------------------------------------------------
+// A few seconds after somebody who is not signed in has landed on a page, a small card slides in at the top right of the window with the
+// Google button (which says "Continue as <name>" for the Google account the browser is already using). Google's own one-tap prompt is not used:
+// it shows nothing in a private window, or where no Google account is signed in, and a card of ours shows everywhere. It is left alone when it
+// would be in the way (the sign-in window is open, the tab is in the background, a page where somebody is in the middle of something), and a
+// visitor who closes it is not shown it again for a while: two days, then a week, then a month.
+const NUDGE_DELAY = 3500;
+const NUDGE_KEY = "cs-nudge";
 const NOT_HERE = /^\/(admin|processing|delete-account)(\/|$)/;
+let nudge: HTMLElement | null = null;
 
-function oneTapQuiet(): boolean {
+function nudgeQuiet(): boolean {
   try {
-    const saved = JSON.parse(localStorage.getItem(ONE_TAP_KEY) || "{}");
+    const saved = JSON.parse(localStorage.getItem(NUDGE_KEY) || "{}");
     return Number(saved.until) > Date.now();
   } catch {
     return false;
   }
 }
 
-function oneTapDismissed() {
+function nudgeDismissed() {
   try {
-    const saved = JSON.parse(localStorage.getItem(ONE_TAP_KEY) || "{}");
+    const saved = JSON.parse(localStorage.getItem(NUDGE_KEY) || "{}");
     const strikes = Math.min(3, (Number(saved.strikes) || 0) + 1);
     const days = [2, 7, 30][strikes - 1];
-    localStorage.setItem(ONE_TAP_KEY, JSON.stringify({ strikes, until: Date.now() + days * 86400000 }));
+    localStorage.setItem(NUDGE_KEY, JSON.stringify({ strikes, until: Date.now() + days * 86400000 }));
   } catch {
-    // no storage: it may be offered again on the next page
+    // no storage: it may be shown again on the next page
   }
 }
 
-let oneTapScheduled = false;
-function scheduleOneTap() {
-  if (oneTapScheduled || NOT_HERE.test(location.pathname) || oneTapQuiet()) return;
-  oneTapScheduled = true;
+function closeNudge() {
+  nudge?.remove();
+  nudge = null;
+}
+
+async function showNudge() {
+  if (nudge || dialog || cachedUser()) return;
+  const config = await getAuthConfig();
+  if (!config.enabled) return;
+  const card = el("aside", "au-nudge");
+  card.setAttribute("role", "dialog");
+  card.setAttribute("aria-label", "Sign in to Chord Suno");
+  const close = el("button", "au-nudge-x");
+  close.type = "button";
+  close.setAttribute("aria-label", "Close");
+  close.innerHTML = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>';
+  const head = el("div", "au-nudge-head");
+  head.innerHTML = '<img src="/logo-mark.png" alt="" width="34" height="38" decoding="async" />';
+  const names = el("div");
+  names.append(el("strong", "", "Sign in to Chord Suno"), el("span", "", "with Google. No password to remember."));
+  head.append(names);
+  const text = el("p", "au-nudge-text", "Keep your favourites, your level and your plan on every device.");
+  const slot = el("div", "au-nudge-button");
+  const status = el("p", "au-nudge-status");
+  status.setAttribute("role", "status");
+  card.append(close, head, text, slot, status);
+  document.body.append(card);
+  nudge = card;
+  const dismiss = () => {
+    nudgeDismissed();
+    closeNudge();
+  };
+  close.addEventListener("click", dismiss);
+  document.addEventListener(
+    "keydown",
+    function onKey(event) {
+      if (nudge !== card) return document.removeEventListener("keydown", onKey);
+      if (event.key === "Escape") dismiss();
+    },
+  );
+  const on = await renderGoogleButton(
+    slot,
+    (user) => {
+      closeNudge();
+      const first = (user.name || user.email).split(" ")[0];
+      toast({ icon: "👋", title: `Welcome, ${first}`, text: "You are signed in.", ms: 3500 });
+    },
+    (message) => {
+      status.textContent = message;
+    },
+  );
+  if (!on) closeNudge();
+}
+
+let nudgeScheduled = false;
+function scheduleNudge() {
+  if (nudgeScheduled || NOT_HERE.test(location.pathname) || nudgeQuiet()) return;
+  nudgeScheduled = true;
   const offer = () => {
     if (cachedUser() || dialog) return; // signed in meanwhile, or the sign-in window is open
     if (document.visibilityState !== "visible") {
       document.addEventListener("visibilitychange", () => window.setTimeout(offer, 1000), { once: true });
       return;
     }
-    void promptOneTap(
-      (user) => {
-        const first = (user.name || user.email).split(" ")[0];
-        toast({ icon: "👋", title: `Welcome, ${first}`, text: "You are signed in.", ms: 3500 });
-      },
-      (end) => {
-        if (end === "dismissed") oneTapDismissed();
-      },
-    );
+    void showNudge();
   };
-  window.setTimeout(offer, ONE_TAP_DELAY);
+  window.setTimeout(offer, NUDGE_DELAY);
 }
 
 export function initAuthUi() {
@@ -378,6 +426,7 @@ export function initAuthUi() {
   render(cachedUser()); // straight away, from what was remembered
   getMe().then((user) => {
     render(user); // then what the server says
-    if (!user) scheduleOneTap();
+    if (!user) scheduleNudge();
+    else closeNudge();
   });
 }
