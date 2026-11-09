@@ -109,7 +109,7 @@
   .ar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 26px 18px; margin: 0; padding: 0; list-style: none; }
   .ar-grid li.extra { display: none; }
   .ar.open .ar-grid li.extra { display: block; animation: ar-in 0.35s ease both; }
-  .ar-item { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 6px 4px 8px; border-radius: 16px; text-align: center; text-decoration: none; color: var(--color-ink); transition: background-color 0.16s, transform 0.16s; }
+  .ar-item { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; padding: 6px 4px 8px; border: 0; border-radius: 16px; background: none; font: inherit; text-align: center; color: var(--color-ink); cursor: pointer; transition: background-color 0.16s, transform 0.16s; }
   .ar-item:hover, .ar-item:focus-visible { background: #f6f1ff; transform: translateY(-2px); }
   .ar-item:focus-visible { outline: 2px solid var(--color-violet); outline-offset: 2px; }
   .ar-pic { position: relative; display: block; width: 100%; max-width: 172px; aspect-ratio: 1; border-radius: 50%; overflow: hidden; background: linear-gradient(135deg, #ede9fe, #fde68a); box-shadow: 0 8px 18px -10px #1a053388; }
@@ -355,8 +355,13 @@
   const FIRST_ARTISTS = 14; // two rows on a wide screen; "Show more artists" shows the rest
   function artistItem(a: ArtistHit, extraRow: boolean): HTMLElement {
     const item = el("li", extraRow ? "extra" : "");
-    const link = el("a", "ar-item");
-    link.href = "/search?q=" + encodeURIComponent(a.name);
+    // a button that goes to the search, not a link: the search page is kept out of Google's index, so a crawler should not be offered
+    // forty addresses of it to read
+    const link = el("button", "ar-item");
+    link.type = "button";
+    link.addEventListener("click", () => {
+      window.location.href = "/search/?q=" + encodeURIComponent(a.name);
+    });
     link.setAttribute("aria-label", "Songs by " + a.name);
     const pic = el("span", "ar-pic");
     const img = el("img");

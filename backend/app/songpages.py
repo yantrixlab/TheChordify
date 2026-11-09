@@ -857,13 +857,16 @@ class SongPages:
         related_html = f'<section class="sp-block"><h2>More songs</h2><div class="sp-grid">{related}</div></section>' if related else ""
 
         thumb = row["thumbnail"] or f"https://i.ytimg.com/vi/{row['video_id']}/hqdefault.jpg"
+        # A page whose saved title already says "chords" (an SEO title written by hand, or by the page editor) is not wrapped in another
+        # "Chords, Key & BPM — artist" that says it twice
+        has_chords = bool(re.search(r"\bchords?\b", title, re.I))
         body = (
             '<article class="sp-wrap">'
             '<nav class="sp-crumb" aria-label="Breadcrumb"><a href="/">Chord Suno</a><span>›</span><a href="/songs/">Songs</a>'
             f"<span>›</span><span>{_esc(title)}</span></nav>"
             '<header class="sp-hero">'
             f'<img src="https://i.ytimg.com/vi/{_esc(row["video_id"])}/hqdefault.jpg" alt="{_esc(name)}" width="480" height="360" />'
-            f'<div class="sp-hero-text"><p class="sp-eyebrow">Chords</p><h1>{_esc(title)} chords</h1>'
+            f'<div class="sp-hero-text"><p class="sp-eyebrow">Chords</p><h1>{_esc(title) if has_chords else _esc(title) + " chords"}</h1>'
             f'{f"<p class=sp-by>{_esc(artist)}</p>" if artist else ""}'
             f'<div class="sp-cta"><a class="sp-play" href="/play?session={_esc(row["session_id"])}">▶ Play along with the chords</a>'
             f'{"<a class=sp-ghost href=#diagrams>Chord diagrams</a>" if used else ""}</div>'
@@ -907,7 +910,10 @@ class SongPages:
         return self._fill(
             template,
             # "Key & BPM" is in the title when the page shows them: people search for "<song> bpm" and "<song> key" as much as for its chords
-            title=f"{title} Chords{', Key & BPM' if key and tempo else ''}{(' — ' + artist) if artist else ''} | Chord Suno",
+            title=(
+                (title if has_chords else f"{title} Chords{', Key & BPM' if key and tempo else ''}{(' — ' + artist) if artist else ''}")
+                + ("" if "chord suno" in title.lower() else " | Chord Suno")
+            ),
             description=description[:300],
             path=f"/songs/{slug}/",
             image=thumb if thumb.startswith("https://") else f"https://i.ytimg.com/vi/{row['video_id']}/hqdefault.jpg",
