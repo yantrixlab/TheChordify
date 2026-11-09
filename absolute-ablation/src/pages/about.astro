@@ -1,0 +1,95 @@
+---
+// /about/: who makes Chord Suno, what it does, how the chords are worked out, and what it does not do.
+import LegalLayout from "../layouts/LegalLayout.astro";
+import { business } from "../lib/business";
+
+const title = "About Chord Suno: the Chord Finder by Yantrix Labs";
+const description = "Chord Suno finds the chords of any song, synced to the beat. Who makes it, how the chords are worked out, what it does not do, and how to reach us.";
+const url = `${business.site}/about/`;
+
+const jsonLd = [
+  {
+    "@context": "https://schema.org",
+    "@type": "AboutPage",
+    name: title,
+    url,
+    description,
+    mainEntity: {
+      "@type": "Organization",
+      name: business.product,
+      legalName: business.name,
+      url: `${business.site}/`,
+      email: business.email,
+      areaServed: "Worldwide",
+      address: { "@type": "PostalAddress", addressCountry: "IN" },
+      sameAs: [business.social.youtube, business.social.telegram],
+    },
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Chord Suno", item: `${business.site}/` },
+      { "@type": "ListItem", position: 2, name: "About", item: url },
+    ],
+  },
+];
+---
+
+<LegalLayout title="About Chord Suno" eyebrow="About" description={description} plain={{ title, jsonLd }}>
+  <p class="lg-lead">
+    Chord Suno finds the chords of a song. Search for a song, or upload an audio file, and it listens and writes out every chord, in time with the music,
+    with the key, the tempo and a diagram for each chord, so you can play along on guitar, ukulele or piano.
+  </p>
+
+  <h2>Who makes it</h2>
+  <p>
+    Chord Suno is made by <strong>{business.name}</strong>, a small team in {business.country}. We read every message, and you can write to us at
+    <a href={`mailto:${business.email}`}>{business.email}</a>.
+  </p>
+
+  <h2>What it does</h2>
+  <ul>
+    <li><strong>Chords of a song, on the beat.</strong> Every chord sits in a bar and a beat, with the intro, verse and chorus marked, so the chart reads like a lead sheet.</li>
+    <li><strong>The key and the tempo,</strong> and a strumming pattern read from the recording and lit up beat by beat as the song plays.</li>
+    <li><strong>Ways to practise.</strong> Slow a song down, loop a section, transpose it or add a capo to fit your voice.</li>
+    <li><strong>A <a href="/toolkit/">Toolkit</a></strong> with a <a href="/toolkit/tuner/">tuner</a>, a <a href="/toolkit/metronome/">metronome</a>, <a href="/toolkit/practice/">chord practice drills</a> and <a href="/toolkit/chord-detector/">live chord detection</a> that names the chord you are playing.</li>
+    <li><strong>A chord library.</strong> A page for every chord on <a href="/guitar-chord-chart/">guitar</a>, <a href="/piano-chord-chart/">piano</a>, <a href="/ukulele-chord-chart/">ukulele</a> and <a href="/mandolin-chord-chart/">mandolin</a>, with its notes and every way to play it, and short <a href="/learn/">lessons</a> on reading diagrams, barre chords, capos and strumming.</li>
+    <li><strong><a href="/songs/">Song pages</a></strong> with the key, tempo, chords and a difficulty level for popular songs.</li>
+  </ul>
+
+  <h2>How the chords are worked out</h2>
+  <p>
+    The chords are not typed in by hand. Chord Suno analyses the audio of the song with a chord-recognition model that is aware of the beat, then places each chord change on
+    the beat where it happens. It finds the key from the chords, and works out the sections and the strumming pattern from the same recording. Basic chords are shown by default,
+    with sevenths and slash chords one tap away.
+  </p>
+  <p>
+    Because this is done by software, it is a transcription, not the artist's own chart. A live recording or a heavily layered song can come out differently from the version
+    you know, so use your ear as the last word. Signed-in listeners can edit a song's strumming pattern, and the chords of a song can be corrected by our editors.
+  </p>
+
+  <h2>What Chord Suno does not do</h2>
+  <ul>
+    <li>It does not show lyrics. The charts show chords, key and tempo only.</li>
+    <li>It is not a library of every chart ever written. A song is analysed when somebody asks for it, and once it has been, everybody can open it.</li>
+  </ul>
+
+  <h2>Your sound and your privacy</h2>
+  <p>
+    The tuner, live chord detection and practice drills listen through your microphone, and the sound is analysed on your device. It is never recorded, uploaded or stored.
+    The <a href="/privacy/">Privacy Policy</a> says what we keep and how to delete your account.
+  </p>
+
+  <h2>Free to start</h2>
+  <p>
+    Everybody starts on a Free plan, with or without an account. Paid plans add more on top, and the Pricing page shows exactly what each plan includes. See the <a href="/pricing/">plans</a>, or read how Chord Suno
+    compares with another chord finder in <a href="/chord-suno-vs-chordify/">Chord Suno vs Chordify</a>.
+  </p>
+
+  <h2>Follow along</h2>
+  <p>
+    New songs, chord tips and practice ideas go on our <a href={business.social.youtube} rel="noopener">YouTube channel</a> and the
+    <a href={business.social.telegram} rel="noopener">Telegram channel</a>. Questions, ideas and bug reports are welcome at <a href="/contact/">Contact us</a>.
+  </p>
+</LegalLayout>

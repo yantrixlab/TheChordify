@@ -1,0 +1,95 @@
+---
+// /chord-suno-vs-chordify/: an honest comparison. Every statement about Chordify is one that chordify.net made on its own pages on CHECKED
+// (below); when you update this page, read their Premium page again and change CHECKED. Statements about Chord Suno are about what it does;
+// which plan includes a tool is on the Pricing page and changes there, so this page does not say.
+import LegalLayout from "../layouts/LegalLayout.astro";
+import { business } from "../lib/business";
+
+const CHECKED = "10 November 2026";
+const title = "Chord Suno vs Chordify: An Honest Comparison";
+const description = "Chord Suno and Chordify both find the chords of a song. How they differ on songs, tools, strumming, lyrics, apps and price, and which suits you.";
+const url = `${business.site}/chord-suno-vs-chordify/`;
+
+const rows: [string, string, string][] = [
+  ["Finds the chords of a song", "Yes: search for a song or upload audio, and every chord appears in time with the music.", "Yes: a very large library of songs with chords to play along with, and an Upload song tool."],
+  ["Size of the library", "A song is analysed when somebody asks for it, and then everybody can open it. Popular songs also get their own page.", "States that members can play along with over 36,000,000 songs."],
+  ["Instruments", "Chord diagrams for guitar and ukulele in the player, and chord charts and pages for guitar, piano, ukulele and mandolin.", "Chords for guitar, piano, ukulele and mandolin."],
+  ["Lyrics", "No. It shows the chords, key and tempo only.", "Has a Chords over lyrics view on some songs, with more coming."],
+  ["Strumming pattern", "Yes: read from the recording, lit up beat by beat, with an easy version for beginners. Signed-in listeners can edit it.", "Not mentioned on the pages we read."],
+  ["Sections and bars", "Intro, verse and chorus are marked, and every chord sits in a bar and a beat.", "Not mentioned on the pages we read."],
+  ["Key, transpose and capo", "Shows the key. Transpose any song or add a capo.", "Changing the key, and its capo and transpose tools, are listed as Premium features."],
+  ["Tempo and looping", "Slow a song down and loop a section.", "Changing the tempo is listed as a Premium feature, and its home page lists loop as a Premium feature too."],
+  ["Practice tools", "A Toolkit with a tuner, a metronome, chord practice drills and live chord detection.", "A Toolkit with a tuner, a metronome, chord practice and live chord detection."],
+  ["Export", "Chord sheet as PDF, and chords as MIDI.", "Lists MIDI chord files and chord diagrams and sheets as PDF as Premium features."],
+  ["Apps", "A web app that works on phones and computers.", "Web, iOS and Android."],
+  ["Ads", "No advertising.", "Lists no commercial advertising as a paid feature."],
+  ["Price", "A Free plan for everybody, and paid plans. See the Pricing page for what each includes.", "Free features, and paid plans. Prices are shown in your local currency and change with offers."],
+];
+
+const faqs: [string, string][] = [
+  ["Is Chord Suno an alternative to Chordify?", "Yes. Both turn a song into chords that move with the music. Chordify has the much bigger library and has apps for iOS and Android. Chord Suno adds a strumming pattern, a chart in bars and sections, and a chord library with a page for every chord on four instruments."],
+  ["Is Chord Suno free?", "Everybody starts on a Free plan, with or without an account. Paid plans add more on top; the Pricing page shows what each includes."],
+  ["Does Chord Suno show lyrics?", "No. Chord Suno shows chords, key and tempo, and does not show lyrics."],
+  ["Is Chord Suno connected to Chordify?", "No. Chord Suno is made by Yantrix Labs and is not affiliated with Chordify. Chordify is a separate product made by another company."],
+  ["Which one has more songs?", "Chordify. It states that it has over 36,000,000 songs. Chord Suno analyses a song when you ask for it, so you can get the chords of a song that nobody has asked for yet."],
+];
+
+const jsonLd = [
+  { "@context": "https://schema.org", "@type": "WebPage", name: title, url, description, inLanguage: "en", about: { "@type": "SoftwareApplication", name: "Chord Suno", applicationCategory: "MusicApplication" }, publisher: { "@type": "Organization", name: business.product, url: `${business.site}/` } },
+  { "@context": "https://schema.org", "@type": "FAQPage", mainEntity: faqs.map(([q, a]) => ({ "@type": "Question", name: q, acceptedAnswer: { "@type": "Answer", text: a } })) },
+  { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [
+    { "@type": "ListItem", position: 1, name: "Chord Suno", item: `${business.site}/` },
+    { "@type": "ListItem", position: 2, name: "Chord Suno vs Chordify", item: url },
+  ] },
+];
+---
+
+<LegalLayout title="Chord Suno vs Chordify" eyebrow="Comparison" description={description} plain={{ title, jsonLd }}>
+  <p class="lg-lead">
+    Chord Suno and Chordify do the same basic job: you pick a song, and you get its chords in time with the music. Here is how they differ, what each does better, and which
+    one suits you.
+  </p>
+  <p class="lg-note">
+    We make Chord Suno, so read this with that in mind. Everything about Chordify below is what its own website says, read on {CHECKED}. Its plans and prices change and
+    differ by country, so check <a href="https://chordify.net/premium" rel="noopener nofollow">its Premium page</a> before you decide. Chord Suno is not affiliated with Chordify.
+  </p>
+
+  <h2>At a glance</h2>
+  <div style="overflow-x: auto">
+    <table>
+      <thead><tr><th scope="col"></th><th scope="col">Chord Suno</th><th scope="col">Chordify</th></tr></thead>
+      <tbody>{rows.map(([what, us, them]) => <tr><th scope="row">{what}</th><td>{us}</td><td>{them}</td></tr>)}</tbody>
+    </table>
+  </div>
+
+  <p class="lg-note">Which plan includes each Chord Suno tool is shown on the <a href="/pricing/">Pricing page</a>, and it can change.</p>
+
+  <h2>Where Chordify is stronger</h2>
+  <ul>
+    <li><strong>A much bigger library.</strong> It says it has over 36,000,000 songs ready to play along with. Chord Suno analyses a song when you ask for it.</li>
+    <li><strong>Apps.</strong> It is on iOS and Android as well as the web.</li>
+    <li><strong>Chords over lyrics.</strong> If you want to read the words with the chords, Chord Suno does not do that today.</li>
+    <li><strong>Track record.</strong> It reports a 4.7 rating from more than 75,000 reviews and more than 9 million app downloads on its own site.</li>
+  </ul>
+
+  <h2>Where Chord Suno is different</h2>
+  <ul>
+    <li><strong>The strumming pattern.</strong> It is read from the recording and lit up beat by beat, with an easy version, and listeners can edit it.</li>
+    <li><strong>A chart you can read like a lead sheet,</strong> with the sections named and every chord in a bar and on a beat.</li>
+    <li><strong>A chord library.</strong> A <a href="/chords/">page for every chord</a> on guitar, piano, ukulele and mandolin, with its notes and every way to play it, plus
+      <a href="/learn/">lessons</a> on reading diagrams, barre chords, capos and strumming.</li>
+    <li><strong>Song pages</strong> with the key, tempo, chords used and a difficulty level, which you can read without opening the player.</li>
+    <li><strong>Paying in India.</strong> Plans are charged through Razorpay, so you can pay by UPI, card, net banking or wallet.</li>
+  </ul>
+
+  <h2>Which should you use?</h2>
+  <ul>
+    <li><strong>Use Chordify</strong> if you want the biggest library, apps on your phone, or lyrics with the chords.</li>
+    <li><strong>Use Chord Suno</strong> if you want the strumming pattern, a bar-by-bar chart, the chord library and lessons next to the songs, or you want the chords of a song that is not in anybody's library yet.</li>
+    <li><strong>Try both.</strong> Both let you start without paying, and the same song can come out slightly different in each, so your ear decides.</li>
+  </ul>
+  <p><a href="/#find">Find the chords of a song on Chord Suno</a> · <a href="/pricing/">See the plans</a> · <a href="/about/">About Chord Suno</a></p>
+
+  <h2>Questions, answered</h2>
+  {faqs.map(([q, a]) => <details><summary>{q}</summary><p>{a}</p></details>)}
+</LegalLayout>

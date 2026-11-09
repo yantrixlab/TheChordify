@@ -8,6 +8,10 @@ const faqs = [
   ["Can I cancel anytime?", "Yes. Cancel from this page whenever you like. You keep your plan until the end of the period you already paid for, then you are back on Free. Your library, favourites and XP stay."],
   ["How do I pay?", "Payments are handled by Razorpay, so you can use UPI, cards, net banking or wallets. Your card details go to Razorpay only; Chord Suno never sees or stores them."],
   ["Can I change plans?", "Yes. Cancel your current plan, and subscribe to the new one when it ends, or any time after. Pick monthly or yearly on each plan."],
+  ["What can I do without paying?", "A lot. Everybody starts on the Free plan, with or without an account: you can find the chords of a song, open songs others have already chordified, and use the chord library and the lessons. The plan cards above show exactly what Free includes and what each paid plan adds."],
+  ["Are the tuner, metronome and the other tools included?", "It depends on the plan. Each plan card lists the Toolkit tools it includes, and the Toolkit marks the tools your plan does not include with a lock."],
+  ["Does Chord Suno show lyrics or ads?", "Chord Suno shows chords, key and tempo, and does not show lyrics. It does not show advertising."],
+  ["How does Chord Suno compare with other chord finders?", "Read the honest comparison with Chordify at chordsuno.com/chord-suno-vs-chordify/: what each does better, and which suits you."],
   ["What does “Soon” mean next to a feature?", "It is on the way and included in the plan, but not built yet. You will get it as soon as it ships, with no extra charge."],
 ];
 
@@ -24,7 +28,7 @@ const jsonLd = [
 ];
 ---
 
-<Layout title="Pricing — Chord Suno" description="Chord Suno plans: start free, and upgrade for more songs, more tools and more ways to play." jsonLd={jsonLd} themeable>
+<Layout title="Chord Suno Pricing: Free Plan and Paid Plans" description="Chord Suno plans: start free, then upgrade for more songs a day, more tools and more ways to play. See what each plan includes. Cancel anytime." jsonLd={jsonLd} themeable>
   <Nav />
   <main id="main-content" class="pg">
     <div class="pg-wrap">
@@ -42,6 +46,30 @@ const jsonLd = [
         Payments are processed securely by Razorpay. By subscribing you agree to our <a href="/terms/">Terms of Service</a> and the <a href="/refunds/">Refund &amp; Cancellation Policy</a>. Questions? <a href="/contact/">Contact us</a>.
       </p>
 
+      <section class="pr-guide" aria-labelledby="guide-title">
+        <h2 id="guide-title">How the plans work</h2>
+        <p>Everybody starts on Free, with or without an account. Sign in with Google to keep your library, favourites and XP. A paid plan adds more on top, and you can cancel it whenever you like.</p>
+        <div class="pr-guide-grid">
+          <div>
+            <h3>Songs and chords</h3>
+            <p>How many new songs you can have chordified each day, full chord detail (sevenths, suspended and slash chords), other ways to play each chord, transpose and capo, and uploading your own audio. A song somebody else has already chordified is quick to open.</p>
+          </div>
+          <div>
+            <h3>Playing</h3>
+            <p>Slow a song down and loop a section while you practise. Chord Suno does not show advertising on any plan.</p>
+          </div>
+          <div>
+            <h3>The Toolkit</h3>
+            <p>The <a href="/toolkit/tuner/">tuner</a>, the <a href="/toolkit/metronome/">metronome</a>, <a href="/toolkit/practice/">chord practice drills</a> and <a href="/toolkit/chord-detector/">live chord detection</a>, which names the chord you play.</p>
+          </div>
+          <div>
+            <h3>Export</h3>
+            <p>Download a song's chords as a printable PDF chord sheet, or as MIDI.</p>
+          </div>
+        </div>
+        <p>Not sure yet? <a href="/#find">Find the chords of a song</a> on the Free plan first, read <a href="/about/">about Chord Suno</a>, or see <a href="/chord-suno-vs-chordify/">how it compares with Chordify</a>.</p>
+      </section>
+
       <section class="pr-faq" aria-labelledby="faq-title">
         <h2 id="faq-title">Questions, answered</h2>
         {faqs.map(([question, answer]) => (
@@ -57,6 +85,15 @@ const jsonLd = [
 </Layout>
 
 <style is:global>
+  .pr-guide { max-width: 900px; margin: 80px auto 0; font-size: 16px; line-height: 1.7; color: var(--color-body); }
+  .pr-guide h2 { margin: 0 0 12px; text-align: center; font-size: clamp(24px, 3.4vw, 34px); font-weight: 800; letter-spacing: -0.035em; color: var(--color-ink); }
+  .pr-guide > p { margin: 0 auto 22px; max-width: 700px; text-align: center; }
+  .pr-guide a { color: var(--color-violet-deep); font-weight: 600; }
+  .pr-guide-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin: 0 0 24px; }
+  .pr-guide-grid > div { padding: 18px 20px; border-radius: 16px; background: #fff; border: 1px solid var(--color-hairline); }
+  .pr-guide-grid h3 { margin: 0 0 6px; font-size: 16.5px; font-weight: 800; color: var(--color-ink); }
+  .pr-guide-grid p { margin: 0; font-size: 14.5px; line-height: 1.65; }
+  html[data-theme="dark"] .pr-guide-grid > div { background: #131116; }
   .pg { padding: 56px 20px 100px; background: radial-gradient(ellipse 70% 38% at 50% -4%, #7c3aed26, transparent 70%), radial-gradient(ellipse 50% 30% at 90% 20%, #f59e0b1c, transparent 70%), linear-gradient(180deg, #fbf7ff, #fff 60%); }
   .pg-wrap { max-width: 1160px; margin: 0 auto; }
   .pg-head { max-width: 680px; margin: 0 auto 36px; text-align: center; }

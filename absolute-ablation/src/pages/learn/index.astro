@@ -9,7 +9,15 @@ import { INSTRUMENT_ICONS } from "../../lib/instrumentIcons";
 
 const title = "Learn Chords: Free Guitar and Piano Lessons — Chord Suno";
 const description = "Short, free lessons on chords: how to read a chord diagram, beginner guitar chords, barre chords, piano inversions, chords in a key, capo and strumming.";
+const faqs: [string, string][] = [
+  ["Where do I start if I have never played a chord?", "Start with how to read a chord diagram, then the first guitar chords to learn (Em, Am, D and G are a good set). Those few chords play a great many songs."],
+  ["How long does it take to learn the first chords?", "Most people can make a clean sound on two or three open chords within a week of ten minutes a day. Changing between them smoothly takes longer, so practise one pair of chords at a time, slowly."],
+  ["Do I need to read music or know theory?", "No. Chord diagrams show where your fingers go. The lessons on chords in a key and on capo and transposing add a little theory when you are ready for it, and each one explains the words it uses."],
+  ["Which instrument should I learn chords on?", "Guitar and ukulele use fingering diagrams and piano uses keys. The ukulele has four strings, which many beginners find gentler. The lessons mark which instruments each one is for."],
+  ["Can I practise with a real song?", "Yes. Search for a song on Chord Suno and play along with the chords on the beat, slow it down and loop the hard part. The Toolkit also has a tuner, a metronome and chord-change drills."],
+];
 const jsonLd = [
+  { "@context": "https://schema.org", "@type": "FAQPage", mainEntity: faqs.map(([q, a]) => ({ "@type": "Question", name: q, acceptedAnswer: { "@type": "Answer", text: a } })) },
   { "@context": "https://schema.org", "@type": "CollectionPage", name: title, description, url: "https://chordsuno.com/learn/" },
   {
     "@context": "https://schema.org",
@@ -60,6 +68,20 @@ const who = (l: (typeof LESSONS)[number]) => (l.instruments.length ? l.instrumen
         ))
       }
     </div>
+  </section>
+
+  <section class="ch-in ch-sec" id="how-to-learn">
+    <span class="ch-kicker" data-reveal>A way through</span>
+    <h2 data-reveal style="--i: 1">How to learn chords</h2>
+    <p data-reveal style="--i: 2">A chord is three or more notes played together. To play one, you put your fingers on the strings (or keys) the diagram shows and play them all at once. You do not need to read music: the diagram is the instruction.</p>
+    <p data-reveal>A good order is <a href="/learn/read-chord-diagrams/">reading a diagram</a>, then <a href="/learn/beginner-guitar-chords/">the first guitar chords</a>, then <a href="/learn/strumming-patterns-for-beginners/">a strumming pattern</a> so you can play a whole song. After that, <a href="/learn/barre-chords/">barre chords</a> open up the rest of the neck, <a href="/learn/chords-in-a-key/">chords in a key</a> shows why some chords go together, and the <a href="/learn/capo-and-transposing/">capo</a> lets you play in any key with easy shapes. Pianists can go straight to <a href="/learn/piano-chords-and-inversions/">piano chords and inversions</a>.</p>
+    <p data-reveal>Practise a little every day. Ten minutes beats one long session, and slow, clean changes between two chords are worth more than a fast sloppy song. The <a href="/toolkit/metronome/">metronome</a> keeps you honest, and the <a href="/toolkit/practice/">chord practice drills</a> time your changes.</p>
+  </section>
+
+  <section class="ch-in ch-sec" id="faq">
+    <span class="ch-kicker" data-reveal>Good to know</span>
+    <h2 data-reveal style="--i: 1">Learning chords: questions and answers</h2>
+    {faqs.map(([q, a], i) => <details data-reveal style={`--i: ${i}`}><summary>{q}</summary><p>{a}</p></details>)}
   </section>
 
   <section class="ch-in ch-sec">

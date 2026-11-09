@@ -26,6 +26,8 @@ const pages: Page[] = [
   { path: "/toolkit/practice/", priority: "0.8", changefreq: "monthly" },
   { path: "/toolkit/chord-detector/", priority: "0.8", changefreq: "monthly" },
   { path: "/pricing/", priority: "0.7", changefreq: "monthly" },
+  { path: "/about/", priority: "0.6", changefreq: "monthly" },
+  { path: "/chord-suno-vs-chordify/", priority: "0.7", changefreq: "monthly" },
   { path: "/contact/", priority: "0.4", changefreq: "yearly" },
   { path: "/terms/", priority: "0.3", changefreq: "yearly" },
   { path: "/privacy/", priority: "0.3", changefreq: "yearly" },
